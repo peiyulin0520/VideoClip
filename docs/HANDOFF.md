@@ -126,6 +126,8 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 > 坑（2026-11-11 預覽優先版面）：Pixi 會在 canvas 上寫 inline 的 `touch-action:none`，要在 CSS 用 `touch-action: pan-y !important` 蓋掉，預覽空白處才能上下滑捲頁面。物件可拖靠的是 `.hit` 觸控區（`touch-action:none`）。
 > 坑：e2e 的雙指／觸控用 CDP `Input.dispatchTouchEvent`（helpers 的 `pinch`、`touchDrag`）；觸控滑動後有慣性捲動，要等停下再量 `scrollY`。整頁捲動後，用滑鼠座標的測試要先 `previewBox`（捲回頂端）或 `showTimeline`。
 
+> 坑（2026-11-12）：PWA 預快取讓 iPhone 一直開到舊版，使用者回報的錯誤可能是舊版的。現在 `src/app/pwa.ts` 會在開網頁／回前景時檢查新版並自動重新整理；請使用者回報時先看「設定 → 版本」。
+
 ## 6. 現況與下一步
 **已完成**（細節與驗證看 PROGRESS.md 日誌）：Phase 0（骨架/PWA/部署）、Phase 1（專案管理＋多影片拼接）、Phase 2（多圖層＋選取框手勢＋圖層屬性）、Phase 3B（字體管線＋首次使用精靈＋設定頁＋字體選單＋匯入字體）。
 **已合併並上線**（PR #2，2026-11-11；GitHub Actions 部署成功）。之後的工作在 `claude/zen-tesla-v3brj5`，要上線一樣：開 PR → 使用者 merge → 部署。PR 合併後分支對齊 main 用 `git merge --ff-only origin/main`（不要 force push）。

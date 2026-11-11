@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
+  countColor,
   clips,
   createProjectWith,
   openTab,
@@ -245,4 +246,42 @@ test('不用手勢也能調：圖層分頁與文字「版面」的整體大小�
   expect(tf.x).toBe(0.5);
   expect(tf.y).toBe(0.5);
   expect(tf.rotation).toBe(0);
+});
+
+test('沒有影片、只有字卡時：預覽中央不放大的匯入鈕（不會蓋住字卡），字卡看得到', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('vc-debug', '1');
+    localStorage.setItem('vc-skip-onboarding', '1');
+  });
+  await page.goto('./');
+  await page.getByRole('button', { name: '新增專案' }).tap();
+  await page.getByRole('button', { name: '建立空白專案' }).tap();
+  await expect(page.locator('.empty-import')).toBeVisible(); // 完全空的：有大匯入鈕
+  await openTab(page, '文字');
+  await page
+    .getByRole('button', { name: /新增文字/ })
+    .first()
+    .tap();
+  await page.getByLabel('文字內容').fill('吃水餃');
+  await expect(page.locator('.empty-import')).toHaveCount(0); // 有字卡了：不要蓋住
+  // 預覽中間有白色的字，而且選取框看得到、沒有被別的東西蓋住
+  await expect.poll(() => countColor(page, [255, 255, 255], 40, [0, 0.35, 1, 0.65])).toBeGreaterThan(200);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const sel = (await page.getByTestId('selbox').boundingBox())!;
+  const topEl = await page.evaluate(
+    ([x, y]) => (document.elementFromPoint(x!, y!) as HTMLElement | null)?.className ?? '',
+    [sel.x + sel.width / 2, sel.y + sel.height / 2],
+  );
+  expect(topEl).not.toContain('empty-import');
+  await page.screenshot({ path: `${SHOT}/text-only-project.png` });
+  // 主軌的匯入入口還在（時間軸上的＋）
+  await expect(page.getByRole('button', { name: '加入素材' })).toBeVisible();
+});
+
+test('設定頁顯示版本（建置時間＋commit），讓使用者確認手機上是不是新版', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('vc-skip-onboarding', '1'));
+  await page.goto('./#/settings');
+  await expect(page.getByTestId('app-version')).toContainText(
+    /20\d\d-\d\d-\d\d \d\d:\d\d（[0-9a-f]{7}|dev）/,
+  );
 });

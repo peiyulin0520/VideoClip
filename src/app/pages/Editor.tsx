@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ensureUrls, releaseProjectUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { addOverlayClips } from '../../store/actions';
-import { mainItems, relayout, totalDuration, formatTime } from '../../engine/timeline';
+import { relayout, totalDuration, formatTime } from '../../engine/timeline';
 import { getProject } from '../../storage/projects';
 import { startAutosave } from '../../store/autosave';
 import { useProjectStore } from '../../store/projectStore';
@@ -140,7 +140,8 @@ function EditorBody() {
     }
   }, []);
 
-  const empty = mainItems(project).length === 0;
+  // 大大的「匯入」鈕只在專案完全是空的時候顯示；已經有文字／貼圖時不要蓋在預覽中央（會擋住字卡），主軌的＋還在時間軸上
+  const empty = project.tracks.every((t) => t.items.length === 0);
 
   return (
     <main className={`editor${previewFull ? ' preview-full' : ''}`}>

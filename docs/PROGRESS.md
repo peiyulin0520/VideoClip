@@ -4,11 +4,11 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`。第 2 次實測修正 ①–⑤＋預覽優先版面＋貼圖＋多格模板規格已開 **PR #4** 等使用者合併（2026-11-11，使用者選「先合併上線，用 iPhone 測」）；合併後 Actions 部署，上線網址才會更新。合併後分支對齊 main：`git fetch origin main && git merge --ff-only origin/main`
-- **最後一個程式 commit**：見 `git log -1`（貼圖 icon）
-- **測試**：560 個單元測試、64 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **分支**：`claude/zen-tesla-v3brj5`（PR #4 已合併上線；之後的工作：第 3 次實測回報的修正，**還沒合併到 main**）
+- **最後一個程式 commit**：見 `git log -1`（空專案匯入鈕不蓋字卡、PWA 自動更新與版本號）
+- **測試**：560 個單元測試、66 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：使用者合併 PR #4 後用 iPhone 重測（清單 `docs/PLAN.md §7`；匯入大影片若仍失敗請回報新錯誤訊息全文）。之後：多格影片模板（R22，`docs/LAYOUTS.md`，先給使用者看草圖或參考圖）→ 物件動畫核心（Phase 4）→ 雲朵字、字卡模板
+- **下一步**：使用者從 `docs/plans/2026-11-12-feedback-3.md` 選下一個要做的：介面主題（工作量最小）、人物去背（MediaPipe 本機自動去背＋手動描邊）、GIPHY 貼圖（要 API key）。多格模板（R22）仍在等使用者決定草圖或參考圖。修正需要合併上線後再請使用者重測匯入（設定頁看版本號）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -48,6 +48,7 @@
 - 備份資料夾保持私人；只貼網址不登入無法寫入（Google 限制），已向使用者說明
 
 ## 使用者的修正紀錄（時間順序）
+- 2026-11-12 第 3 次 iPhone 實測：①「匯入影片一樣發生 operation 問題」（錄影的錯誤訊息是舊版格式＝手機開到快取舊版）②「加了字卡，但也沒有在預覽畫面看到」③「貼圖可以參考 IG 的 stickers 來源嗎？」④「影片可以加上自己描邊剪裁人體出現部位的影片就好嗎？相當於去背的概念」⑤「之前有給你附檔的三個字體檔案，但好像沒有在網頁中看到」⑥「背景風格可以彈性調整嗎？黑白網頁風格、清新（白色基底）、溫暖（棕色系）」→ 分析與規劃見 docs/plans/2026-11-12-feedback-3.md
 - 2026-11-11 選 B（先不合併、繼續做貼圖），並提出新需求：「希望還可以增加不同模板，例如拍貼機或膠卷，可以有多格影片呈現在不同格子裡面，然後可以以特效方式滑過等」→ 記成需求 R22，規格 docs/LAYOUTS.md
 - 2026-11-11 看完第 2 次修正後：「選取框一率不需要小圓點，只需要有框框可以選取字串並用手指控制縮放就行」「預覽不要太小，如果需要其他功能，可以往下滑新增相關功能，不要擠到預覽畫面」→ 規劃見 docs/plans/2026-11-11-preview-first-layout.md（取代 feedback-2 §② 的角點／旋轉點／時間軸精簡）
 - 2026-11-11 更正上面第二點：「第一點可以，第二點我的意思是頁面可以整體往下滑新增功能，但往上滑可以看到不會縮小的預覽畫面」→ **整頁一起捲**，預覽不固定在螢幕上、往下滑會捲走，往上滑回來是原尺寸；規劃 §2-① 已改寫
@@ -58,6 +59,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 第 3 次實測回報：修 2 項＋規劃 3 項（分支 claude/zen-tesla-v3brj5，Opus）
+  - 做了什麼：看錄影（ffmpeg 抽格）發現錯誤訊息還是舊版格式 → 手機一直開到 Service Worker 快取的舊版。改成在 `src/app/pwa.ts` 自己註冊（`injectRegister:false`）：開網頁、切回前景、每 30 分鐘檢查新版，新版接手自動重新整理；設定頁新增「版本」（建置時間台北時間＋commit，`__APP_VERSION__`）。重現「字卡看不到」：字卡有畫，但被預覽中央的大匯入鈕蓋住 → 大匯入鈕只在專案完全空的時候顯示。讀了使用者給的三個字體的 name table：星光小熊貓體禁止上傳網站與修改、851 手書き雜沒有授權 → 維持只能自己匯入。寫 `docs/plans/2026-11-12-feedback-3.md`（GIPHY 貼圖、人物去背、介面主題）
+  - 動了哪些檔：src/app/pwa.ts（新）、src/vite-env.d.ts（新）、src/main.tsx、vite.config.ts、src/app/pages/{Editor,Settings}.tsx、e2e/preview-first.spec.ts、docs/plans/2026-11-12-feedback-3.md
+  - 驗證：✅ e2e：只有字卡的專案沒有大匯入鈕、預覽中間有白字、選取框中心不是匯入鈕、時間軸的「加入素材」還在；設定頁版本格式；build 後 index.html 沒有內嵌 registerSW、版本字串有進 bundle；560 單元＋66 e2e 全過、連跑 2 次  🔴 iPhone：自動更新是否真的換新版、匯入大影片（要使用者更新後重測）
+  - 踩到的坑：PWA 預快取讓 iPhone 長時間停在舊版，使用者回報的問題可能是舊版的 → 以後回報先請使用者看設定頁版本號
+  - 下一步：等使用者選主題／去背／GIPHY
 - 2026-11-11 Phase 3A 第 4 步後半：貼圖 icon（分支 claude/zen-tesla-v3brj5，Opus）
   - 做了什麼：新管線 `scripts/build-stickers.mjs`（`npm run stickers`）：用 `npm pack` 取 `@iconify-json/fluent-emoji@1.2.7`（彩色 Fluent Emoji，**授權 MIT、作者 Microsoft，腳本會檢查 info.json，不符就停**），分類取自 `@iconify-json/fluent-emoji-flat` 的 metadata；每個分類用人工挑的常用清單（照順序），不足時用該分類其他的補；排除膚色變體。輸出 **397 個** `public/stickers/*.svg`（4.7MB，寬高設 512）＋ `LICENSE.txt`（MIT 全文）＋ `src/stickers/catalog.generated.json`。疊加分頁新增「貼圖」：9 個分類（表情、愛心、手勢、動物植物、食物、慶祝活動、旅行天氣、物品、符號）＋ 6 欄格子。點貼圖 → 畫成 512px PNG → 當照片素材加到目前這一秒（大小 30%，**素材與片段同一步復原**——順便把一般疊加匯入也改成同一步）。設定頁加「素材授權」。貼圖不進 PWA 預快取（用到才下載）
   - 動了哪些檔：scripts/build-stickers.mjs（新）、public/stickers/（新）、src/stickers/（新）、src/app/editor/{StickerPicker（新）,Toolbar}.tsx、src/store/actions.ts（addOverlayClips 一併加入素材、可指定大小）、src/app/pages/{Editor,Settings}.tsx、styles.css、vite.config.ts、package.json、e2e/phase3a-stickers.spec.ts、AGENTS.md、docs/TEXT_CARDS.md
