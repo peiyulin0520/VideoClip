@@ -1,0 +1,68 @@
+:root {
+  color-scheme: dark;
+  --bg: #111;
+  --fg: #f4f4f4;
+  --muted: #9a9a9a;
+  --accent: #ff4d8d;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+.page {
+  min-height: 100%;
+  padding: calc(var(--safe-top) + 8px) 16px calc(var(--safe-bottom) + 16px);
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+}
+.topbar h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 20px;
+}
+/* 所有可點元素至少 44×44（見 CLAUDE.md 觸控規則） */
+.icon-btn,
+button {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  background: #222;
+  border: 0;
+  border-radius: 12px;
+  font-size: 20px;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+.empty {
+  margin-top: 25vh;
+  text-align: center;
+}
+.empty-title {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.empty-note {
+  color: var(--muted);
+  margin: 0;
+}
