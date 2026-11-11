@@ -2,7 +2,7 @@ import { Film, MoreHorizontal, Plus, Settings, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { importFiles } from '../../engine/importMedia';
-import { formatTime, mainTrack, relayout, totalDuration } from '../../engine/timeline';
+import { formatTime, mainItems, mainTrack, relayout, totalDuration } from '../../engine/timeline';
 import { ASPECTS, createProject, nextProjectName } from '../../model/defaults';
 import type { Aspect, Project } from '../../model/types';
 import { requestPersistence } from '../../storage/media';
@@ -17,7 +17,7 @@ import { toast, useUI } from '../../store/uiStore';
 import { ConfirmSheet, Sheet } from '../../ui/Sheet';
 
 function coverOf(p: Project): string | undefined {
-  const first = mainTrack(p).items[0];
+  const first = mainItems(p)[0];
   return first ? p.assets.find((a) => a.id === first.assetId)?.thumbs[0] : undefined;
 }
 

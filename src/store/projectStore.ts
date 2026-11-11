@@ -1,6 +1,6 @@
 import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
-import type { Project, VideoItem } from '../model/types';
+import type { Item, Project, VideoItem } from '../model/types';
 
 const HISTORY_LIMIT = 100;
 const COALESCE_MS = 800;
@@ -99,6 +99,14 @@ export const useProjectStore = create<State>((set, get) => ({
 export function setMainItems(items: VideoItem[], opts?: ApplyOpts) {
   useProjectStore.getState().apply((d) => {
     const tr = d.tracks.find((t) => t.kind === 'main');
+    if (tr) tr.items = items;
+  }, opts);
+}
+
+/** 取代某條軌道的物件清單（疊加/文字軌：呼叫端用 timeline.ts 的 *Free 函式算好） */
+export function setTrackItems(trackId: string, items: Item[], opts?: ApplyOpts) {
+  useProjectStore.getState().apply((d) => {
+    const tr = d.tracks.find((t) => t.id === trackId);
     if (tr) tr.items = items;
   }, opts);
 }

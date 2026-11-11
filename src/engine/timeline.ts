@@ -1,5 +1,5 @@
 import { MAX_SPEED, MIN_CLIP_DURATION, MIN_SPEED, newId } from '../model/defaults';
-import type { Asset, Project, Track, VideoItem } from '../model/types';
+import type { Asset, Item, Project, Track, VideoItem } from '../model/types';
 
 /** 主軌片段首尾相接：依序重算 start。回傳新陣列（不改原物件）。 */
 export function relayout(items: VideoItem[]): VideoItem[] {
@@ -15,6 +15,55 @@ export function mainTrack(p: Project): Track {
   const t = p.tracks.find((x) => x.kind === 'main');
   if (!t) throw new Error('專案沒有主軌');
   return t;
+}
+
+export function mainItems(p: Project): VideoItem[] {
+  return mainTrack(p).items as VideoItem[];
+}
+
+export function isVideoItem(i: Item): i is VideoItem {
+  return i.type !== 'text';
+}
+
+export const itemEnd = (i: Item) => i.start + i.duration;
+
+export function findItem(
+  p: Project,
+  id: string | null,
+): { item: Item; track: Track; trackIndex: number; index: number } | null {
+  if (!id) return null;
+  for (let ti = 0; ti < p.tracks.length; ti++) {
+    const track = p.tracks[ti]!;
+    const index = track.items.findIndex((x) => x.id === id);
+    if (index >= 0) return { item: track.items[index]!, track, trackIndex: ti, index };
+  }
+  return null;
+}
+
+export type Layer = { item: Item; track: Track; trackIndex: number };
+
+/**
+ * t 秒時要畫出來的圖層，由下到上（= 軌道順序）。隱藏的軌道跳過。
+ * 主軌用 itemAt（t 超過結尾時仍顯示最後一個片段）；其他軌道只在 [start, end) 內顯示。
+ */
+export function visibleLayers(p: Project, t: number): Layer[] {
+  return layersAt(p, t, false);
+}
+
+/** 同上，但可以選擇連隱藏軌道的物件也列出來（圖層面板要能把隱藏的軌道再打開） */
+export function layersAt(p: Project, t: number, includeHidden: boolean): Layer[] {
+  const out: Layer[] = [];
+  p.tracks.forEach((track, trackIndex) => {
+    if (track.hidden && !includeHidden) return;
+    if (track.kind === 'main') {
+      const hit = itemAt(track.items as VideoItem[], t);
+      if (hit) out.push({ item: hit.item, track, trackIndex });
+      return;
+    }
+    const item = track.items.find((x) => t >= x.start && t < x.start + x.duration);
+    if (item) out.push({ item, track, trackIndex });
+  });
+  return out;
 }
 
 export function totalDuration(p: Project): number {
@@ -135,4 +184,129 @@ export function formatTime(t: number): string {
   const m = Math.floor(s / 60);
   const sec = s - m * 60;
   return `${m}:${sec.toFixed(1).padStart(4, '0')}`;
+}
+
+// ---------- 疊加 / 文字軌：自由放置（不 ripple），同一軌的物件不能重疊 ----------
+
+const EPS = 1e-6;
+
+export function canPlace(items: Item[], start: number, duration: number, excludeId?: string): boolean {
+  if (start < -EPS) return false;
+  return items.every(
+    (o) => o.id === excludeId || start + duration <= o.start + EPS || start >= o.start + o.duration - EPS,
+  );
+}
+
+/** 離 desired 最近、不和同軌其他物件重疊的起點 */
+export function findFreeStart(items: Item[], desired: number, duration: number, excludeId?: string): number {
+  const want = Math.max(desired, 0);
+  if (canPlace(items, want, duration, excludeId)) return want;
+  const cands = new Set<number>([0]);
+  for (const o of items) {
+    if (o.id === excludeId) continue;
+    cands.add(o.start + o.duration);
+    cands.add(o.start - duration);
+  }
+  let best = Infinity;
+  let bestD = Infinity;
+  for (const c of cands) {
+    if (c < 0 || !canPlace(items, c, duration, excludeId)) continue;
+    const d = Math.abs(c - want);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  return best === Infinity ? Math.max(...items.map(itemEnd), 0) : best;
+}
+
+export function moveFree(items: Item[], id: string, newStart: number): Item[] {
+  const it = items.find((x) => x.id === id);
+  if (!it) return items;
+  const start = findFreeStart(items, newStart, it.duration, id);
+  return items.map((x) => (x.id === id ? { ...x, start } : x));
+}
+
+export function splitFree(items: Item[], id: string, t: number): Item[] | null {
+  const i = items.findIndex((x) => x.id === id);
+  if (i < 0) return null;
+  const it = items[i]!;
+  const local = t - it.start;
+  if (local < MIN_CLIP_DURATION || it.duration - local < MIN_CLIP_DURATION) return null;
+  const a: Item = { ...it, duration: local };
+  const b: Item = isVideoItem(it)
+    ? {
+        ...it,
+        id: newId('i_'),
+        start: t,
+        duration: it.duration - local,
+        trimIn: it.trimIn + local * it.speed,
+      }
+    : { ...it, id: newId('i_'), start: t, duration: it.duration - local };
+  return [...items.slice(0, i), a, b, ...items.slice(i + 1)];
+}
+
+export function duplicateFree(items: Item[], id: string): { items: Item[]; newId: string } | null {
+  const it = items.find((x) => x.id === id);
+  if (!it) return null;
+  const copy: Item = { ...it, id: newId('i_') };
+  copy.start = findFreeStart(items, itemEnd(it), it.duration);
+  return { items: [...items, copy], newId: copy.id };
+}
+
+function neighbors(items: Item[], it: Item): { prevEnd: number; nextStart: number } {
+  let prevEnd = 0;
+  let nextStart = Infinity;
+  for (const o of items) {
+    if (o.id === it.id) continue;
+    if (o.start + o.duration <= it.start + EPS) prevEnd = Math.max(prevEnd, o.start + o.duration);
+    else if (o.start >= it.start + it.duration - EPS) nextStart = Math.min(nextStart, o.start);
+  }
+  return { prevEnd, nextStart };
+}
+
+/** 頭端：delta > 0 代表起點往後切。不能侵入前一個物件，也不能超過素材起點。 */
+export function trimStartFree(items: Item[], id: string, delta: number): Item[] {
+  return items.map((it) => {
+    if (it.id !== id) return it;
+    const { prevEnd } = neighbors(items, it);
+    let lo = prevEnd - it.start; // 最多往前延伸到這裡（負值）
+    if (isVideoItem(it) && it.type === 'video') lo = Math.max(lo, -it.trimIn / it.speed);
+    const hi = it.duration - MIN_CLIP_DURATION;
+    const d = Math.min(Math.max(delta, lo), hi);
+    const next = { ...it, start: it.start + d, duration: it.duration - d };
+    if (isVideoItem(it) && it.type === 'video') (next as VideoItem).trimIn = it.trimIn + d * it.speed;
+    return next;
+  });
+}
+
+export function trimEndFree(
+  items: Item[],
+  id: string,
+  newDuration: number,
+  asset: Asset | undefined,
+): Item[] {
+  return items.map((it) => {
+    if (it.id !== id) return it;
+    const { nextStart } = neighbors(items, it);
+    let hi = nextStart - it.start;
+    if (isVideoItem(it)) hi = Math.min(hi, maxDuration(it, asset));
+    const d = Math.min(Math.max(newDuration, MIN_CLIP_DURATION), Math.max(hi, MIN_CLIP_DURATION));
+    return { ...it, duration: d };
+  });
+}
+
+/** 交換圖層順序（dir = +1 往上層）。主軌固定在最底層。 */
+export function moveTrack(tracks: Track[], id: string, dir: -1 | 1): Track[] {
+  const i = tracks.findIndex((t) => t.id === id);
+  const j = i + dir;
+  if (i < 1 || j < 1 || j >= tracks.length) return tracks;
+  const next = tracks.slice();
+  [next[i], next[j]] = [next[j]!, next[i]!];
+  return next;
+}
+
+/** 在哪一條同類型軌道的 [start, start+duration) 是空的；找不到回傳 -1（呼叫端要新增軌道） */
+export function firstFreeTrack(p: Project, kind: Track['kind'], start: number, duration: number): number {
+  return p.tracks.findIndex((t) => t.kind === kind && !t.locked && canPlace(t.items, start, duration));
 }

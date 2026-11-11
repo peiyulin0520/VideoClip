@@ -19,11 +19,21 @@ export type Asset = {
 
 export type Transform = { x: number; y: number; scale: number; rotation: number; opacity: number };
 
+export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'add';
+export type Outline = { color: string; width: number }; // width：以 1080 寬畫面為基準的 px
+/** 裁切：各邊切掉的比例 0–0.9 */
+export type Crop = { l: number; t: number; r: number; b: number };
+
 export type ItemBase = {
   id: string;
   start: number; // 時間軸位置（秒）。主軌由 relayout 自動算出，首尾相接
   duration: number; // 時間軸上的長度（秒）
+  /** x、y：中心點，佔畫面寬/高的比例；scale：乘上「填滿/完整」算出的基本大小；rotation：度，順時針 */
   transform: Transform;
+  blend?: BlendMode;
+  cornerRadius?: number; // 0–0.5，佔短邊的比例（畫中畫圓角）
+  outline?: Outline;
+  crop?: Crop;
 };
 
 export type VideoItem = ItemBase & {
@@ -35,9 +45,23 @@ export type VideoItem = ItemBase & {
   fit: 'cover' | 'contain';
 };
 
-export type Item = VideoItem;
+// Phase 2 的最小文字卡：只有一段文字、系統字體。Phase 3 會擴充成完整的 TextCard（見 docs/TEXT_CARDS.md）。
+export type TextRun = {
+  text: string;
+  fontId: string;
+  size: number; // px，以 1080 寬畫面為基準
+  color: string;
+  letterSpacing: number; // em
+  lineHeight: number; // 倍數
+  weight: 'normal' | 'bold';
+};
+export type TextCard = { runs: TextRun[]; align: 'left' | 'center' | 'right' };
+export type TextItem = ItemBase & { type: 'text'; card: TextCard };
 
-export type TrackKind = 'main';
+export type Item = VideoItem | TextItem;
+
+/** 軌道由下往上排列 = 圖層順序；index 0 一定是主軌 */
+export type TrackKind = 'main' | 'overlay' | 'text';
 
 export type Track = {
   id: string;

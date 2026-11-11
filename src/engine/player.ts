@@ -1,40 +1,51 @@
-import type { Project, VideoItem } from '../model/types';
-import { itemAt, mainTrack, sourceTimeAt, totalDuration } from './timeline';
+import type { Asset, Project, Track, VideoItem } from '../model/types';
+import { Compositor } from './compositor';
+import { VideoPool } from './mediaPool';
+import { buildScene } from './scene';
+import { mainTrack, sourceTimeAt, totalDuration } from './timeline';
 
-export type StageEls = { videos: [HTMLVideoElement, HTMLVideoElement]; img: HTMLImageElement };
 type Deps = { getProject: () => Project | null; urlFor: (assetId: string) => string | undefined };
 type Listener = (t: number, playing: boolean) => void;
 
 const DRIFT = 0.3;
+const PREFETCH_S = 1.0;
+const POOL_SIZE = 6;
+
+/** 預覽畫面的內部解析度：長邊 960（1:1 也是 960） */
+export function previewSize(p: Pick<Project, 'width' | 'height'>): { width: number; height: number } {
+  const k = 960 / Math.max(p.width, p.height);
+  return { width: Math.round(p.width * k), height: Math.round(p.height * k) };
+}
 
 /**
- * 預覽播放引擎（Phase 1：只有主軌）。
- * 時間由時鐘驅動；兩個 <video> 輪流使用，下一個片段會提前載入並停在起點，切換時不會黑畫面。
+ * 預覽播放引擎。時間由時鐘驅動；每個 t 算出要畫的圖層（主軌＋疊加＋文字…），
+ * 影片物件各用一個 <video>（VideoPool），再交給 Pixi 合成到 canvas。
+ * 即將開始的片段/疊加會提前載入並停在起點，切換時不會黑畫面。
  */
 export class Player {
   private t = 0;
   private playing = false;
   private raf = 0;
+  private renderRaf = 0;
   private wallStart = 0;
   private tStart = 0;
-  private active = 0;
-  private wantVisible: 0 | 1 | 'img' | null = null;
   private listeners = new Set<Listener>();
-  private cleanup: (() => void)[] = [];
+  private images = new Map<string, HTMLImageElement>();
 
-  constructor(
-    private els: StageEls,
+  private constructor(
+    readonly compositor: Compositor,
+    private pool: VideoPool,
     private deps: Deps,
-  ) {
-    for (const v of els.videos) {
-      const on = () => this.applyVisibility();
-      v.addEventListener('seeked', on);
-      v.addEventListener('loadeddata', on);
-      this.cleanup.push(() => {
-        v.removeEventListener('seeked', on);
-        v.removeEventListener('loadeddata', on);
-      });
-    }
+  ) {}
+
+  static async create(opts: { host: HTMLElement; canvas: HTMLCanvasElement } & Deps): Promise<Player> {
+    const p = opts.getProject();
+    const size = p ? previewSize(p) : { width: 540, height: 960 };
+    const compositor = await Compositor.create({ ...size, canvas: opts.canvas });
+    let player: Player | null = null;
+    const pool = new VideoPool(opts.host, POOL_SIZE, () => player?.scheduleRender());
+    player = new Player(compositor, pool, opts);
+    return player;
   }
 
   get time() {
@@ -59,8 +70,7 @@ export class Player {
   }
 
   seek(t: number) {
-    const total = this.total();
-    this.t = Math.min(Math.max(t, 0), total);
+    this.t = Math.min(Math.max(t, 0), this.total());
     if (this.playing) {
       this.wallStart = performance.now();
       this.tStart = this.t;
@@ -78,15 +88,7 @@ export class Player {
     const total = this.total();
     if (total <= 0 || this.playing) return;
     if (this.t >= total - 0.01) this.t = 0;
-    // iOS Safari：另一個 <video> 要在使用者點擊當下「解鎖」，之後才能自動接著播放
-    const spare = this.els.videos[1 - this.active]!;
-    if (spare.paused) {
-      spare.muted = true;
-      void spare.play().then(
-        () => spare.pause(),
-        () => {},
-      );
-    }
+    this.pool.unlock();
     this.playing = true;
     this.wallStart = performance.now();
     this.tStart = this.t;
@@ -99,7 +101,6 @@ export class Player {
     if (!this.playing) return;
     this.playing = false;
     cancelAnimationFrame(this.raf);
-    for (const v of this.els.videos) v.pause();
     this.render(this.t);
     this.emit();
   }
@@ -117,16 +118,22 @@ export class Player {
     this.emit();
   }
 
+  scheduleRender() {
+    if (this.playing || this.renderRaf) return;
+    this.renderRaf = requestAnimationFrame(() => {
+      this.renderRaf = 0;
+      if (!this.playing) this.render(this.t);
+    });
+  }
+
   private tick = () => {
     if (!this.playing) return;
     const total = this.total();
-    let t = this.tStart + (performance.now() - this.wallStart) / 1000;
+    const t = this.tStart + (performance.now() - this.wallStart) / 1000;
     if (t >= total) {
-      t = total;
-      this.t = t;
+      this.t = total;
       this.playing = false;
-      for (const v of this.els.videos) v.pause();
-      this.render(t);
+      this.render(total);
       this.emit();
       return;
     }
@@ -136,107 +143,118 @@ export class Player {
     this.raf = requestAnimationFrame(this.tick);
   };
 
-  private assign(el: HTMLVideoElement, item: VideoItem) {
-    const url = this.deps.urlFor(item.assetId);
-    if (!url) return;
-    if (el.dataset.assetId !== item.assetId) {
-      el.src = url;
-      el.dataset.assetId = item.assetId;
+  private imageFor(assetId: string): HTMLImageElement | null {
+    let img = this.images.get(assetId);
+    if (!img) {
+      const url = this.deps.urlFor(assetId);
+      if (!url) return null;
+      img = new Image();
+      img.onload = () => this.scheduleRender();
+      img.src = url;
+      this.images.set(assetId, img);
     }
-    el.dataset.itemId = item.id;
+    return img;
+  }
+
+  private syncVideo(el: HTMLVideoElement, item: VideoItem, asset: Asset, track: Track, t: number) {
+    const s = sourceTimeAt(item, t);
+    el.volume = item.volume;
+    el.muted = !!track.muted || !asset.hasAudio || item.volume === 0;
+    el.playbackRate = item.speed;
+    if (this.playing) {
+      if (Math.abs(el.currentTime - s) > DRIFT) el.currentTime = s;
+      if (el.paused) void el.play().catch(() => {});
+    } else {
+      if (!el.paused) el.pause();
+      if (Math.abs(el.currentTime - s) > 0.02) el.currentTime = s;
+    }
   }
 
   private render(t: number) {
     const p = this.deps.getProject();
-    const hit = p ? itemAt(mainTrack(p).items, t) : null;
-    if (!p || !hit) {
-      this.wantVisible = null;
-      this.applyVisibility();
+    const { compositor: comp } = this;
+    if (!p) {
+      comp.render([]);
       return;
     }
-    const { item, index } = hit;
-    const items = mainTrack(p).items;
-    const fit = item.fit;
+    const used = new Set<HTMLVideoElement>();
 
-    if (item.type === 'image') {
-      const url = this.deps.urlFor(item.assetId);
-      if (url && this.els.img.dataset.assetId !== item.assetId) {
-        this.els.img.src = url;
-        this.els.img.dataset.assetId = item.assetId;
+    const scene = buildScene(p, t, comp.width, comp.height, (item, asset, track) => {
+      const url = this.deps.urlFor(asset.id);
+      if (!url) return null;
+      if (item.type === 'image') {
+        const img = this.imageFor(asset.id);
+        if (!img) return null;
+        return {
+          source: img,
+          ready: img.complete && img.naturalWidth > 0,
+          srcW: img.naturalWidth || asset.width,
+          srcH: img.naturalHeight || asset.height,
+        };
       }
-      this.els.img.style.objectFit = fit;
-      for (const v of this.els.videos) v.pause();
-      this.wantVisible = 'img';
-    } else {
-      const els = this.els.videos;
-      let el = els.find((v) => v.dataset.itemId === item.id);
-      if (!el) {
-        el = els[1 - this.active]!;
-        this.assign(el, item);
-      }
-      this.active = els.indexOf(el);
-      const spare = els[1 - this.active]!;
-      const asset = p.assets.find((a) => a.id === item.assetId);
-      const s = sourceTimeAt(item, t);
-      el.style.objectFit = fit;
-      el.volume = item.volume;
-      el.muted = !asset?.hasAudio || item.volume === 0;
-      el.playbackRate = item.speed;
-      if (this.playing) {
-        if (Math.abs(el.currentTime - s) > DRIFT) el.currentTime = s;
-        if (el.paused) void el.play().catch(() => {});
-      } else {
-        el.pause();
-        if (Math.abs(el.currentTime - s) > 0.02) el.currentTime = s;
-      }
-      this.wantVisible = this.active as 0 | 1;
+      const el = this.pool.acquire(item.id, asset.id, url, used);
+      if (!el) return null; // 同時疊的影片超過上限，多的不畫
+      used.add(el);
+      this.syncVideo(el, item, asset, track, t);
+      return {
+        source: el,
+        ready: el.readyState >= 2 && !el.seeking && el.videoWidth > 0,
+        srcW: el.videoWidth || asset.width,
+        srcH: el.videoHeight || asset.height,
+      };
+    });
 
-      // 預載下一個片段到另一個 <video>，停在起點
-      const next = items[index + 1];
-      if (next && next.type === 'video') {
-        if (spare.dataset.itemId !== next.id) {
-          this.assign(spare, next);
-          spare.currentTime = next.trimIn;
-        }
-        spare.pause();
-      } else {
-        spare.pause();
+    // 預載：下一個主軌片段、1 秒內要開始的疊加影片
+    for (const { item, asset } of this.upcoming(p, t)) {
+      const url = this.deps.urlFor(asset.id);
+      if (!url) continue;
+      const el = this.pool.acquire(item.id, asset.id, url, used);
+      if (!el) continue;
+      used.add(el);
+      if (el.dataset.primed !== '1') {
+        el.currentTime = item.trimIn;
+        el.dataset.primed = '1';
       }
+      if (!el.paused) el.pause();
     }
-    this.applyVisibility();
+    this.pool.pauseAllExcept(used);
+    comp.render(scene);
   }
 
-  /** 新的 <video> 還沒畫出第一格前，先留著舊畫面，避免閃黑 */
-  private applyVisibility() {
-    const { videos, img } = this.els;
-    const w = this.wantVisible;
-    if (w === null) {
-      img.style.visibility = 'hidden';
-      for (const v of videos) v.style.visibility = 'hidden';
-      return;
+  private upcoming(p: Project, t: number): { item: VideoItem; asset: Asset }[] {
+    const out: { item: VideoItem; asset: Asset }[] = [];
+    const push = (item: VideoItem) => {
+      if (item.type !== 'video') return;
+      const asset = p.assets.find((a) => a.id === item.assetId);
+      if (asset) out.push({ item, asset });
+    };
+    for (const track of p.tracks) {
+      if (track.hidden) continue;
+      const items = track.items;
+      if (track.kind === 'main') {
+        const cur = (items as VideoItem[]).findIndex((x) => t < x.start + x.duration);
+        const next = items[cur + 1] as VideoItem | undefined;
+        if (cur >= 0 && next) push(next);
+      } else if (track.kind === 'overlay') {
+        for (const it of items as VideoItem[]) if (it.start > t && it.start <= t + PREFETCH_S) push(it);
+      }
     }
-    if (w === 'img') {
-      img.style.visibility = 'visible';
-      for (const v of videos) v.style.visibility = 'hidden';
-      return;
-    }
-    const el = videos[w];
-    if (el.readyState >= 2 && !el.seeking) {
-      el.style.visibility = 'visible';
-      videos[1 - w]!.style.visibility = 'hidden';
-      img.style.visibility = 'hidden';
-    }
+    return out;
+  }
+
+  /** 預覽主軌目前的片段 id（測試用） */
+  currentMainItemId(): string | undefined {
+    const p = this.deps.getProject();
+    if (!p) return undefined;
+    return mainTrack(p).items.find((x) => this.t < x.start + x.duration)?.id;
   }
 
   destroy() {
     cancelAnimationFrame(this.raf);
+    cancelAnimationFrame(this.renderRaf);
     this.playing = false;
-    this.cleanup.forEach((f) => f());
     this.listeners.clear();
-    for (const v of this.els.videos) {
-      v.pause();
-      v.removeAttribute('src');
-      v.load();
-    }
+    this.pool.destroy();
+    this.compositor.destroy();
   }
 }

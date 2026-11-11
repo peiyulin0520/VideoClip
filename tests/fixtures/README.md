@@ -4,3 +4,4 @@
 - clip-b.webm：smptebars，320×568 直式，1.6 秒，沒有聲音
 - clip-c.webm：testsrc，480×270 橫式，3 秒，有聲音（660Hz）
 - photo.png：400×300 漸層圖
+- solid-red.webm / solid-green.webm / solid-blue.webm：純色 320×568 直式，4 秒，沒有聲音（Phase 2 疊圖層測試用，可以用取樣顏色判斷誰在上面）

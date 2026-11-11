@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ensureUrls, releaseProjectUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
-import { mainTrack, relayout, totalDuration, formatTime } from '../../engine/timeline';
+import { addOverlayClips } from '../../store/actions';
+import { mainItems, relayout, totalDuration, formatTime } from '../../engine/timeline';
 import { getProject } from '../../storage/projects';
 import { startAutosave } from '../../store/autosave';
 import { useProjectStore } from '../../store/projectStore';
@@ -11,7 +12,7 @@ import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { Preview } from '../editor/Preview';
 import { Timeline, MAX_PPS, MIN_PPS } from '../editor/Timeline';
-import { Toolbar } from '../editor/Toolbar';
+import { BottomBar } from '../editor/Toolbar';
 
 export function Editor() {
   const { projectId = '' } = useParams();
@@ -86,6 +87,12 @@ function EditorBody() {
     });
   }, [player]);
 
+  const importMode = useRef<'main' | 'overlay'>('main');
+  const pick = (mode: 'main' | 'overlay') => {
+    importMode.current = mode;
+    fileInput.current?.click();
+  };
+
   const onFiles = useCallback(async (list: FileList | null) => {
     const files = list ? Array.from(list) : [];
     if (fileInput.current) fileInput.current.value = '';
@@ -97,16 +104,23 @@ function EditorBody() {
       const res = await importFiles(pid, files, (d, n) => setBusy(`匯入中… ${d}/${n}`));
       if (res.assets.length) {
         await ensureUrls(pid, res.assets);
-        const startOfNew = totalDuration(useProjectStore.getState().project!);
-        useProjectStore.getState().apply(
-          (d) => {
-            d.assets.push(...res.assets);
-            const tr = d.tracks.find((t) => t.kind === 'main')!;
-            tr.items = relayout([...tr.items, ...res.clips]);
-          },
-          { select: res.clips[0]!.id },
-        );
-        useUI.getState().player?.seek(startOfNew);
+        const player = useUI.getState().player;
+        if (importMode.current === 'overlay') {
+          // 疊加：放在播放頭這一秒，同一秒疊多個就各佔一條軌道
+          useProjectStore.getState().apply((d) => void d.assets.push(...res.assets));
+          addOverlayClips(res.assets, player?.time ?? 0);
+        } else {
+          const startOfNew = totalDuration(useProjectStore.getState().project!);
+          useProjectStore.getState().apply(
+            (d) => {
+              d.assets.push(...res.assets);
+              const tr = d.tracks.find((t) => t.kind === 'main')!;
+              tr.items = relayout([...(tr.items as typeof res.clips), ...res.clips]);
+            },
+            { select: res.clips[0]!.id },
+          );
+          player?.seek(startOfNew);
+        }
       }
       if (res.failed.length)
         toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`);
@@ -116,7 +130,7 @@ function EditorBody() {
     }
   }, []);
 
-  const empty = mainTrack(project).items.length === 0;
+  const empty = mainItems(project).length === 0;
 
   return (
     <main className="editor">
@@ -158,7 +172,7 @@ function EditorBody() {
 
       <Preview projectId={project.id} width={project.width} height={project.height} />
       {empty && (
-        <button className="empty-import" onClick={() => fileInput.current?.click()}>
+        <button className="empty-import" onClick={() => pick('main')}>
           ＋ 匯入影片或照片
         </button>
       )}
@@ -194,8 +208,8 @@ function EditorBody() {
         </button>
       </div>
 
-      <Timeline pps={pps} setPps={setPps} onAdd={() => fileInput.current?.click()} />
-      <Toolbar onImport={() => fileInput.current?.click()} />
+      <Timeline pps={pps} setPps={setPps} onAdd={() => pick('main')} />
+      <BottomBar onImportMain={() => pick('main')} onImportOverlay={() => pick('overlay')} />
 
       <input
         ref={fileInput}

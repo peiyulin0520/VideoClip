@@ -1,4 +1,4 @@
-import type { Aspect, Asset, Project, Track, VideoItem } from './types';
+import type { Aspect, Asset, Project, TextItem, Track, TrackKind, VideoItem } from './types';
 
 export const ASPECTS: Record<Aspect, { label: string; width: number; height: number }> = {
   '9:16': { label: '直式 9:16', width: 1080, height: 1920 },
@@ -60,4 +60,50 @@ export function nextProjectName(existing: string[]): string {
   let n = existing.length + 1;
   while (existing.includes(`新專案 ${n}`)) n++;
   return `新專案 ${n}`;
+}
+
+export const TEXT_DEFAULT_DURATION = 3;
+
+const TRACK_NAMES: Record<TrackKind, string> = { main: '主軌', overlay: '疊加', text: '文字' };
+
+export function createTrack(kind: TrackKind, existing: Track[]): Track {
+  const n = existing.filter((t) => t.kind === kind).length + 1;
+  return {
+    id: newId('t_'),
+    kind,
+    name: kind === 'main' ? TRACK_NAMES.main : `${TRACK_NAMES[kind]} ${n}`,
+    hidden: false,
+    locked: false,
+    items: [],
+  };
+}
+
+/** 疊加素材：預設縮小 50%、完整顯示，放在畫面中央（畫中畫） */
+export function createOverlayClip(asset: Asset, start: number): VideoItem {
+  const c = createClip(asset);
+  return { ...c, start, fit: 'contain', transform: { ...c.transform, scale: 0.5 } };
+}
+
+export function createTextItem(start: number, text = '點兩下編輯文字'): TextItem {
+  return {
+    id: newId('i_'),
+    type: 'text',
+    start,
+    duration: TEXT_DEFAULT_DURATION,
+    transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
+    card: {
+      align: 'center',
+      runs: [
+        {
+          text,
+          fontId: 'system',
+          size: 96,
+          color: '#ffffff',
+          letterSpacing: 0,
+          lineHeight: 1.25,
+          weight: 'bold',
+        },
+      ],
+    },
+  };
 }

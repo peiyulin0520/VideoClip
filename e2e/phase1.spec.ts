@@ -5,6 +5,10 @@ import {
   createProjectWith,
   expectToast,
   fixture,
+  isGray,
+  isRed,
+  isWhite,
+  samplePreview,
   seekTo,
   selectedIndex,
   timeText,
@@ -33,7 +37,7 @@ test('兩個專案各匯入 2 個素材：重新整理後都還在，編輯一�
   await page.getByRole('link', { name: '開啟 新專案 1' }).tap();
   await expect(clips(page)).toHaveCount(2);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '刪除' }).tap();
+  await page.getByRole('button', { name: '刪除', exact: true }).tap();
   await expect(clips(page)).toHaveCount(1);
   await page.getByRole('link', { name: '回首頁' }).tap();
   // 首頁是從資料庫讀的：封面角落的長度變成剩下那段（clip-b 1.6 秒）＝ 離開編輯器時已立即存檔
@@ -75,7 +79,7 @@ test('專案卡片選單：改名、複製、刪除', async ({ page }) => {
 
   await page.getByRole('button', { name: '旅行 vlog 的選單' }).tap();
   await page.getByRole('button', { name: '刪除', exact: true }).tap();
-  await page.getByRole('dialog').getByRole('button', { name: '刪除' }).tap();
+  await page.getByRole('dialog').getByRole('button', { name: '刪除', exact: true }).tap();
   await expect(page.getByTestId('project-card')).toHaveCount(1);
   await page.reload();
   await expect(page.getByTestId('project-card')).toHaveCount(1);
@@ -86,7 +90,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await expect(page.getByTestId('time')).toContainText('/ 0:06.6');
 
   // 沒選片段時，需要選取的按鈕會提示
-  await page.getByRole('button', { name: '刪除' }).tap();
+  await page.getByRole('button', { name: '刪除', exact: true }).tap();
   await expectToast(page, '請先點選一個片段');
 
   // 點選片段
@@ -147,7 +151,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   // 刪除 / 復原 / 重做
   await clips(page).first().tap();
   const count = await clips(page).count();
-  await page.getByRole('button', { name: '刪除' }).tap();
+  await page.getByRole('button', { name: '刪除', exact: true }).tap();
   await expect(clips(page)).toHaveCount(count - 1);
   await page.getByRole('button', { name: '復原' }).tap();
   await expect(clips(page)).toHaveCount(count);
@@ -237,24 +241,15 @@ test('長按拖曳片段可以重新排序', async ({ page }) => {
 
 test('播放：時間前進、影片真的在解碼、跨片段會無縫換到下一支', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
-  const ids = await clipIds(page);
 
-  // 預覽畫面真的有影像（不是黑的）：第 1 支的第 1 格
-  const visible = () =>
-    page.getByTestId('stage').evaluate((st) => {
-      const v = Array.from(st.querySelectorAll('video')).find((x) => x.style.visibility === 'visible');
-      return v
-        ? { item: v.dataset.itemId, w: v.videoWidth, t: v.currentTime, paused: v.paused, ready: v.readyState }
-        : null;
-    });
-  await expect.poll(visible).toMatchObject({ item: ids[0], w: 320 });
+  // 預覽畫面真的有影像：第 1 支（testsrc2）最左邊是紅色條，第 2 支（色條）最左邊是灰色
+  await expect.poll(async () => isRed(await samplePreview(page, 0.1, 0.5)), { timeout: 8000 }).toBe(true);
 
   // 從第 1.5 秒開始播，會跨過 2.0 秒進入第 2 支
   await seekTo(page, 1.5);
   await page.getByRole('button', { name: '播放' }).tap();
   await expect(page.getByRole('button', { name: '暫停' })).toBeVisible();
-  await expect.poll(visible, { timeout: 5000 }).toMatchObject({ item: ids[1] });
-  await expect.poll(async () => (await visible())?.t ?? 0, { timeout: 5000 }).toBeGreaterThan(0.05);
+  await expect.poll(async () => isGray(await samplePreview(page, 0.1, 0.5)), { timeout: 6000 }).toBe(true);
   await page.screenshot({ path: `${SHOT}/playing-second-clip.png` });
 
   // 播到結尾自動停止
@@ -265,9 +260,8 @@ test('播放：時間前進、影片真的在解碼、跨片段會無縫換到�
 test('照片素材：預設 3 秒、預覽會顯示、不能變速', async ({ page }) => {
   await createProjectWith(page, ['photo.png']);
   await expect(page.getByTestId('time')).toContainText('/ 0:03.0');
-  await expect
-    .poll(() => page.getByTestId('stage').evaluate((st) => st.querySelector('img')!.style.visibility))
-    .toBe('visible');
+  // photo.png 正中間是白色圓
+  await expect.poll(async () => isWhite(await samplePreview(page, 0.5, 0.5)), { timeout: 8000 }).toBe(true);
   await clips(page).first().tap();
   await page.getByRole('button', { name: '變速' }).tap();
   await expectToast(page, '照片不能變速');
