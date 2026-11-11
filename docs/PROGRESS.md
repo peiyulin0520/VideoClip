@@ -3,10 +3,11 @@
 （換對話時從這裡接。每完成一步或收到使用者的決定，就更新。）
 
 ## 目前
-- 階段：Phase 0 完成（2026-11-11），下一步 Phase 1：專案管理＋多影片拼接
+- 階段：Phase 1 完成（2026-11-11，等使用者用手機實測）。下一步 Phase 2：圖層系統＋選取變形
 - 規劃文件：docs/PLAN.md、docs/TEXT_CARDS.md、docs/EFFECTS.md、docs/FONTS.md
 
 ## 等使用者的事
+- Phase 1 要用 iPhone 實測（見 PLAN.md §7 新增的 Phase 1 項目）：匯入手機影片（含 .mov/HEVC）、播放與跨片段聲音、長按拖曳排序、雙指縮放時間軸、重新整理後專案還在
 - Phase 0 部署：功能分支只跑檢查與建置，**要 merge 到 main 才會部署到 GitHub Pages**。請使用者決定何時要開 PR / merge（我不會自己開）
 - Phase 0：請使用者到 repo Settings → Pages → Source 選「GitHub Actions」
 - Phase 3 開始時：請使用者上傳 6 款沒有下載網址的字體檔（佮逸體、LINE Seed TW、中規中矩體、星光小熊貓幼兒體、字言字型手繪體、致一宋體），見 docs/FONTS.md §4
@@ -33,6 +34,12 @@
 - （尚無）
 
 ## 日誌
+- 2026-11-11 Phase 1 完成（分支 claude/zen-tesla-v3brj5）：
+  - ✅ 專案管理（新增選比例、改名、複製、刪除）、多影片/照片匯入（OPFS，無法寫入時退回 IndexedDB）、主軌拼接、點選/修剪頭尾/分割/複製/刪除/前後移/長按拖曳排序/變速 0.25–4x/音量/填滿↔完整、復原重做（上限 100，拖滑桿合併成一步）、自動儲存（800ms；離開編輯器立即存）、預覽雙 <video> 預載跨片段播放。
+  - ✅ lint、14 個單元測試（時間軸函式、復原堆疊）、10 個 e2e（iPhone 13 模擬，Chromium，WebM 測試素材）通過。截圖在 docs/screenshots/phase1/。e2e 抓到並修掉一個真 bug：離開編輯器時的存檔可能比首頁讀取晚，首頁會顯示舊資料 → 儲存層改成「寫入排隊、讀取等寫入」。
+  - 🟡 只在 Chromium 驗證：雙指縮放時間軸（程式寫好，e2e 沒測）、iOS 播放解鎖第二個 <video>、HEVC/H.264（沙盒 Chromium 沒有 H.264，測試用 WebM）。
+  - 🔴/未做（刻意留到之後）：拖曳排序時靠近邊緣不會自動捲動（片段很多時請先縮小時間軸）；修剪時預覽畫格用 peek（沒移動播放頭）；匯出（Phase 2 後）；點預覽畫面不會暫停/播放；專案 .zip 匯出（Phase 6）。
+  - 套件：npm audit 有 1 個 moderate（vite-plugin-pwa → workbox-build → deepmerge），只在建置階段，不會進到網站；等上游更新。
 - 2026-11-11 Phase 0 完成：Vite 8 + React 18 + TS 5.9（typescript-eslint 不支援 TS 6.1 以上，故不用 TS 7）+ Vitest 5 + Playwright 1.63（要與沙盒 Chromium 版本一致）。✅ lint、2 個單元測試、build（含 PWA）、2 個 e2e（iPhone 13 模擬，Chromium）通過；截圖 docs/screenshots/phase0/home.png。🟡 iPhone Safari 與「加入主畫面」沒測（沙盒沒有 WebKit）。deploy.yml 寫好但尚未實際跑過（要 merge 到 main 才會觸發）。
 - 2026-11-11 整理使用者的字體下載紀錄成 fonts/manifest.json（78 檔，52 檔放進網站），更新 FONTS.md
 - 2026-11-11 加入「首次使用選備份位置」到 PLAN.md（Phase 3 精靈、Phase 6）

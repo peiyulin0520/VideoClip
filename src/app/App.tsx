@@ -1,4 +1,6 @@
 import { HashRouter, Route, Routes } from 'react-router-dom';
+import { Toasts } from '../ui/Toasts';
+import { Editor } from './pages/Editor';
 import { Home } from './pages/Home';
 import { Placeholder } from './pages/Placeholder';
 
@@ -6,9 +8,10 @@ import { Placeholder } from './pages/Placeholder';
 export function App() {
   return (
     <HashRouter>
+      <Toasts />
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/p/:projectId" element={<Placeholder title="編輯器" note="Phase 1 會做" />} />
+        <Route path="/p/:projectId" element={<Editor />} />
         <Route path="/settings" element={<Placeholder title="設定" note="Phase 3 會做" />} />
         <Route path="*" element={<Placeholder title="找不到頁面" note="" />} />
       </Routes>

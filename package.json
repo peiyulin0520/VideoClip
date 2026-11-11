@@ -14,6 +14,10 @@
     "fonts": "echo 'Phase 3 才會實作 npm run fonts'"
   },
   "dependencies": {
+    "idb": "^8.0.4",
+    "immer": "^11.2.10",
+    "lucide-react": "^1.72.0",
+    "mediabunny": "^1.65.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.5",
@@ -30,6 +34,7 @@
     "@vitejs/plugin-react": "^6.3.0",
     "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "fake-indexeddb": "^6.2.8",
     "globals": "^17.14.0",
     "jsdom": "^31.0.0",
     "prettier": "^3.9.10",
