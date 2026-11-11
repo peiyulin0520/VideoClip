@@ -4,11 +4,11 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`（Phase 1–3B 已在 `main`；分支上多了：實測修正 A/B/C/D＋Phase 3A 第 1 步。**都還沒合併到 main，上線網址是舊版**——使用者選 B：先不合併，繼續做字卡）
+- **分支**：`claude/zen-tesla-v3brj5`。實測修正 A/B/C/D＋Phase 3A 第 1–4 步前半已開 **PR #3** 等使用者合併（2026-11-11，使用者選「合併讓我用 iPhone 測」）；合併後 Actions 部署，上線網址才會更新。合併後分支對齊 main：`git fetch origin main && git merge --ff-only origin/main`
 - **最後一個程式 commit**：見 `git log -1`（Phase 3A-4：圖形庫）
 - **測試**：218 個單元測試、42 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅、第 4 步前半（33 種圖形當字塊／獨立圖形）✅；4 後半（貼圖 icon）未做**；Phase 4–7 未開始
-- **下一步**：Phase 3A 第 4 步後半「貼圖 icon」（Fluent Emoji 約 300 個常用子集，MIT；沙盒只能連 `raw.githubusercontent.com`，下載要用 raw 網址＋`NODE_USE_ENV_PROXY=1`；要附授權檔；貼圖可加白邊/陰影）。也可補規格裡沒做的 `cloud-frame`／`speech-frame`／`dot-line`／`number-badge`／`tail-loop-double` 裝飾與缺的圖形。之後第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
+- **下一步**：（等使用者在 iPhone 重測、回報）Phase 3A 第 4 步後半「貼圖 icon」（Fluent Emoji 約 300 個常用子集，MIT；沙盒只能連 `raw.githubusercontent.com`，下載要用 raw 網址＋`NODE_USE_ENV_PROXY=1`；要附授權檔；貼圖可加白邊/陰影）。也可補規格裡沒做的 `cloud-frame`／`speech-frame`／`dot-line`／`number-badge`／`tail-loop-double` 裝飾與缺的圖形。之後第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是修正 A/B/C/D 要等合併上線後才測得到
