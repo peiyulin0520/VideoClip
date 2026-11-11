@@ -13,7 +13,7 @@ function fontOf(weight: string, px: number, fontId: string) {
   return `${weight === 'bold' ? '700' : '400'} ${px}px ${fam ? `"${fam}", ` : ''}${FALLBACK_STACK}`;
 }
 
-/** scale：畫布寬度 / 1080。字級以 1080 寬為基準，所以預覽（較小）與輸出（1080）看起來一樣。 */
+/** scale：畫布短邊 / 1080（uiScale）。字級以 1080 為基準，所以預覽（較小）與輸出（1080）看起來一樣。 */
 export function renderText(card: TextCard, scale: number): TextRender {
   // 字體還沒載入完成時畫的是備用字體，所以「各字體載入了沒」也要算進快取鍵，載入後才會重畫
   for (const run of card.runs) requestFont(run.fontId);
@@ -85,7 +85,12 @@ export function renderText(card: TextCard, scale: number): TextRender {
   return out;
 }
 
-export function measureTextItem(item: TextItem, canvasW: number): { w: number; h: number } {
-  const r = renderText(item.card, canvasW / 1080);
+/** 字級/外框的縮放：以畫面「短邊 ÷ 1080」為準（橫式畫面的字不會被放大） */
+export function uiScale(canvasW: number, canvasH: number): number {
+  return Math.min(canvasW, canvasH) / 1080;
+}
+
+export function measureTextItem(item: TextItem, canvasW: number, canvasH: number): { w: number; h: number } {
+  const r = renderText(item.card, uiScale(canvasW, canvasH));
   return { w: r.w, h: r.h };
 }

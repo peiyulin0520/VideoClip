@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（Phase 3B：字體管線、首次使用精靈、設定頁、字體選單）；之後只有交接文件的 commit
 - **測試**：41 個單元測試、22 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0 ✅、1 ✅、2 ✅、3B（字體）✅；**Phase 3A（字卡引擎）尚未開始**；Phase 4–7 未開始
-- **下一步**：先修使用者實測回報的問題 → 照 `docs/plans/2026-11-11-safe-zone-and-selection.md` 實作。建議順序 **D → A → B → C**：D（自動比例）已有草稿 `docs/plans/2026-11-11-aspect-auto-draft.patch`，`git apply` 後補完規劃 §2-D「實作細節」列的 3 件事（重建預覽後回到原時間、字卡大小跟短邊、e2e）。其他：安全區參考線預設關閉＋拖移時才出現＋加標籤；主軌匯入後不自動選取、點預覽不選主軌、主軌選取框不顯示 ✕；iPhone 時間軸縮圖改用 Mediabunny＋退路）。修完再做 Phase 3A 字卡引擎（拆法見 `docs/HANDOFF.md §6`）
+- **下一步**：先修使用者實測回報的問題 → 照 `docs/plans/2026-11-11-safe-zone-and-selection.md` 實作。建議順序 **D → A → B → C**：D（自動比例）已有草稿 （草稿 patch 已套用並刪除），`git apply` 後補完規劃 §2-D「實作細節」列的 3 件事（重建預覽後回到原時間、字卡大小跟短邊、e2e）。其他：安全區參考線預設關閉＋拖移時才出現＋加標籤；主軌匯入後不自動選取、點預覽不選主軌、主軌選取框不顯示 ✕；iPhone 時間軸縮圖改用 Mediabunny＋退路）。修完再做 Phase 3A 字卡引擎（拆法見 `docs/HANDOFF.md §6`）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 用 iPhone 實測 Phase 1–3B（清單在 `docs/PLAN.md §7`），特別是：多影片同時播放、字體下載/快取、首次使用精靈、匯入字體、預覽畫面在底部面板展開時是否太小
@@ -54,7 +54,7 @@
 
 ## 日誌（最新在最上面）
 - 2026-11-11 補完自動比例（§2-D）的實作規劃＋存草稿 patch（分支 claude/zen-tesla-v3brj5，只有文件）
-  - 做了什麼：中斷前寫好的 D 程式草稿存成 `docs/plans/2026-11-11-aspect-auto-draft.patch`，程式還原（使用者要的是規劃，實作交給 Sonnet）。規劃 §2-D 加「實作細節」：草稿涵蓋範圍、還缺的 3 件事、e2e 清單、已知行為
+  - 做了什麼：中斷前寫好的 D 程式草稿存成 （草稿 patch 已套用並刪除），程式還原（使用者要的是規劃，實作交給 Sonnet）。規劃 §2-D 加「實作細節」：草稿涵蓋範圍、還缺的 3 件事、e2e 清單、已知行為
   - 動了哪些檔：docs/plans/2026-11-11-safe-zone-and-selection.md、docs/plans/2026-11-11-aspect-auto-draft.patch（新）、docs/PLAN.md §7、docs/HANDOFF.md §4
   - 驗證：✅ 草稿 `tsc -b` 通過、`defaults.test.ts` 12 個單元測試通過  🔴 草稿沒跑 lint／e2e
   - 使用者的決定/回饋：「A跟第一支影片一樣，但保留之後影片可以調整修改，根據這個做相關規劃」

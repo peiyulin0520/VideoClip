@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { importFiles } from '../../engine/importMedia';
 import { formatTime, mainItems, mainTrack, relayout, totalDuration } from '../../engine/timeline';
-import { ASPECTS, createProject, nextProjectName } from '../../model/defaults';
+import { ASPECTS, assignAspect, createProject, nextProjectName, pickAspect } from '../../model/defaults';
 import type { Aspect, Project } from '../../model/types';
 import { requestPersistence } from '../../storage/media';
 import {
@@ -42,7 +42,7 @@ export function Home() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [newOpen, setNewOpen] = useState(false);
-  const [aspect, setAspect] = useState<Aspect>('9:16');
+  const [aspect, setAspect] = useState<Aspect | 'auto'>('auto');
   const [menuFor, setMenuFor] = useState<Project | null>(null);
   const [renameFor, setRenameFor] = useState<Project | null>(null);
   const [nameDraft, setNameDraft] = useState('');
@@ -66,7 +66,13 @@ export function Home() {
 
   const createAndOpen = async (files: File[]) => {
     const { setBusy } = useUI.getState();
-    const p = createProject(nextProjectName((projects ?? []).map((x) => x.name)), aspect);
+    const auto = aspect === 'auto';
+    const p = createProject(
+      nextProjectName((projects ?? []).map((x) => x.name)),
+      auto ? '9:16' : aspect,
+      Date.now(),
+      auto,
+    );
     setNewOpen(false);
     if (files.length === 0) {
       await saveProject(p);
@@ -78,6 +84,9 @@ export function Home() {
       const res = await importFiles(p.id, files, (d, n) => setBusy(`匯入中… ${d}/${n}`));
       p.assets = res.assets;
       mainTrack(p).items = relayout(res.clips);
+      // 自動：照第一個素材的形狀決定專案比例（之後在編輯器還可以改）
+      const first = res.assets[0];
+      if (auto && first) assignAspect(p, pickAspect(first.width, first.height), true);
       await saveProject(p);
       if (res.failed.length) toast(`無法匯入：${res.failed.map((f) => f.name).join('、')}`);
       navigate(`/p/${p.id}`);
@@ -175,6 +184,14 @@ export function Home() {
 
       <Sheet open={newOpen} title="新專案" onClose={() => setNewOpen(false)}>
         <div className="chips" role="radiogroup" aria-label="畫面比例">
+          <button
+            role="radio"
+            aria-checked={aspect === 'auto'}
+            className={`chip${aspect === 'auto' ? ' active' : ''}`}
+            onClick={() => setAspect('auto')}
+          >
+            自動（跟第一支影片）
+          </button>
           {(Object.keys(ASPECTS) as Aspect[]).map((a) => (
             <button
               key={a}

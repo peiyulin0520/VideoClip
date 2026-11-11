@@ -1,7 +1,7 @@
 // 資料模型（見 docs/PLAN.md §2.5）。Phase 1 只有主軌的影片/照片片段；
 // 其他軌道與物件種類（文字、貼圖、繪畫、調整）在之後的 Phase 加進 Track.kind / Item 聯集。
 
-export type Aspect = '9:16' | '16:9' | '1:1';
+export type Aspect = '9:16' | '16:9' | '1:1' | '3:4' | '4:3';
 
 export type Asset = {
   id: string;
@@ -79,6 +79,8 @@ export type Project = {
   createdAt: number;
   updatedAt: number;
   aspect: Aspect;
+  /** true = 比例跟著第一個素材自動決定（使用者手動改過比例就變 false）；舊專案沒有這個欄位＝false */
+  aspectAuto?: boolean;
   width: number;
   height: number;
   fps: number;

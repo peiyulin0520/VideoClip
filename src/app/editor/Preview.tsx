@@ -54,6 +54,8 @@ export function Preview({ projectId, width, height }: { projectId: string; width
   const fontEpoch = useFonts((s) => s.epoch); // 字體載入完成：字卡大小可能變，選取框要重算
 
   // ---- 建立 / 銷毀播放引擎（含 Pixi 合成器）----
+  // 比例改了（寬高變了）會重建；記住舊的播放時間，重建後回到同一個位置（換專案則歸 0）
+  const resumeRef = useRef<{ projectId: string; time: number } | null>(null);
   useEffect(() => {
     let cancelled = false;
     let created: Player | null = null;
@@ -67,7 +69,8 @@ export function Preview({ projectId, width, height }: { projectId: string; width
       if (cancelled) return player.destroy();
       created = player;
       useUI.setState({ player });
-      player.seek(0);
+      const resume = resumeRef.current;
+      player.seek(resume && resume.projectId === projectId ? resume.time : 0);
       const unsubProject = useProjectStore.subscribe((s, prev) => {
         if (s.project !== prev.project) player.refresh();
       });
@@ -83,10 +86,11 @@ export function Preview({ projectId, width, height }: { projectId: string; width
     return () => {
       cancelled = true;
       unsub();
+      if (created) resumeRef.current = { projectId, time: created.time };
       created?.destroy();
       useUI.setState({ player: null });
     };
-  }, [projectId]);
+  }, [projectId, width, height]); // 比例改了（寬高變了）就重建預覽引擎
 
   // ---- 舞台大小（CSS px）----
   useEffect(() => {
@@ -288,7 +292,8 @@ export function Preview({ projectId, width, height }: { projectId: string; width
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <canvas ref={canvasRef} data-testid="preview-canvas" />
+        {/* key：比例改變就換一個新的 canvas（舊的 WebGL 環境被 Pixi 銷毀後不能在同一個 canvas 上重建） */}
+        <canvas key={`${width}x${height}`} ref={canvasRef} data-testid="preview-canvas" />
         <div ref={poolRef} className="pool" aria-hidden="true" />
 
         {safe && (

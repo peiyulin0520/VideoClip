@@ -9,6 +9,9 @@ import { getProject } from '../../storage/projects';
 import { startAutosave } from '../../store/autosave';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
+import { ASPECTS, assignAspect, pickAspect } from '../../model/defaults';
+import type { Aspect } from '../../model/types';
+import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
 import { Preview } from '../editor/Preview';
 import { Timeline, MAX_PPS, MIN_PPS } from '../editor/Timeline';
@@ -76,6 +79,7 @@ function EditorBody() {
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [ratioOpen, setRatioOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const total = totalDuration(project);
 
@@ -111,14 +115,16 @@ function EditorBody() {
           addOverlayClips(res.assets, player?.time ?? 0);
         } else {
           const startOfNew = totalDuration(useProjectStore.getState().project!);
-          useProjectStore.getState().apply(
-            (d) => {
-              d.assets.push(...res.assets);
-              const tr = d.tracks.find((t) => t.kind === 'main')!;
-              tr.items = relayout([...(tr.items as typeof res.clips), ...res.clips]);
-            },
-            { select: res.clips[0]!.id },
-          );
+          // 匯入主軌素材後不自動選取（主軌是滿版的，選取框會像「要手動縮小」的框）
+          useProjectStore.getState().apply((d) => {
+            d.assets.push(...res.assets);
+            const tr = d.tracks.find((t) => t.kind === 'main')!;
+            // 比例設成「自動」、而且主軌還是空的：第一次匯入時照第一個素材的形狀決定專案比例
+            const first = res.assets[0];
+            if (d.aspectAuto && tr.items.length === 0 && first)
+              assignAspect(d, pickAspect(first.width, first.height), true);
+            tr.items = relayout([...(tr.items as typeof res.clips), ...res.clips]);
+          });
           player?.seek(startOfNew);
         }
       }
@@ -147,6 +153,9 @@ function EditorBody() {
           }}
         >
           {project.name}
+        </button>
+        <button className="ratio-btn" aria-label="畫面比例" onClick={() => setRatioOpen(true)}>
+          {project.aspect}
         </button>
         <button
           className="icon-btn"
@@ -220,6 +229,38 @@ function EditorBody() {
         data-testid="file-input"
         onChange={(e) => void onFiles(e.target.files)}
       />
+
+      <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
+        <p className="hint">改了之後，影片和文字的位置、大小會跟著新的畫面。可以按「復原」改回來。</p>
+        <div className="chips" role="radiogroup" aria-label="選擇畫面比例">
+          <button
+            role="radio"
+            aria-checked={!!project.aspectAuto}
+            className={`chip${project.aspectAuto ? ' active' : ''}`}
+            onClick={() => {
+              const a = setProjectAspect('auto');
+              if (a) toast(`已設成自動（目前是 ${a}）`);
+              setRatioOpen(false);
+            }}
+          >
+            自動（跟第一支影片）
+          </button>
+          {(Object.keys(ASPECTS) as Aspect[]).map((a) => (
+            <button
+              key={a}
+              role="radio"
+              aria-checked={!project.aspectAuto && project.aspect === a}
+              className={`chip${!project.aspectAuto && project.aspect === a ? ' active' : ''}`}
+              onClick={() => {
+                setProjectAspect(a);
+                setRatioOpen(false);
+              }}
+            >
+              {ASPECTS[a].label}
+            </button>
+          ))}
+        </div>
+      </Sheet>
 
       <Sheet open={renaming} title="專案名稱" onClose={() => setRenaming(false)}>
         <input

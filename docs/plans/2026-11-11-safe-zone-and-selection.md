@@ -56,7 +56,7 @@
 5. 首頁卡片顯示的比例文字（`p.aspect`）會自動跟著。
 
 #### D 的實作細節（2026-11-11 Opus 補充，給 Sonnet）
-- **已有草稿可以直接套**：`docs/plans/2026-11-11-aspect-auto-draft.patch`（`git apply docs/plans/2026-11-11-aspect-auto-draft.patch`）。內容：`types.ts`／`defaults.ts`（5 種比例、`pickAspect`、`assignAspect`、`createProject(..., aspectAuto)`）、`defaults.test.ts`（12 個單元測試，已通過）、`actions.ts` 的 `setProjectAspect('auto' | Aspect)`、`Home.tsx` 的自動 chip、`Editor.tsx` 的比例按鈕＋面板＋空主軌第一次匯入自動套用（**也順便拿掉了匯入後自動選取主軌，屬於 B**）、`Preview.tsx` effect 依賴、`.ratio-btn` 樣式。**只跑過 `tsc` 和那 12 個單元測試，沒跑 lint／e2e**；套上後要先 `npm run check`。
+- **已有草稿可以直接套**：（草稿 patch 已套用並刪除）（`git apply docs/plans/2026-11-11-aspect-auto-draft.patch`）。內容：`types.ts`／`defaults.ts`（5 種比例、`pickAspect`、`assignAspect`、`createProject(..., aspectAuto)`）、`defaults.test.ts`（12 個單元測試，已通過）、`actions.ts` 的 `setProjectAspect('auto' | Aspect)`、`Home.tsx` 的自動 chip、`Editor.tsx` 的比例按鈕＋面板＋空主軌第一次匯入自動套用（**也順便拿掉了匯入後自動選取主軌，屬於 B**）、`Preview.tsx` effect 依賴、`.ratio-btn` 樣式。**只跑過 `tsc` 和那 12 個單元測試，沒跑 lint／e2e**；套上後要先 `npm run check`。
 - 草稿**還沒做**、要補的：
   1. **重建預覽後回到原本時間**：`Preview.tsx` 的 Player effect 建好後現在是 `player.seek(0)`。改成先記住舊 player 的時間（例如 effect 外用 `useRef` 存 `lastTime`，在 cleanup 時 `lastTime.current = created?.time ?? 0`），新的建好後 `seek(lastTime.current)`。換專案（`projectId` 變）時要歸 0。
   2. **字卡大小要跟「短邊」走**：現在 `scene.ts` 的 `renderText(item.card, ctx.canvasW / 1080)` 和 Preview 的 `textSize` 都用「畫面寬 ÷ 1080」。9:16 改 16:9 時寬變 1920，字會放大 1.78 倍、在扁的畫面上顯得很大。建議改成 `Math.min(canvasW, canvasH) / 1080`（9:16、3:4、1:1 不變；4:3、16:9 的字不會被放大）。⚠️ 舊的 16:9 專案裡的字會變小一點——目前字卡只是 Phase 3B 簡版、使用者還沒正式用，可以接受；要在日誌寫明。`exportFrame` 走同一個 `buildScene`，會一起變。改了要全域搜尋 `/ 1080` 確認沒有漏（`geometry.ts` 的 `TextSize`、Preview 的 handle 大小計算）。
