@@ -1,0 +1,10 @@
+dist
+dev-dist
+docs
+fonts
+public
+.font-cache
+playwright-report
+test-results
+package-lock.json
+*.md

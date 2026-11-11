@@ -3,10 +3,11 @@
 （換對話時從這裡接。每完成一步或收到使用者的決定，就更新。）
 
 ## 目前
-- 階段：規劃完成，尚未開始 Phase 0
+- 階段：Phase 0 完成（2026-11-11），下一步 Phase 1：專案管理＋多影片拼接
 - 規劃文件：docs/PLAN.md、docs/TEXT_CARDS.md、docs/EFFECTS.md、docs/FONTS.md
 
 ## 等使用者的事
+- Phase 0 部署：功能分支只跑檢查與建置，**要 merge 到 main 才會部署到 GitHub Pages**。請使用者決定何時要開 PR / merge（我不會自己開）
 - Phase 0：請使用者到 repo Settings → Pages → Source 選「GitHub Actions」
 - Phase 3 開始時：請使用者上傳 6 款沒有下載網址的字體檔（佮逸體、LINE Seed TW、中規中矩體、星光小熊貓幼兒體、字言字型手繪體、致一宋體），見 docs/FONTS.md §4
 - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
@@ -32,6 +33,7 @@
 - （尚無）
 
 ## 日誌
+- 2026-11-11 Phase 0 完成：Vite 8 + React 18 + TS 5.9（typescript-eslint 不支援 TS 6.1 以上，故不用 TS 7）+ Vitest 5 + Playwright 1.63（要與沙盒 Chromium 版本一致）。✅ lint、2 個單元測試、build（含 PWA）、2 個 e2e（iPhone 13 模擬，Chromium）通過；截圖 docs/screenshots/phase0/home.png。🟡 iPhone Safari 與「加入主畫面」沒測（沙盒沒有 WebKit）。deploy.yml 寫好但尚未實際跑過（要 merge 到 main 才會觸發）。
 - 2026-11-11 整理使用者的字體下載紀錄成 fonts/manifest.json（78 檔，52 檔放進網站），更新 FONTS.md
 - 2026-11-11 加入「首次使用選備份位置」到 PLAN.md（Phase 3 精靈、Phase 6）
 - 2026-11-11 完成規劃文件；尾端圈圈路徑已與參考圖疊圖校準（docs/reference/tail-loop-calibration.png）
