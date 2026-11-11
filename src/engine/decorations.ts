@@ -305,6 +305,34 @@ export function opsBounds(ops: Op[]): { l: number; t: number; r: number; b: numb
   return Number.isFinite(l) ? { l, t, r, b } : null;
 }
 
+/** 同上，但貝茲曲線用曲線上的點量（不是控制點），範圍比較貼近看得到的線條 */
+export function opsExtent(ops: Op[]): { l: number; t: number; r: number; b: number } | null {
+  const flat: Op[] = ops.map((op) => {
+    const cmds: PathCmd[] = [];
+    let cur: [number, number] = [0, 0];
+    for (const c of op.cmds) {
+      if (c[0] === 'M' || c[0] === 'L') {
+        cur = [c[1], c[2]];
+        cmds.push(c);
+      } else if (c[0] === 'C') {
+        const [x0, y0] = cur;
+        for (let i = 1; i <= 12; i++) {
+          const t = i / 12;
+          const u = 1 - t;
+          cmds.push([
+            'L',
+            u * u * u * x0 + 3 * u * u * t * c[1] + 3 * u * t * t * c[3] + t * t * t * c[5],
+            u * u * u * y0 + 3 * u * u * t * c[2] + 3 * u * t * t * c[4] + t * t * t * c[6],
+          ]);
+        }
+        cur = [c[5], c[6]];
+      }
+    }
+    return { ...op, cmds };
+  });
+  return opsBounds(flat);
+}
+
 export function drawOps(ctx: CanvasRenderingContext2D, ops: Op[], color: string) {
   ctx.save();
   ctx.lineCap = 'round';

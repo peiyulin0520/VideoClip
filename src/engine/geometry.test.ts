@@ -5,6 +5,7 @@ import {
   fittedSize,
   itemBox,
   pointInBox,
+  selectionBox,
   snapMove,
   snapRotation,
   SAFE_BOTTOM,
@@ -50,6 +51,44 @@ describe('geometry', () => {
     const b = itemBox(createTextItem(0), ctx)!;
     expect(b.w).toBe(400);
     expect(b.h).toBe(100);
+  });
+
+  it('selectionBox：文字用「看得到的內容」，不是含透明邊的整張畫布；內容偏一邊時中心跟著偏（含旋轉）', () => {
+    const textCtx: GeoCtx = {
+      ...ctx,
+      // 畫布 400×200，看得到的內容只有左上角 100×40（x=20,y=10）→ 內容中心 (70,30)，畫布中心 (200,100)
+      textSize: () => ({ w: 400, h: 200, content: { x: 20, y: 10, w: 100, h: 40 } }),
+    };
+    const it = createTextItem(0);
+    const b = selectionBox(it, textCtx)!;
+    expect(b.w).toBe(100);
+    expect(b.h).toBe(40);
+    expect(b.cx).toBeCloseTo(540 + (70 - 200)); // 偏左
+    expect(b.cy).toBeCloseTo(960 + (30 - 100)); // 偏上
+    // 縮放 2 倍：大小和偏移都乘 2
+    const b2 = selectionBox({ ...it, transform: { ...it.transform, scale: 2 } }, textCtx)!;
+    expect(b2.w).toBe(200);
+    expect(b2.cx).toBeCloseTo(540 + 2 * (70 - 200));
+    // 轉 90°：偏移 (-130,-70) 順時針轉 90° → (70,-130)
+    const b3 = selectionBox({ ...it, transform: { ...it.transform, rotation: 90 } }, textCtx)!;
+    expect(b3.cx).toBeCloseTo(540 + 70);
+    expect(b3.cy).toBeCloseTo(960 - 130);
+    // 沒有 content 資訊就退回整張畫布
+    expect(selectionBox(it, ctx)!.w).toBe(400);
+    // 影片不受影響
+    const v: VideoItem = { ...createOverlayClip(asset, 0), assetId: 'a' };
+    expect(selectionBox(v, ctx)).toEqual(itemBox(v, ctx));
+  });
+
+  it('topHit：很小的物件點選範圍至少 minSize', () => {
+    const tiny: GeoCtx = { ...ctx, textSize: () => ({ w: 20, h: 20 }) };
+    const layer = {
+      item: createTextItem(0),
+      track: { id: 't', kind: 'text', name: 't', hidden: false, locked: false, items: [] },
+      trackIndex: 1,
+    } as never;
+    expect(topHit([layer], tiny, 540 + 30, 960)).toBeNull();
+    expect(topHit([layer], tiny, 540 + 30, 960, 80)).toBeTruthy();
   });
 
   it('旋轉後的點擊判斷', () => {

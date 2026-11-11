@@ -2,11 +2,18 @@ import { cssFamily, FALLBACK_STACK, requestFont } from '../fonts/fontStore';
 import type { TextCard, TextItem, TextRun } from '../model/types';
 import type { Op } from './decorations';
 import { shapePath } from './shapes';
-import { decorationOps, drawOps, opsBounds } from './decorations';
+import { decorationOps, drawOps, opsExtent } from './decorations';
 import { layoutCard, type GlyphBox, type GlyphMetric, type Measurer } from './cardLayout';
 
 // 字卡繪製：排版交給 cardLayout（逐字、墨跡邊界），這裡負責畫字塊、描邊、陰影、文字。見 docs/TEXT_CARDS.md。
-export type TextRender = { canvas: HTMLCanvasElement; w: number; h: number; key: string };
+export type TextRender = {
+  canvas: HTMLCanvasElement;
+  w: number;
+  h: number;
+  key: string;
+  /** 看得到的內容範圍（字塊、文字含描邊、裝飾的聯集），相對畫布左上角。選取框、點選範圍用這個，不用含透明邊的整張畫布 */
+  content: { x: number; y: number; w: number; h: number };
+};
 
 const cache = new Map<string, TextRender>();
 const MAX_CACHE = 60;
@@ -84,7 +91,7 @@ export function renderText(card: TextCard, scale: number): TextRender {
   let decoReach = 0;
   const boxStroke = (card.box?.stroke?.width ?? 0) * scale;
   for (const { ops } of [...decoOps, { ops: boxOps.map((o) => ({ ...o, width: boxStroke })) }]) {
-    const bb = opsBounds(ops);
+    const bb = opsExtent(ops);
     if (!bb) continue;
     decoReach = Math.max(decoReach, -bb.l, -bb.t, bb.r - lay.w, bb.b - lay.h);
   }
@@ -168,7 +175,29 @@ export function renderText(card: TextCard, scale: number): TextRender {
     withSkew(run, oy + g.y, () => ctx.fillText(g.ch, ox + g.x, oy + g.y));
   }
 
-  const out = { canvas, w, h, key };
+  // 看得到的內容範圍：文字墨跡（含描邊）∪ 字塊（含外框、尾巴）∪ 裝飾
+  const strokeW = Math.max(0, ...card.runs.flatMap((r) => (r.strokes ?? []).map((s) => s.width))) * scale;
+  let cl = ox + lay.ink.x - strokeW;
+  let ct = oy + lay.ink.y - strokeW;
+  let cr = ox + lay.ink.x + lay.ink.w + strokeW;
+  let cb = oy + lay.ink.y + lay.ink.h + strokeW;
+  const addBounds = (ops: Op[]) => {
+    const bb = opsExtent(ops);
+    if (!bb) return;
+    cl = Math.min(cl, ox + bb.l);
+    ct = Math.min(ct, oy + bb.t);
+    cr = Math.max(cr, ox + bb.r);
+    cb = Math.max(cb, oy + bb.b);
+  };
+  addBounds(boxOps.map((o) => ({ ...o, width: boxStroke })));
+  for (const { ops } of decoOps) addBounds(ops);
+  const content = {
+    x: Math.max(cl, 0),
+    y: Math.max(ct, 0),
+    w: Math.min(cr, w) - Math.max(cl, 0),
+    h: Math.min(cb, h) - Math.max(ct, 0),
+  };
+  const out = { canvas, w, h, key, content };
   cache.set(key, out);
   if (cache.size > MAX_CACHE) cache.delete(cache.keys().next().value!);
   return out;
@@ -179,7 +208,11 @@ export function uiScale(canvasW: number, canvasH: number): number {
   return Math.min(canvasW, canvasH) / 1080;
 }
 
-export function measureTextItem(item: TextItem, canvasW: number, canvasH: number): { w: number; h: number } {
+export function measureTextItem(
+  item: TextItem,
+  canvasW: number,
+  canvasH: number,
+): { w: number; h: number; content: TextRender['content'] } {
   const r = renderText(item.card, uiScale(canvasW, canvasH));
-  return { w: r.w, h: r.h };
+  return { w: r.w, h: r.h, content: r.content };
 }

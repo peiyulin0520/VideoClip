@@ -1,11 +1,11 @@
-import { Maximize2, ShieldCheck, X } from 'lucide-react';
+import { Maximize, Minimize, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { urlFor } from '../../engine/assetUrls';
 import { installDebugHook } from '../../engine/debug';
 import { useFonts } from '../../fonts/fontStore';
 import {
   boxCorners,
-  itemBox,
+  selectionBox,
   snapMove,
   snapRotation,
   SAFE_BOTTOM,
@@ -15,7 +15,7 @@ import {
 import { Player } from '../../engine/player';
 import { geoCtx } from '../../engine/scene';
 import { findItem, visibleLayers } from '../../engine/timeline';
-import { removeAnyItem, setTransform } from '../../store/actions';
+import { setTransform } from '../../store/actions';
 import { setAssetThumbs, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 
@@ -41,7 +41,18 @@ type Gesture =
       startRot: number;
     };
 
-export function Preview({ projectId, width, height }: { projectId: string; width: number; height: number }) {
+export function Preview({
+  projectId,
+  width,
+  height,
+  emptyAction,
+}: {
+  projectId: string;
+  width: number;
+  height: number;
+  /** 專案還沒有素材時，在預覽中央顯示的「匯入」按鈕 */
+  emptyAction?: () => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const poolRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -53,6 +64,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
+  const previewFull = useUI((s) => s.previewFull);
   const fontEpoch = useFonts((s) => s.epoch); // 字體載入完成：字卡大小可能變，選取框要重算
 
   // ---- 建立 / 銷毀播放引擎（含 Pixi 合成器）----
@@ -122,7 +134,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const geo = useMemo(() => geoCtx(project, width, height), [project, width, height, fontEpoch]);
   const sel = findItem(project, selectedId);
-  const box = sel && selVisible ? itemBox(sel.item, geo) : null;
+  const box = sel && selVisible ? selectionBox(sel.item, geo) : null;
   const selLocked = !!sel?.track.locked || !!sel?.track.hidden;
 
   const pointers = useRef(new Map<number, Pt>());
@@ -171,7 +183,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
 
     useUI.getState().player?.pause();
     const t = useUI.getState().player?.time ?? 0;
-    const hit = topHit(visibleLayers(st.project!, t), geo, pt.x, pt.y);
+    const hit = topHit(visibleLayers(st.project!, t), geo, pt.x, pt.y, 40 / k);
     if (!hit) {
       st.select(null);
       gesture.current = null;
@@ -213,11 +225,14 @@ export function Preview({ projectId, width, height }: { projectId: string; width
       if (!g.moved && Math.hypot(dx, dy) < 4 / k) return; // 小於 4px 當作點擊，不算移動
       g.moved = true;
       setDragging(true);
-      const base = itemBox(f.item, geo);
+      const base = selectionBox(f.item, geo);
       if (!base) return;
+      // 吸附用「看得到的內容」的方框；內容中心和物件中心（transform）可能不同（裝飾偏一邊）
+      const offX = base.cx - f.item.transform.x * width;
+      const offY = base.cy - f.item.transform.y * height;
       let cx = g.startX * width + dx;
       let cy = g.startY * height + dy;
-      const snap = snapMove({ ...base, cx, cy }, width, height, 8 / k, true);
+      const snap = snapMove({ ...base, cx: cx + offX, cy: cy + offY }, width, height, 8 / k, true);
       cx += snap.dx;
       cy += snap.dy;
       setGuides({ x: snap.guideX, y: snap.guideY });
@@ -237,8 +252,8 @@ export function Preview({ projectId, width, height }: { projectId: string; width
     }
   };
 
-  // ---- 右上角：縮放＋旋轉 ----
-  const onScaleDown = (e: RPointerEvent) => {
+  // ---- 四角小點：縮放（以中心為準）；上方小點：旋轉 ----
+  const onHandleDown = (kind: 'scale' | 'rotate') => (e: RPointerEvent) => {
     if (!sel || !box || selLocked) return;
     e.stopPropagation();
     e.preventDefault();
@@ -257,9 +272,13 @@ export function Preview({ projectId, width, height }: { projectId: string; width
     const r0 = sel.item.transform.rotation;
     const move = (ev: PointerEvent) => {
       const v = { x: ev.clientX - cx, y: ev.clientY - cy };
-      const d = Math.hypot(v.x, v.y);
-      const rot = snapRotation(r0 + ((Math.atan2(v.y, v.x) - a0) * 180) / Math.PI);
-      setTransform(id, { scale: clamp((s0 * d) / d0, 0.05, 10), rotation: rot }, `scale:${id}`);
+      if (kind === 'scale') {
+        const d = Math.hypot(v.x, v.y);
+        setTransform(id, { scale: clamp((s0 * d) / d0, 0.05, 10) }, `scale:${id}`);
+      } else {
+        const rot = snapRotation(r0 + ((Math.atan2(v.y, v.x) - a0) * 180) / Math.PI);
+        setTransform(id, { rotation: rot }, `rotate:${id}`);
+      }
     };
     const up = () => {
       setDragging(false);
@@ -283,16 +302,26 @@ export function Preview({ projectId, width, height }: { projectId: string; width
     }
   };
 
-  // 縮放鈕（右上）與刪除鈕（左上）：跟著方框的角走，但夾在舞台內，方框比畫面大時（例如填滿的影片）也按得到
-  let handles: { tl: Pt; tr: Pt } | null = null;
+  // 四角小點與旋轉點：貼著方框，往框外偏一點（不蓋住物件），但夾在舞台內，方框比畫面大時（例如填滿的影片）也按得到
+  let handles: { corners: Pt[]; rotate: Pt } | null = null;
   if (box) {
-    const [tl, tr] = boxCorners(box);
-    const m = 22;
-    const cl = (p: [number, number]): Pt => ({
-      x: clamp(p[0] * k, m, cssW - m),
-      y: clamp(p[1] * k, m, (height / width) * cssW - m),
-    });
-    handles = { tl: cl(tl!), tr: cl(tr!) };
+    const m = 18;
+    const stageH = (height / width) * cssW;
+    const c = { x: box.cx * k, y: box.cy * k };
+    const out = (p: [number, number], d: number): Pt => {
+      const vx = p[0] * k - c.x;
+      const vy = p[1] * k - c.y;
+      const len = Math.hypot(vx, vy) || 1;
+      return {
+        x: clamp(p[0] * k + (vx / len) * d, m, cssW - m),
+        y: clamp(p[1] * k + (vy / len) * d, m, stageH - m),
+      };
+    };
+    const cs = boxCorners(box);
+    const topMid: [number, number] = [(cs[0]![0] + cs[1]![0]) / 2, (cs[0]![1] + cs[1]![1]) / 2];
+    // 物件很小時，角點和旋轉點會擠在一起、觸控區互相蓋住：越小就推得越遠
+    const extra = clamp((72 - Math.min(box.w, box.h) * k) / 2, 0, 18);
+    handles = { corners: cs.map((p) => out(p, 10 + extra)), rotate: out(topMid, 28 + extra * 1.8) };
   }
 
   return (
@@ -339,35 +368,41 @@ export function Preview({ projectId, width, height }: { projectId: string; width
         )}
         {box && sel && !selLocked && handles && (
           <>
-            {/* 主軌不放 ✕：在預覽上一鍵刪掉整段主軌太容易誤觸，刪除請用工具列 */}
-            {sel.track.kind !== 'main' && (
+            {handles.corners.map((p, i) => (
               <button
-                data-handle="del"
-                className="sel-handle"
-                aria-label="刪除圖層"
-                style={{ left: handles.tl.x, top: handles.tl.y }}
-                onClick={() => removeAnyItem(sel.item.id)}
-              >
-                <span>
-                  <X size={14} />
-                </span>
-              </button>
-            )}
+                key={i}
+                data-handle="scale"
+                className="sel-dot"
+                aria-label="縮放（拖曳角落）"
+                data-testid="scale-handle"
+                style={{ left: p.x, top: p.y }}
+                onPointerDown={onHandleDown('scale')}
+              />
+            ))}
             <button
-              data-handle="scale"
-              className="sel-handle scale"
-              aria-label="縮放與旋轉"
-              data-testid="scale-handle"
-              style={{ left: handles.tr.x, top: handles.tr.y }}
-              onPointerDown={onScaleDown}
-            >
-              <span>
-                <Maximize2 size={14} />
-              </span>
-            </button>
+              data-handle="rotate"
+              className="sel-dot rotate"
+              aria-label="旋轉（拖曳上方圓點）"
+              data-testid="rotate-handle"
+              style={{ left: handles.rotate.x, top: handles.rotate.y }}
+              onPointerDown={onHandleDown('rotate')}
+            />
           </>
         )}
       </div>
+      {emptyAction && (
+        <button className="empty-import" onClick={emptyAction}>
+          ＋ 匯入影片或照片
+        </button>
+      )}
+      <button
+        className="full-toggle"
+        aria-label={previewFull ? '結束全螢幕預覽' : '全螢幕預覽'}
+        aria-pressed={previewFull}
+        onClick={() => useUI.setState({ previewFull: !previewFull })}
+      >
+        {previewFull ? <Minimize size={20} /> : <Maximize size={20} />}
+      </button>
       <button
         className={`safe-toggle${safe ? ' on' : ''}`}
         aria-label="安全區參考線"

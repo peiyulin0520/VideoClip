@@ -82,20 +82,19 @@ test('同一秒疊 3 支影片＋1 個字卡：換圖層順序後預覽正確，
   }
 });
 
-test('預覽上的選取框：點選、拖移、右上角縮放旋轉鈕、刪除鈕', async ({ page }) => {
+test('預覽上的選取框：點選、拖移、四角小點縮放、上方圓點旋轉、用剪輯分頁刪除', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
   await expect(clips(page)).toHaveCount(2);
 
-  // 新加的疊加素材自動被選取，出現選取框與兩顆圓鈕
+  // 新加的疊加素材自動被選取，出現選取框、四個角點、一個旋轉點（沒有 ✕ 和大圓鈕）
   await expect(page.getByTestId('selbox')).toBeVisible();
-  const handle = page.getByTestId('scale-handle');
-  await expect(handle).toBeVisible();
+  await expect(page.getByTestId('scale-handle')).toHaveCount(4);
+  await expect(page.getByRole('button', { name: '刪除圖層' })).toHaveCount(0);
+  const handle = page.getByTestId('scale-handle').nth(1); // 右上角
   const hb = (await handle.boundingBox())!;
-  expect(hb.width).toBeGreaterThanOrEqual(44);
-  expect(hb.height).toBeGreaterThanOrEqual(44);
-  const del = page.getByRole('button', { name: '刪除圖層' });
-  expect((await del.boundingBox())!.width).toBeGreaterThanOrEqual(44);
+  expect(hb.width).toBeGreaterThanOrEqual(36);
+  expect(hb.height).toBeGreaterThanOrEqual(36);
 
   const tf0 = (await project(page)).tracks[1]!.items[0]!.transform;
   expect(tf0.scale).toBeCloseTo(0.5);
@@ -130,8 +129,25 @@ test('預覽上的選取框：點選、拖移、右上角縮放旋轉鈕、刪�
   const tf3 = (await project(page)).tracks[1]!.items[0]!.transform;
   expect(tf3.x).toBeCloseTo(tf1.x, 1);
 
-  // 刪除鈕
-  await page.getByRole('button', { name: '刪除圖層' }).tap();
+  // 旋轉：拖上方圓點到右邊（約 90°，會吸附）
+  const rot = page.getByTestId('rotate-handle');
+  await expect(rot).toBeVisible();
+  const rb = (await rot.boundingBox())!;
+  const sb = (await page.getByTestId('selbox').boundingBox())!;
+  const ccx = sb.x + sb.width / 2;
+  const ccy = sb.y + sb.height / 2;
+  const rr = Math.hypot(rb.x + rb.width / 2 - ccx, rb.y + rb.height / 2 - ccy);
+  await page.mouse.move(rb.x + rb.width / 2, rb.y + rb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(ccx + rr * 0.7, ccy - rr * 0.7, { steps: 5 });
+  await page.mouse.move(ccx + rr, ccy, { steps: 5 });
+  await page.mouse.up();
+  const rotated = (await project(page)).tracks[1]!.items[0]!.transform.rotation;
+  expect(Math.abs(rotated - 90)).toBeLessThan(6);
+
+  // 刪除：用剪輯分頁的刪除鈕（預覽上不再放 ✕）
+  await openTab(page, '剪輯');
+  await page.getByRole('button', { name: '刪除', exact: true }).tap();
   await expect(clips(page)).toHaveCount(1);
   await expect(page.getByTestId('selbox')).toHaveCount(0);
 });

@@ -68,7 +68,7 @@ test('拖移疊加物件時參考線才出現，放開就消失；匯出的畫�
   expect(isRed(out.samples[1] as [number, number, number, number])).toBe(true);
 });
 
-test('主軌：匯入後不自動選取；預覽單點不選；從時間軸選才有細框（沒有 ✕、有縮放鈕）；疊加照舊自動選取', async ({
+test('主軌：匯入後不自動選取；預覽單點不選；從時間軸選才有細框（四角縮放點）；疊加照舊自動選取', async ({
   page,
 }) => {
   await createProjectWith(page, ['solid-red.webm']);
@@ -95,11 +95,11 @@ test('主軌：匯入後不自動選取；預覽單點不選；從時間軸選�
   await expect(page.getByTestId('selbox')).toBeVisible();
   await expect(page.getByTestId('selbox')).toHaveClass(/main/);
   await expect(page.getByRole('button', { name: '刪除圖層' })).toHaveCount(0);
-  await expect(page.getByTestId('scale-handle')).toBeVisible();
+  await expect(page.getByTestId('scale-handle')).toHaveCount(4);
   await page.screenshot({ path: `${SHOT}/after-main-selected.png` });
 
   // 疊加素材：匯入後仍自動選取，有 ✕
   await addOverlays(page, ['solid-green.webm']);
   await expect(page.getByTestId('selbox')).toBeVisible();
-  await expect(page.getByRole('button', { name: '刪除圖層' })).toBeVisible();
+  await expect(page.getByTestId('scale-handle')).toHaveCount(4);
 });

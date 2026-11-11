@@ -10,6 +10,10 @@ type UI = {
   busy: string | null;
   setBusy: (text: string | null) => void;
   player: Player | null;
+  /** 底部設定面板展開時，時間軸縮成精簡模式，讓預覽畫面大一點 */
+  compactTimeline: boolean;
+  /** 全螢幕預覽：隱藏時間軸與底部面板 */
+  previewFull: boolean;
 };
 
 export const useUI = create<UI>((set, get) => ({
@@ -22,6 +26,8 @@ export const useUI = create<UI>((set, get) => ({
   busy: null,
   setBusy: (busy) => set({ busy }),
   player: null,
+  compactTimeline: false,
+  previewFull: false,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

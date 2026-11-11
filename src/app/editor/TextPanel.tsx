@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CardBox, Stroke, TextItem } from '../../model/types';
-import { editText } from '../../store/actions';
+import { editText, removeAnyItem } from '../../store/actions';
+import { useProjectStore } from '../../store/projectStore';
 import { DECORATION_KINDS } from '../../engine/decorations';
 import { SHAPE_CATS, SHAPES, shapeDef } from '../../engine/shapes';
 import { Slider } from '../../ui/Slider';
@@ -149,6 +150,16 @@ export function TextPanel({
               onClick={() => edit((c) => void (c.runs[0]!.italic = !run.italic))}
             >
               斜體
+            </button>
+            <button
+              className="chip danger"
+              aria-label="刪除這個文字"
+              onClick={() => {
+                removeAnyItem(id);
+                useProjectStore.getState().select(null);
+              }}
+            >
+              刪除
             </button>
           </div>
         </>

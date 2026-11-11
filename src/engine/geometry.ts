@@ -3,7 +3,11 @@ import type { Layer } from './timeline';
 
 /** 畫面（canvas）像素座標下的物件方框；rotation 單位是度，順時針，繞中心 */
 export type Box = { cx: number; cy: number; w: number; h: number; rotation: number };
-export type TextSize = (item: TextItem, canvasW: number, canvasH: number) => { w: number; h: number };
+export type TextSize = (
+  item: TextItem,
+  canvasW: number,
+  canvasH: number,
+) => { w: number; h: number; content?: { x: number; y: number; w: number; h: number } };
 export type GeoCtx = { canvasW: number; canvasH: number; assets: Asset[]; textSize: TextSize };
 
 // 平台按鈕安全區：直式畫面底部約 250/1920、右側約 150/1080（見 docs 的字卡規則）
@@ -27,6 +31,29 @@ export function croppedSource(asset: Asset, crop?: Crop): { w: number; h: number
   return {
     w: Math.max(asset.width * (1 - c.l - c.r), 1),
     h: Math.max(asset.height * (1 - c.t - c.b), 1),
+  };
+}
+
+/**
+ * 選取框／點選範圍／吸附用的方框：文字用「看得到的內容」（字塊∪文字∪裝飾），不是含透明邊的整張畫布。
+ * 畫面渲染用 itemBox（整張畫布）；兩者中心可能不同（裝飾偏一邊時），這裡已換算。
+ */
+export function selectionBox(item: Item, ctx: GeoCtx): Box | null {
+  const base = itemBox(item, ctx);
+  if (!base || item.type !== 'text') return base;
+  const s = ctx.textSize(item, ctx.canvasW, ctx.canvasH);
+  const c = s.content;
+  if (!c) return base;
+  const k = item.transform.scale;
+  const dx = (c.x + c.w / 2 - s.w / 2) * k;
+  const dy = (c.y + c.h / 2 - s.h / 2) * k;
+  const a = (base.rotation * Math.PI) / 180;
+  return {
+    cx: base.cx + dx * Math.cos(a) - dy * Math.sin(a),
+    cy: base.cy + dx * Math.sin(a) + dy * Math.cos(a),
+    w: c.w * k,
+    h: c.h * k,
+    rotation: base.rotation,
   };
 }
 
@@ -83,12 +110,14 @@ export function aabb(box: Box): { l: number; t: number; r: number; b: number } {
 }
 
 /** 點在哪個圖層上（最上面的優先）。鎖定的軌道、隱藏的軌道不會被選到。 */
-export function topHit(layers: Layer[], ctx: GeoCtx, px: number, py: number): Layer | null {
+/** minSize：點選範圍至少這麼大（畫面座標），讓很小的物件手指也點得到 */
+export function topHit(layers: Layer[], ctx: GeoCtx, px: number, py: number, minSize = 0): Layer | null {
   for (let i = layers.length - 1; i >= 0; i--) {
     const l = layers[i]!;
     if (l.track.locked) continue;
-    const box = itemBox(l.item, ctx);
-    if (box && pointInBox(box, px, py)) return l;
+    const box = selectionBox(l.item, ctx);
+    if (box && pointInBox({ ...box, w: Math.max(box.w, minSize), h: Math.max(box.h, minSize) }, px, py))
+      return l;
   }
   return null;
 }

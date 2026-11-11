@@ -321,7 +321,7 @@ button {
 .stage-wrap {
   position: relative;
   flex: 1;
-  min-height: 120px;
+  min-height: 150px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -406,7 +406,7 @@ button {
 .selbox {
   position: absolute;
   box-sizing: border-box;
-  border: 2px solid #fff;
+  border: 1.5px solid #fff;
   pointer-events: none;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
@@ -464,7 +464,7 @@ button {
 }
 .empty-import {
   position: absolute;
-  top: 38%;
+  top: 50%;
   left: 50%;
   z-index: 5;
   min-height: 52px;
@@ -473,7 +473,7 @@ button {
   color: #fff;
   background: var(--accent);
   border-radius: 26px;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
 }
 .playbar {
   display: flex;
@@ -1123,7 +1123,7 @@ button {
 
 /* 字卡面板：設定很多，面板高一點；分頁（文字／版面／字塊／描邊陰影）捲動時固定在上面 */
 .panel.tall {
-  max-height: 34dvh;
+  max-height: 25dvh;
 }
 .sticky-tabs {
   position: sticky;
@@ -1223,4 +1223,51 @@ button {
 .shape-thumb {
   width: 100%;
   height: 40px;
+}
+
+/* 選取框的角點：看得到的點 12px，觸控區 40px（往框外偏，不蓋住物件） */
+.sel-dot {
+  position: absolute;
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  touch-action: none;
+}
+.sel-dot::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+}
+.sel-dot.rotate::after {
+  background: var(--accent);
+  border-color: #fff;
+}
+
+.chip.danger {
+  color: #ff6b6b;
+}
+.full-toggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 4;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+}
+/* 全螢幕預覽：隱藏時間軸與底部面板，預覽用掉所有剩下的空間 */
+.editor.preview-full .timeline,
+.editor.preview-full .bottombar {
+  display: none;
 }

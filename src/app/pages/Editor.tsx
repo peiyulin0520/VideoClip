@@ -75,6 +75,7 @@ function EditorBody() {
   const canUndo = useProjectStore((s) => s.past.length > 0);
   const canRedo = useProjectStore((s) => s.future.length > 0);
   const player = useUI((s) => s.player);
+  const previewFull = useUI((s) => s.previewFull);
   const fileInput = useRef<HTMLInputElement>(null);
   const [pps, setPps] = useState(60);
   const [time, setTime] = useState(0);
@@ -143,7 +144,7 @@ function EditorBody() {
   const empty = mainItems(project).length === 0;
 
   return (
-    <main className="editor">
+    <main className={`editor${previewFull ? ' preview-full' : ''}`}>
       <header className="ed-top">
         <Link className="icon-btn" to="/" aria-label="回首頁">
           <ChevronLeft />
@@ -183,12 +184,12 @@ function EditorBody() {
         </button>
       </header>
 
-      <Preview projectId={project.id} width={project.width} height={project.height} />
-      {empty && (
-        <button className="empty-import" onClick={() => pick('main')}>
-          ＋ 匯入影片或照片
-        </button>
-      )}
+      <Preview
+        projectId={project.id}
+        width={project.width}
+        height={project.height}
+        emptyAction={empty ? () => pick('main') : undefined}
+      />
 
       <div className="playbar">
         <button

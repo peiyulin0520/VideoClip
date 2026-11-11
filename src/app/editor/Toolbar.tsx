@@ -18,7 +18,7 @@ import {
   Volume2,
   type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BLEND_LABELS } from '../../engine/geometry';
 import {
   findItem,
@@ -93,6 +93,13 @@ export function BottomBar({
 
   const found = findItem(project, selectedId);
   const items = mainItems(project);
+
+  // 文字／疊加／圖層面板展開時，時間軸縮成精簡模式（預覽畫面才夠大）
+  const compact = tab !== 'edit' && !collapsed;
+  useEffect(() => {
+    useUI.setState({ compactTimeline: compact });
+    return () => useUI.setState({ compactTimeline: false });
+  }, [compact]);
 
   // 點目前的分頁＝收合/展開下面的面板（讓出空間給預覽畫面）
   const switchTab = (t: Tab) => {
