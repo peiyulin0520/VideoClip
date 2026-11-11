@@ -363,23 +363,30 @@ button {
 .safe-bottom,
 .safe-right {
   position: absolute;
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(255, 77, 141, 0.22) 0 6px,
-    rgba(255, 77, 141, 0.08) 6px 12px
-  );
+  background: rgba(255, 77, 141, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  line-height: 1.2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
 }
 .safe-bottom {
   left: 0;
   right: 0;
   bottom: 0;
-  border-top: 1px dashed rgba(255, 77, 141, 0.7);
+  border-top: 1.5px dashed rgba(255, 77, 141, 0.85);
 }
 .safe-right {
   top: 0;
   right: 0;
   bottom: 0;
-  border-left: 1px dashed rgba(255, 77, 141, 0.7);
+  border-left: 1.5px dashed rgba(255, 77, 141, 0.85);
+}
+.safe-right span {
+  writing-mode: vertical-rl;
 }
 .guide {
   position: absolute;
@@ -402,6 +409,10 @@ button {
   border: 2px solid #fff;
   pointer-events: none;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.selbox.main {
+  border-width: 1px;
+  box-shadow: none;
 }
 .selbox.locked {
   border-style: dashed;
@@ -436,6 +447,11 @@ button {
   background: var(--accent);
 }
 .safe-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  font-size: 13px;
   position: absolute;
   right: 6px;
   bottom: 6px;

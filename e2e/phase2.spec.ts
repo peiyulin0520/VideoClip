@@ -141,7 +141,6 @@ test('點預覽畫面會選到最上面那個物件；鎖定的軌道不會被�
   await addOverlays(page, ['solid-green.webm', 'solid-blue.webm']);
   const track2Id = (await project(page)).tracks[2]!.items[0]!.id; // 藍（最上面）
   const track1Id = (await project(page)).tracks[1]!.items[0]!.id; // 綠
-  const mainId = (await project(page)).tracks[0]!.items[0]!.id;
 
   // 開關底部分頁會讓舞台大小改變，所以每次點擊前重新量舞台的位置
   const click = async (nx: number, ny: number) => {
@@ -151,8 +150,8 @@ test('點預覽畫面會選到最上面那個物件；鎖定的軌道不會被�
 
   await click(0.5, 0.5); // 中間：藍在最上面
   expect(await selectedItemId(page)).toBe(track2Id);
-  await click(0.08, 0.08); // 角落：只有主軌
-  expect(await selectedItemId(page)).toBe(mainId);
+  await click(0.08, 0.08); // 角落：只有主軌 → 預覽上單點主軌不會選到它（要從時間軸選）
+  expect(await selectedItemId(page)).toBeNull();
 
   // 鎖定藍色那條軌道 → 點中間會選到綠
   await openTab(page, '圖層');
