@@ -4,7 +4,7 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`（Phase 1–3B 都在這個分支，**還沒合併到 `main`**；網址上線的只有 Phase 0）
+- **分支**：Phase 1–3B 已經合併進 `main`（PR #2，使用者 2026-11-11 合併，GitHub Actions 部署成功，run #8）。上線網址 https://peiyulin0520.github.io/VideoClip/ 現在是 Phase 3B 的版本。之後的新工作繼續在 `claude/zen-tesla-v3brj5`（已用 fast-forward 對齊最新 `main`，沒有改寫歷史）
 - **最後一個程式 commit**：見 `git log -1`（Phase 3B：字體管線、首次使用精靈、設定頁、字體選單）；之後只有交接文件的 commit
 - **測試**：41 個單元測試、22 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0 ✅、1 ✅、2 ✅、3B（字體）✅；**Phase 3A（字卡引擎）尚未開始**；Phase 4–7 未開始
@@ -12,7 +12,7 @@
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 用 iPhone 實測 Phase 1–3B（清單在 `docs/PLAN.md §7`），特別是：多影片同時播放、字體下載/快取、首次使用精靈、匯入字體、預覽畫面在底部面板展開時是否太小
-  - 決定是否把 Phase 1–3B 合併到 `main` 上線（要開 PR）
+  - （已完成）合併上線；現在等使用者在手機上實測 https://peiyulin0520.github.io/VideoClip/ 並回報
   - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
 - **目前沒有進行到一半的修改**（工作目錄乾淨、已 push）
 
@@ -51,6 +51,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 Phase 1–3B 合併上線（PR #2，分支 claude/zen-tesla-v3brj5 → main）
+  - 做了什麼：開 PR #2；GitHub 上的 build 檢查成功；使用者合併；`main` 的 CI & Deploy（run #8）成功，GitHub Pages 已部署；取消 PR 訂閱；分支用 fast-forward 對齊 main。
+  - 驗證：✅ 部署流程第一次在 main 跑成功（PLAN.md §7 原本的「部署尚未實際執行」已解除）；🟡 網站在 iPhone 上的實際表現還沒人測
+  - 使用者的決定/回饋：選 A（合併上線）、訂閱 PR
+  - 踩到的坑：自動模式會擋 `git push --force`；PR 合併後要對齊 main 時，用 `git merge --ff-only origin/main` 再一般 push 就好，不用強制推送
+  - 下一步：等使用者手機實測回報；沒有回報前可以先做 Phase 3A（字卡引擎）
 - 2026-11-11 建立交接文件，讓其他 AI 只讀檔案就能接手（分支 claude/zen-tesla-v3brj5）
   - 做了什麼：新增 `AGENTS.md`（所有 AI 共用的規則、指令、紀錄規則）、`docs/HANDOFF.md`（使用者與合作方式、需求與決定的時間順序、架構地圖、資料流、決策與原因、踩過的坑、Phase 3A 的具體拆法、驗證方式）；`CLAUDE.md` 改成指向 AGENTS.md ＋ 沙盒補充；`docs/PROGRESS.md` 加「交接快照」（每次覆寫）和「日誌格式」；`package.json` 加 `npm run check`（lint＋測試＋build）。
   - 動了哪些檔：AGENTS.md、CLAUDE.md、README.md、docs/HANDOFF.md、docs/PROGRESS.md、package.json

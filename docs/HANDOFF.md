@@ -102,7 +102,7 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 
 ## 6. 現況與下一步
 **已完成**（細節與驗證看 PROGRESS.md 日誌）：Phase 0（骨架/PWA/部署）、Phase 1（專案管理＋多影片拼接）、Phase 2（多圖層＋選取框手勢＋圖層屬性）、Phase 3B（字體管線＋首次使用精靈＋設定頁＋字體選單＋匯入字體）。
-**尚未合併到 `main`**（Phase 1–3B 都在 `claude/zen-tesla-v3brj5`；目前上線的只有 Phase 0）。要上線：開 PR → merge → GitHub Actions 部署。
+**已合併並上線**（PR #2，2026-11-11；GitHub Actions 部署成功）。之後的工作在 `claude/zen-tesla-v3brj5`，要上線一樣：開 PR → 使用者 merge → 部署。PR 合併後分支對齊 main 用 `git merge --ff-only origin/main`（不要 force push）。
 
 ### 下一步：Phase 3A 字卡引擎（規格 `docs/TEXT_CARDS.md`，驗收見 `docs/PLAN.md` Phase 3）
 建議拆成可各自驗證的小步（每步都更新 PROGRESS.md、commit）：
