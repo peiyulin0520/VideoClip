@@ -337,11 +337,14 @@ function TextTab({ found }: { found: Found }) {
   return (
     <div className="panel tall">
       {item ? (
-        <TextPanel item={item} onAdd={add} />
+        <TextPanel item={item} onAdd={add} onAddShape={() => addText(player?.time ?? 0, true)} />
       ) : (
         <>
           <button className="btn primary done" onClick={add}>
             ＋ 新增文字（放在目前這一秒）
+          </button>
+          <button className="btn done" onClick={() => addText(player?.time ?? 0, true)}>
+            ＋ 新增圖形（星形、對話框、雲朵…）
           </button>
           <p className="hint">新增或點選一個文字後，可以在這裡改內容、字體、字塊和描邊。</p>
         </>
@@ -370,7 +373,9 @@ function LayersTab() {
           const asset = isVideoItem(item) ? project.assets.find((a) => a.id === item.assetId) : undefined;
           const label =
             item.type === 'text'
-              ? `文字：${item.card.runs[0]?.text.slice(0, 8) ?? ''}`
+              ? item.card.runs[0]?.text === ''
+                ? '圖形'
+                : `文字：${item.card.runs[0]?.text.slice(0, 8) ?? ''}`
               : (asset?.name ?? '素材');
           const isMain = track.kind === 'main';
           return (

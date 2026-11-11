@@ -77,7 +77,40 @@ export type DecorationKind =
   | 'corner-brackets';
 /** 字卡裝飾。width：線寬，佔文字墨跡高度的比例（星星、愛心、螢光筆不用） */
 export type Decoration = { kind: DecorationKind; color: string; width: number };
-export type BoxShape = 'rect' | 'roundRect' | 'pill';
+export type BoxShape =
+  | 'rect'
+  | 'roundRect'
+  | 'pill'
+  | 'ellipse'
+  | 'triangle'
+  | 'diamond'
+  | 'parallelogram'
+  | 'trapezoid'
+  | 'pentagon'
+  | 'hexagon'
+  | 'octagon'
+  | 'cross'
+  | 'snip'
+  | 'heart'
+  | 'cloud'
+  | 'cylinder'
+  | 'speech-rect'
+  | 'speech-round'
+  | 'speech-oval'
+  | 'thought'
+  | 'burst-bubble'
+  | 'star4'
+  | 'star5'
+  | 'star6'
+  | 'star8'
+  | 'burst'
+  | 'badge'
+  | 'banner'
+  | 'tag'
+  | 'arrow-right'
+  | 'chevron'
+  | 'step'
+  | 'doc';
 /** 字塊（字卡的底色塊）。尺寸＝文字墨跡 + 四邊內距，所以上下左右分開調才會準 */
 export type CardBox = {
   shape: BoxShape;
@@ -85,7 +118,9 @@ export type CardBox = {
   opacity: number; // 0–1
   padding: { top: number; right: number; bottom: number; left: number }; // px（1080 基準）
   nudgeY: number; // 文字在字塊內的垂直微調 px
-  radius?: number; // roundRect 的圓角 px；pill 固定半圓
+  radius?: number; // roundRect / speech-round 的圓角 px；pill 固定半圓
+  stroke?: Stroke; // 字塊外框（畫在圖形邊緣）
+  tailDir?: 'bottom-left' | 'bottom-right'; // 對話框尾巴方向（預設左下）
 };
 export type TextCard = {
   runs: TextRun[];

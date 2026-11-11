@@ -1,5 +1,7 @@
 import { cssFamily, FALLBACK_STACK, requestFont } from '../fonts/fontStore';
-import type { BoxShape, TextCard, TextItem, TextRun } from '../model/types';
+import type { TextCard, TextItem, TextRun } from '../model/types';
+import type { Op } from './decorations';
+import { shapePath } from './shapes';
 import { decorationOps, drawOps, opsBounds } from './decorations';
 import { layoutCard, type GlyphBox, type GlyphMetric, type Measurer } from './cardLayout';
 
@@ -42,29 +44,6 @@ const canvasMeasurer = (() => {
   return measurer;
 })();
 
-function boxPath(
-  ctx: CanvasRenderingContext2D,
-  shape: BoxShape,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
-  const rad = shape === 'rect' ? 0 : shape === 'pill' ? Math.min(w, h) / 2 : Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  if (rad <= 0) {
-    ctx.rect(x, y, w, h);
-    return;
-  }
-  ctx.moveTo(x + rad, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rad);
-  ctx.arcTo(x + w, y + h, x, y + h, rad);
-  ctx.arcTo(x, y + h, x, y, rad);
-  ctx.arcTo(x, y, x + w, y, rad);
-  ctx.closePath();
-}
-
 const ITALIC_TAN = Math.tan((12 * Math.PI) / 180);
 
 /** scale：畫布短邊 / 1080（uiScale）。字級以 1080 為基準，所以預覽（較小）與輸出（1080）看起來一樣。 */
@@ -89,9 +68,22 @@ export function renderText(card: TextCard, scale: number): TextRender {
       reach = Math.max(reach, r.shadow.blur + Math.max(Math.abs(r.shadow.x), Math.abs(r.shadow.y)));
   }
   // 裝飾（尾端圈圈等）會畫到字塊外面：以墨跡矩形算出每個裝飾的範圍，畫布四周留夠
+  const boxOps: Op[] = card.box
+    ? [
+        {
+          type: 'fill',
+          alpha: card.box.opacity,
+          cmds: shapePath(card.box.shape, lay.w, lay.h, {
+            radius: (card.box.radius ?? 28) * scale,
+            tail: card.box.tailDir,
+          }),
+        },
+      ]
+    : [];
   const decoOps = (card.decorations ?? []).map((d) => ({ d, ops: decorationOps(d, lay.ink) }));
   let decoReach = 0;
-  for (const { ops } of decoOps) {
+  const boxStroke = (card.box?.stroke?.width ?? 0) * scale;
+  for (const { ops } of [...decoOps, { ops: boxOps.map((o) => ({ ...o, width: boxStroke })) }]) {
     const bb = opsBounds(ops);
     if (!bb) continue;
     decoReach = Math.max(decoReach, -bb.l, -bb.t, bb.r - lay.w, bb.b - lay.h);
@@ -108,10 +100,12 @@ export function renderText(card: TextCard, scale: number): TextRender {
 
   if (card.box) {
     ctx.save();
-    ctx.globalAlpha = card.box.opacity;
-    ctx.fillStyle = card.box.fill;
-    boxPath(ctx, card.box.shape, ox, oy, lay.w, lay.h, (card.box.radius ?? 24) * scale);
-    ctx.fill();
+    ctx.translate(ox, oy);
+    // 填色與外框分開畫：外框不跟著字塊透明度以外的東西變
+    drawOps(ctx, boxOps, card.box.fill);
+    if (card.box.stroke && card.box.stroke.width > 0) {
+      drawOps(ctx, [{ ...boxOps[0]!, type: 'stroke', width: boxStroke }], card.box.stroke.color);
+    }
     ctx.restore();
   }
 

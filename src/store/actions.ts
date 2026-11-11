@@ -1,5 +1,12 @@
 import type { Draft } from 'immer';
-import { assignAspect, createOverlayClip, createTextItem, createTrack, pickAspect } from '../model/defaults';
+import {
+  assignAspect,
+  createOverlayClip,
+  createShapeItem,
+  createTextItem,
+  createTrack,
+  pickAspect,
+} from '../model/defaults';
 import type { Aspect, Asset, Item, TextItem, Track, Transform, VideoItem } from '../model/types';
 import {
   duplicateFree,
@@ -65,8 +72,8 @@ export function addOverlayClips(assets: Asset[], t: number): string | null {
   return firstId;
 }
 
-export function addText(t: number): string {
-  const item = createTextItem(t);
+export function addText(t: number, shape = false): string {
+  const item = shape ? createShapeItem(t) : createTextItem(t);
   store().apply((d) => {
     let ti = firstFreeTrack(d as never, 'text', item.start, item.duration);
     if (ti < 0) {

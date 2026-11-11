@@ -1,21 +1,17 @@
 import { useState } from 'react';
-import type { BoxShape, CardBox, Stroke, TextItem } from '../../model/types';
+import type { CardBox, Stroke, TextItem } from '../../model/types';
 import { editText } from '../../store/actions';
 import { DECORATION_KINDS } from '../../engine/decorations';
+import { SHAPE_CATS, SHAPES, shapeDef } from '../../engine/shapes';
 import { Slider } from '../../ui/Slider';
 import { DecoThumb } from './DecoThumb';
+import { ShapeThumb } from './ShapeThumb';
 import { FontSelect } from '../fonts/FontSelect';
 
 const COLORS = ['#ffffff', '#111111', '#ff4d8d', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
 const BOX_COLORS = ['#ff4d8d', '#ffffff', '#111111', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
 const SECTIONS = ['文字', '版面', '字塊', '描邊陰影', '裝飾'] as const;
 type Section = (typeof SECTIONS)[number];
-const SHAPES: { id: BoxShape | 'none'; label: string }[] = [
-  { id: 'none', label: '無字塊' },
-  { id: 'rect', label: '方形' },
-  { id: 'roundRect', label: '圓角' },
-  { id: 'pill', label: '膠囊' },
-];
 const SIDES = [
   ['top', '上'],
   ['bottom', '下'],
@@ -59,9 +55,18 @@ function Swatches({
   );
 }
 
-export function TextPanel({ item, onAdd }: { item: TextItem; onAdd: () => void }) {
+export function TextPanel({
+  item,
+  onAdd,
+  onAddShape,
+}: {
+  item: TextItem;
+  onAdd: () => void;
+  onAddShape: () => void;
+}) {
   const [section, setSection] = useState<Section>('文字');
   const [linked, setLinked] = useState(false);
+  const [cat, setCat] = useState<(typeof SHAPE_CATS)[number]>('基本');
   const card = item.card;
   const run = card.runs[0]!;
   const id = item.id;
@@ -218,27 +223,55 @@ export function TextPanel({ item, onAdd }: { item: TextItem; onAdd: () => void }
 
       {section === '字塊' && (
         <>
-          <div className="chips" role="radiogroup" aria-label="字塊形狀">
-            {SHAPES.map((s) => {
-              const on = s.id === 'none' ? !box : box?.shape === s.id;
+          <div className="chips">
+            <button
+              role="radio"
+              aria-checked={!box}
+              className={`chip${!box ? ' active' : ''}`}
+              onClick={() => edit((c) => void delete c.box)}
+            >
+              無字塊
+            </button>
+            {SHAPE_CATS.map((c) => (
+              <button
+                key={c}
+                className={`chip${cat === c ? ' active' : ''}`}
+                aria-pressed={cat === c}
+                aria-label={`圖形分類 ${c}`}
+                onClick={() => setCat(c)}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+          <div className="shape-grid" role="radiogroup" aria-label="字塊形狀" data-testid="shape-grid">
+            {SHAPES.filter((s) => s.cat === cat).map((s) => {
+              const on = box?.shape === s.id;
               return (
                 <button
                   key={s.id}
                   role="radio"
                   aria-checked={on}
-                  className={`chip${on ? ' active' : ''}`}
+                  aria-label={s.label}
+                  data-shape={s.id}
+                  className={`shape-cell${on ? ' active' : ''}`}
                   onClick={() =>
                     edit((c) => {
-                      if (s.id === 'none') delete c.box;
-                      else if (c.box) c.box.shape = s.id;
+                      if (c.box) c.box.shape = s.id;
                       else c.box = { ...DEFAULT_BOX, padding: { ...DEFAULT_BOX.padding }, shape: s.id };
                     })
                   }
                 >
-                  {s.label}
+                  <ShapeThumb shape={s.id} />
+                  <span>{s.label}</span>
                 </button>
               );
             })}
+          </div>
+          <div className="chips">
+            <button className="chip sm" onClick={onAddShape}>
+              ＋ 另外新增一個獨立圖形
+            </button>
           </div>
           {box ? (
             <>
@@ -257,7 +290,27 @@ export function TextPanel({ item, onAdd }: { item: TextItem; onAdd: () => void }
                 format={(v) => `${v}%`}
                 onChange={(v) => edit((c) => void (c.box!.opacity = v / 100), 'bop')}
               />
-              {box.shape === 'roundRect' && (
+              {shapeDef(box.shape).tail && (
+                <div className="chips" role="radiogroup" aria-label="尾巴方向">
+                  {(
+                    [
+                      ['bottom-left', '尾巴在左下'],
+                      ['bottom-right', '尾巴在右下'],
+                    ] as const
+                  ).map(([d, label]) => (
+                    <button
+                      key={d}
+                      role="radio"
+                      aria-checked={(box.tailDir ?? 'bottom-left') === d}
+                      className={`chip${(box.tailDir ?? 'bottom-left') === d ? ' active' : ''}`}
+                      onClick={() => edit((c) => void (c.box!.tailDir = d))}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {(box.shape === 'roundRect' || box.shape === 'speech-round') && (
                 <Slider
                   label="圓角"
                   value={box.radius ?? 28}
@@ -266,6 +319,31 @@ export function TextPanel({ item, onAdd }: { item: TextItem; onAdd: () => void }
                   step={2}
                   format={px}
                   onChange={(v) => edit((c) => void (c.box!.radius = v), 'brad')}
+                />
+              )}
+              <Slider
+                label="字塊外框"
+                value={box.stroke?.width ?? 0}
+                min={0}
+                max={24}
+                step={1}
+                format={px}
+                onChange={(v) =>
+                  edit((c) => {
+                    const b2 = c.box!;
+                    b2.stroke = { color: b2.stroke?.color ?? '#ffffff', width: v };
+                    if (v <= 0) delete b2.stroke;
+                  }, 'bst')
+                }
+              />
+              {box.stroke && (
+                <Swatches
+                  colors={COLORS}
+                  value={box.stroke.color}
+                  label="字塊外框顏色"
+                  onPick={(col) =>
+                    edit((c) => void (c.box!.stroke = { color: col, width: c.box!.stroke?.width ?? 4 }))
+                  }
                 />
               )}
               <div className="panel-head">

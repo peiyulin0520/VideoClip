@@ -439,7 +439,9 @@ export function Timeline({
                     {isVideoItem(it) ? <Tiles item={it} asset={asset} pps={pps} h={h} /> : null}
                     <div className="clip-label">
                       {it.type === 'text'
-                        ? `Aa ${it.card.runs[0]?.text.replace(/\n/g, ' ') ?? ''}`
+                        ? it.card.runs[0]?.text === ''
+                          ? '圖形'
+                          : `Aa ${it.card.runs[0]?.text.replace(/\n/g, ' ') ?? ''}`
                         : `${it.type === 'image' ? '照片' : '影片'} ${it.duration.toFixed(1)}s`}
                       {isVideoItem(it) && it.speed !== 1 && ` · ${it.speed}x`}
                       {isVideoItem(it) && it.type === 'video' && it.volume === 0 && ' · 靜音'}

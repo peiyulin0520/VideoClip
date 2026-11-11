@@ -5,10 +5,10 @@
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
 - **分支**：`claude/zen-tesla-v3brj5`（Phase 1–3B 已在 `main`；分支上多了：實測修正 A/B/C/D＋Phase 3A 第 1 步。**都還沒合併到 main，上線網址是舊版**——使用者選 B：先不合併，繼續做字卡）
-- **最後一個程式 commit**：見 `git log -1`（Phase 3A-3：裝飾）
-- **測試**：84 個單元測試、39 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅**；Phase 4–7 未開始
-- **下一步**：Phase 3A 第 4 步「圖形庫」（Office 風格：方塊、雲朵、對話框、星形、緞帶、箭頭…當字塊底；貼圖 icon 用 Fluent Emoji 子集 MIT；同時補規格裡還沒做的 `cloud-frame`／`speech-frame`／`dot-line`／`number-badge`／`tail-loop-double` 裝飾）。之後第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
+- **最後一個程式 commit**：見 `git log -1`（Phase 3A-4：圖形庫）
+- **測試**：218 個單元測試、42 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅、第 4 步前半（33 種圖形當字塊／獨立圖形）✅；4 後半（貼圖 icon）未做**；Phase 4–7 未開始
+- **下一步**：Phase 3A 第 4 步後半「貼圖 icon」（Fluent Emoji 約 300 個常用子集，MIT；沙盒只能連 `raw.githubusercontent.com`，下載要用 raw 網址＋`NODE_USE_ENV_PROXY=1`；要附授權檔；貼圖可加白邊/陰影）。也可補規格裡沒做的 `cloud-frame`／`speech-frame`／`dot-line`／`number-badge`／`tail-loop-double` 裝飾與缺的圖形。之後第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是修正 A/B/C/D 要等合併上線後才測得到
@@ -53,6 +53,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 Phase 3A 第 4 步前半：圖形庫（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：新 `engine/shapes.ts`：**33 種 Office 風格圖形**（自己用路徑畫，沒用任何現成圖檔）。基本：方形、圓角、膠囊、橢圓、三角形、菱形、斜切色塊、梯形、五邊形、六邊形、八邊形、十字、剪角、愛心、雲朵、圓柱。對話框：方／圓角／橢圓對話框（尾巴可選左下／右下）、思考泡泡、爆炸對話框。星形：4／5／6／8 角星、爆炸、波浪印章。標籤箭頭：橫幅、標籤、粗箭頭、V 形、步驟條、文件。當**字塊**用：外框大小＝文字區×`inset`（每個圖形一組，橢圓／星形／愛心可放文字的範圍比外框小），文字區在圖形裡置中。字塊新增**外框**（顏色、粗細）、尾巴方向。**獨立圖形**（貼圖用）：沒有文字的字卡，「＋新增圖形」，大小用內距調，時間軸顯示「圖形」。字塊分頁：4 個分類＋縮圖格（縮圖用同一套路徑函式畫的）
+  - 動了哪些檔：src/engine/{shapes,shapes.test,cardLayout,textRender}.ts、src/model/{types,defaults}.ts、src/store/actions.ts、src/app/editor/{ShapeThumb,TextPanel,Toolbar,Timeline}.tsx、styles.css、e2e/phase3a-shapes.spec.ts、docs/TEXT_CARDS.md
+  - 驗證：✅ 單元測試 134 個（每個圖形：座標有限、主體在範圍內、**文字區（外框÷inset）在 3 種長寬比下四角和四邊中點都落在圖形內**、尾巴往下超出且左右方向不同）；✅ e2e：4 個分類、**每個圖形都點過**且資料對得上、縮圖有畫、尾巴方向、外框、換星形後預覽有粉紅和白字、獨立圖形新增/改愛心/加第二個；截圖 docs/screenshots/phase3a/（shapes-sheet 33 種放字總覽、speech-bubble、shape-picker-stars、standalone-heart）；218 單元＋42 e2e 全過，連跑 2 次穩定  🟡 只在 Chromium  🔴 沒做：貼圖 icon（Fluent Emoji）、手繪感、漸層填色、虛線外框、閃電/月亮/太陽/笑臉/緞帶/捲軸/流程圖/線條類圖形
+  - 踩到的坑：bezier 控制點會超出曲線，量圖形範圍的測試要用曲線上的點（`flatten`）；`inset` 不能只調一組數字——先寫「文字區放得進圖形」的測試，再用掃描找最小值；星形四角、閃電的可放文字區太小，已拿掉閃電、四角星 inset 4.1
+  - 下一步：貼圖 icon，或先請使用者看圖形總覽
 - 2026-11-11 Phase 3A 第 3 步：字卡裝飾（分支 claude/zen-tesla-v3brj5，Sonnet）
   - 做了什麼：新 `engine/decorations.ts`（純計算：墨跡矩形 → 繪圖指令，可單元測試）。13 種：尾端圈圈（照規格路徑）、波浪底線、虛線、點點線、雙底線、螢光筆、手繪圈住（頭尾不閉合）、彎箭頭、星星、愛心、斜線、打勾、角括號。`TextCard.decorations`（可疊多個，各自顏色、粗細＝佔字高比例）。畫在字後面；畫布四周依裝飾範圍自動多留邊。文字面板新分頁「**裝飾**」：3 欄格子，**每格縮圖是用範例字「好看」真的畫出來的**；點一下加、再點拿掉；已加的每個有顏色和粗細，可「移除」。尾端圈圈：字很長時圈圈固定大小貼字右緣（不被拉扁）
   - 動了哪些檔：src/engine/{decorations,decorations.test,textRender,debug}.ts、src/model/types.ts、src/app/editor/{DecoThumb,TextPanel}.tsx、styles.css、e2e/phase3a-deco.spec.ts、e2e/helpers.ts、docs/TEXT_CARDS.md、AGENTS.md

@@ -121,6 +121,22 @@ export function createOverlayClip(asset: Asset, start: number): VideoItem {
   return { ...c, start, fit: 'contain', transform: { ...c.transform, scale: 0.5 } };
 }
 
+/** 獨立圖形（貼圖用）：沒有文字的字卡，只有字塊；大小用內距調（也可以用右上角縮放） */
+export function createShapeItem(start: number): TextItem {
+  const t = createTextItem(start, '');
+  const run = t.card.runs[0]!;
+  run.shadow = undefined;
+  delete run.shadow;
+  t.card.box = {
+    shape: 'star5',
+    fill: '#ffd23f',
+    opacity: 1,
+    padding: { top: 70, right: 70, bottom: 70, left: 70 },
+    nudgeY: 0,
+  };
+  return t;
+}
+
 export function createTextItem(start: number, text = '點兩下編輯文字'): TextItem {
   return {
     id: newId('i_'),
