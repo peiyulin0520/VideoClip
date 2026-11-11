@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（Phase 3A-4：圖形庫）
 - **測試**：218 個單元測試、42 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅、第 4 步前半（33 種圖形當字塊／獨立圖形）✅；4 後半（貼圖 icon）未做**；Phase 4–7 未開始
-- **下一步**：使用者用 iPhone 重測（修正 A/B/C/D＋字卡面板，清單在 `docs/PLAN.md §7`）並回報；等回報期間可先做 Phase 3A 第 4 步後半「貼圖 icon」（Fluent Emoji 約 300 個常用子集，MIT；沙盒只能連 `raw.githubusercontent.com`，下載要用 raw 網址＋`NODE_USE_ENV_PROXY=1`；要附授權檔；貼圖可加白邊/陰影）。也可補規格裡沒做的 `cloud-frame`／`speech-frame`／`dot-line`／`number-badge`／`tail-loop-double` 裝飾與缺的圖形。之後第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
+- **下一步**：照 `docs/plans/2026-11-11-iphone-feedback-2.md` 實作使用者第 2 次 iPhone 實測回報的修正，順序 **① 匯入失敗（P0）→ ② 預覽太小＋操作鈕 → ③ 顏色 → ④ 裝飾距離 → ⑤ 字塊形狀調整**。貼圖 icon、雲朵字等這批修完再做
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是修正 A/B/C/D 要等合併上線後才測得到
@@ -47,12 +47,18 @@
 - 備份資料夾保持私人；只貼網址不登入無法寫入（Google 限制），已向使用者說明
 
 ## 使用者的修正紀錄（時間順序）
+- 2026-11-11 第 2 次 iPhone 實測（PR #3 上線版）：①「在任何上傳影片的地方要上傳影片都會顯示無法上傳影片」（錄影顯示：無法匯入 IMG_8177.mov（The operation failed for an unknown transient reason (e.g. out of memory).））②「預覽畫面太小，我新增的文字都看不到，縮放等 icon 太大了，或是直接不要那個 icon，到可以在點選的文字或圖塊直接縮放也可以」③「文字可選擇的顏色太少，建議可以更彈性化」④「裝飾…應該還要能夠調整跟文字的貼近程度，才不會像圖中波浪線太靠近文字」⑤「字塊應該也要能夠彈性調整邊界光滑程度、明顯凹槽處的程度，像是 excel word 字塊那樣」→ 規劃見 docs/plans/2026-11-11-iphone-feedback-2.md
 - 2026-11-11 iPhone 實測回報：「預覽畫面中會有粉色斜底區塊，不懂那個意思，是因為我前面選了尺寸 9:16？但不是應該影片要直接 match 整個黑框比較好嗎，多了一個粉底還需要手動縮小調整很麻煩」→ 原因是平台安全區參考線（預設開）＋主軌被選取時的選取框；修改規劃見 docs/plans/2026-11-11-safe-zone-and-selection.md。另從截圖看到：iPhone 上時間軸片段沒有縮圖
 - 2026-11-11 要求把每次進度都記錄下來，供其他 AI（如 ChatGPT）銜接 → 新增 AGENTS.md、docs/HANDOFF.md、交接快照與日誌格式
 - 2026-11-11 選 B：先做字體下載＋首次使用精靈，再做字卡引擎
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 寫修改規劃：第 2 次 iPhone 實測回報 5 項（分支 claude/zen-tesla-v3brj5，只有文件，Opus）
+  - 做了什麼：看使用者 3 張截圖＋螢幕錄影（用 ffmpeg 抽格，錄影沒放進 repo），查程式找原因，寫 `docs/plans/2026-11-11-iphone-feedback-2.md`。另外從截圖發現 2 個問題一起列入：文字選取框用的是含透明邊的整張畫布（比看得到的大很多）、空專案的匯入鈕蓋在時間軸上
+  - 動了哪些檔：docs/plans/2026-11-11-iphone-feedback-2.md（新）、docs/PROGRESS.md、docs/PLAN.md §7、docs/HANDOFF.md
+  - 驗證：🔴 程式未改。匯入失敗的確切步驟沙盒測不到（錯誤訊息是 WebKit 的 UnknownError，最可能是 OPFS 一次寫入大檔），規劃第一步是讓錯誤訊息分步驟，再請使用者回報
+  - 下一步：照規劃 ①→⑤ 實作
 - 2026-11-11 Phase 3A 第 4 步前半：圖形庫（分支 claude/zen-tesla-v3brj5，Sonnet）
   - 做了什麼：新 `engine/shapes.ts`：**33 種 Office 風格圖形**（自己用路徑畫，沒用任何現成圖檔）。基本：方形、圓角、膠囊、橢圓、三角形、菱形、斜切色塊、梯形、五邊形、六邊形、八邊形、十字、剪角、愛心、雲朵、圓柱。對話框：方／圓角／橢圓對話框（尾巴可選左下／右下）、思考泡泡、爆炸對話框。星形：4／5／6／8 角星、爆炸、波浪印章。標籤箭頭：橫幅、標籤、粗箭頭、V 形、步驟條、文件。當**字塊**用：外框大小＝文字區×`inset`（每個圖形一組，橢圓／星形／愛心可放文字的範圍比外框小），文字區在圖形裡置中。字塊新增**外框**（顏色、粗細）、尾巴方向。**獨立圖形**（貼圖用）：沒有文字的字卡，「＋新增圖形」，大小用內距調，時間軸顯示「圖形」。字塊分頁：4 個分類＋縮圖格（縮圖用同一套路徑函式畫的）
   - 動了哪些檔：src/engine/{shapes,shapes.test,cardLayout,textRender}.ts、src/model/{types,defaults}.ts、src/store/actions.ts、src/app/editor/{ShapeThumb,TextPanel,Toolbar,Timeline}.tsx、styles.css、e2e/phase3a-shapes.spec.ts、docs/TEXT_CARDS.md
