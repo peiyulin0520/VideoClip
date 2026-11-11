@@ -4,14 +4,15 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`（Phase 1–3B 已在 `main`；這個分支多了「使用者第一次 iPhone 實測回報」的 4 項修正，**還沒合併到 main，所以上線網址還是舊版**）
-- **最後一個程式 commit**：見 `git log -1`（修正 C：縮圖）；前面有修正 D（自動比例）、A+B（安全區／主軌選取）
-- **測試**：53 個單元測試、33 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、**實測修正 A/B/C/D ✅（Chromium 驗證，iPhone 待真機）**；Phase 3A（字卡引擎）尚未開始；Phase 4–7 未開始
-- **下一步**：使用者決定要不要先把這 4 項修正合併到 main（才會更新上線網址、讓他在 iPhone 重測）→ 再做 Phase 3A 字卡引擎（拆法見 `docs/HANDOFF.md §6`）
+- **分支**：`claude/zen-tesla-v3brj5`（Phase 1–3B 已在 `main`；分支上多了：實測修正 A/B/C/D＋Phase 3A 第 1 步。**都還沒合併到 main，上線網址是舊版**——使用者選 B：先不合併，繼續做字卡）
+- **最後一個程式 commit**：見 `git log -1`（Phase 3A-1：字卡排版引擎）
+- **測試**：65 個單元測試、36 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅**；Phase 4–7 未開始
+- **下一步**：Phase 3A 第 2 步「字塊與內距 UI」：文字分頁加字塊（形狀 rect/roundRect/pill、顏色、透明度、四邊內距＋連動鎖、垂直微調）、字距、行距、寬度、對齊、粗體、斜體、描邊、陰影的控制項；每個按鈕要有 e2e 點擊測試；截圖給使用者看。之後第 3 步尾端圈圈與裝飾（拆法見 `docs/HANDOFF.md §6`）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
-  - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是這次的 A/B/C/D：粉紅線是否消失、主軌白框是否消失、時間軸縮圖是否出現、直拍影片自動比例是否為 9:16
+  - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是修正 A/B/C/D 要等合併上線後才測得到
+  - 要不要把修正 A–D 合併到 main（目前使用者選先不合併）
   - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
 - **目前沒有進行到一半的修改**（工作目錄乾淨、已 push）
 
@@ -52,6 +53,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 Phase 3A 第 1 步：字卡型別擴充＋逐字排版引擎（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：`TextRun` 加 `italic/strokes/shadow`、`TextCard` 加 `width/box`、新 `CardBox`（形狀 rect/roundRect/pill、顏色、透明度、四邊內距、垂直微調、圓角）——全是選填，舊字卡不用轉換。新 `engine/cardLayout.ts`（純計算、量字器可注入）：逐字排、字距（em）、固定寬度自動換行（中文逐字、英文在單字邊界、太長硬斷、避頭尾）、對齊、字塊尺寸＝墨跡邊界＋四邊內距。`textRender.ts` 改成用它畫：字塊→多層描邊（由外到內）→陰影→文字，斜體用斜切。新字卡預設帶陰影（舊字卡不再有預設陰影）
+  - 動了哪些檔：src/model/{types,defaults}.ts、src/engine/{cardLayout,cardLayout.test,textRender,debug}.ts、e2e/phase3a-layout.spec.ts
+  - 驗證：✅ 12 個排版單元測試（假量字器）；✅ e2e 在真的 Chromium 用真字體（粉圓、饅頭黑體、霞鶩文楷）量像素：字上下左右內距跟設定一致（±2px），上 10／下 60 分開調也對  🔴 還沒有介面可以設字塊（第 2 步）；粗體用字型本身的 700（沒有用描邊模擬）；直排、漸層、發光未做
+  - 踩到的坑：量字器的 `right` 要從 pen 起算（`actualBoundingBoxRight`），不是從字寬末端
+  - 下一步：第 2 步字塊與內距 UI
 - 2026-11-11 實作 4 項實測修正 A/B/C/D（分支 claude/zen-tesla-v3brj5，Sonnet）
   - 做了什麼：
     - D 自動比例：新專案預設「自動（跟第一支影片）」；比例多 3:4、4:3；編輯器頂列「畫面比例」按鈕（可復原、可切回自動）；空白專案第一次匯入主軌時自動決定；字卡大小/外框改跟短邊（`uiScale`）；改比例時預覽重建並回到原播放時間

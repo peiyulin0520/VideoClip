@@ -45,17 +45,39 @@ export type VideoItem = ItemBase & {
   fit: 'cover' | 'contain';
 };
 
-// Phase 2 的最小文字卡：只有一段文字、系統字體。Phase 3 會擴充成完整的 TextCard（見 docs/TEXT_CARDS.md）。
+// 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
+export type Stroke = { color: string; width: number }; // width：從字緣往外的厚度，px（1080 基準）
+export type TextShadow = { color: string; blur: number; x: number; y: number };
 export type TextRun = {
   text: string;
   fontId: string;
-  size: number; // px，以 1080 寬畫面為基準
+  size: number; // px，以 1080（畫面短邊）為基準
   color: string;
-  letterSpacing: number; // em
-  lineHeight: number; // 倍數
+  letterSpacing: number; // em，-0.2 ~ 1.0
+  lineHeight: number; // 倍數，0.8 ~ 2.5
   weight: 'normal' | 'bold';
+  italic?: boolean; // 字型沒有斜體就斜切 -12°
+  /** 多層描邊（由外到內，畫的時候依厚度由大到小）。例：白 12 + 粉 6 */
+  strokes?: Stroke[];
+  shadow?: TextShadow;
 };
-export type TextCard = { runs: TextRun[]; align: 'left' | 'center' | 'right' };
+export type BoxShape = 'rect' | 'roundRect' | 'pill';
+/** 字塊（字卡的底色塊）。尺寸＝文字墨跡 + 四邊內距，所以上下左右分開調才會準 */
+export type CardBox = {
+  shape: BoxShape;
+  fill: string;
+  opacity: number; // 0–1
+  padding: { top: number; right: number; bottom: number; left: number }; // px（1080 基準）
+  nudgeY: number; // 文字在字塊內的垂直微調 px
+  radius?: number; // roundRect 的圓角 px；pill 固定半圓
+};
+export type TextCard = {
+  runs: TextRun[];
+  align: 'left' | 'center' | 'right';
+  /** 文字區寬度 px（1080 基準），超過自動換行；沒有＝依文字長度 */
+  width?: number;
+  box?: CardBox;
+};
 export type TextItem = ItemBase & { type: 'text'; card: TextCard };
 
 export type Item = VideoItem | TextItem;

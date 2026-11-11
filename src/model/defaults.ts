@@ -139,6 +139,7 @@ export function createTextItem(start: number, text = '點兩下編輯文字'): T
           letterSpacing: 0,
           lineHeight: 1.25,
           weight: 'bold',
+          shadow: { color: 'rgba(0,0,0,0.55)', blur: 6, x: 0, y: 2 },
         },
       ],
     },
