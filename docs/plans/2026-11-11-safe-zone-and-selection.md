@@ -55,6 +55,26 @@
    - 單格匯出本來就用 `project.width/height`，不用另外改。
 5. 首頁卡片顯示的比例文字（`p.aspect`）會自動跟著。
 
+#### D 的實作細節（2026-11-11 Opus 補充，給 Sonnet）
+- **已有草稿可以直接套**：`docs/plans/2026-11-11-aspect-auto-draft.patch`（`git apply docs/plans/2026-11-11-aspect-auto-draft.patch`）。內容：`types.ts`／`defaults.ts`（5 種比例、`pickAspect`、`assignAspect`、`createProject(..., aspectAuto)`）、`defaults.test.ts`（12 個單元測試，已通過）、`actions.ts` 的 `setProjectAspect('auto' | Aspect)`、`Home.tsx` 的自動 chip、`Editor.tsx` 的比例按鈕＋面板＋空主軌第一次匯入自動套用（**也順便拿掉了匯入後自動選取主軌，屬於 B**）、`Preview.tsx` effect 依賴、`.ratio-btn` 樣式。**只跑過 `tsc` 和那 12 個單元測試，沒跑 lint／e2e**；套上後要先 `npm run check`。
+- 草稿**還沒做**、要補的：
+  1. **重建預覽後回到原本時間**：`Preview.tsx` 的 Player effect 建好後現在是 `player.seek(0)`。改成先記住舊 player 的時間（例如 effect 外用 `useRef` 存 `lastTime`，在 cleanup 時 `lastTime.current = created?.time ?? 0`），新的建好後 `seek(lastTime.current)`。換專案（`projectId` 變）時要歸 0。
+  2. **字卡大小要跟「短邊」走**：現在 `scene.ts` 的 `renderText(item.card, ctx.canvasW / 1080)` 和 Preview 的 `textSize` 都用「畫面寬 ÷ 1080」。9:16 改 16:9 時寬變 1920，字會放大 1.78 倍、在扁的畫面上顯得很大。建議改成 `Math.min(canvasW, canvasH) / 1080`（9:16、3:4、1:1 不變；4:3、16:9 的字不會被放大）。⚠️ 舊的 16:9 專案裡的字會變小一點——目前字卡只是 Phase 3B 簡版、使用者還沒正式用，可以接受；要在日誌寫明。`exportFrame` 走同一個 `buildScene`，會一起變。改了要全域搜尋 `/ 1080` 確認沒有漏（`geometry.ts` 的 `TextSize`、Preview 的 handle 大小計算）。
+  3. **e2e**（新檔 `e2e/fix-aspect.spec.ts`，或併進 `fix-safe-zone.spec.ts`）：
+     - 首頁新專案面板預設選「自動（跟第一支影片）」（`aria-checked=true`）。
+     - 自動＋匯入 `clip-a.webm`（直式）→ `__videoclip.project().aspect === '9:16'`；`clip-c.webm`（橫式）→ `'16:9'`；`photo.png`（400×300）→ `'4:3'`。fixture 實際寬高先用 ffprobe 確認，不對就調預期值。
+     - 自動＋建立空白專案 → 編輯器匯入橫式 → 16:9；再匯入直式 → 仍是 16:9（只有主軌是空的時候才自動）。
+     - 手動選 1:1 → 匯入橫式 → 仍是 1:1，`aspectAuto` 不存在。
+     - 編輯器按「畫面比例」（`getByRole('button', { name: '畫面比例' })`）→ 選 1:1 → 預覽 canvas 的寬高比變 1；按「復原」→ 回到原比例；面板選「自動」→ 照主軌第一個片段重算。
+     - 每個新按鈕都要有點擊測試（AGENTS.md 規則 8）；截圖存 `docs/screenshots/fix-safe-zone/`（新專案面板、比例面板、改比例前後）。
+- **已知行為（寫進日誌，不是 bug）**：
+  - 「自動」只看**主軌第一個片段**；疊加軌的素材不會影響比例。
+  - 自動＋把主軌全部刪光、再匯入，會再自動決定一次（因為主軌又是空的）。可以接受；若使用者不喜歡，再改成「只自動一次」。
+  - 第一次匯入時「比例改變」和「匯入」在同一個 `apply` 裡，按一次復原會兩個一起還原。
+  - 匯入時第一個檔案失敗、第二個成功 → 用第一個**成功**的素材決定（`res.assets[0]`）。
+  - 改比例後，疊加物件的位置是「佔畫面的比例」，會跟著移動；可能有物件跑到畫面外一部分——不自動修正，使用者可復原。
+  - iPhone 直拍影片的寬高是否已考慮旋轉（`displayWidth/Height`）**沙盒測不到**，列進 `docs/PLAN.md §7` 待真機驗證：「iPhone 直拍影片匯入後，自動比例是 9:16，不是 16:9」。
+
 ## 3. 會動到的檔案
 - `src/app/editor/Preview.tsx`（安全區預設、拖移中顯示、主軌點擊行為、主軌選取框外觀、隱藏 ✕）
 - `src/app/styles.css`（`.safe*` 改虛線＋標籤、`.safe-toggle` 加文字）
