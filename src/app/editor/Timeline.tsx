@@ -50,7 +50,13 @@ function Tiles({
   h: number;
 }) {
   const thumbs = asset?.thumbs ?? [];
-  if (thumbs.length === 0) return <div className="tiles" />;
+  // 沒有縮圖（例如 iPhone 匯入時產生不出來）：顯示檔名，不要一片灰
+  if (thumbs.length === 0)
+    return (
+      <div className="tiles no-thumb" data-testid="clip-name">
+        {asset?.name ?? ''}
+      </div>
+    );
   const aspect = asset && asset.height ? asset.width / asset.height : 0.56;
   const tileW = Math.min(Math.max(h * aspect, 30), 114);
   const widthPx = item.duration * pps;

@@ -561,6 +561,15 @@ button {
   border-radius: 6px;
   pointer-events: none;
 }
+.tiles.no-thumb {
+  align-items: flex-start;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: #2a2a2e;
+}
 .tiles span {
   flex: none;
   height: 100%;

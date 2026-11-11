@@ -16,7 +16,7 @@ import { Player } from '../../engine/player';
 import { geoCtx } from '../../engine/scene';
 import { findItem, visibleLayers } from '../../engine/timeline';
 import { removeAnyItem, setTransform } from '../../store/actions';
-import { useProjectStore } from '../../store/projectStore';
+import { setAssetThumbs, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 
 // v2：改成預設關閉（舊版 'vc-safe-zone' 預設開，會讓使用者誤以為粉紅區是畫面的一部分）
@@ -67,6 +67,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
       canvas: canvasRef.current!,
       getProject: () => useProjectStore.getState().project,
       urlFor: (id) => urlFor(projectId, id),
+      onThumb: setAssetThumbs,
     }).then((player) => {
       if (cancelled) return player.destroy();
       created = player;

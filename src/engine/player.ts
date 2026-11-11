@@ -1,10 +1,16 @@
 import type { Asset, Project, Track, VideoItem } from '../model/types';
 import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
+import { captureThumb } from './probe';
 import { buildScene } from './scene';
 import { mainTrack, sourceTimeAt, totalDuration } from './timeline';
 
-type Deps = { getProject: () => Project | null; urlFor: (assetId: string) => string | undefined };
+type Deps = {
+  getProject: () => Project | null;
+  urlFor: (assetId: string) => string | undefined;
+  /** 素材沒有縮圖時，播放器拿到畫面後順手擷取一張（iPhone 匯入時可能產生不出來） */
+  onThumb?: (assetId: string, thumbs: string[]) => void;
+};
 type Listener = (t: number, playing: boolean) => void;
 
 const DRIFT = 0.3;
@@ -31,6 +37,7 @@ export class Player {
   private tStart = 0;
   private listeners = new Set<Listener>();
   private images = new Map<string, HTMLImageElement>();
+  private thumbTried = new Set<string>();
 
   private constructor(
     readonly compositor: Compositor,
@@ -196,6 +203,7 @@ export class Player {
       if (!el) return null; // 同時疊的影片超過上限，多的不畫
       used.add(el);
       this.syncVideo(el, item, asset, track, t);
+      this.maybeCaptureThumb(el, asset);
       return {
         source: el,
         ready: el.readyState >= 2 && !el.seeking && el.videoWidth > 0,
@@ -219,6 +227,16 @@ export class Player {
     }
     this.pool.pauseAllExcept(used);
     comp.render(scene);
+  }
+
+  private maybeCaptureThumb(el: HTMLVideoElement, asset: Asset) {
+    if (!this.deps.onThumb || asset.thumbs.length > 0 || this.thumbTried.has(asset.id)) return;
+    if (el.seeking || el.readyState < 2) return;
+    const url = captureThumb(el);
+    if (!url) return;
+    this.thumbTried.add(asset.id);
+    // render() 進行中不要改 store，等這一輪結束
+    queueMicrotask(() => this.deps.onThumb?.(asset.id, [url]));
   }
 
   private upcoming(p: Project, t: number): { item: VideoItem; asset: Asset }[] {

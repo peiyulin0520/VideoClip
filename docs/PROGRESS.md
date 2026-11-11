@@ -4,15 +4,14 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：Phase 1–3B 已經合併進 `main`（PR #2，使用者 2026-11-11 合併，GitHub Actions 部署成功，run #8）。上線網址 https://peiyulin0520.github.io/VideoClip/ 現在是 Phase 3B 的版本。之後的新工作繼續在 `claude/zen-tesla-v3brj5`（已用 fast-forward 對齊最新 `main`，沒有改寫歷史）
-- **最後一個程式 commit**：見 `git log -1`（Phase 3B：字體管線、首次使用精靈、設定頁、字體選單）；之後只有交接文件的 commit
-- **測試**：41 個單元測試、22 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B（字體）✅；**Phase 3A（字卡引擎）尚未開始**；Phase 4–7 未開始
-- **下一步**：先修使用者實測回報的問題 → 照 `docs/plans/2026-11-11-safe-zone-and-selection.md` 實作。建議順序 **D → A → B → C**：D（自動比例）已有草稿 （草稿 patch 已套用並刪除），`git apply` 後補完規劃 §2-D「實作細節」列的 3 件事（重建預覽後回到原時間、字卡大小跟短邊、e2e）。其他：安全區參考線預設關閉＋拖移時才出現＋加標籤；主軌匯入後不自動選取、點預覽不選主軌、主軌選取框不顯示 ✕；iPhone 時間軸縮圖改用 Mediabunny＋退路）。修完再做 Phase 3A 字卡引擎（拆法見 `docs/HANDOFF.md §6`）
+- **分支**：`claude/zen-tesla-v3brj5`（Phase 1–3B 已在 `main`；這個分支多了「使用者第一次 iPhone 實測回報」的 4 項修正，**還沒合併到 main，所以上線網址還是舊版**）
+- **最後一個程式 commit**：見 `git log -1`（修正 C：縮圖）；前面有修正 D（自動比例）、A+B（安全區／主軌選取）
+- **測試**：53 個單元測試、33 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、**實測修正 A/B/C/D ✅（Chromium 驗證，iPhone 待真機）**；Phase 3A（字卡引擎）尚未開始；Phase 4–7 未開始
+- **下一步**：使用者決定要不要先把這 4 項修正合併到 main（才會更新上線網址、讓他在 iPhone 重測）→ 再做 Phase 3A 字卡引擎（拆法見 `docs/HANDOFF.md §6`）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
-  - 用 iPhone 實測 Phase 1–3B（清單在 `docs/PLAN.md §7`），特別是：多影片同時播放、字體下載/快取、首次使用精靈、匯入字體、預覽畫面在底部面板展開時是否太小
-  - 使用者已開始實測（2026-11-11 第一個回報：粉紅斜線區塊看不懂 → 已寫修改規劃）；其他項目繼續實測回報
+  - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是這次的 A/B/C/D：粉紅線是否消失、主軌白框是否消失、時間軸縮圖是否出現、直拍影片自動比例是否為 9:16
   - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
 - **目前沒有進行到一半的修改**（工作目錄乾淨、已 push）
 
@@ -53,6 +52,17 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 實作 4 項實測修正 A/B/C/D（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：
+    - D 自動比例：新專案預設「自動（跟第一支影片）」；比例多 3:4、4:3；編輯器頂列「畫面比例」按鈕（可復原、可切回自動）；空白專案第一次匯入主軌時自動決定；字卡大小/外框改跟短邊（`uiScale`）；改比例時預覽重建並回到原播放時間
+    - A 安全區：預設關（新 key `vc-safe-zone-v2`）、拖移/縮放時自動出現、虛線＋標籤「IG／抖音按鈕區」、按鈕有「安全區」字、打開時 toast 說明
+    - B 主軌：匯入後不自動選、預覽單點不選不拖、從時間軸選才有細框、沒有 ✕、保留縮放鈕；疊加物件照舊
+    - C 縮圖：匯入用 Mediabunny `CanvasSink`，失敗退回 `<video>`，再失敗由預覽播放器拿到畫面後補一張（`setAssetThumbs`，不進復原）；沒縮圖時時間軸顯示檔名
+  - 動了哪些檔：src/model/{types,defaults}.ts（+defaults.test.ts）、src/store/{actions,projectStore}.ts、src/engine/{probe,player,scene,compositor,textRender,geometry}.ts、src/app/editor/{Preview,Timeline}.tsx、src/app/pages/{Home,Editor}.tsx、styles.css、e2e/{fix-aspect,fix-safe-zone,fix-thumbs}.spec.ts、phase2.spec.ts（點角落改成不選取）
+  - 驗證：✅ 53 單元＋33 e2e 全過；截圖在 docs/screenshots/fix-safe-zone/；✅ 模擬「iPhone 行為」（沒有 VideoDecoder、probe 的 `<video>` 聽不到 loadeddata）時，播放器會補上縮圖，重新整理後仍在；✅ Chromium 下 Mediabunny 路徑有效（匯入 0.4 秒完成，沒有等 8 秒）  🟡 Chromium：以上全部  🔴 沒驗證：iPhone Safari 的 WebCodecs/HEVC 解碼、直拍 .mov 的自動比例、觸控手感（列進 PLAN §7）
+  - 使用者的決定/回饋：選 A（4 項一起做）；比例「A 跟第一支影片一樣，但保留之後可以調整」
+  - 踩到的坑：Pixi destroy 後不能在同一個 canvas 重建 WebGL（頁面卡死）→ 比例改變用 `key` 換新 canvas；e2e 要等 `__videoclip` 出現；模擬 iOS 時要用 `webkit-playsinline` 屬性區分「探測用 video」與「影片池 video」
+  - 下一步：使用者決定是否合併到 main 以便 iPhone 重測；之後 Phase 3A
 - 2026-11-11 補完自動比例（§2-D）的實作規劃＋存草稿 patch（分支 claude/zen-tesla-v3brj5，只有文件）
   - 做了什麼：中斷前寫好的 D 程式草稿存成 （草稿 patch 已套用並刪除），程式還原（使用者要的是規劃，實作交給 Sonnet）。規劃 §2-D 加「實作細節」：草稿涵蓋範圍、還缺的 3 件事、e2e 清單、已知行為
   - 動了哪些檔：docs/plans/2026-11-11-safe-zone-and-selection.md、docs/plans/2026-11-11-aspect-auto-draft.patch（新）、docs/PLAN.md §7、docs/HANDOFF.md §4
