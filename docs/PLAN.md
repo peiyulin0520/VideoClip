@@ -48,7 +48,8 @@
 ### 2.1 部署：GitHub Pages（公開、免登入）
 - 純前端靜態網站，`vite build` 後由 GitHub Actions 部署到 GitHub Pages。
 - 網址預計：`https://peiyulin0520.github.io/VideoClip/`（Vite `base: '/VideoClip/'`）。
-- **注意**：免費帳號的 GitHub Pages 需要 repo 是 public（公開的是程式碼，不是使用者的影片）。若使用者不想公開 repo，替代方案是 Cloudflare Pages（private repo 也可部署）。
+- ✅ 已定案（2026-11-11）：使用者已把 repo 改為公開，用免費 GitHub Pages。公開的只是程式碼，不是使用者的影片。
+- 部署方式：repo Settings → Pages → Source 選「GitHub Actions」（Phase 0 時請使用者做這一步，並附截圖說明位置）。
 - 路由用 **HashRouter**（`#/`、`#/p/<projectId>`、`#/settings`），避免 Pages 子路徑 404。
 
 ### 2.2 資料隔離與儲存（R1）
@@ -331,7 +332,7 @@ docs/
 - [ ] 匯出 1 分鐘影片的時間與是否當掉
 
 ## 8. 使用者要先決定/準備的事
-1. GitHub Pages 需 repo 公開（或改 Cloudflare Pages）。
+1. ✅ 已決定：repo 已公開，用 GitHub Pages。
 2. Google Cloud OAuth Client ID / API key（P6 再做，Sonnet 會帶步驟；只有「存到 Google 雲端」需要，「存在手機檔案」不需要）。
-3. 佮逸體與 Zizi 字體檔案：請放到 Drive 資料夾 `fonts/`，或直接上傳到 Sonnet 的對話（詳見 FONTS.md）。
+3. 字體清單已整理在 `fonts/manifest.json`。沒有下載網址的 6 款（佮逸體、LINE Seed TW、中規中矩體、星光小熊貓幼兒體、字言字型手繪體、致一宋體）請在 Phase 3 開始時上傳到 Sonnet 的對話（詳見 FONTS.md §4）。
 4. Sonnet 工作環境的網路需允許：`raw.githubusercontent.com`、`registry.npmjs.org`（已可用）；若要從 GitHub Release 下載字體還需 `github.com`、`objects.githubusercontent.com`；從 Drive 下載需 `drive.google.com`、`drive.usercontent.google.com`。

@@ -6,7 +6,7 @@
 1. `docs/PLAN.md`：總規劃、技術決策、資料模型、Phase 0–7 與驗收標準
 2. `docs/TEXT_CARDS.md`：字卡、字塊、裝飾（含**尾端圈圈的精確路徑**）、雲朵字、圖形庫、模板清單
 3. `docs/EFFECTS.md`：字卡動畫、轉場、特效、調色、筆刷、自由剪裁遮罩（VLOG 人頭 O）
-4. `docs/FONTS.md`：字體清單、來源、授權、首次下載流程
+4. `docs/FONTS.md`＋`fonts/manifest.json`：字體清單、來源、SHA-256、授權、首次下載流程
 5. `docs/reference/legacy-notes/`：使用者以前的剪片規則（溝通方式、字卡規則、踩過的坑），**溝通規則照做**
 
 ## 工作方式
