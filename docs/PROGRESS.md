@@ -6,7 +6,7 @@
 - **日期**：2026-11-11
 - **分支**：PR #3（實測修正 A/B/C/D＋Phase 3A 第 1–4 步前半）**已由使用者合併進 `main`**（2026-11-11，部署 run #21 啟動；上線網址 https://peiyulin0520.github.io/VideoClip/ 會更新成這版）。`claude/zen-tesla-v3brj5` 已用 `git merge --ff-only origin/main` 對齊 main，之後的新工作繼續在這個分支
 - **最後一個程式 commit**：見 `git log -1`（Phase 3A-4：圖形庫）
-- **測試**：230 個單元測試、50 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：234 個單元測試、53 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅、第 4 步前半（33 種圖形當字塊／獨立圖形）✅；4 後半（貼圖 icon）未做**；Phase 4–7 未開始
 - **下一步**：照 `docs/plans/2026-11-11-iphone-feedback-2.md` 實作使用者第 2 次 iPhone 實測回報的修正，順序 **① 匯入失敗（P0）→ ② 預覽太小＋操作鈕 → ③ 顏色 → ④ 裝飾距離 → ⑤ 字塊形狀調整**。貼圖 icon、雲朵字等這批修完再做
 - **等使用者的事**
@@ -54,6 +54,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 回報 2-③：顏色選擇器（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：新 `src/ui/ColorPicker.tsx`，文字、字塊、字塊外框、描邊兩層、裝飾**全部**換成它：「最近用過」（最多 8 色，存在這台裝置 localStorage `vc-recent-colors`，最新在最前面）→ 基本 8 色（裝飾會把自己的預設色放最前面）→「更多顏色」展開粉嫩／莫蘭迪／螢光各 8 色（共 **32 色**）→「自訂顏色」（`<input type=color>`，iPhone 上會跳系統取色盤）＋色碼輸入（`#RRGGBB`，沒輸入完或不合法不套用）。色票 40px。資料格式仍是色碼字串，舊專案不用轉換
+  - 動了哪些檔：src/ui/{ColorPicker,ColorPicker.test}.ts(x)、src/app/editor/TextPanel.tsx、styles.css、e2e/fix-colors.spec.ts
+  - 驗證：✅ 單元：色碼正規化、32 色不重複且合法、最近用過的排序／去重／上限／壞資料；✅ e2e：32 色**每一格都點過**且資料對得上、最近用過 8 個＋點選套用＋重新整理後還在、色碼輸入（壞的不套用）、模擬取色器 change 事件、字塊／外框／描邊內外層／裝飾都用同一個選擇器；截圖 docs/screenshots/fix-feedback-2/color-picker-expanded.png；234 單元＋53 e2e 全過，連跑 2 次穩定  🔴 iPhone 真機：系統取色盤有沒有跳出來沒驗證（列進 PLAN §7，已列）  🔴 沒做：文字顏色透明度（規劃寫「可選」）
+  - 踩到的坑：「最近用過」和色票是同一個色碼時，兩顆按鈕無障礙名稱會重複（e2e strict mode 衝突）→ 最近用過用「最近用過 #xxxxxx」不同名稱
+  - 下一步：回報 2-④ 裝飾距離與大小
 - 2026-11-11 回報 2-②：預覽太小＋選取操作（分支 claude/zen-tesla-v3brj5，Sonnet）
   - 做了什麼：(1) **拿掉 ✕ 和粉紅大縮放鈕**；改成選取框**四個角的小點**（看得到 12px、觸控區 40px、往框外偏不蓋住物件；拖角＝以中心縮放）＋**上方旋轉點**（拖＝旋轉，吸附 0/90/180/270）；物件很小時角點與旋轉點會自動推遠，避免觸控區互相蓋住；很小的物件點選範圍至少 40px。刪除改到文字面板「文字」分頁的「刪除」（其他物件用剪輯分頁的刪除）。(2) **選取框貼著看得到的內容**：新 `selectionBox`（字塊∪文字含描邊∪裝飾的實際範圍，曲線用取樣點量），選取框、點選、吸附都用它；渲染仍用整張畫布。(3) **時間軸精簡模式**：文字／疊加／圖層面板展開時時間軸縮成一條（選到哪條就捲到哪條，沒選就顯示主軌），面板最高 25dvh。(4) **全螢幕預覽鈕**（預覽右上角）：隱藏時間軸與面板。(5) 空專案的「匯入影片或照片」改在預覽中央，不再蓋到時間軸
   - 動了哪些檔：src/engine/{geometry,textRender,decorations}.ts、src/app/editor/{Preview,Timeline,Toolbar,TextPanel}.tsx、src/app/pages/Editor.tsx、src/store/uiStore.ts、styles.css、e2e/fix-preview-size.spec.ts、phase2/fix-safe-zone 的選取框測試、geometry.test.ts

@@ -4,13 +4,12 @@ import { editText, removeAnyItem } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
 import { DECORATION_KINDS } from '../../engine/decorations';
 import { SHAPE_CATS, SHAPES, shapeDef } from '../../engine/shapes';
+import { ColorPicker } from '../../ui/ColorPicker';
 import { Slider } from '../../ui/Slider';
 import { DecoThumb } from './DecoThumb';
 import { ShapeThumb } from './ShapeThumb';
 import { FontSelect } from '../fonts/FontSelect';
 
-const COLORS = ['#ffffff', '#111111', '#ff4d8d', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
-const BOX_COLORS = ['#ff4d8d', '#ffffff', '#111111', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
 const SECTIONS = ['文字', '版面', '字塊', '描邊陰影', '裝飾'] as const;
 type Section = (typeof SECTIONS)[number];
 const SIDES = [
@@ -29,32 +28,6 @@ export const DEFAULT_BOX: CardBox = {
   nudgeY: 0,
   radius: 28,
 };
-
-function Swatches({
-  colors,
-  value,
-  label,
-  onPick,
-}: {
-  colors: string[];
-  value: string;
-  label: string;
-  onPick: (c: string) => void;
-}) {
-  return (
-    <div className="chips">
-      {colors.map((c) => (
-        <button
-          key={c}
-          className={`swatch${value.toLowerCase() === c.toLowerCase() ? ' active' : ''}`}
-          style={{ background: c }}
-          aria-label={`${label} ${c}`}
-          onClick={() => onPick(c)}
-        />
-      ))}
-    </div>
-  );
-}
 
 export function TextPanel({
   item,
@@ -128,8 +101,7 @@ export function TextPanel({
             step={1}
             onChange={(v) => edit((c) => void (c.runs[0]!.size = v), 'size')}
           />
-          <Swatches
-            colors={COLORS}
+          <ColorPicker
             value={run.color}
             label="文字顏色"
             onPick={(col) => edit((c) => void (c.runs[0]!.color = col))}
@@ -286,8 +258,7 @@ export function TextPanel({
           </div>
           {box ? (
             <>
-              <Swatches
-                colors={BOX_COLORS}
+              <ColorPicker
                 value={box.fill}
                 label="字塊顏色"
                 onPick={(col) => edit((c) => void (c.box!.fill = col))}
@@ -348,8 +319,7 @@ export function TextPanel({
                 }
               />
               {box.stroke && (
-                <Swatches
-                  colors={COLORS}
+                <ColorPicker
                   value={box.stroke.color}
                   label="字塊外框顏色"
                   onPick={(col) =>
@@ -419,8 +389,7 @@ export function TextPanel({
             format={px}
             onChange={(v) => setStroke(0, { width: v }, 'st0')}
           />
-          <Swatches
-            colors={COLORS}
+          <ColorPicker
             value={stroke(0).color}
             label="外層描邊顏色"
             onPick={(col) => setStroke(0, { color: col, width: stroke(0).width || 6 })}
@@ -437,8 +406,7 @@ export function TextPanel({
             format={px}
             onChange={(v) => setStroke(1, { width: v }, 'st1')}
           />
-          <Swatches
-            colors={COLORS}
+          <ColorPicker
             value={stroke(1).color}
             label="內層描邊顏色"
             onPick={(col) => setStroke(1, { color: col, width: stroke(1).width || 3 })}
@@ -521,9 +489,9 @@ export function TextPanel({
                     移除
                   </button>
                 </div>
-                <Swatches
-                  colors={[def.color, ...COLORS.filter((c) => c !== def.color)]}
+                <ColorPicker
                   value={d.color}
+                  extra={def.color}
                   label={`${def.label}顏色`}
                   onPick={(col) => edit((c) => void (c.decorations![i]!.color = col))}
                 />
