@@ -96,7 +96,7 @@
 ## 5. 「匯入字體」功能（必做）
 - 設定頁與字體下拉選單底部都有「＋匯入字體」：選 .ttf/.otf/.woff/.woff2（iPhone 檔案 App 可直接選 Google Drive 裡的檔案）。
 - 讀取字型 name table 取名稱，存 OPFS `fonts/`，用 `FontFace` API 註冊；計算繁體覆蓋率。
-- 這些字體**只存在該裝置**（P6 完成後可同步到使用者自己的 Drive `VideoClip/fonts/`）。
+- 這些字體存在該裝置；若使用者的備份位置選「Google 雲端」，會同步到他自己 Drive 的 `VideoClip/fonts/`，換裝置登入後自動下載；選「手機檔案」則包含在備份 .zip 裡。
 
 ## 6. 首次使用 → 之後讀快取（使用者的需求）
 - 第一次：詢問「第一次在這台裝置使用嗎？」→ 勾選字體包 → 下載到 Cache Storage → IndexedDB 記錄 `installedFonts`。

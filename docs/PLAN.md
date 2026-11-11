@@ -38,7 +38,7 @@
 | R17 | 調色功能（亮度、對比、飽和、色溫…＋濾鏡預設） | P4 |
 | R18 | 字體：下載好看、支援繁體的免費字體（含日文字體中繁體覆蓋率高的）；首次使用自動下載清單；之後從快取讀取 | P3 |
 | R19 | 佮逸體放入字庫；Zizi app 字體（饅頭黑體、中規中矩體、星光手體） | P3（見 FONTS.md 限制） |
-| R20 | 資料存到使用者的 Google Drive 資料夾（備份/同步） | P6 |
+| R20 | 首次使用就讓使用者選專案備份位置：手機檔案，或 Google 雲端（貼資料夾網址或登入後選資料夾） | P3 精靈＋P6 |
 | R21 | 依影片內容推薦 IG 音源 | P7 |
 
 ---
@@ -244,11 +244,17 @@ docs/
 4. Office 風格圖形庫（可當貼圖，也可當字卡底塊）。
 5. 雲朵字。
 6. 字體：首次使用引導下載字體包；字體快取；匯入自己的字體檔（.ttf/.otf/.woff2）。
-- **首次使用流程**：開 App 時若 IndexedDB 沒有 `appState`：
-  1. 對話框「第一次在這台裝置使用嗎？」
-  2. 「是」→ 顯示建議字體清單（勾選、每款大小、總大小，預設勾選「基本包」）→ 下載到 Cache Storage，顯示進度。
-  3. 「不是，我換了裝置/清過資料」→ 選項：「從 Google Drive 還原」（P6 完成後才出現）/「匯入專案 .zip」/「略過」。
-  4. 之後開啟：直接從快取讀字體，不再詢問；設定頁可「管理字體」（增刪、重新下載）。
+- **首次使用流程**（引導精靈，3 步）：開 App 時若 IndexedDB 沒有 `appState`：
+  1. 「第一次在這台裝置使用嗎？」
+     - 「是」→ 進入第 2 步。
+     - 「不是，我換了裝置/清過資料」→「從 Google 雲端還原」（登入後選資料夾，見 Phase 6）/「從手機檔案匯入備份 .zip」/「略過」。
+  2. **選擇專案備份位置**（使用者的需求：一開始就給選項；之後可在設定頁改）：
+     - 「存在手機檔案」：專案平常存在瀏覽器內；備份時匯出 `.zip`，透過分享選單「儲存到檔案」（iPhone 可選「我的 iPhone」或 iCloud Drive）。
+     - 「存到 Google 雲端」：可先貼上 Drive 資料夾網址（選填）→「用 Google 登入」→ Google 資料夾選擇器直接開在那個資料夾（沒貼網址就從「我的雲端硬碟」開始）→ 確認 → 之後自動備份。詳見 Phase 6。
+     - 「先不要備份」：只存在瀏覽器（提示：iPhone 未加入主畫面可能被清掉）。
+     - Phase 6 完成前，「存到 Google 雲端」顯示為「即將推出」，選了先當成「存在手機檔案」。
+  3. 下載字體：顯示建議字體清單（勾選、每款大小、總大小，預設勾選「基本包」）→ 下載到 Cache Storage，顯示進度。
+  - 之後開啟：直接從快取讀字體，不再詢問；設定頁可「管理字體」（增刪、重新下載）與「備份位置」（切換、重新選資料夾、登出）。
   - 若本機已有資料就**不詢問**（同一台裝置自然就是「不是初次」）。
 - **驗收**：每個模板截圖存到 `docs/screenshots/templates/`（給使用者審核）；尾端圈圈截圖與 `docs/reference/tail-loop-underline.jpg` 並排對照；繁體覆蓋率報告 `docs/font-coverage.md`。
 
@@ -270,14 +276,31 @@ docs/
   4. 上層可單獨縮放、移動，中層字放在不會被遮擋之處，只讓 O 被頭取代。
 - **驗收**：用測試影片做出 VLOG 疊層，輸出 3 個時間點截圖；遮罩與白邊正確。
 
-### Phase 6：Google Drive 備份/同步（R20）
-- 用 Google Identity Services（OAuth 2.0 token flow，純前端）＋ Drive API v3，scope `drive.file`。
-- 「連接 Google Drive」→ 用 Google Picker 選擇資料夾（使用者指定的資料夾 ID：`1fLGtxMS4oRFIOqpyn-jnBtifCRCclF2l`）→ App 在該資料夾內建立 `VideoClip/` 子資料夾：
-  - `projects/<id>/project.json`、`projects/<id>/media/*`（可選是否上傳原始影片，預設只上傳 project.json＋縮圖，因為影片很大）
-  - `fonts/`：使用者個人字體（佮逸體、Zizi 字體等）
-- 功能：備份目前專案、全部備份、從 Drive 還原、從 Drive 匯入字體。
-- **需要使用者先做（Sonnet 要用中文一步步帶）**：建立 Google Cloud 專案 → 啟用 Drive API 與 Picker API → 建立 OAuth Client ID（網頁應用程式，授權來源 `https://peiyulin0520.github.io`）→ 建立 API key（限制在 Picker API 與該網域）→ OAuth 同意畫面設為「測試」並把自己加入測試使用者。Client ID 與 API key 是公開值，可寫進前端設定檔。
-- 說明給使用者：別人用同一網址連 Drive，會存到**他們自己的** Drive，看不到你的資料夾。
+### Phase 6：備份位置（手機檔案 / Google 雲端）（R20）
+使用者在首次使用精靈（見 Phase 3）或設定頁選擇備份位置。**每個人選自己的**：別人用同一網址選雲端，是登入他自己的 Google 帳號、存到他自己的資料夾。
+
+**A. 存在手機檔案**
+- 「備份」按鈕 → 產生 `.zip`（`project.json`＋縮圖＋可選原始影片）→ `navigator.share({ files })` 開分享選單 →「儲存到檔案」；不支援分享時改成下載。
+- iPhone Safari **不能**讓網頁自動寫入「檔案」App 的資料夾（不支援 File System Access API），所以每次備份都要按一下確認；App 在專案有變更且超過 N 天沒備份時提醒。
+- 桌機 Chrome/Edge 支援 `showDirectoryPicker()`：可選一個資料夾後自動備份（有支援才顯示）。
+- 還原：選 `.zip` 匯入。
+
+**B. 存到 Google 雲端**
+- 用 Google Identity Services（OAuth 2.0 token flow，純前端）＋ Drive API v3 ＋ Google Picker，scope 只用 `drive.file`（只能存取 App 自己建立或使用者在選擇器裡選的檔案，不會看到使用者其他檔案）。
+- 流程：
+  1.（選填）貼上 Drive 資料夾網址 → 解析出資料夾 ID（支援 `drive.google.com/drive/folders/<id>`、`…/u/0/folders/<id>?usp=sharing` 等格式）。
+  2. 「用 Google 登入」→ 授權。
+  3. 開 Google Picker（資料夾模式）：有貼網址就用 `DocsView.setParent(<id>)` 直接開在那個資料夾，讓使用者確認；沒貼就從「我的雲端硬碟」開始選。
+  4. App 在選定資料夾內建立 `VideoClip/`：`projects/<id>/project.json`、`projects/<id>/thumb.jpg`、`projects/<id>/media/*`（原始影片預設**不**上傳，因為很大；設定可開）、`fonts/`（使用者匯入的個人字體）。
+  5. 之後自動備份：專案變更後 30 秒 debounce 上傳 `project.json`；影片在 Wi-Fi 下才上傳（可設定）。
+  6. 換裝置：首次使用選「不是初次」→ 登入 → 選同一個資料夾 → 列出雲端上的專案 → 選要還原的；個人字體自動下載。
+- 只有資料夾網址、不登入**不能寫入**：Google 不允許未登入的程式寫入 Drive，即使資料夾開放「知道連結的人可以編輯」也一樣。UI 要說明這點。
+- 備份資料夾**不要**設成公開分享（否則別人能看到影片）；App 偵測到資料夾是公開時顯示警告。
+- 登入權杖只放在記憶體／sessionStorage，過期時再請使用者點一次登入（純前端的 token flow 沒有長期 refresh token）。
+- 使用者原本指定的資料夾：`https://drive.google.com/drive/folders/1fLGtxMS4oRFIOqpyn-jnBtifCRCclF2l`（只是使用者自己的預設，不要寫死在程式裡給所有人用）。
+- 功能：備份目前專案、全部備份、從雲端還原、雲端上的個人字體同步、切換資料夾、登出。
+- **需要使用者先做（Sonnet 要用中文一步步帶）**：建立 Google Cloud 專案（免費、不需綁信用卡）→ 啟用 Drive API 與 Picker API → 設定 OAuth 同意畫面（App 名稱、使用者的聯絡信箱、scope 只加 `drive.file`）→ 建立 OAuth Client ID（網頁應用程式，授權來源 `https://peiyulin0520.github.io`）→ 建立 API key（限制在 Drive/Picker API 與該網域）→ 記下專案編號（Picker 的 App ID）。Client ID、API key、App ID 都是公開值，可寫進前端設定檔。
+- 同意畫面先用「測試」模式（只有加入的測試使用者能登入，上限 100 人）；要讓任何人都能登入再改「正式版」。`drive.file` 屬於非敏感 scope，通常不需要 Google 的完整審查，但發布時 Google 可能要求品牌資訊（隱私權政策網址等）：Sonnet 要在 repo 準備一頁 `privacy.html`，並以申請當下 Google 的實際要求為準，不要先說成一定不用審查。
 - **驗收**：實際授權需要使用者在真機操作；Sonnet 寫好 mock 測試，真機測試列入待驗證。
 
 ### Phase 7：IG 音源推薦（R21）
@@ -309,6 +332,6 @@ docs/
 
 ## 8. 使用者要先決定/準備的事
 1. GitHub Pages 需 repo 公開（或改 Cloudflare Pages）。
-2. Google Cloud OAuth Client ID / API key（P6 再做，Sonnet 會帶步驟）。
+2. Google Cloud OAuth Client ID / API key（P6 再做，Sonnet 會帶步驟；只有「存到 Google 雲端」需要，「存在手機檔案」不需要）。
 3. 佮逸體與 Zizi 字體檔案：請放到 Drive 資料夾 `fonts/`，或直接上傳到 Sonnet 的對話（詳見 FONTS.md）。
 4. Sonnet 工作環境的網路需允許：`raw.githubusercontent.com`、`registry.npmjs.org`（已可用）；若要從 GitHub Release 下載字體還需 `github.com`、`objects.githubusercontent.com`；從 Drive 下載需 `drive.google.com`、`drive.usercontent.google.com`。
