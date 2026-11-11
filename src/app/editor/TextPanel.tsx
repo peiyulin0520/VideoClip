@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import type { BoxShape, CardBox, Stroke, TextItem } from '../../model/types';
 import { editText } from '../../store/actions';
+import { DECORATION_KINDS } from '../../engine/decorations';
 import { Slider } from '../../ui/Slider';
+import { DecoThumb } from './DecoThumb';
 import { FontSelect } from '../fonts/FontSelect';
 
 const COLORS = ['#ffffff', '#111111', '#ff4d8d', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
 const BOX_COLORS = ['#ff4d8d', '#ffffff', '#111111', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
-const SECTIONS = ['文字', '版面', '字塊', '描邊陰影'] as const;
+const SECTIONS = ['文字', '版面', '字塊', '描邊陰影', '裝飾'] as const;
 type Section = (typeof SECTIONS)[number];
 const SHAPES: { id: BoxShape | 'none'; label: string }[] = [
   { id: 'none', label: '無字塊' },
@@ -378,6 +380,78 @@ export function TextPanel({ item, onAdd }: { item: TextItem; onAdd: () => void }
               onChange={(v) => edit((c) => void (c.runs[0]!.shadow!.blur = v), 'shb')}
             />
           )}
+        </>
+      )}
+
+      {section === '裝飾' && (
+        <>
+          <p className="hint">點一個風格加到字上（可以疊好幾個），再點一次就拿掉。</p>
+          <div className="deco-grid" data-testid="deco-grid">
+            {DECORATION_KINDS.map((k) => {
+              const on = !!card.decorations?.some((d) => d.kind === k.kind);
+              return (
+                <button
+                  key={k.kind}
+                  className={`deco-cell${on ? ' active' : ''}`}
+                  aria-pressed={on}
+                  aria-label={`裝飾 ${k.label}`}
+                  data-kind={k.kind}
+                  onClick={() =>
+                    edit((c) => {
+                      const list = c.decorations ?? [];
+                      const i = list.findIndex((d) => d.kind === k.kind);
+                      if (i >= 0) list.splice(i, 1);
+                      else list.push({ kind: k.kind, color: k.color, width: k.width });
+                      if (list.length) c.decorations = list;
+                      else delete c.decorations;
+                    })
+                  }
+                >
+                  <DecoThumb kind={k.kind} />
+                  <span>{k.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {(card.decorations ?? []).map((d, i) => {
+            const def = DECORATION_KINDS.find((k) => k.kind === d.kind)!;
+            return (
+              <div key={d.kind} className="deco-row" data-testid="deco-row">
+                <div className="panel-head">
+                  <span>{def.label}</span>
+                  <button
+                    className="chip sm"
+                    aria-label={`移除 ${def.label}`}
+                    onClick={() =>
+                      edit((c) => {
+                        c.decorations!.splice(i, 1);
+                        if (!c.decorations!.length) delete c.decorations;
+                      })
+                    }
+                  >
+                    移除
+                  </button>
+                </div>
+                <Swatches
+                  colors={[def.color, ...COLORS.filter((c) => c !== def.color)]}
+                  value={d.color}
+                  label={`${def.label}顏色`}
+                  onPick={(col) => edit((c) => void (c.decorations![i]!.color = col))}
+                />
+                {d.kind !== 'marker' && d.kind !== 'sparkles' && d.kind !== 'hearts' && (
+                  <Slider
+                    label={`${def.label}粗細`}
+                    value={Math.round(d.width * 100)}
+                    min={3}
+                    max={25}
+                    step={1}
+                    format={(v) => `${v}%`}
+                    onChange={(v) => edit((c) => void (c.decorations![i]!.width = v / 100), `deco${i}`)}
+                  />
+                )}
+              </div>
+            );
+          })}
         </>
       )}
     </>

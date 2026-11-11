@@ -61,6 +61,22 @@ export type TextRun = {
   strokes?: Stroke[];
   shadow?: TextShadow;
 };
+export type DecorationKind =
+  | 'tail-loop'
+  | 'wave-underline'
+  | 'dashed-underline'
+  | 'dotted-underline'
+  | 'double-line'
+  | 'marker'
+  | 'scribble-circle'
+  | 'arrow-curve'
+  | 'sparkles'
+  | 'hearts'
+  | 'slashes'
+  | 'check'
+  | 'corner-brackets';
+/** 字卡裝飾。width：線寬，佔文字墨跡高度的比例（星星、愛心、螢光筆不用） */
+export type Decoration = { kind: DecorationKind; color: string; width: number };
 export type BoxShape = 'rect' | 'roundRect' | 'pill';
 /** 字塊（字卡的底色塊）。尺寸＝文字墨跡 + 四邊內距，所以上下左右分開調才會準 */
 export type CardBox = {
@@ -77,6 +93,7 @@ export type TextCard = {
   /** 文字區寬度 px（1080 基準），超過自動換行；沒有＝依文字長度 */
   width?: number;
   box?: CardBox;
+  decorations?: Decoration[];
 };
 export type TextItem = ItemBase & { type: 'text'; card: TextCard };
 

@@ -5,10 +5,10 @@
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
 - **分支**：`claude/zen-tesla-v3brj5`（Phase 1–3B 已在 `main`；分支上多了：實測修正 A/B/C/D＋Phase 3A 第 1 步。**都還沒合併到 main，上線網址是舊版**——使用者選 B：先不合併，繼續做字卡）
-- **最後一個程式 commit**：見 `git log -1`（Phase 3A-2：字卡面板）
-- **測試**：65 個單元測試、37 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板：文字／版面／字塊／描邊陰影）✅**；Phase 4–7 未開始
-- **下一步**：Phase 3A 第 3 步「尾端圈圈與裝飾」：`tail-loop` 照 `docs/TEXT_CARDS.md §3.1` 路徑、波浪、虛線、螢光筆、手繪圈住、箭頭、星星、愛心；風格選單用即時渲染縮圖；**驗收：與 `docs/reference/tail-loop-underline.jpg` 疊圖對照截圖**。之後第 4 步圖形庫、第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
+- **最後一個程式 commit**：見 `git log -1`（Phase 3A-3：裝飾）
+- **測試**：84 個單元測試、39 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅**；Phase 4–7 未開始
+- **下一步**：Phase 3A 第 4 步「圖形庫」（Office 風格：方塊、雲朵、對話框、星形、緞帶、箭頭…當字塊底；貼圖 icon 用 Fluent Emoji 子集 MIT；同時補規格裡還沒做的 `cloud-frame`／`speech-frame`／`dot-line`／`number-badge`／`tail-loop-double` 裝飾）。之後第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是修正 A/B/C/D 要等合併上線後才測得到
@@ -33,7 +33,7 @@
 - 字體選擇用下拉式選單，放在字卡頁籤
 - 字卡/icon 選取時右上角有縮放（調大小）鈕，可拖移位置
 - 字塊內距上下左右可分開調（修正字上方色塊多、下方貼底）
-- 尾端圈圈照參考圖 docs/reference/tail-loop-underline.jpg
+- 尾端圈圈參考圖 docs/reference/tail-loop-underline.jpg 只是**示意圖**（2026-11-11 使用者說明）：形狀神韻像即可，不必逐像素重合
 - 雲朵字不必很蓬鬆，有那個效果即可
 - VLOG 效果：底層完整影片 → 中層文字 V L G → 上層只保留人頭的影片（使用者自己描邊剪裁/擦除），不是自動去背
 - Office 圖案指方塊、雲朵、對話框等素材，可當字卡底塊
@@ -53,6 +53,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 Phase 3A 第 3 步：字卡裝飾（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：新 `engine/decorations.ts`（純計算：墨跡矩形 → 繪圖指令，可單元測試）。13 種：尾端圈圈（照規格路徑）、波浪底線、虛線、點點線、雙底線、螢光筆、手繪圈住（頭尾不閉合）、彎箭頭、星星、愛心、斜線、打勾、角括號。`TextCard.decorations`（可疊多個，各自顏色、粗細＝佔字高比例）。畫在字後面；畫布四周依裝飾範圍自動多留邊。文字面板新分頁「**裝飾**」：3 欄格子，**每格縮圖是用範例字「好看」真的畫出來的**；點一下加、再點拿掉；已加的每個有顏色和粗細，可「移除」。尾端圈圈：字很長時圈圈固定大小貼字右緣（不被拉扁）
+  - 動了哪些檔：src/engine/{decorations,decorations.test,textRender,debug}.ts、src/model/types.ts、src/app/editor/{DecoThumb,TextPanel}.tsx、styles.css、e2e/phase3a-deco.spec.ts、e2e/helpers.ts、docs/TEXT_CARDS.md、AGENTS.md
+  - 驗證：✅ 19 個裝飾單元測試（尾端圈圈位置/超出比例/長字不拉扁）；✅ e2e：13 格縮圖都有畫東西、每一種都點得動（加／拿掉）、改顏色粗細後預覽像素變化、疊兩個、移除、復原；截圖 docs/screenshots/phase3a/（decorations-sheet 13 種總覽、tail-loop-short/long、deco-picker、deco-two）；84 單元＋39 e2e 全過，整套連跑 5 次穩定  🟡 只在 Chromium  🔴 沒做：裝飾動畫（drawOn，Phase 4）、tail-loop-double、dot-line、number-badge、cloud/speech-frame（等圖形庫）、裝飾位置微調
+  - 使用者的決定/回饋：「A，然後我給你的參考圖只是示意圖」→ 尾端圈圈不必疊圖到逐像素重合（已改 TEXT_CARDS §3.1、AGENTS 規則 9、偏好）
+  - 踩到的坑：e2e 的 `project()` 要等 `window.__videoclip` 出現（機器忙時預覽引擎晚建好），整套平行跑偶爾失敗 → helpers 裡統一等待
+  - 下一步：第 4 步圖形庫
 - 2026-11-11 Phase 3A 第 2 步：字卡面板（分支 claude/zen-tesla-v3brj5，Sonnet）
   - 做了什麼：文字分頁改成 4 個子頁。**文字**：內容、字體、大小、顏色、粗體、斜體。**版面**：字距、行距、寬度（依文字／固定寬度滑桿）、對齊。**字塊**：無／方形／圓角／膠囊、顏色、透明度、圓角、**內距上下左右四個滑桿＋四邊連動鎖**、文字上下微調。**描邊陰影**：外層／內層兩層描邊（顏色＋粗細）、陰影開關與模糊。「＋新增」放在分頁列上；字卡面板比其他面板高（34dvh）、分頁列捲動時固定、控制項縮小（≥38px，滑桿 44px）
   - 動了哪些檔：src/app/editor/TextPanel.tsx（新）、src/ui/Slider.tsx（新，從 Toolbar 抽出）、Toolbar.tsx、textRender.ts（描邊厚度 0 的層略過）、styles.css、e2e/phase3a-panel.spec.ts

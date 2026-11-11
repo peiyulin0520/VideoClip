@@ -105,7 +105,7 @@ type Decoration = {
 | `cloud-frame` | 雲朵外框（線條） |
 | `speech-frame` | 對話框外框（線條） |
 
-### 3.1 尾端圈圈 `tail-loop`（照使用者參考圖，不要自由發揮）
+### 3.1 尾端圈圈 `tail-loop`（使用者參考圖是**示意圖**：抓住形狀神韻即可，不必逐像素重合）
 
 參考圖：`docs/reference/tail-loop-underline.jpg`；校準對照：`docs/reference/tail-loop-calibration.png`（藍線＝下面的路徑，粉紅＝參考圖，已幾乎重合）。
 
@@ -128,7 +128,8 @@ C 1.14 0.62, 1.22 0.78, 1.285 0.89
 - 實作：把 (u,v) 換算成像素 `x = left + u*w`、`y = bottom + v*h`。**不要用等比縮放**，寬高分別縮放，這樣字很長時圈圈仍在尾端。若字很長（w/h > 8），圈圈部分（u > 0.75 的那幾段）改用以 h 為基準的固定大小，避免圈圈被拉得太扁：圈圈段的 x 改為 `right + (u-1)*h*5.3`。
 - 字卡外框要把超出字寬的 28% 與下方 1.2 倍字高算進去，避免被裁掉。
 - `drawOn` 動畫：用 `getTotalLength` 等價方法（自己取樣曲線長度）＋ `setLineDash([len,len])`、`lineDashOffset` 從 len → 0。
-- 驗收：用 `docs/reference/tail-loop-calibrate.py` 的方式，把 App 渲染結果與參考圖疊在一起截圖，給使用者看。
+- 驗收：截圖給使用者看形狀像不像（使用者 2026-11-11 說明參考圖只是示意圖，**不需要**疊圖到逐像素重合；`tail-loop-calibrate.py` 留作需要時的工具）。
+- 實作備註：字很長（w/h > 5.3）時，圈圈（u > 0.75）改成以字高為基準的固定大小、貼字右緣，前面直線段拉長補寬度；w/h = 5.3 時與等比縮放完全相同，所以是連續的。
 
 ## 4. 圖形庫（Office PPT 風格，當貼圖或字卡底塊，R12）
 

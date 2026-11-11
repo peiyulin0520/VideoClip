@@ -1169,3 +1169,33 @@ button {
   padding: 0 11px;
   white-space: nowrap;
 }
+.deco-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 8px 0;
+}
+.deco-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  font-size: 12px;
+  background: #f4f1ec;
+  color: #333;
+  border: 2px solid transparent;
+  border-radius: 10px;
+}
+.deco-cell.active {
+  border-color: var(--accent);
+}
+.deco-thumb {
+  width: 100%;
+  height: 52px;
+}
+.deco-row {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid #333;
+}

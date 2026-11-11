@@ -1,5 +1,6 @@
 import { cssFamily, FALLBACK_STACK, requestFont } from '../fonts/fontStore';
 import type { BoxShape, TextCard, TextItem, TextRun } from '../model/types';
+import { decorationOps, drawOps, opsBounds } from './decorations';
 import { layoutCard, type GlyphBox, type GlyphMetric, type Measurer } from './cardLayout';
 
 // 字卡繪製：排版交給 cardLayout（逐字、墨跡邊界），這裡負責畫字塊、描邊、陰影、文字。見 docs/TEXT_CARDS.md。
@@ -87,7 +88,15 @@ export function renderText(card: TextCard, scale: number): TextRender {
     if (r.shadow)
       reach = Math.max(reach, r.shadow.blur + Math.max(Math.abs(r.shadow.x), Math.abs(r.shadow.y)));
   }
-  const bleed = Math.ceil(reach * scale);
+  // 裝飾（尾端圈圈等）會畫到字塊外面：以墨跡矩形算出每個裝飾的範圍，畫布四周留夠
+  const decoOps = (card.decorations ?? []).map((d) => ({ d, ops: decorationOps(d, lay.ink) }));
+  let decoReach = 0;
+  for (const { ops } of decoOps) {
+    const bb = opsBounds(ops);
+    if (!bb) continue;
+    decoReach = Math.max(decoReach, -bb.l, -bb.t, bb.r - lay.w, bb.b - lay.h);
+  }
+  const bleed = Math.ceil(Math.max(reach * scale, decoReach + 2));
   const w = Math.ceil(lay.w + bleed * 2);
   const h = Math.ceil(lay.h + bleed * 2);
   const canvas = document.createElement('canvas');
@@ -103,6 +112,14 @@ export function renderText(card: TextCard, scale: number): TextRender {
     ctx.fillStyle = card.box.fill;
     boxPath(ctx, card.box.shape, ox, oy, lay.w, lay.h, (card.box.radius ?? 24) * scale);
     ctx.fill();
+    ctx.restore();
+  }
+
+  // 裝飾畫在字後面（底線、螢光筆、圈圈都在字外面或字底下）
+  for (const { d, ops } of decoOps) {
+    ctx.save();
+    ctx.translate(ox, oy);
+    drawOps(ctx, ops, d.color);
     ctx.restore();
   }
 

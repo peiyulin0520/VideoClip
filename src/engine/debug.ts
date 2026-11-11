@@ -79,6 +79,19 @@ export function installDebugHook(player: Player) {
         }
       return { w: out.w, h: out.h, top, bottom, left, right };
     },
+    /** 把字卡畫成 PNG（dataURL），驗收截圖用；bg 是背景色（預設白） */
+    async cardPng(card: TextCard, scale = 1, bg = '#ffffff') {
+      for (const r of card.runs) await ensureFont(r.fontId);
+      const out = renderText(card, scale);
+      const cv = document.createElement('canvas');
+      cv.width = out.w;
+      cv.height = out.h;
+      const ctx = cv.getContext('2d')!;
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, out.w, out.h);
+      ctx.drawImage(out.canvas, 0, 0);
+      return cv.toDataURL('image/png');
+    },
     /** 用輸出解析度畫出 t 秒那一格（匯出共用的流程），回傳 PNG 大小與幾個取樣點的顏色 */
     async exportFrame(t: number, points: [number, number][]) {
       const p = useProjectStore.getState().project!;
