@@ -78,7 +78,15 @@ export type DecorationKind =
   | 'check'
   | 'corner-brackets';
 /** 字卡裝飾。width：線寬，佔文字墨跡高度的比例（星星、愛心、螢光筆不用） */
-export type Decoration = { kind: DecorationKind; color: string; width: number };
+export type Decoration = {
+  kind: DecorationKind;
+  color: string;
+  width: number;
+  /** 與文字的距離，佔字高的比例（−0.3 ~ 1.0，預設 0）；螢光筆是上下位置 */
+  gap?: number;
+  /** 大小倍數（0.5 ~ 2，預設 1）：星星、愛心、打勾、彎箭頭 */
+  scale?: number;
+};
 export type BoxShape =
   | 'rect'
   | 'roundRect'

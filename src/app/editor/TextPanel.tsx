@@ -495,7 +495,7 @@ export function TextPanel({
                   label={`${def.label}顏色`}
                   onPick={(col) => edit((c) => void (c.decorations![i]!.color = col))}
                 />
-                {d.kind !== 'marker' && d.kind !== 'sparkles' && d.kind !== 'hearts' && (
+                {def.hasWidth && (
                   <Slider
                     label={`${def.label}粗細`}
                     value={Math.round(d.width * 100)}
@@ -504,6 +504,26 @@ export function TextPanel({
                     step={1}
                     format={(v) => `${v}%`}
                     onChange={(v) => edit((c) => void (c.decorations![i]!.width = v / 100), `deco${i}`)}
+                  />
+                )}
+                <Slider
+                  label={`${def.label}${def.gapLabel}`}
+                  value={Math.round((d.gap ?? 0) * 100)}
+                  min={-30}
+                  max={100}
+                  step={5}
+                  format={(v) => `${v}%`}
+                  onChange={(v) => edit((c) => void (c.decorations![i]!.gap = v / 100), `decogap${i}`)}
+                />
+                {def.hasScale && (
+                  <Slider
+                    label={`${def.label}大小`}
+                    value={Math.round((d.scale ?? 1) * 100)}
+                    min={50}
+                    max={200}
+                    step={5}
+                    format={(v) => `${v}%`}
+                    onChange={(v) => edit((c) => void (c.decorations![i]!.scale = v / 100), `decosc${i}`)}
                   />
                 )}
               </div>

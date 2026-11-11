@@ -6,7 +6,7 @@
 - **日期**：2026-11-11
 - **分支**：PR #3（實測修正 A/B/C/D＋Phase 3A 第 1–4 步前半）**已由使用者合併進 `main`**（2026-11-11，部署 run #21 啟動；上線網址 https://peiyulin0520.github.io/VideoClip/ 會更新成這版）。`claude/zen-tesla-v3brj5` 已用 `git merge --ff-only origin/main` 對齊 main，之後的新工作繼續在這個分支
 - **最後一個程式 commit**：見 `git log -1`（Phase 3A-4：圖形庫）
-- **測試**：234 個單元測試、53 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：243 個單元測試、54 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅、第 4 步前半（33 種圖形當字塊／獨立圖形）✅；4 後半（貼圖 icon）未做**；Phase 4–7 未開始
 - **下一步**：照 `docs/plans/2026-11-11-iphone-feedback-2.md` 實作使用者第 2 次 iPhone 實測回報的修正，順序 **① 匯入失敗（P0）→ ② 預覽太小＋操作鈕 → ③ 顏色 → ④ 裝飾距離 → ⑤ 字塊形狀調整**。貼圖 icon、雲朵字等這批修完再做
 - **等使用者的事**
@@ -54,6 +54,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 回報 2-④：裝飾距離與大小（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：`Decoration` 加選填 `gap`（與文字的距離，佔字高比例 −0.3~1.0）、`scale`（大小 0.5~2）。底線類（波浪、虛線、點點、雙底線）改成「線的**上緣**離字底 0.32 字高 ＋ gap」，**線變粗時往下長**，不會往上碰到字（使用者回報的問題）；尾端圈圈整條往下移 gap；手繪圈住、角括號往外擴；愛心、星星、斜線、打勾、彎箭頭往外側推開；螢光筆的距離改叫「上下位置」。星星、愛心、打勾、彎箭頭多一條「大小」。面板每個裝飾列：粗細（有線寬的才有）、與文字距離、大小（有的才有）。⚠ 預設的底線位置比以前遠（舊專案裡的底線會往下移一點，這是使用者要的）
+  - 動了哪些檔：src/engine/decorations.ts（＋test）、src/model/types.ts、src/app/editor/TextPanel.tsx、e2e/phase3a-deco.spec.ts
+  - 驗證：✅ 單元：每種裝飾 gap=0.5 離墨跡更遠；底線粗細 5%→25% 線的上緣 y 幾乎不變且永遠在字下方；預設值下底線離字底 ≥ 0.28 字高；包圍類四邊外擴、兩側類推開、打勾與彎箭頭單邊推開、螢光筆上下位置；大小變大而線寬不變；調整項目旗標。✅ e2e：拖距離／大小滑桿 → 資料與預覽改變；愛心有大小沒粗細、螢光筆叫「上下位置」；截圖 docs/screenshots/phase3a/deco-wave-thick.png、deco-wave-gap60.png；243 單元＋54 e2e 全過，連跑 2 次穩定  🟡 只在 Chromium
+  - 下一步：回報 2-⑤ 圖形可調整（雲朵凹槽、星形內徑、角圓滑、對話框尾巴位置）
 - 2026-11-11 回報 2-③：顏色選擇器（分支 claude/zen-tesla-v3brj5，Sonnet）
   - 做了什麼：新 `src/ui/ColorPicker.tsx`，文字、字塊、字塊外框、描邊兩層、裝飾**全部**換成它：「最近用過」（最多 8 色，存在這台裝置 localStorage `vc-recent-colors`，最新在最前面）→ 基本 8 色（裝飾會把自己的預設色放最前面）→「更多顏色」展開粉嫩／莫蘭迪／螢光各 8 色（共 **32 色**）→「自訂顏色」（`<input type=color>`，iPhone 上會跳系統取色盤）＋色碼輸入（`#RRGGBB`，沒輸入完或不合法不套用）。色票 40px。資料格式仍是色碼字串，舊專案不用轉換
   - 動了哪些檔：src/ui/{ColorPicker,ColorPicker.test}.ts(x)、src/app/editor/TextPanel.tsx、styles.css、e2e/fix-colors.spec.ts
