@@ -16,15 +16,16 @@ import { Player } from '../../engine/player';
 import { geoCtx } from '../../engine/scene';
 import { findItem, visibleLayers } from '../../engine/timeline';
 import { removeAnyItem, setTransform } from '../../store/actions';
-import { useProjectStore } from '../../store/projectStore';
-import { useUI } from '../../store/uiStore';
+import { setAssetThumbs, useProjectStore } from '../../store/projectStore';
+import { toast, useUI } from '../../store/uiStore';
 
-const SAFE_KEY = 'vc-safe-zone';
+// v2：改成預設關閉（舊版 'vc-safe-zone' 預設開，會讓使用者誤以為粉紅區是畫面的一部分）
+const SAFE_KEY = 'vc-safe-zone-v2';
 const readSafe = () => {
   try {
-    return localStorage.getItem(SAFE_KEY) !== '0';
+    return localStorage.getItem(SAFE_KEY) === '1';
   } catch {
-    return true;
+    return false;
   }
 };
 
@@ -46,6 +47,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
   const stageRef = useRef<HTMLDivElement>(null);
   const [cssW, setCssW] = useState(1);
   const [safe, setSafe] = useState(readSafe);
+  const [dragging, setDragging] = useState(false); // 拖移/縮放中：安全區參考線暫時出現
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [selVisible, setSelVisible] = useState(true);
   const project = useProjectStore((s) => s.project)!;
@@ -54,6 +56,8 @@ export function Preview({ projectId, width, height }: { projectId: string; width
   const fontEpoch = useFonts((s) => s.epoch); // 字體載入完成：字卡大小可能變，選取框要重算
 
   // ---- 建立 / 銷毀播放引擎（含 Pixi 合成器）----
+  // 比例改了（寬高變了）會重建；記住舊的播放時間，重建後回到同一個位置（換專案則歸 0）
+  const resumeRef = useRef<{ projectId: string; time: number } | null>(null);
   useEffect(() => {
     let cancelled = false;
     let created: Player | null = null;
@@ -63,11 +67,13 @@ export function Preview({ projectId, width, height }: { projectId: string; width
       canvas: canvasRef.current!,
       getProject: () => useProjectStore.getState().project,
       urlFor: (id) => urlFor(projectId, id),
+      onThumb: setAssetThumbs,
     }).then((player) => {
       if (cancelled) return player.destroy();
       created = player;
       useUI.setState({ player });
-      player.seek(0);
+      const resume = resumeRef.current;
+      player.seek(resume && resume.projectId === projectId ? resume.time : 0);
       const unsubProject = useProjectStore.subscribe((s, prev) => {
         if (s.project !== prev.project) player.refresh();
       });
@@ -83,10 +89,11 @@ export function Preview({ projectId, width, height }: { projectId: string; width
     return () => {
       cancelled = true;
       unsub();
+      if (created) resumeRef.current = { projectId, time: created.time };
       created?.destroy();
       useUI.setState({ player: null });
     };
-  }, [projectId]);
+  }, [projectId, width, height]); // 比例改了（寬高變了）就重建預覽引擎
 
   // ---- 舞台大小（CSS px）----
   useEffect(() => {
@@ -149,6 +156,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
 
     if (pointers.current.size === 2 && cur && !cur.track.locked) {
       const [a, b] = [...pointers.current.values()] as [Pt, Pt];
+      setDragging(true);
       gesture.current = {
         type: 'pinch',
         id: cur.item.id,
@@ -165,6 +173,12 @@ export function Preview({ projectId, width, height }: { projectId: string; width
     const t = useUI.getState().player?.time ?? 0;
     const hit = topHit(visibleLayers(st.project!, t), geo, pt.x, pt.y);
     if (!hit) {
+      st.select(null);
+      gesture.current = null;
+      return;
+    }
+    // 主軌是滿版的：預覽上單點它不選取、也不拖移（要選主軌請點時間軸）；已經從時間軸選了主軌時才可以在預覽上調整
+    if (hit.track.kind === 'main' && hit.item.id !== st.selectedId) {
       st.select(null);
       gesture.current = null;
       return;
@@ -198,11 +212,12 @@ export function Preview({ projectId, width, height }: { projectId: string; width
       const dy = pt.y - g.start.y;
       if (!g.moved && Math.hypot(dx, dy) < 4 / k) return; // 小於 4px 當作點擊，不算移動
       g.moved = true;
+      setDragging(true);
       const base = itemBox(f.item, geo);
       if (!base) return;
       let cx = g.startX * width + dx;
       let cy = g.startY * height + dy;
-      const snap = snapMove({ ...base, cx, cy }, width, height, 8 / k, safe);
+      const snap = snapMove({ ...base, cx, cy }, width, height, 8 / k, true);
       cx += snap.dx;
       cy += snap.dy;
       setGuides({ x: snap.guideX, y: snap.guideY });
@@ -213,6 +228,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
   const onPointerUp = (e: RPointerEvent) => {
     pointers.current.delete(e.pointerId);
     setGuides({ x: null, y: null });
+    if (pointers.current.size === 0) setDragging(false);
     if (pointers.current.size === 0) gesture.current = null;
     else if (pointers.current.size === 1 && gesture.current?.type === 'pinch') {
       // 兩指放掉一指：剩下的那一指接著當移動
@@ -236,6 +252,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
     const v0 = { x: e.clientX - cx, y: e.clientY - cy };
     const d0 = Math.hypot(v0.x, v0.y) || 1;
     const a0 = Math.atan2(v0.y, v0.x);
+    setDragging(true);
     const s0 = sel.item.transform.scale;
     const r0 = sel.item.transform.rotation;
     const move = (ev: PointerEvent) => {
@@ -245,6 +262,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
       setTransform(id, { scale: clamp((s0 * d) / d0, 0.05, 10), rotation: rot }, `scale:${id}`);
     };
     const up = () => {
+      setDragging(false);
       target.removeEventListener('pointermove', move);
       target.removeEventListener('pointerup', up);
       target.removeEventListener('pointercancel', up);
@@ -257,6 +275,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
   const toggleSafe = () => {
     const v = !safe;
     setSafe(v);
+    if (v) toast('粉紅虛線＝IG／抖音按鈕會蓋住的地方，重點別放這裡；匯出的影片不會有這些線');
     try {
       localStorage.setItem(SAFE_KEY, v ? '1' : '0');
     } catch {
@@ -288,13 +307,18 @@ export function Preview({ projectId, width, height }: { projectId: string; width
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <canvas ref={canvasRef} data-testid="preview-canvas" />
+        {/* key：比例改變就換一個新的 canvas（舊的 WebGL 環境被 Pixi 銷毀後不能在同一個 canvas 上重建） */}
+        <canvas key={`${width}x${height}`} ref={canvasRef} data-testid="preview-canvas" />
         <div ref={poolRef} className="pool" aria-hidden="true" />
 
-        {safe && (
+        {(safe || dragging) && (
           <div className="safe" aria-hidden="true" data-testid="safe-zone">
-            <div className="safe-bottom" style={{ height: `${SAFE_BOTTOM * 100}%` }} />
-            <div className="safe-right" style={{ width: `${SAFE_RIGHT * 100}%` }} />
+            <div className="safe-bottom" style={{ height: `${SAFE_BOTTOM * 100}%` }}>
+              <span>IG／抖音按鈕區</span>
+            </div>
+            <div className="safe-right" style={{ width: `${SAFE_RIGHT * 100}%` }}>
+              <span>按鈕</span>
+            </div>
           </div>
         )}
         {guides.x !== null && <div className="guide v" style={{ left: guides.x * k }} />}
@@ -302,7 +326,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
 
         {box && sel && (
           <div
-            className={`selbox${selLocked ? ' locked' : ''}`}
+            className={`selbox${selLocked ? ' locked' : ''}${sel.track.kind === 'main' ? ' main' : ''}`}
             data-testid="selbox"
             style={{
               left: box.cx * k,
@@ -315,17 +339,20 @@ export function Preview({ projectId, width, height }: { projectId: string; width
         )}
         {box && sel && !selLocked && handles && (
           <>
-            <button
-              data-handle="del"
-              className="sel-handle"
-              aria-label="刪除圖層"
-              style={{ left: handles.tl.x, top: handles.tl.y }}
-              onClick={() => removeAnyItem(sel.item.id)}
-            >
-              <span>
-                <X size={14} />
-              </span>
-            </button>
+            {/* 主軌不放 ✕：在預覽上一鍵刪掉整段主軌太容易誤觸，刪除請用工具列 */}
+            {sel.track.kind !== 'main' && (
+              <button
+                data-handle="del"
+                className="sel-handle"
+                aria-label="刪除圖層"
+                style={{ left: handles.tl.x, top: handles.tl.y }}
+                onClick={() => removeAnyItem(sel.item.id)}
+              >
+                <span>
+                  <X size={14} />
+                </span>
+              </button>
+            )}
             <button
               data-handle="scale"
               className="sel-handle scale"
@@ -347,7 +374,8 @@ export function Preview({ projectId, width, height }: { projectId: string; width
         aria-pressed={safe}
         onClick={toggleSafe}
       >
-        <ShieldCheck size={20} />
+        <ShieldCheck size={18} />
+        <span>安全區</span>
       </button>
     </div>
   );

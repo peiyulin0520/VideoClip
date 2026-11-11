@@ -95,6 +95,25 @@ export const useProjectStore = create<State>((set, get) => ({
   select: (id) => set({ selectedId: id }),
 }));
 
+/**
+ * 補上素材縮圖：不進復原歷史（不是使用者的編輯），但會標記有變更讓自動儲存存起來。
+ * 歷史快照裡同一個素材也一併更新，不然復原後縮圖又會不見。
+ */
+export function setAssetThumbs(assetId: string, thumbs: string[]) {
+  const st = useProjectStore.getState();
+  if (!st.project) return;
+  const patch = (p: Project): Project =>
+    p.assets.some((a) => a.id === assetId)
+      ? { ...p, assets: p.assets.map((a) => (a.id === assetId ? { ...a, thumbs } : a)) }
+      : p;
+  useProjectStore.setState({
+    project: patch(st.project),
+    past: st.past.map(patch),
+    future: st.future.map(patch),
+    revision: st.revision + 1,
+  });
+}
+
 /** 取代主軌的片段清單（呼叫端要先用 timeline.ts 的函式算好、包含 relayout） */
 export function setMainItems(items: VideoItem[], opts?: ApplyOpts) {
   useProjectStore.getState().apply((d) => {

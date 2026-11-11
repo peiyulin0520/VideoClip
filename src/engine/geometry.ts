@@ -3,7 +3,7 @@ import type { Layer } from './timeline';
 
 /** 畫面（canvas）像素座標下的物件方框；rotation 單位是度，順時針，繞中心 */
 export type Box = { cx: number; cy: number; w: number; h: number; rotation: number };
-export type TextSize = (item: TextItem, canvasW: number) => { w: number; h: number };
+export type TextSize = (item: TextItem, canvasW: number, canvasH: number) => { w: number; h: number };
 export type GeoCtx = { canvasW: number; canvasH: number; assets: Asset[]; textSize: TextSize };
 
 // 平台按鈕安全區：直式畫面底部約 250/1920、右側約 150/1080（見 docs 的字卡規則）
@@ -36,7 +36,7 @@ export function itemBox(item: Item, ctx: GeoCtx): Box | null {
   let w: number;
   let h: number;
   if (item.type === 'text') {
-    const s = ctx.textSize(item, cw);
+    const s = ctx.textSize(item, cw, ch);
     w = s.w;
     h = s.h;
   } else {

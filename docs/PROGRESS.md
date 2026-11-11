@@ -4,15 +4,15 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`（Phase 1–3B 都在這個分支，**還沒合併到 `main`**；網址上線的只有 Phase 0）
-- **最後一個程式 commit**：見 `git log -1`（Phase 3B：字體管線、首次使用精靈、設定頁、字體選單）；之後只有交接文件的 commit
-- **測試**：41 個單元測試、22 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B（字體）✅；**Phase 3A（字卡引擎）尚未開始**；Phase 4–7 未開始
-- **下一步**：Phase 3A 字卡引擎。具體拆法在 `docs/HANDOFF.md §6`（先做「排版引擎＋墨跡邊界置中＋字塊四邊內距」，再尾端圈圈與裝飾、圖形庫、雲朵字、模板）
+- **分支**：`claude/zen-tesla-v3brj5`。實測修正 A/B/C/D＋Phase 3A 第 1–4 步前半已開 **PR #3** 等使用者合併（2026-11-11，使用者選「合併讓我用 iPhone 測」）；合併後 Actions 部署，上線網址才會更新。合併後分支對齊 main：`git fetch origin main && git merge --ff-only origin/main`
+- **最後一個程式 commit**：見 `git log -1`（Phase 3A-4：圖形庫）
+- **測試**：218 個單元測試、42 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅、第 4 步前半（33 種圖形當字塊／獨立圖形）✅；4 後半（貼圖 icon）未做**；Phase 4–7 未開始
+- **下一步**：（等使用者在 iPhone 重測、回報）Phase 3A 第 4 步後半「貼圖 icon」（Fluent Emoji 約 300 個常用子集，MIT；沙盒只能連 `raw.githubusercontent.com`，下載要用 raw 網址＋`NODE_USE_ENV_PROXY=1`；要附授權檔；貼圖可加白邊/陰影）。也可補規格裡沒做的 `cloud-frame`／`speech-frame`／`dot-line`／`number-badge`／`tail-loop-double` 裝飾與缺的圖形。之後第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
-  - 用 iPhone 實測 Phase 1–3B（清單在 `docs/PLAN.md §7`），特別是：多影片同時播放、字體下載/快取、首次使用精靈、匯入字體、預覽畫面在底部面板展開時是否太小
-  - 決定是否把 Phase 1–3B 合併到 `main` 上線（要開 PR）
+  - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是修正 A/B/C/D 要等合併上線後才測得到
+  - 要不要把修正 A–D 合併到 main（目前使用者選先不合併）
   - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
 - **目前沒有進行到一半的修改**（工作目錄乾淨、已 push）
 
@@ -28,11 +28,12 @@
 ```
 
 ## 使用者已確認的偏好
+- 新專案比例預設「自動：跟第一支影片一樣」，但之後可以調整修改（2026-11-11 使用者選 A：「跟第一支影片一樣，但保留之後影片可以調整修改」；先前誤記為 B）
 - **每次的進度都要記錄成檔案，之後可以用 ChatGPT 等其他 AI 直接讀檔無縫接手**（2026-11-11 使用者要求）→ 見 AGENTS.md「紀錄規則」
 - 字體選擇用下拉式選單，放在字卡頁籤
 - 字卡/icon 選取時右上角有縮放（調大小）鈕，可拖移位置
 - 字塊內距上下左右可分開調（修正字上方色塊多、下方貼底）
-- 尾端圈圈照參考圖 docs/reference/tail-loop-underline.jpg
+- 尾端圈圈參考圖 docs/reference/tail-loop-underline.jpg 只是**示意圖**（2026-11-11 使用者說明）：形狀神韻像即可，不必逐像素重合
 - 雲朵字不必很蓬鬆，有那個效果即可
 - VLOG 效果：底層完整影片 → 中層文字 V L G → 上層只保留人頭的影片（使用者自己描邊剪裁/擦除），不是自動去背
 - Office 圖案指方塊、雲朵、對話框等素材，可當字卡底塊
@@ -46,11 +47,70 @@
 - 備份資料夾保持私人；只貼網址不登入無法寫入（Google 限制），已向使用者說明
 
 ## 使用者的修正紀錄（時間順序）
+- 2026-11-11 iPhone 實測回報：「預覽畫面中會有粉色斜底區塊，不懂那個意思，是因為我前面選了尺寸 9:16？但不是應該影片要直接 match 整個黑框比較好嗎，多了一個粉底還需要手動縮小調整很麻煩」→ 原因是平台安全區參考線（預設開）＋主軌被選取時的選取框；修改規劃見 docs/plans/2026-11-11-safe-zone-and-selection.md。另從截圖看到：iPhone 上時間軸片段沒有縮圖
 - 2026-11-11 要求把每次進度都記錄下來，供其他 AI（如 ChatGPT）銜接 → 新增 AGENTS.md、docs/HANDOFF.md、交接快照與日誌格式
 - 2026-11-11 選 B：先做字體下載＋首次使用精靈，再做字卡引擎
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 Phase 3A 第 4 步前半：圖形庫（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：新 `engine/shapes.ts`：**33 種 Office 風格圖形**（自己用路徑畫，沒用任何現成圖檔）。基本：方形、圓角、膠囊、橢圓、三角形、菱形、斜切色塊、梯形、五邊形、六邊形、八邊形、十字、剪角、愛心、雲朵、圓柱。對話框：方／圓角／橢圓對話框（尾巴可選左下／右下）、思考泡泡、爆炸對話框。星形：4／5／6／8 角星、爆炸、波浪印章。標籤箭頭：橫幅、標籤、粗箭頭、V 形、步驟條、文件。當**字塊**用：外框大小＝文字區×`inset`（每個圖形一組，橢圓／星形／愛心可放文字的範圍比外框小），文字區在圖形裡置中。字塊新增**外框**（顏色、粗細）、尾巴方向。**獨立圖形**（貼圖用）：沒有文字的字卡，「＋新增圖形」，大小用內距調，時間軸顯示「圖形」。字塊分頁：4 個分類＋縮圖格（縮圖用同一套路徑函式畫的）
+  - 動了哪些檔：src/engine/{shapes,shapes.test,cardLayout,textRender}.ts、src/model/{types,defaults}.ts、src/store/actions.ts、src/app/editor/{ShapeThumb,TextPanel,Toolbar,Timeline}.tsx、styles.css、e2e/phase3a-shapes.spec.ts、docs/TEXT_CARDS.md
+  - 驗證：✅ 單元測試 134 個（每個圖形：座標有限、主體在範圍內、**文字區（外框÷inset）在 3 種長寬比下四角和四邊中點都落在圖形內**、尾巴往下超出且左右方向不同）；✅ e2e：4 個分類、**每個圖形都點過**且資料對得上、縮圖有畫、尾巴方向、外框、換星形後預覽有粉紅和白字、獨立圖形新增/改愛心/加第二個；截圖 docs/screenshots/phase3a/（shapes-sheet 33 種放字總覽、speech-bubble、shape-picker-stars、standalone-heart）；218 單元＋42 e2e 全過，連跑 2 次穩定  🟡 只在 Chromium  🔴 沒做：貼圖 icon（Fluent Emoji）、手繪感、漸層填色、虛線外框、閃電/月亮/太陽/笑臉/緞帶/捲軸/流程圖/線條類圖形
+  - 踩到的坑：bezier 控制點會超出曲線，量圖形範圍的測試要用曲線上的點（`flatten`）；`inset` 不能只調一組數字——先寫「文字區放得進圖形」的測試，再用掃描找最小值；星形四角、閃電的可放文字區太小，已拿掉閃電、四角星 inset 4.1
+  - 下一步：貼圖 icon，或先請使用者看圖形總覽
+- 2026-11-11 Phase 3A 第 3 步：字卡裝飾（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：新 `engine/decorations.ts`（純計算：墨跡矩形 → 繪圖指令，可單元測試）。13 種：尾端圈圈（照規格路徑）、波浪底線、虛線、點點線、雙底線、螢光筆、手繪圈住（頭尾不閉合）、彎箭頭、星星、愛心、斜線、打勾、角括號。`TextCard.decorations`（可疊多個，各自顏色、粗細＝佔字高比例）。畫在字後面；畫布四周依裝飾範圍自動多留邊。文字面板新分頁「**裝飾**」：3 欄格子，**每格縮圖是用範例字「好看」真的畫出來的**；點一下加、再點拿掉；已加的每個有顏色和粗細，可「移除」。尾端圈圈：字很長時圈圈固定大小貼字右緣（不被拉扁）
+  - 動了哪些檔：src/engine/{decorations,decorations.test,textRender,debug}.ts、src/model/types.ts、src/app/editor/{DecoThumb,TextPanel}.tsx、styles.css、e2e/phase3a-deco.spec.ts、e2e/helpers.ts、docs/TEXT_CARDS.md、AGENTS.md
+  - 驗證：✅ 19 個裝飾單元測試（尾端圈圈位置/超出比例/長字不拉扁）；✅ e2e：13 格縮圖都有畫東西、每一種都點得動（加／拿掉）、改顏色粗細後預覽像素變化、疊兩個、移除、復原；截圖 docs/screenshots/phase3a/（decorations-sheet 13 種總覽、tail-loop-short/long、deco-picker、deco-two）；84 單元＋39 e2e 全過，整套連跑 5 次穩定  🟡 只在 Chromium  🔴 沒做：裝飾動畫（drawOn，Phase 4）、tail-loop-double、dot-line、number-badge、cloud/speech-frame（等圖形庫）、裝飾位置微調
+  - 使用者的決定/回饋：「A，然後我給你的參考圖只是示意圖」→ 尾端圈圈不必疊圖到逐像素重合（已改 TEXT_CARDS §3.1、AGENTS 規則 9、偏好）
+  - 踩到的坑：e2e 的 `project()` 要等 `window.__videoclip` 出現（機器忙時預覽引擎晚建好），整套平行跑偶爾失敗 → helpers 裡統一等待
+  - 下一步：第 4 步圖形庫
+- 2026-11-11 Phase 3A 第 2 步：字卡面板（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：文字分頁改成 4 個子頁。**文字**：內容、字體、大小、顏色、粗體、斜體。**版面**：字距、行距、寬度（依文字／固定寬度滑桿）、對齊。**字塊**：無／方形／圓角／膠囊、顏色、透明度、圓角、**內距上下左右四個滑桿＋四邊連動鎖**、文字上下微調。**描邊陰影**：外層／內層兩層描邊（顏色＋粗細）、陰影開關與模糊。「＋新增」放在分頁列上；字卡面板比其他面板高（34dvh）、分頁列捲動時固定、控制項縮小（≥38px，滑桿 44px）
+  - 動了哪些檔：src/app/editor/TextPanel.tsx（新）、src/ui/Slider.tsx（新，從 Toolbar 抽出）、Toolbar.tsx、textRender.ts（描邊厚度 0 的層略過）、styles.css、e2e/phase3a-panel.spec.ts
+  - 驗證：✅ e2e 逐一點過每個按鈕／滑桿並檢查專案資料與預覽像素（字塊顏色出現在預覽）；截圖 docs/screenshots/phase3a/（box-default、box-padding-separate、stroke-two-layers）；65 單元＋37 e2e 全過  🟡 只在 Chromium；🔴 iPhone 觸控手感、滑桿好不好拖未驗證  🔴 尚未做：漸層、發光、直排、多段文字（面板只編輯第一段）、字塊的尾巴／斜切／描邊
+  - 踩到的坑：字卡面板太高會把預覽擠很小（iPhone 13 尺寸下預覽只剩約 200px 高）→ 控制項縮小、分頁列固定；需要大預覽時點底部「文字」分頁可收合面板。flex 容器裡的圓形色票會被壓成橢圓，要 `flex:none` 加 `min-height`
+  - 順手修：`fix-thumbs` 的「有縮圖」測試在機器忙（整套平行跑）時偶爾失敗（縮圖晚到）→ 改成輪詢；整套連跑 2 次 37/37 過
+  - 下一步：第 3 步尾端圈圈與裝飾
+- 2026-11-11 Phase 3A 第 1 步：字卡型別擴充＋逐字排版引擎（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：`TextRun` 加 `italic/strokes/shadow`、`TextCard` 加 `width/box`、新 `CardBox`（形狀 rect/roundRect/pill、顏色、透明度、四邊內距、垂直微調、圓角）——全是選填，舊字卡不用轉換。新 `engine/cardLayout.ts`（純計算、量字器可注入）：逐字排、字距（em）、固定寬度自動換行（中文逐字、英文在單字邊界、太長硬斷、避頭尾）、對齊、字塊尺寸＝墨跡邊界＋四邊內距。`textRender.ts` 改成用它畫：字塊→多層描邊（由外到內）→陰影→文字，斜體用斜切。新字卡預設帶陰影（舊字卡不再有預設陰影）
+  - 動了哪些檔：src/model/{types,defaults}.ts、src/engine/{cardLayout,cardLayout.test,textRender,debug}.ts、e2e/phase3a-layout.spec.ts
+  - 驗證：✅ 12 個排版單元測試（假量字器）；✅ e2e 在真的 Chromium 用真字體（粉圓、饅頭黑體、霞鶩文楷）量像素：字上下左右內距跟設定一致（±2px），上 10／下 60 分開調也對  🔴 還沒有介面可以設字塊（第 2 步）；粗體用字型本身的 700（沒有用描邊模擬）；直排、漸層、發光未做
+  - 踩到的坑：量字器的 `right` 要從 pen 起算（`actualBoundingBoxRight`），不是從字寬末端
+  - 下一步：第 2 步字塊與內距 UI
+- 2026-11-11 實作 4 項實測修正 A/B/C/D（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：
+    - D 自動比例：新專案預設「自動（跟第一支影片）」；比例多 3:4、4:3；編輯器頂列「畫面比例」按鈕（可復原、可切回自動）；空白專案第一次匯入主軌時自動決定；字卡大小/外框改跟短邊（`uiScale`）；改比例時預覽重建並回到原播放時間
+    - A 安全區：預設關（新 key `vc-safe-zone-v2`）、拖移/縮放時自動出現、虛線＋標籤「IG／抖音按鈕區」、按鈕有「安全區」字、打開時 toast 說明
+    - B 主軌：匯入後不自動選、預覽單點不選不拖、從時間軸選才有細框、沒有 ✕、保留縮放鈕；疊加物件照舊
+    - C 縮圖：匯入用 Mediabunny `CanvasSink`，失敗退回 `<video>`，再失敗由預覽播放器拿到畫面後補一張（`setAssetThumbs`，不進復原）；沒縮圖時時間軸顯示檔名
+  - 動了哪些檔：src/model/{types,defaults}.ts（+defaults.test.ts）、src/store/{actions,projectStore}.ts、src/engine/{probe,player,scene,compositor,textRender,geometry}.ts、src/app/editor/{Preview,Timeline}.tsx、src/app/pages/{Home,Editor}.tsx、styles.css、e2e/{fix-aspect,fix-safe-zone,fix-thumbs}.spec.ts、phase2.spec.ts（點角落改成不選取）
+  - 驗證：✅ 53 單元＋33 e2e 全過；截圖在 docs/screenshots/fix-safe-zone/；✅ 模擬「iPhone 行為」（沒有 VideoDecoder、probe 的 `<video>` 聽不到 loadeddata）時，播放器會補上縮圖，重新整理後仍在；✅ Chromium 下 Mediabunny 路徑有效（匯入 0.4 秒完成，沒有等 8 秒）  🟡 Chromium：以上全部  🔴 沒驗證：iPhone Safari 的 WebCodecs/HEVC 解碼、直拍 .mov 的自動比例、觸控手感（列進 PLAN §7）
+  - 使用者的決定/回饋：選 A（4 項一起做）；比例「A 跟第一支影片一樣，但保留之後可以調整」
+  - 踩到的坑：Pixi destroy 後不能在同一個 canvas 重建 WebGL（頁面卡死）→ 比例改變用 `key` 換新 canvas；e2e 要等 `__videoclip` 出現；模擬 iOS 時要用 `webkit-playsinline` 屬性區分「探測用 video」與「影片池 video」
+  - 下一步：使用者決定是否合併到 main 以便 iPhone 重測；之後 Phase 3A
+- 2026-11-11 補完自動比例（§2-D）的實作規劃＋存草稿 patch（分支 claude/zen-tesla-v3brj5，只有文件）
+  - 做了什麼：中斷前寫好的 D 程式草稿存成 （草稿 patch 已套用並刪除），程式還原（使用者要的是規劃，實作交給 Sonnet）。規劃 §2-D 加「實作細節」：草稿涵蓋範圍、還缺的 3 件事、e2e 清單、已知行為
+  - 動了哪些檔：docs/plans/2026-11-11-safe-zone-and-selection.md、docs/plans/2026-11-11-aspect-auto-draft.patch（新）、docs/PLAN.md §7、docs/HANDOFF.md §4
+  - 驗證：✅ 草稿 `tsc -b` 通過、`defaults.test.ts` 12 個單元測試通過  🔴 草稿沒跑 lint／e2e
+  - 使用者的決定/回饋：「A跟第一支影片一樣，但保留之後影片可以調整修改，根據這個做相關規劃」
+  - 踩到的坑：字卡大小現在用「畫面寬 ÷ 1080」，改成 16:9 時字會放大 1.78 倍 → 規劃建議改用短邊
+  - 下一步：照規劃實作 D → A → B → C
+- 2026-11-11 更正：新專案比例使用者選 A（自動跟第一支影片，之後可改）。先前因為使用者誤解選項而記成 B（不做）；已更新規劃 §2-D 與偏好。程式未改。
+- 2026-11-11 使用者回覆修改規劃 §2-D：選 B（不做自動比例）。已更新規劃與偏好；程式未改。下一步不變：照規劃實作 A→B→C
+- 2026-11-11 寫修改規劃：粉紅安全區、主軌選取框、iPhone 縮圖（分支 claude/zen-tesla-v3brj5，只有文件）
+  - 做了什麼：依使用者實測截圖查程式，確認粉紅斜線是預設開啟的「平台安全區參考線」（Preview.tsx 的 readSafe 預設開）、白框與 ✕ 是主軌選取框（匯入後自動選取＋點預覽一定打到主軌）、灰色片段是 iPhone 上 `<video>` 沒觸發 loadeddata 所以 probe 沒產生縮圖。寫成可照做的規劃（原因表、要改的事、檔案、驗收、要調整的既有測試、回覆使用者的話）。
+  - 動了哪些檔：新增 docs/plans/2026-11-11-safe-zone-and-selection.md；docs/PROGRESS.md
+  - 驗證：只有文件；程式未改
+  - 使用者的決定/回饋：要求先寫規劃，之後用 Sonnet 實作
+  - 下一步：照規劃實作（A 安全區 → B 主軌選取 → C 縮圖）；D 自動比例要做（使用者選 A，細節在規劃 §2-D）
+- 2026-11-11 Phase 1–3B 合併上線（PR #2，分支 claude/zen-tesla-v3brj5 → main）
+  - 做了什麼：開 PR #2；GitHub 上的 build 檢查成功；使用者合併；`main` 的 CI & Deploy（run #8）成功，GitHub Pages 已部署；取消 PR 訂閱；分支用 fast-forward 對齊 main。
+  - 驗證：✅ 部署流程第一次在 main 跑成功（PLAN.md §7 原本的「部署尚未實際執行」已解除）；🟡 網站在 iPhone 上的實際表現還沒人測
+  - 使用者的決定/回饋：選 A（合併上線）、訂閱 PR
+  - 踩到的坑：自動模式會擋 `git push --force`；PR 合併後要對齊 main 時，用 `git merge --ff-only origin/main` 再一般 push 就好，不用強制推送
+  - 下一步：等使用者手機實測回報；沒有回報前可以先做 Phase 3A（字卡引擎）
 - 2026-11-11 建立交接文件，讓其他 AI 只讀檔案就能接手（分支 claude/zen-tesla-v3brj5）
   - 做了什麼：新增 `AGENTS.md`（所有 AI 共用的規則、指令、紀錄規則）、`docs/HANDOFF.md`（使用者與合作方式、需求與決定的時間順序、架構地圖、資料流、決策與原因、踩過的坑、Phase 3A 的具體拆法、驗證方式）；`CLAUDE.md` 改成指向 AGENTS.md ＋ 沙盒補充；`docs/PROGRESS.md` 加「交接快照」（每次覆寫）和「日誌格式」；`package.json` 加 `npm run check`（lint＋測試＋build）。
   - 動了哪些檔：AGENTS.md、CLAUDE.md、README.md、docs/HANDOFF.md、docs/PROGRESS.md、package.json

@@ -2,6 +2,7 @@ import { Application, CanvasSource, Container, Graphics, Rectangle, Sprite, Text
 import 'pixi.js/advanced-blend-modes';
 import type { BlendMode, Crop, Outline } from '../model/types';
 import type { Box } from './geometry';
+import { uiScale } from './textRender';
 
 export type LayerSource = HTMLVideoElement | HTMLImageElement | HTMLCanvasElement | ImageBitmap;
 
@@ -209,7 +210,7 @@ export class Compositor {
 
     // ---- 外框（畫在框內側，方框大小不變，選取框才對得準）----
     if (layer.outline && layer.outline.width > 0) {
-      const w = layer.outline.width * (this.width / 1080);
+      const w = layer.outline.width * uiScale(this.width, this.height);
       const key = `${box.w.toFixed(1)}|${box.h.toFixed(1)}|${radius.toFixed(1)}|${w.toFixed(1)}|${layer.outline.color}`;
       if (!o.outline) {
         o.outline = new Graphics();

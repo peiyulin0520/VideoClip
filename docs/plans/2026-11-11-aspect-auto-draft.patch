@@ -1,0 +1,356 @@
+diff --git a/src/app/editor/Preview.tsx b/src/app/editor/Preview.tsx
+index c2f7f5e..168f703 100644
+--- a/src/app/editor/Preview.tsx
++++ b/src/app/editor/Preview.tsx
+@@ -86,7 +86,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
+       created?.destroy();
+       useUI.setState({ player: null });
+     };
+-  }, [projectId]);
++  }, [projectId, width, height]); // 比例改了（寬高變了）就重建預覽引擎
+ 
+   // ---- 舞台大小（CSS px）----
+   useEffect(() => {
+diff --git a/src/app/pages/Editor.tsx b/src/app/pages/Editor.tsx
+index 44a11d5..bd64d4a 100644
+--- a/src/app/pages/Editor.tsx
++++ b/src/app/pages/Editor.tsx
+@@ -9,6 +9,9 @@ import { getProject } from '../../storage/projects';
+ import { startAutosave } from '../../store/autosave';
+ import { useProjectStore } from '../../store/projectStore';
+ import { toast, useUI } from '../../store/uiStore';
++import { ASPECTS, assignAspect, pickAspect } from '../../model/defaults';
++import type { Aspect } from '../../model/types';
++import { setProjectAspect } from '../../store/actions';
+ import { Sheet } from '../../ui/Sheet';
+ import { Preview } from '../editor/Preview';
+ import { Timeline, MAX_PPS, MIN_PPS } from '../editor/Timeline';
+@@ -76,6 +79,7 @@ function EditorBody() {
+   const [time, setTime] = useState(0);
+   const [playing, setPlaying] = useState(false);
+   const [renaming, setRenaming] = useState(false);
++  const [ratioOpen, setRatioOpen] = useState(false);
+   const [nameDraft, setNameDraft] = useState('');
+   const total = totalDuration(project);
+ 
+@@ -111,14 +115,16 @@ function EditorBody() {
+           addOverlayClips(res.assets, player?.time ?? 0);
+         } else {
+           const startOfNew = totalDuration(useProjectStore.getState().project!);
+-          useProjectStore.getState().apply(
+-            (d) => {
+-              d.assets.push(...res.assets);
+-              const tr = d.tracks.find((t) => t.kind === 'main')!;
+-              tr.items = relayout([...(tr.items as typeof res.clips), ...res.clips]);
+-            },
+-            { select: res.clips[0]!.id },
+-          );
++          // 匯入主軌素材後不自動選取（主軌是滿版的，選取框會像「要手動縮小」的框）
++          useProjectStore.getState().apply((d) => {
++            d.assets.push(...res.assets);
++            const tr = d.tracks.find((t) => t.kind === 'main')!;
++            // 比例設成「自動」、而且主軌還是空的：第一次匯入時照第一個素材的形狀決定專案比例
++            const first = res.assets[0];
++            if (d.aspectAuto && tr.items.length === 0 && first)
++              assignAspect(d, pickAspect(first.width, first.height), true);
++            tr.items = relayout([...(tr.items as typeof res.clips), ...res.clips]);
++          });
+           player?.seek(startOfNew);
+         }
+       }
+@@ -148,6 +154,9 @@ function EditorBody() {
+         >
+           {project.name}
+         </button>
++        <button className="ratio-btn" aria-label="畫面比例" onClick={() => setRatioOpen(true)}>
++          {project.aspect}
++        </button>
+         <button
+           className="icon-btn"
+           aria-label="復原"
+@@ -221,6 +230,38 @@ function EditorBody() {
+         onChange={(e) => void onFiles(e.target.files)}
+       />
+ 
++      <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
++        <p className="hint">改了之後，影片和文字的位置、大小會跟著新的畫面。可以按「復原」改回來。</p>
++        <div className="chips" role="radiogroup" aria-label="選擇畫面比例">
++          <button
++            role="radio"
++            aria-checked={!!project.aspectAuto}
++            className={`chip${project.aspectAuto ? ' active' : ''}`}
++            onClick={() => {
++              const a = setProjectAspect('auto');
++              if (a) toast(`已設成自動（目前是 ${a}）`);
++              setRatioOpen(false);
++            }}
++          >
++            自動（跟第一支影片）
++          </button>
++          {(Object.keys(ASPECTS) as Aspect[]).map((a) => (
++            <button
++              key={a}
++              role="radio"
++              aria-checked={!project.aspectAuto && project.aspect === a}
++              className={`chip${!project.aspectAuto && project.aspect === a ? ' active' : ''}`}
++              onClick={() => {
++                setProjectAspect(a);
++                setRatioOpen(false);
++              }}
++            >
++              {ASPECTS[a].label}
++            </button>
++          ))}
++        </div>
++      </Sheet>
++
+       <Sheet open={renaming} title="專案名稱" onClose={() => setRenaming(false)}>
+         <input
+           className="text-input"
+diff --git a/src/app/pages/Home.tsx b/src/app/pages/Home.tsx
+index 8808bd0..74beb3c 100644
+--- a/src/app/pages/Home.tsx
++++ b/src/app/pages/Home.tsx
+@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
+ import { Link, useNavigate } from 'react-router-dom';
+ import { importFiles } from '../../engine/importMedia';
+ import { formatTime, mainItems, mainTrack, relayout, totalDuration } from '../../engine/timeline';
+-import { ASPECTS, createProject, nextProjectName } from '../../model/defaults';
++import { ASPECTS, assignAspect, createProject, nextProjectName, pickAspect } from '../../model/defaults';
+ import type { Aspect, Project } from '../../model/types';
+ import { requestPersistence } from '../../storage/media';
+ import {
+@@ -42,7 +42,7 @@ export function Home() {
+   const navigate = useNavigate();
+   const [projects, setProjects] = useState<Project[] | null>(null);
+   const [newOpen, setNewOpen] = useState(false);
+-  const [aspect, setAspect] = useState<Aspect>('9:16');
++  const [aspect, setAspect] = useState<Aspect | 'auto'>('auto');
+   const [menuFor, setMenuFor] = useState<Project | null>(null);
+   const [renameFor, setRenameFor] = useState<Project | null>(null);
+   const [nameDraft, setNameDraft] = useState('');
+@@ -66,7 +66,13 @@ export function Home() {
+ 
+   const createAndOpen = async (files: File[]) => {
+     const { setBusy } = useUI.getState();
+-    const p = createProject(nextProjectName((projects ?? []).map((x) => x.name)), aspect);
++    const auto = aspect === 'auto';
++    const p = createProject(
++      nextProjectName((projects ?? []).map((x) => x.name)),
++      auto ? '9:16' : aspect,
++      Date.now(),
++      auto,
++    );
+     setNewOpen(false);
+     if (files.length === 0) {
+       await saveProject(p);
+@@ -78,6 +84,9 @@ export function Home() {
+       const res = await importFiles(p.id, files, (d, n) => setBusy(`匯入中… ${d}/${n}`));
+       p.assets = res.assets;
+       mainTrack(p).items = relayout(res.clips);
++      // 自動：照第一個素材的形狀決定專案比例（之後在編輯器還可以改）
++      const first = res.assets[0];
++      if (auto && first) assignAspect(p, pickAspect(first.width, first.height), true);
+       await saveProject(p);
+       if (res.failed.length) toast(`無法匯入：${res.failed.map((f) => f.name).join('、')}`);
+       navigate(`/p/${p.id}`);
+@@ -175,6 +184,14 @@ export function Home() {
+ 
+       <Sheet open={newOpen} title="新專案" onClose={() => setNewOpen(false)}>
+         <div className="chips" role="radiogroup" aria-label="畫面比例">
++          <button
++            role="radio"
++            aria-checked={aspect === 'auto'}
++            className={`chip${aspect === 'auto' ? ' active' : ''}`}
++            onClick={() => setAspect('auto')}
++          >
++            自動（跟第一支影片）
++          </button>
+           {(Object.keys(ASPECTS) as Aspect[]).map((a) => (
+             <button
+               key={a}
+diff --git a/src/app/styles.css b/src/app/styles.css
+index 9bb15b8..9522268 100644
+--- a/src/app/styles.css
++++ b/src/app/styles.css
+@@ -1088,3 +1088,10 @@ button {
+   color: var(--accent);
+   white-space: nowrap;
+ }
++
++.ratio-btn {
++  min-width: 56px;
++  padding: 0 10px;
++  font-size: 14px;
++  font-variant-numeric: tabular-nums;
++}
+diff --git a/src/model/defaults.test.ts b/src/model/defaults.test.ts
+new file mode 100644
+index 0000000..455b0c8
+--- /dev/null
++++ b/src/model/defaults.test.ts
+@@ -0,0 +1,29 @@
++import { ASPECTS, createProject, pickAspect } from './defaults';
++
++describe('pickAspect：挑最接近的專案比例', () => {
++  it.each([
++    [1080, 1920, '9:16'],
++    [320, 568, '9:16'],
++    [1920, 1080, '16:9'],
++    [480, 270, '16:9'],
++    [1000, 1000, '1:1'],
++    [4032, 3024, '4:3'],
++    [400, 300, '4:3'],
++    [3024, 4032, '3:4'],
++    [2160, 3840, '9:16'],
++  ])('%i×%i → %s', (w, h, expected) => {
++    expect(pickAspect(w, h)).toBe(expected);
++  });
++  it('寬高不合理時退回 9:16', () => {
++    expect(pickAspect(0, 100)).toBe('9:16');
++    expect(pickAspect(NaN, 100)).toBe('9:16');
++  });
++  it('每個比例自己的寬高都會選回自己', () => {
++    for (const [k, a] of Object.entries(ASPECTS)) expect(pickAspect(a.width, a.height)).toBe(k);
++  });
++  it('專案解析度偶數、aspectAuto 只在需要時才有', () => {
++    for (const a of Object.values(ASPECTS)) expect(a.width % 2 === 0 && a.height % 2 === 0).toBe(true);
++    expect(createProject('x', '9:16').aspectAuto).toBeUndefined();
++    expect(createProject('x', '9:16', 1, true).aspectAuto).toBe(true);
++  });
++});
+diff --git a/src/model/defaults.ts b/src/model/defaults.ts
+index 4470c44..6951236 100644
+--- a/src/model/defaults.ts
++++ b/src/model/defaults.ts
+@@ -2,10 +2,28 @@ import type { Aspect, Asset, Project, TextItem, Track, TrackKind, VideoItem } fr
+ 
+ export const ASPECTS: Record<Aspect, { label: string; width: number; height: number }> = {
+   '9:16': { label: '直式 9:16', width: 1080, height: 1920 },
+-  '16:9': { label: '橫式 16:9', width: 1920, height: 1080 },
++  '3:4': { label: '直式 3:4', width: 1080, height: 1440 },
+   '1:1': { label: '方形 1:1', width: 1080, height: 1080 },
++  '4:3': { label: '橫式 4:3', width: 1440, height: 1080 },
++  '16:9': { label: '橫式 16:9', width: 1920, height: 1080 },
+ };
+ 
++/** 依素材（顯示後）的寬高，挑形狀最接近的專案比例 */
++export function pickAspect(width: number, height: number): Aspect {
++  if (!(width > 0) || !(height > 0)) return '9:16';
++  const r = Math.log(width / height);
++  let best: Aspect = '9:16';
++  let bestD = Infinity;
++  for (const [key, a] of Object.entries(ASPECTS) as [Aspect, (typeof ASPECTS)[Aspect]][]) {
++    const d = Math.abs(r - Math.log(a.width / a.height));
++    if (d < bestD) {
++      bestD = d;
++      best = key;
++    }
++  }
++  return best;
++}
++
+ export const IMAGE_DEFAULT_DURATION = 3;
+ export const MIN_CLIP_DURATION = 0.2;
+ export const MIN_SPEED = 0.25;
+@@ -23,7 +41,25 @@ export function createMainTrack(): Track {
+   return { id: newId('t_'), kind: 'main', name: '主軌', hidden: false, locked: false, items: [] };
+ }
+ 
+-export function createProject(name: string, aspect: Aspect = '9:16', now = Date.now()): Project {
++/** 改專案比例（直接改傳進來的物件，immer 草稿也可以）。auto=true 代表之後仍跟著第一個素材。 */
++export function assignAspect(
++  p: { aspect: Aspect; width: number; height: number; aspectAuto?: boolean },
++  aspect: Aspect,
++  auto: boolean,
++): void {
++  p.aspect = aspect;
++  p.width = ASPECTS[aspect].width;
++  p.height = ASPECTS[aspect].height;
++  if (auto) p.aspectAuto = true;
++  else delete p.aspectAuto;
++}
++
++export function createProject(
++  name: string,
++  aspect: Aspect = '9:16',
++  now = Date.now(),
++  aspectAuto = false,
++): Project {
+   const a = ASPECTS[aspect];
+   return {
+     id: newId('p_'),
+@@ -31,6 +67,7 @@ export function createProject(name: string, aspect: Aspect = '9:16', now = Date.
+     createdAt: now,
+     updatedAt: now,
+     aspect,
++    ...(aspectAuto ? { aspectAuto: true } : {}),
+     width: a.width,
+     height: a.height,
+     fps: 30,
+diff --git a/src/model/types.ts b/src/model/types.ts
+index f635b50..1218786 100644
+--- a/src/model/types.ts
++++ b/src/model/types.ts
+@@ -1,7 +1,7 @@
+ // 資料模型（見 docs/PLAN.md §2.5）。Phase 1 只有主軌的影片/照片片段；
+ // 其他軌道與物件種類（文字、貼圖、繪畫、調整）在之後的 Phase 加進 Track.kind / Item 聯集。
+ 
+-export type Aspect = '9:16' | '16:9' | '1:1';
++export type Aspect = '9:16' | '16:9' | '1:1' | '3:4' | '4:3';
+ 
+ export type Asset = {
+   id: string;
+@@ -79,6 +79,8 @@ export type Project = {
+   createdAt: number;
+   updatedAt: number;
+   aspect: Aspect;
++  /** true = 比例跟著第一個素材自動決定（使用者手動改過比例就變 false）；舊專案沒有這個欄位＝false */
++  aspectAuto?: boolean;
+   width: number;
+   height: number;
+   fps: number;
+diff --git a/src/store/actions.ts b/src/store/actions.ts
+index 397475e..cea42ea 100644
+--- a/src/store/actions.ts
++++ b/src/store/actions.ts
+@@ -1,6 +1,6 @@
+ import type { Draft } from 'immer';
+-import { createOverlayClip, createTextItem, createTrack } from '../model/defaults';
+-import type { Asset, Item, TextItem, Track, Transform, VideoItem } from '../model/types';
++import { assignAspect, createOverlayClip, createTextItem, createTrack, pickAspect } from '../model/defaults';
++import type { Aspect, Asset, Item, TextItem, Track, Transform, VideoItem } from '../model/types';
+ import {
+   duplicateFree,
+   duplicateItem,
+@@ -8,6 +8,7 @@ import {
+   findFreeStart,
+   firstFreeTrack,
+   isVideoItem,
++  mainItems,
+   mainTrack,
+   moveTrack,
+   relayout,
+@@ -179,3 +180,22 @@ export function placeItem(id: string, start: number, opts?: Opts) {
+ }
+ 
+ export { isVideoItem, mainTrack, relayout };
++
++/**
++ * 改專案比例。choice='auto'＝照主軌第一個片段的形狀決定，並維持「自動」（沒有片段就維持現在的比例）。
++ * 手動選比例後 aspectAuto 會關掉。可以復原。
++ */
++export function setProjectAspect(choice: Aspect | 'auto'): Aspect | null {
++  const p = store().project;
++  if (!p) return null;
++  let aspect: Aspect;
++  if (choice === 'auto') {
++    const first = mainItems(p)[0];
++    const asset = first && p.assets.find((a) => a.id === first.assetId);
++    aspect = asset ? pickAspect(asset.width, asset.height) : p.aspect;
++  } else aspect = choice;
++  store().apply((d) => {
++    assignAspect(d, aspect, choice === 'auto');
++  });
++  return aspect;
++}

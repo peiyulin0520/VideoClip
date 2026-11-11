@@ -363,23 +363,30 @@ button {
 .safe-bottom,
 .safe-right {
   position: absolute;
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(255, 77, 141, 0.22) 0 6px,
-    rgba(255, 77, 141, 0.08) 6px 12px
-  );
+  background: rgba(255, 77, 141, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  line-height: 1.2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
 }
 .safe-bottom {
   left: 0;
   right: 0;
   bottom: 0;
-  border-top: 1px dashed rgba(255, 77, 141, 0.7);
+  border-top: 1.5px dashed rgba(255, 77, 141, 0.85);
 }
 .safe-right {
   top: 0;
   right: 0;
   bottom: 0;
-  border-left: 1px dashed rgba(255, 77, 141, 0.7);
+  border-left: 1.5px dashed rgba(255, 77, 141, 0.85);
+}
+.safe-right span {
+  writing-mode: vertical-rl;
 }
 .guide {
   position: absolute;
@@ -402,6 +409,10 @@ button {
   border: 2px solid #fff;
   pointer-events: none;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.selbox.main {
+  border-width: 1px;
+  box-shadow: none;
 }
 .selbox.locked {
   border-style: dashed;
@@ -436,6 +447,11 @@ button {
   background: var(--accent);
 }
 .safe-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  font-size: 13px;
   position: absolute;
   right: 6px;
   bottom: 6px;
@@ -544,6 +560,15 @@ button {
   overflow: hidden;
   border-radius: 6px;
   pointer-events: none;
+}
+.tiles.no-thumb {
+  align-items: flex-start;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: #2a2a2e;
 }
 .tiles span {
   flex: none;
@@ -1087,4 +1112,115 @@ button {
 .banner a {
   color: var(--accent);
   white-space: nowrap;
+}
+
+.ratio-btn {
+  min-width: 56px;
+  padding: 0 10px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 字卡面板：設定很多，面板高一點；分頁（文字／版面／字塊／描邊陰影）捲動時固定在上面 */
+.panel.tall {
+  max-height: 34dvh;
+}
+.sticky-tabs {
+  position: sticky;
+  top: -10px;
+  z-index: 2;
+  margin: 0 -16px 4px;
+  padding: 8px 16px;
+  background: var(--panel);
+}
+.chip.sm {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+.chip.sm.add {
+  color: #fff;
+  background: var(--accent);
+}
+/* 字卡面板：控制項多，縮小一點（仍 ≥ 36px 高；滑桿維持 44px 好拖） */
+.panel.tall .chips {
+  gap: 6px;
+  margin: 4px 0;
+}
+.panel.tall .chip {
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+.panel.tall .swatch {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+}
+.panel.tall .sticky-tabs {
+  flex-wrap: nowrap;
+  margin: 0 -16px 4px;
+  padding: 8px 16px;
+}
+.panel.tall .sticky-tabs .chip {
+  flex: none;
+  padding: 0 11px;
+  white-space: nowrap;
+}
+.deco-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 8px 0;
+}
+.deco-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  font-size: 12px;
+  background: #f4f1ec;
+  color: #333;
+  border: 2px solid transparent;
+  border-radius: 10px;
+}
+.deco-cell.active {
+  border-color: var(--accent);
+}
+.deco-thumb {
+  width: 100%;
+  height: 52px;
+}
+.deco-row {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid #333;
+}
+.shape-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 6px 0;
+}
+.shape-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 64px;
+  padding: 4px 2px;
+  font-size: 11px;
+  background: #2a2a2e;
+  border: 2px solid transparent;
+  border-radius: 10px;
+}
+.shape-cell.active {
+  border-color: var(--accent);
+}
+.shape-thumb {
+  width: 100%;
+  height: 40px;
 }

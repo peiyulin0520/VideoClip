@@ -1,4 +1,4 @@
-import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
+import { ALL_FORMATS, BlobSource, CanvasSink, Input } from 'mediabunny';
 import type { Asset } from '../model/types';
 
 export type MediaKind = 'video' | 'image';
@@ -76,6 +76,50 @@ function canvasFor(w: number, h: number) {
   return c;
 }
 
+/**
+ * 用 Mediabunny（WebCodecs）直接從容器解碼幾格縮圖，不靠 <video> 的 loadeddata——
+ * iPhone Safari 沒有使用者手勢時，隱藏的 <video> 常常不載入畫面，舊方法會拿不到縮圖。
+ * 瀏覽器不能解碼這個格式時回傳空陣列（由呼叫端改用 <video> 方法）。
+ */
+export async function mediabunnyThumbs(file: Blob, duration: number, count: number): Promise<string[]> {
+  const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+  const out: string[] = [];
+  try {
+    const track = await input.getPrimaryVideoTrack();
+    if (!track || !(await track.canDecode())) return out;
+    const sink = new CanvasSink(track, { height: THUMB_H, fit: 'contain' });
+    const times = Array.from({ length: count }, (_, i) =>
+      Math.min(((i + 0.5) / count) * duration, Math.max(duration - 0.05, 0)),
+    );
+    let last: string | null = null;
+    for await (const wrapped of sink.canvasesAtTimestamps(times)) {
+      if (wrapped) {
+        const c = canvasFor(wrapped.canvas.width, wrapped.canvas.height);
+        c.getContext('2d')!.drawImage(wrapped.canvas, 0, 0, c.width, c.height);
+        last = c.toDataURL('image/jpeg', 0.6);
+      }
+      if (last) out.push(last); // 某一格拿不到就沿用前一格
+    }
+  } catch {
+    /* 解碼失敗：交給備用方法 */
+  } finally {
+    input.dispose();
+  }
+  return out.length === count ? out : [];
+}
+
+/** 從已經有畫面的 <video> 擷取一張縮圖（預覽播放器的備用方案） */
+export function captureThumb(v: HTMLVideoElement): string | null {
+  if (v.videoWidth <= 0 || v.videoHeight <= 0 || v.readyState < 2) return null;
+  try {
+    const c = canvasFor(v.videoWidth, v.videoHeight);
+    c.getContext('2d')!.drawImage(v, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.6);
+  } catch {
+    return null;
+  }
+}
+
 async function videoThumbs(url: string, duration: number, count: number): Promise<string[]> {
   const v = document.createElement('video');
   v.preload = 'auto';
@@ -131,7 +175,9 @@ export async function probeMedia(file: File, kind: MediaKind): Promise<ProbeResu
     }
     const meta = (await probeVideoContainer(file)) ?? (await probeVideoElement(url));
     if (!meta || !(meta.duration > 0)) return { ok: false, reason: '讀不到影片資訊' };
-    const thumbs = await videoThumbs(url, meta.duration, Math.min(Math.max(Math.ceil(meta.duration), 1), 8));
+    const count = Math.min(Math.max(Math.ceil(meta.duration), 1), 8);
+    let thumbs = await mediabunnyThumbs(file, meta.duration, count);
+    if (thumbs.length === 0) thumbs = await videoThumbs(url, meta.duration, count);
     return { ok: true, info: { kind, ...meta, thumbs } };
   } finally {
     URL.revokeObjectURL(url);

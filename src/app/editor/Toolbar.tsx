@@ -35,7 +35,6 @@ import {
   addText,
   duplicateAny,
   editItem,
-  editText,
   patchTrack,
   removeAnyItem,
   shiftTrackLayer,
@@ -43,7 +42,8 @@ import {
 } from '../../store/actions';
 import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
-import { FontSelect } from '../fonts/FontSelect';
+import { Slider } from '../../ui/Slider';
+import { TextPanel } from './TextPanel';
 
 export type Tab = 'edit' | 'overlay' | 'text' | 'layers';
 type Panel = 'speed' | 'volume' | null;
@@ -77,40 +77,6 @@ function ToolButton({
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
 const COLORS = ['#ffffff', '#111111', '#ff4d8d', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
 const BLENDS = Object.keys(BLEND_LABELS) as BlendMode[];
-
-function Slider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  format,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  format?: (v: number) => string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <label className="slider-row">
-      <span className="slider-label">{label}</span>
-      <input
-        type="range"
-        aria-label={label}
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-      <b className="slider-val">{format ? format(value) : value}</b>
-    </label>
-  );
-}
 
 export function BottomBar({
   onImportMain,
@@ -367,57 +333,21 @@ function OverlayTab({ onImportOverlay }: { onImportOverlay: () => void }) {
 function TextTab({ found }: { found: Found }) {
   const player = useUI((s) => s.player);
   const item = found?.item.type === 'text' ? found.item : null;
-  const run = item?.card.runs[0];
+  const add = () => addText(player?.time ?? 0);
   return (
-    <div className="panel">
-      <button className="btn primary done" onClick={() => addText(player?.time ?? 0)}>
-        ＋ 新增文字（放在目前這一秒）
-      </button>
-      {item && run ? (
-        <>
-          <textarea
-            className="text-input area"
-            aria-label="文字內容"
-            rows={2}
-            value={run.text}
-            onChange={(e) =>
-              editText(item.id, (c) => void (c.runs[0]!.text = e.target.value), {
-                coalesce: `txt:${item.id}`,
-              })
-            }
-          />
-          <div className="font-row-wrap">
-            <FontSelect
-              value={run.fontId}
-              onChange={(fontId) => editText(item.id, (c) => void (c.runs[0]!.fontId = fontId))}
-            />
-          </div>
-          <Slider
-            label="大小"
-            value={run.size}
-            min={24}
-            max={240}
-            step={1}
-            format={(v) => `${v}`}
-            onChange={(v) =>
-              editText(item.id, (c) => void (c.runs[0]!.size = v), { coalesce: `txtsize:${item.id}` })
-            }
-          />
-          <div className="chips">
-            {COLORS.map((c) => (
-              <button
-                key={c}
-                className={`swatch${run.color === c ? ' active' : ''}`}
-                style={{ background: c }}
-                aria-label={`文字顏色 ${c}`}
-                onClick={() => editText(item.id, (card) => void (card.runs[0]!.color = c))}
-              />
-            ))}
-          </div>
-          <p className="hint">字體、字塊、裝飾和動畫會在下一個階段加入。</p>
-        </>
+    <div className="panel tall">
+      {item ? (
+        <TextPanel item={item} onAdd={add} onAddShape={() => addText(player?.time ?? 0, true)} />
       ) : (
-        <p className="hint">新增或點選一個文字後，可以在這裡改內容、大小和顏色。</p>
+        <>
+          <button className="btn primary done" onClick={add}>
+            ＋ 新增文字（放在目前這一秒）
+          </button>
+          <button className="btn done" onClick={() => addText(player?.time ?? 0, true)}>
+            ＋ 新增圖形（星形、對話框、雲朵…）
+          </button>
+          <p className="hint">新增或點選一個文字後，可以在這裡改內容、字體、字塊和描邊。</p>
+        </>
       )}
     </div>
   );
@@ -443,7 +373,9 @@ function LayersTab() {
           const asset = isVideoItem(item) ? project.assets.find((a) => a.id === item.assetId) : undefined;
           const label =
             item.type === 'text'
-              ? `文字：${item.card.runs[0]?.text.slice(0, 8) ?? ''}`
+              ? item.card.runs[0]?.text === ''
+                ? '圖形'
+                : `文字：${item.card.runs[0]?.text.slice(0, 8) ?? ''}`
               : (asset?.name ?? '素材');
           const isMain = track.kind === 'main';
           return (

@@ -2,9 +2,27 @@ import type { Aspect, Asset, Project, TextItem, Track, TrackKind, VideoItem } fr
 
 export const ASPECTS: Record<Aspect, { label: string; width: number; height: number }> = {
   '9:16': { label: '直式 9:16', width: 1080, height: 1920 },
-  '16:9': { label: '橫式 16:9', width: 1920, height: 1080 },
+  '3:4': { label: '直式 3:4', width: 1080, height: 1440 },
   '1:1': { label: '方形 1:1', width: 1080, height: 1080 },
+  '4:3': { label: '橫式 4:3', width: 1440, height: 1080 },
+  '16:9': { label: '橫式 16:9', width: 1920, height: 1080 },
 };
+
+/** 依素材（顯示後）的寬高，挑形狀最接近的專案比例 */
+export function pickAspect(width: number, height: number): Aspect {
+  if (!(width > 0) || !(height > 0)) return '9:16';
+  const r = Math.log(width / height);
+  let best: Aspect = '9:16';
+  let bestD = Infinity;
+  for (const [key, a] of Object.entries(ASPECTS) as [Aspect, (typeof ASPECTS)[Aspect]][]) {
+    const d = Math.abs(r - Math.log(a.width / a.height));
+    if (d < bestD) {
+      bestD = d;
+      best = key;
+    }
+  }
+  return best;
+}
 
 export const IMAGE_DEFAULT_DURATION = 3;
 export const MIN_CLIP_DURATION = 0.2;
@@ -23,7 +41,25 @@ export function createMainTrack(): Track {
   return { id: newId('t_'), kind: 'main', name: '主軌', hidden: false, locked: false, items: [] };
 }
 
-export function createProject(name: string, aspect: Aspect = '9:16', now = Date.now()): Project {
+/** 改專案比例（直接改傳進來的物件，immer 草稿也可以）。auto=true 代表之後仍跟著第一個素材。 */
+export function assignAspect(
+  p: { aspect: Aspect; width: number; height: number; aspectAuto?: boolean },
+  aspect: Aspect,
+  auto: boolean,
+): void {
+  p.aspect = aspect;
+  p.width = ASPECTS[aspect].width;
+  p.height = ASPECTS[aspect].height;
+  if (auto) p.aspectAuto = true;
+  else delete p.aspectAuto;
+}
+
+export function createProject(
+  name: string,
+  aspect: Aspect = '9:16',
+  now = Date.now(),
+  aspectAuto = false,
+): Project {
   const a = ASPECTS[aspect];
   return {
     id: newId('p_'),
@@ -31,6 +67,7 @@ export function createProject(name: string, aspect: Aspect = '9:16', now = Date.
     createdAt: now,
     updatedAt: now,
     aspect,
+    ...(aspectAuto ? { aspectAuto: true } : {}),
     width: a.width,
     height: a.height,
     fps: 30,
@@ -84,6 +121,22 @@ export function createOverlayClip(asset: Asset, start: number): VideoItem {
   return { ...c, start, fit: 'contain', transform: { ...c.transform, scale: 0.5 } };
 }
 
+/** 獨立圖形（貼圖用）：沒有文字的字卡，只有字塊；大小用內距調（也可以用右上角縮放） */
+export function createShapeItem(start: number): TextItem {
+  const t = createTextItem(start, '');
+  const run = t.card.runs[0]!;
+  run.shadow = undefined;
+  delete run.shadow;
+  t.card.box = {
+    shape: 'star5',
+    fill: '#ffd23f',
+    opacity: 1,
+    padding: { top: 70, right: 70, bottom: 70, left: 70 },
+    nudgeY: 0,
+  };
+  return t;
+}
+
 export function createTextItem(start: number, text = '點兩下編輯文字'): TextItem {
   return {
     id: newId('i_'),
@@ -102,6 +155,7 @@ export function createTextItem(start: number, text = '點兩下編輯文字'): T
           letterSpacing: 0,
           lineHeight: 1.25,
           weight: 'bold',
+          shadow: { color: 'rgba(0,0,0,0.55)', blur: 6, x: 0, y: 2 },
         },
       ],
     },

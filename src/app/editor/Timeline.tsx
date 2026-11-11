@@ -50,7 +50,13 @@ function Tiles({
   h: number;
 }) {
   const thumbs = asset?.thumbs ?? [];
-  if (thumbs.length === 0) return <div className="tiles" />;
+  // 沒有縮圖（例如 iPhone 匯入時產生不出來）：顯示檔名，不要一片灰
+  if (thumbs.length === 0)
+    return (
+      <div className="tiles no-thumb" data-testid="clip-name">
+        {asset?.name ?? ''}
+      </div>
+    );
   const aspect = asset && asset.height ? asset.width / asset.height : 0.56;
   const tileW = Math.min(Math.max(h * aspect, 30), 114);
   const widthPx = item.duration * pps;
@@ -433,7 +439,9 @@ export function Timeline({
                     {isVideoItem(it) ? <Tiles item={it} asset={asset} pps={pps} h={h} /> : null}
                     <div className="clip-label">
                       {it.type === 'text'
-                        ? `Aa ${it.card.runs[0]?.text.replace(/\n/g, ' ') ?? ''}`
+                        ? it.card.runs[0]?.text === ''
+                          ? '圖形'
+                          : `Aa ${it.card.runs[0]?.text.replace(/\n/g, ' ') ?? ''}`
                         : `${it.type === 'image' ? '照片' : '影片'} ${it.duration.toFixed(1)}s`}
                       {isVideoItem(it) && it.speed !== 1 && ` · ${it.speed}x`}
                       {isVideoItem(it) && it.type === 'video' && it.volume === 0 && ' · 靜音'}

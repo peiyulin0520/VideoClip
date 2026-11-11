@@ -1,7 +1,7 @@
 // 資料模型（見 docs/PLAN.md §2.5）。Phase 1 只有主軌的影片/照片片段；
 // 其他軌道與物件種類（文字、貼圖、繪畫、調整）在之後的 Phase 加進 Track.kind / Item 聯集。
 
-export type Aspect = '9:16' | '16:9' | '1:1';
+export type Aspect = '9:16' | '16:9' | '1:1' | '3:4' | '4:3';
 
 export type Asset = {
   id: string;
@@ -45,17 +45,91 @@ export type VideoItem = ItemBase & {
   fit: 'cover' | 'contain';
 };
 
-// Phase 2 的最小文字卡：只有一段文字、系統字體。Phase 3 會擴充成完整的 TextCard（見 docs/TEXT_CARDS.md）。
+// 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
+export type Stroke = { color: string; width: number }; // width：從字緣往外的厚度，px（1080 基準）
+export type TextShadow = { color: string; blur: number; x: number; y: number };
 export type TextRun = {
   text: string;
   fontId: string;
-  size: number; // px，以 1080 寬畫面為基準
+  size: number; // px，以 1080（畫面短邊）為基準
   color: string;
-  letterSpacing: number; // em
-  lineHeight: number; // 倍數
+  letterSpacing: number; // em，-0.2 ~ 1.0
+  lineHeight: number; // 倍數，0.8 ~ 2.5
   weight: 'normal' | 'bold';
+  italic?: boolean; // 字型沒有斜體就斜切 -12°
+  /** 多層描邊（由外到內，畫的時候依厚度由大到小）。例：白 12 + 粉 6 */
+  strokes?: Stroke[];
+  shadow?: TextShadow;
 };
-export type TextCard = { runs: TextRun[]; align: 'left' | 'center' | 'right' };
+export type DecorationKind =
+  | 'tail-loop'
+  | 'wave-underline'
+  | 'dashed-underline'
+  | 'dotted-underline'
+  | 'double-line'
+  | 'marker'
+  | 'scribble-circle'
+  | 'arrow-curve'
+  | 'sparkles'
+  | 'hearts'
+  | 'slashes'
+  | 'check'
+  | 'corner-brackets';
+/** 字卡裝飾。width：線寬，佔文字墨跡高度的比例（星星、愛心、螢光筆不用） */
+export type Decoration = { kind: DecorationKind; color: string; width: number };
+export type BoxShape =
+  | 'rect'
+  | 'roundRect'
+  | 'pill'
+  | 'ellipse'
+  | 'triangle'
+  | 'diamond'
+  | 'parallelogram'
+  | 'trapezoid'
+  | 'pentagon'
+  | 'hexagon'
+  | 'octagon'
+  | 'cross'
+  | 'snip'
+  | 'heart'
+  | 'cloud'
+  | 'cylinder'
+  | 'speech-rect'
+  | 'speech-round'
+  | 'speech-oval'
+  | 'thought'
+  | 'burst-bubble'
+  | 'star4'
+  | 'star5'
+  | 'star6'
+  | 'star8'
+  | 'burst'
+  | 'badge'
+  | 'banner'
+  | 'tag'
+  | 'arrow-right'
+  | 'chevron'
+  | 'step'
+  | 'doc';
+/** 字塊（字卡的底色塊）。尺寸＝文字墨跡 + 四邊內距，所以上下左右分開調才會準 */
+export type CardBox = {
+  shape: BoxShape;
+  fill: string;
+  opacity: number; // 0–1
+  padding: { top: number; right: number; bottom: number; left: number }; // px（1080 基準）
+  nudgeY: number; // 文字在字塊內的垂直微調 px
+  radius?: number; // roundRect / speech-round 的圓角 px；pill 固定半圓
+  stroke?: Stroke; // 字塊外框（畫在圖形邊緣）
+  tailDir?: 'bottom-left' | 'bottom-right'; // 對話框尾巴方向（預設左下）
+};
+export type TextCard = {
+  runs: TextRun[];
+  align: 'left' | 'center' | 'right';
+  /** 文字區寬度 px（1080 基準），超過自動換行；沒有＝依文字長度 */
+  width?: number;
+  box?: CardBox;
+  decorations?: Decoration[];
+};
 export type TextItem = ItemBase & { type: 'text'; card: TextCard };
 
 export type Item = VideoItem | TextItem;
@@ -79,6 +153,8 @@ export type Project = {
   createdAt: number;
   updatedAt: number;
   aspect: Aspect;
+  /** true = 比例跟著第一個素材自動決定（使用者手動改過比例就變 false）；舊專案沒有這個欄位＝false */
+  aspectAuto?: boolean;
   width: number;
   height: number;
   fps: number;

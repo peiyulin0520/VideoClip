@@ -1,6 +1,13 @@
 import type { Draft } from 'immer';
-import { createOverlayClip, createTextItem, createTrack } from '../model/defaults';
-import type { Asset, Item, TextItem, Track, Transform, VideoItem } from '../model/types';
+import {
+  assignAspect,
+  createOverlayClip,
+  createShapeItem,
+  createTextItem,
+  createTrack,
+  pickAspect,
+} from '../model/defaults';
+import type { Aspect, Asset, Item, TextItem, Track, Transform, VideoItem } from '../model/types';
 import {
   duplicateFree,
   duplicateItem,
@@ -8,6 +15,7 @@ import {
   findFreeStart,
   firstFreeTrack,
   isVideoItem,
+  mainItems,
   mainTrack,
   moveTrack,
   relayout,
@@ -64,8 +72,8 @@ export function addOverlayClips(assets: Asset[], t: number): string | null {
   return firstId;
 }
 
-export function addText(t: number): string {
-  const item = createTextItem(t);
+export function addText(t: number, shape = false): string {
+  const item = shape ? createShapeItem(t) : createTextItem(t);
   store().apply((d) => {
     let ti = firstFreeTrack(d as never, 'text', item.start, item.duration);
     if (ti < 0) {
@@ -179,3 +187,22 @@ export function placeItem(id: string, start: number, opts?: Opts) {
 }
 
 export { isVideoItem, mainTrack, relayout };
+
+/**
+ * 改專案比例。choice='auto'＝照主軌第一個片段的形狀決定，並維持「自動」（沒有片段就維持現在的比例）。
+ * 手動選比例後 aspectAuto 會關掉。可以復原。
+ */
+export function setProjectAspect(choice: Aspect | 'auto'): Aspect | null {
+  const p = store().project;
+  if (!p) return null;
+  let aspect: Aspect;
+  if (choice === 'auto') {
+    const first = mainItems(p)[0];
+    const asset = first && p.assets.find((a) => a.id === first.assetId);
+    aspect = asset ? pickAspect(asset.width, asset.height) : p.aspect;
+  } else aspect = choice;
+  store().apply((d) => {
+    assignAspect(d, aspect, choice === 'auto');
+  });
+  return aspect;
+}

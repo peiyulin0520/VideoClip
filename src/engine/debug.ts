@@ -1,6 +1,9 @@
 import { useProjectStore } from '../store/projectStore';
 import { urlFor } from './assetUrls';
+import { ensureFont } from '../fonts/fontStore';
+import type { TextCard } from '../model/types';
 import { renderFrame } from './exportFrame';
+import { renderText } from './textRender';
 import type { Player } from './player';
 
 /** 測試/除錯用：localStorage 的 vc-debug 設成 1 才會掛出 window.__videoclip。正常使用者看不到。 */
@@ -50,6 +53,44 @@ export function installDebugHook(player: Player) {
       let h = 2166136261;
       for (let i = 0; i < px.length; i++) h = Math.imul(h ^ px[i]!, 16777619) >>> 0;
       return h;
+    },
+    /**
+     * 把字卡用 scale 畫出來（會先載入字體），量「亮色的字」墨跡在畫布裡的上下左右邊界，
+     * 驗證字塊內距跟設定的一樣。字塊要用深色、字用白色。
+     */
+    async cardInk(card: TextCard, scale = 1) {
+      for (const r of card.runs) await ensureFont(r.fontId);
+      const out = renderText(card, scale);
+      const ctx = out.canvas.getContext('2d')!;
+      const { data } = ctx.getImageData(0, 0, out.w, out.h);
+      let top = Infinity;
+      let bottom = -1;
+      let left = Infinity;
+      let right = -1;
+      for (let y = 0; y < out.h; y++)
+        for (let x = 0; x < out.w; x++) {
+          const i = (y * out.w + x) * 4;
+          if (data[i + 3]! > 200 && data[i + 1]! > 128 && data[i + 2]! > 128) {
+            top = Math.min(top, y);
+            bottom = Math.max(bottom, y);
+            left = Math.min(left, x);
+            right = Math.max(right, x);
+          }
+        }
+      return { w: out.w, h: out.h, top, bottom, left, right };
+    },
+    /** 把字卡畫成 PNG（dataURL），驗收截圖用；bg 是背景色（預設白） */
+    async cardPng(card: TextCard, scale = 1, bg = '#ffffff') {
+      for (const r of card.runs) await ensureFont(r.fontId);
+      const out = renderText(card, scale);
+      const cv = document.createElement('canvas');
+      cv.width = out.w;
+      cv.height = out.h;
+      const ctx = cv.getContext('2d')!;
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, out.w, out.h);
+      ctx.drawImage(out.canvas, 0, 0);
+      return cv.toDataURL('image/png');
     },
     /** 用輸出解析度畫出 t 秒那一格（匯出共用的流程），回傳 PNG 大小與幾個取樣點的顏色 */
     async exportFrame(t: number, points: [number, number][]) {

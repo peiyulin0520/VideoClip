@@ -85,6 +85,11 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 | 最小版文字（Phase 2）先做 | 只為了驗收「3 影片＋1 字卡」；完整字卡引擎是 Phase 3A |
 | 不放進網站的 3 款字體 | 授權：All rights reserved／禁止散布／無授權說明（見 FONTS.md） |
 | TypeScript 5.9 | typescript-eslint 不支援 ≥ 6.1 |
+| 新專案比例預設「自動：跟主軌第一個素材」，編輯器頂列可隨時改（可復原）；比例多加 3:4、4:3 | 使用者 2026-11-11 選 A；位置/大小本來就是「佔畫面比例」，改比例不用搬資料 |
+| 字卡大小/外框粗細跟畫面短邊走（`uiScale = min(w,h)/1080`） | 改成橫式時字不會被放大 1.78 倍；9:16、3:4、1:1 不受影響 |
+| 安全區參考線預設關（localStorage `vc-safe-zone-v2`），只在拖移時自動出現；拖移一律吸附安全區邊界 | 使用者誤以為粉紅斜線是背景 |
+| 主軌：匯入不自動選、預覽單點不選也不拖、選取時只有細框和縮放鈕（沒有 ✕） | 主軌滿版，選取框像「需要手動縮小」 |
+| 縮圖：Mediabunny `CanvasSink` 優先 → `<video>` → 預覽播放器拿到畫面後 `setAssetThumbs`（不進復原歷史，歷史快照一併更新） | iPhone 隱藏 `<video>` 常不觸發 `loadeddata` |
 
 ## 5. 踩過的坑（避免再踩）
 - **iPhone Safari 沒辦法在沙盒測**：OPFS 寫入、Cache Storage、同時多個 `<video>` 解碼/自動播放解鎖、混合模式、手勢，全部在 `PLAN.md §7` 待真機驗證。
@@ -100,11 +105,17 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 - 字體：`new FontFace(…, ArrayBuffer)` 一次只該載「用到的」；預覽字樣用幾 KB 的 `preview.woff2`；OFL 裁切後內部名稱要加 `VC Subset`。
 - `npm audit` 有 1 個 moderate（vite-plugin-pwa → workbox-build → deepmerge），只在建置階段，不進網站，等上游。
 
+> 坑（2026-11-11）：Pixi `Application.destroy` 後不能在**同一個 `<canvas>`** 上重建 WebGL（頁面會卡死）。改比例要重建預覽時，`Preview.tsx` 用 `key={width x height}` 換新的 canvas。
+> 坑：e2e 裡 `window.__videoclip` 要等預覽引擎建好才有，進編輯器後先等它再讀 `project()`。
+
 ## 6. 現況與下一步
 **已完成**（細節與驗證看 PROGRESS.md 日誌）：Phase 0（骨架/PWA/部署）、Phase 1（專案管理＋多影片拼接）、Phase 2（多圖層＋選取框手勢＋圖層屬性）、Phase 3B（字體管線＋首次使用精靈＋設定頁＋字體選單＋匯入字體）。
-**尚未合併到 `main`**（Phase 1–3B 都在 `claude/zen-tesla-v3brj5`；目前上線的只有 Phase 0）。要上線：開 PR → merge → GitHub Actions 部署。
+**已合併並上線**（PR #2，2026-11-11；GitHub Actions 部署成功）。之後的工作在 `claude/zen-tesla-v3brj5`，要上線一樣：開 PR → 使用者 merge → 部署。PR 合併後分支對齊 main 用 `git merge --ff-only origin/main`（不要 force push）。
 
-### 下一步：Phase 3A 字卡引擎（規格 `docs/TEXT_CARDS.md`，驗收見 `docs/PLAN.md` Phase 3）
+### 先做：使用者實測回報的修正
+照 `docs/plans/2026-11-11-safe-zone-and-selection.md`（安全區參考線、主軌選取框、iPhone 縮圖）。之後的修改規劃也放在 `docs/plans/`，檔名用日期開頭。
+
+### 再做：Phase 3A 字卡引擎（規格 `docs/TEXT_CARDS.md`，驗收見 `docs/PLAN.md` Phase 3）
 建議拆成可各自驗證的小步（每步都更新 PROGRESS.md、commit）：
 1. **型別與排版引擎**：把 `TextCard/TextRun/CardBox/Decoration` 擴充到 TEXT_CARDS.md §1 的完整版（`src/model/types.ts`），`engine/textRender.ts` 改成「逐字排版 → 墨跡邊界（`measureText().actualBoundingBox*`）→ 字塊尺寸＝墨跡＋四邊內距」（修正「字上方色塊多、下方貼底」）。單元測試：3 款字體的上下內距對稱。
 2. **字塊與內距 UI**：字卡分頁加字塊（形狀、顏色、透明度、四邊內距＋連動鎖、垂直微調）、字距、行距、寬度、對齊、粗體（描邊模擬）、斜體、描邊、陰影。

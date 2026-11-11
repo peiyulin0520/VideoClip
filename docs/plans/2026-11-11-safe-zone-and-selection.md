@@ -1,0 +1,106 @@
+# 修改規劃：預覽畫面的粉紅斜線區塊、主軌選取框、時間軸沒有縮圖
+
+- 來源：使用者 2026-11-11 在 iPhone 實測 https://peiyulin0520.github.io/VideoClip/ 的回報（截圖：預覽右側與下方有粉紅斜線、影片外圍有白框和 ✕／縮放鈕、時間軸片段是灰色沒有縮圖）。
+- 使用者原話：「預覽畫面中會有粉色斜底區塊，不懂那個意思，是因為我前面選了尺寸 9:16？但不是應該影片要直接 match 整個黑框比較好嗎，多了一個粉底還需要手動縮小調整很麻煩」
+- 狀態：**A、B、C、D 都已實作並通過 e2e（2026-11-11，Sonnet）**；iPhone 真機驗證列在 `docs/PLAN.md §7`。截圖在 `docs/screenshots/fix-safe-zone/`。
+
+## 1. 原因分析（已查證程式）
+
+| 看到的現象 | 實際是什麼 | 程式位置 |
+|---|---|---|
+| 右側、下方的粉紅斜線 | **平台安全區參考線**（IG／抖音的按鈕會蓋住畫面底部約 250/1920、右側約 150/1080），只是提示「重點不要放這裡」。**不是背景、不會被匯出、和選 9:16 無關**。影片其實已經填滿整個 9:16 畫面（主軌預設「填滿」cover）。 | `src/app/editor/Preview.tsx`：`SAFE_KEY='vc-safe-zone'`、`readSafe()` 預設 **開**（`!== '0'`）、`{safe && <div className="safe">…}`；樣式 `src/app/styles.css` 的 `.safe-bottom/.safe-right`（斜線填色） |
+| 影片外圍白框＋左上 ✕＋右上粉紅縮放鈕 | 主軌片段被選取時的**選取框**。主軌片段預設就是滿版，所以選取框剛好框住整個畫面，看起來像「影片被放在一個框裡、要自己調」。點預覽畫面任何地方都會選到主軌（它在最底層、佔滿畫面），匯入後也會自動選第一個新片段。 | `Preview.tsx` 的 `onPointerDown`（`topHit` 一定會打到主軌）；`src/app/pages/Editor.tsx` 第 ~120 行 `{ select: res.clips[0]!.id }` |
+| 時間軸片段是灰的、沒有縮圖 | iPhone Safari 在沒有使用者點擊播放前，隱藏的 `<video>` 常常**不載入畫面資料**（`loadeddata` 不觸發），`probe.ts` 的 `videoThumbs()` 等 8 秒後放棄 → `thumbs: []`。沙盒 Chromium 測不到這個行為。 | `src/engine/probe.ts` 的 `videoThumbs()`（`waitFor(v, 'loadeddata', 8000)`） |
+
+結論：使用者**不需要手動縮小**任何東西；問題是 UI 讓人誤會。
+
+## 2. 要改的事（依優先順序）
+
+### A. 安全區參考線：預設關閉、只在需要時出現、看得懂（必做）
+1. **預設關閉**：`readSafe()` 改成只有 `localStorage` 明確是 `'1'` 才開。**換新的 key `vc-safe-zone-v2`**，讓已經用過的人（舊 key 預設開）也變成關閉。
+2. **只在拖移物件時自動出現**（手勢進行中顯示、放開就消失），這時才有用；開關打開時才常駐。實作：`Preview` 多一個 `dragging` state（`startMove`／縮放鈕／雙指開始時 true，`onPointerUp` 時 false），顯示條件 `safe || dragging`。
+3. **改成不像內容的樣子**：拿掉斜線填色，改成「細虛線邊界＋很淡的填色（例如 `rgba(255,77,141,0.08)`）＋小標籤」。標籤放在區塊內：底部寫「IG／抖音按鈕區」、右側直排或小字「按鈕」。字 11px、半透明白、`pointer-events: none`。
+4. **開關按鈕看得懂**：目前只有一個盾牌 icon。改成 icon＋文字「安全區」（或長按/第一次點時 toast：「粉紅虛線＝IG／抖音按鈕會蓋住的地方，重點別放這裡；匯出時不會出現」）。`aria-pressed` 保留。
+5. **吸附**：安全區邊界的吸附只在參考線顯示時生效（現在 `snapMove(…, safe)` 已經是這樣，改成 `safe || dragging` 時要確認拖移中也吸附——建議：拖移中一律吸附安全區邊界，因為那時參考線是看得到的）。
+6. 確認匯出不會有參考線（它是 DOM 疊在 canvas 上，本來就不會進匯出；加一個 e2e 斷言）。
+
+### B. 主軌片段的選取框不要像「需要調整的框」（必做）
+1. **匯入主軌素材後不要自動選取**：`Editor.tsx` 的 `apply(…, { select: res.clips[0]!.id })` 改成不選（`select: null` 或不傳），只把播放頭移到新片段開頭。疊加素材（`addOverlayClips`）**維持自動選取**（使用者通常馬上要拖移/縮放它）。
+2. **點預覽畫面時，主軌片段的優先順序降低**：
+   - 點到疊加/文字物件 → 照舊選取。
+   - 只點到主軌（`topHit` 結果的 `track.kind === 'main'`）→ **單點不選取**，改成「播放/暫停」或什麼都不做（建議：什麼都不做＋取消目前選取，避免誤觸）；要選主軌片段請點時間軸。拖移手勢也不要移動主軌（避免一不小心把整個畫面拖歪）。
+   - 例外：使用者已經從時間軸選了主軌片段，這時在預覽上拖移/縮放仍然可以（給想做「放大裁切」的人）。
+3. **主軌被選取時的外觀改輕量**：細白框即可；**不顯示左上 ✕**（在預覽上一鍵刪掉整段主軌太危險，刪除請用工具列）；右上縮放鈕保留（只有在時間軸選取後才看得到）。
+4. 「位置、大小、旋轉歸位」對主軌已經會回到 scale 1、置中；確認文字說明清楚。
+
+### C. 時間軸縮圖在 iPhone 上產生不出來（必做，但要真機驗證）
+1. 匯入時的縮圖改用 **Mediabunny 解碼**（`CanvasSink` / `VideoSampleSink` 從容器直接取幾格），不依賴 `<video>` 的 `loadeddata`。iOS 16.4+ 支援 WebCodecs；HEVC 能不能解要真機確認。
+2. **退路**：匯入時拿不到縮圖就先留空，等預覽播放器第一次把這支影片畫出來（`player.ts` 的 pool 元素 `readyState >= 2`）時，順手從那個元素畫幾張縮圖存回 `asset.thumbs`（寫進專案、可復原歷史不要記這一步——用不進歷史的更新方式，例如 `apply` 加 `skipHistory` 選項，或直接 `useProjectStore.setState` 並 `revision+1` 讓自動儲存存起來）。
+3. 縮圖空的時候，時間軸片段顯示素材檔名＋小 icon，而不是一片灰。
+
+### D. 新專案比例「自動跟第一支影片一樣」，之後隨時可以改（使用者 2026-11-11 選 A：「跟第一支影片一樣，但保留之後影片可以調整修改」）
+（先前曾記成 B 不做，那是使用者誤解選項；已更正為 **A 要做**。）
+1. **比例清單擴充**：`Aspect` 加 `'3:4'`（1080×1440）、`'4:3'`（1440×1080）。原本 9:16、16:9、1:1 不變。`src/model/types.ts`、`defaults.ts` 的 `ASPECTS`（含 label）。
+2. **純函式 `pickAspect(width, height): Aspect`**（`src/model/defaults.ts`，要有單元測試）：取 `|ln(w/h) − ln(目標比例)|` 最小的那個。測資：1080×1920→9:16、1920×1080→16:9、1000×1000→1:1、4032×3024→4:3、3024×4032→3:4、480×270→16:9、320×568→9:16。影片的寬高要用「顯示後」的寬高（Mediabunny 的 `displayWidth/Height` 已考慮旋轉；`probe.ts` 已在用）。
+3. **新專案面板**：比例 chips 多一個 **「自動（跟第一支影片）」，預設選它**，後面接手動的 5 個比例。
+   - 自動＋選了素材：匯入完成後用第一個素材的寬高 `pickAspect` 決定專案比例（`Home.tsx` 的 `createAndOpen`）。
+   - 自動＋建立空白專案：先用 9:16，專案標記 `aspectAuto: true`；之後在編輯器**第一次把素材匯入空的主軌**時，照第一個素材決定比例（`Editor.tsx` 的 `onFiles` main 分支；只有主軌是空的、且 `aspectAuto` 為 true 才會自動套用）。
+   - 手動選了比例：`aspectAuto: false`，不會被自動改。
+   - `Project` 型別加 `aspectAuto?: boolean`（舊專案沒有這個欄位 = false，不用 migration）。
+4. **之後可以調整**：編輯器頂列在專案名稱旁加「比例」按鈕（顯示目前比例，例如 `9:16`，≥ 44px）→ 開底部面板：「自動（跟第一支影片）」＋各比例 chips，目前的打勾。
+   - 選手動比例 → `apply` 改 `aspect/width/height` 並設 `aspectAuto=false`；**可以復原**（走一般復原歷史）。
+   - 選「自動」→ 立刻用主軌第一個片段的寬高重算並設 `aspectAuto=true`（沒有片段就維持現在比例）。
+   - 改完所有物件的位置/縮放是「佔畫面比例」，所以會自動跟著新畫面；主軌的填滿/完整會重新計算。
+   - **預覽引擎要跟著重建**：`Preview.tsx` 建立 Player 的 effect 現在只看 `projectId`，要加上 `width/height`（比例變了就 destroy 再 create，並 `seek` 回原本的時間）。`previewSize()` 已會依專案寬高算。
+   - 單格匯出本來就用 `project.width/height`，不用另外改。
+5. 首頁卡片顯示的比例文字（`p.aspect`）會自動跟著。
+
+#### D 的實作細節（2026-11-11 Opus 補充，給 Sonnet）
+- **已有草稿可以直接套**：（草稿 patch 已套用並刪除）（`git apply docs/plans/2026-11-11-aspect-auto-draft.patch`）。內容：`types.ts`／`defaults.ts`（5 種比例、`pickAspect`、`assignAspect`、`createProject(..., aspectAuto)`）、`defaults.test.ts`（12 個單元測試，已通過）、`actions.ts` 的 `setProjectAspect('auto' | Aspect)`、`Home.tsx` 的自動 chip、`Editor.tsx` 的比例按鈕＋面板＋空主軌第一次匯入自動套用（**也順便拿掉了匯入後自動選取主軌，屬於 B**）、`Preview.tsx` effect 依賴、`.ratio-btn` 樣式。**只跑過 `tsc` 和那 12 個單元測試，沒跑 lint／e2e**；套上後要先 `npm run check`。
+- 草稿**還沒做**、要補的：
+  1. **重建預覽後回到原本時間**：`Preview.tsx` 的 Player effect 建好後現在是 `player.seek(0)`。改成先記住舊 player 的時間（例如 effect 外用 `useRef` 存 `lastTime`，在 cleanup 時 `lastTime.current = created?.time ?? 0`），新的建好後 `seek(lastTime.current)`。換專案（`projectId` 變）時要歸 0。
+  2. **字卡大小要跟「短邊」走**：現在 `scene.ts` 的 `renderText(item.card, ctx.canvasW / 1080)` 和 Preview 的 `textSize` 都用「畫面寬 ÷ 1080」。9:16 改 16:9 時寬變 1920，字會放大 1.78 倍、在扁的畫面上顯得很大。建議改成 `Math.min(canvasW, canvasH) / 1080`（9:16、3:4、1:1 不變；4:3、16:9 的字不會被放大）。⚠️ 舊的 16:9 專案裡的字會變小一點——目前字卡只是 Phase 3B 簡版、使用者還沒正式用，可以接受；要在日誌寫明。`exportFrame` 走同一個 `buildScene`，會一起變。改了要全域搜尋 `/ 1080` 確認沒有漏（`geometry.ts` 的 `TextSize`、Preview 的 handle 大小計算）。
+  3. **e2e**（新檔 `e2e/fix-aspect.spec.ts`，或併進 `fix-safe-zone.spec.ts`）：
+     - 首頁新專案面板預設選「自動（跟第一支影片）」（`aria-checked=true`）。
+     - 自動＋匯入 `clip-a.webm`（直式）→ `__videoclip.project().aspect === '9:16'`；`clip-c.webm`（橫式）→ `'16:9'`；`photo.png`（400×300）→ `'4:3'`。fixture 實際寬高先用 ffprobe 確認，不對就調預期值。
+     - 自動＋建立空白專案 → 編輯器匯入橫式 → 16:9；再匯入直式 → 仍是 16:9（只有主軌是空的時候才自動）。
+     - 手動選 1:1 → 匯入橫式 → 仍是 1:1，`aspectAuto` 不存在。
+     - 編輯器按「畫面比例」（`getByRole('button', { name: '畫面比例' })`）→ 選 1:1 → 預覽 canvas 的寬高比變 1；按「復原」→ 回到原比例；面板選「自動」→ 照主軌第一個片段重算。
+     - 每個新按鈕都要有點擊測試（AGENTS.md 規則 8）；截圖存 `docs/screenshots/fix-safe-zone/`（新專案面板、比例面板、改比例前後）。
+- **已知行為（寫進日誌，不是 bug）**：
+  - 「自動」只看**主軌第一個片段**；疊加軌的素材不會影響比例。
+  - 自動＋把主軌全部刪光、再匯入，會再自動決定一次（因為主軌又是空的）。可以接受；若使用者不喜歡，再改成「只自動一次」。
+  - 第一次匯入時「比例改變」和「匯入」在同一個 `apply` 裡，按一次復原會兩個一起還原。
+  - 匯入時第一個檔案失敗、第二個成功 → 用第一個**成功**的素材決定（`res.assets[0]`）。
+  - 改比例後，疊加物件的位置是「佔畫面的比例」，會跟著移動；可能有物件跑到畫面外一部分——不自動修正，使用者可復原。
+  - iPhone 直拍影片的寬高是否已考慮旋轉（`displayWidth/Height`）**沙盒測不到**，列進 `docs/PLAN.md §7` 待真機驗證：「iPhone 直拍影片匯入後，自動比例是 9:16，不是 16:9」。
+
+## 3. 會動到的檔案
+- `src/app/editor/Preview.tsx`（安全區預設、拖移中顯示、主軌點擊行為、主軌選取框外觀、隱藏 ✕）
+- `src/app/styles.css`（`.safe*` 改虛線＋標籤、`.safe-toggle` 加文字）
+- `src/app/pages/Editor.tsx`（匯入主軌後不自動選取）
+- `src/model/types.ts`、`src/model/defaults.ts`（比例清單、`pickAspect`、`aspectAuto`）、`src/app/pages/Home.tsx`（新專案面板）、`src/app/pages/Editor.tsx`（頂列比例按鈕、空主軌第一次匯入自動比例）
+- `src/engine/probe.ts`、可能 `src/engine/player.ts`、`src/store/projectStore.ts`（縮圖改用 Mediabunny＋退路；不進復原歷史的更新）
+- `src/app/editor/Timeline.tsx`（沒有縮圖時顯示檔名）
+- 測試：`e2e/phase2.spec.ts`、新的 `e2e/fix-safe-zone.spec.ts`；單元測試如有新純函式
+
+## 4. 驗收（全部要有截圖給使用者看：`docs/screenshots/fix-safe-zone/`）
+- [ ] 新使用者（沒有任何 localStorage）打開編輯器：**沒有粉紅參考線**；改前/改後對照截圖。
+- [ ] 舊使用者（`vc-safe-zone` 是空的或 `'1'`）：也預設關閉（新 key）。
+- [ ] 拖移疊加物件時參考線出現、放開後消失；開關打開後常駐；狀態重新整理後保留。
+- [ ] 參考線有文字標籤；開關按鈕有「安全區」文字；都 ≥ 44px 可點。
+- [ ] 匯出單格（`window.__videoclip.exportFrame`）在安全區位置取樣不是粉紅（＝不會被匯出）。
+- [ ] 匯入主軌影片後：沒有選取框、沒有 ✕。單點預覽畫面（只有主軌的地方）：不會選到主軌。點疊加物件：照舊選到。從時間軸選主軌後：預覽上有細框、沒有 ✕、可以縮放。
+- [ ] 縮圖：Chromium 的 e2e 仍有縮圖（現有測試不能壞）；新增一個「`loadeddata` 不觸發時」的測試（可在測試裡把 `HTMLMediaElement.prototype.load` 或 `preload` 行為模擬掉）確認退路會補上縮圖或顯示檔名。**iPhone 真機驗證列進 `docs/PLAN.md §7`**。
+- [ ] 自動比例：直式影片（clip-a）→ 專案 9:16；橫式（clip-c）→ 16:9；照片（photo.png 400×300）→ 4:3；空白專案＋自動，第一次匯入橫式 → 16:9，第二次匯入直式不會再改；手動選 1:1 後匯入橫式 → 仍是 1:1；編輯器改比例後預覽黑框形狀改變、物件位置比例不變，復原可以還原；選「自動」會照第一個片段重算。`pickAspect` 單元測試。
+- [ ] `npm run check`、`npm run e2e -- --trace off` 全過；更新 `docs/PROGRESS.md`（交接快照＋日誌）。
+
+## 5. 要調整的既有測試（預先告知）
+- `e2e/phase2.spec.ts`「點預覽畫面會選到最上面那個物件」：最後一段「點角落只有主軌 → 選到主軌」要改成「點角落 → 不選取（selected 為 null）」。
+- 依賴「匯入後自動選取主軌第一個片段」的測試：目前 Phase 1 的測試都是先點時間軸片段再操作，預期不受影響；跑一次確認。
+- 有用到安全區的測試：`selection-box-scaled` 等截圖會改變（預期內）。
+
+## 6. 回覆使用者時要說的（白話）
+- 粉紅斜線是「IG／抖音按鈕會蓋到的地方」的提示，不是背景，也不會出現在匯出的影片裡；影片本來就已經填滿 9:16，不用縮小。
+- 改完後：預設不顯示，只有在拖移文字/貼圖時才出現，並且標明是什麼；匯入影片後也不會再出現那個白框和 ✕。
+- 新專案現在預設「自動：跟第一支影片一樣」，之後在編輯器頂列的「比例」按鈕可以隨時改；改了可以復原

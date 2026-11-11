@@ -1,7 +1,7 @@
 import type { Asset, Item, Project, Track, VideoItem } from '../model/types';
 import type { SceneLayer } from './compositor';
 import { fittedSize, itemBox, type GeoCtx } from './geometry';
-import { renderText, measureTextItem } from './textRender';
+import { renderText, measureTextItem, uiScale } from './textRender';
 import { visibleLayers } from './timeline';
 
 /** 預覽/匯出各自提供「這個影片/照片物件現在的畫面」 */
@@ -56,7 +56,7 @@ function toLayer(
     crop: item.crop,
   };
   if (item.type === 'text') {
-    const r = renderText(item.card, ctx.canvasW / 1080);
+    const r = renderText(item.card, uiScale(ctx.canvasW, ctx.canvasH));
     return { ...common, kind: 'text', source: r.canvas, ready: true, srcW: r.w, srcH: r.h, textKey: r.key };
   }
   const asset = project.assets.find((a) => a.id === item.assetId);

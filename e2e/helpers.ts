@@ -104,8 +104,11 @@ type Hook = {
 };
 export type HookProject = ReturnType<Hook['project']>;
 
-export const project = (page: Page): Promise<HookProject> =>
-  page.evaluate(() => (window as unknown as { __videoclip: Hook }).__videoclip.project());
+export const project = async (page: Page): Promise<HookProject> => {
+  // 除錯掛鉤要等預覽引擎建好才有（機器忙時會晚一點）
+  await page.waitForFunction(() => !!(window as unknown as { __videoclip?: unknown }).__videoclip);
+  return page.evaluate(() => (window as unknown as { __videoclip: Hook }).__videoclip.project());
+};
 
 export const selectedItemId = (page: Page): Promise<string | null> =>
   page.evaluate(() => (window as unknown as { __videoclip: Hook }).__videoclip.selected());
