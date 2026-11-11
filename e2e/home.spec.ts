@@ -5,6 +5,7 @@ test('首頁在 iPhone 13 尺寸可開啟、沒有錯誤，並可點設定', asy
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
+  await page.addInitScript(() => localStorage.setItem('vc-skip-onboarding', '1'));
   await page.goto('./');
   await expect(page.getByRole('heading', { name: 'VideoClip 剪輯' })).toBeVisible();
   await page.screenshot({ path: 'docs/screenshots/phase0/home.png' });

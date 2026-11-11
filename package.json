@@ -11,9 +11,16 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "e2e": "playwright test",
-    "fonts": "echo 'Phase 3 才會實作 npm run fonts'"
+    "fonts": "NODE_USE_ENV_PROXY=1 node scripts/fetch-fonts.mjs && .venv/bin/python -I scripts/build-fonts.py",
+    "fonts:setup": "python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt",
+    "check": "npm run lint && npm test && npm run build"
   },
   "dependencies": {
+    "idb": "^8.0.4",
+    "immer": "^11.2.10",
+    "lucide-react": "^1.72.0",
+    "mediabunny": "^1.65.2",
+    "pixi.js": "^8.22.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.5",
@@ -30,6 +37,7 @@
     "@vitejs/plugin-react": "^6.3.0",
     "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "fake-indexeddb": "^6.2.8",
     "globals": "^17.14.0",
     "jsdom": "^31.0.0",
     "prettier": "^3.9.10",
