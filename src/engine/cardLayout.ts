@@ -1,5 +1,5 @@
 import type { TextCard, TextRun } from '../model/types';
-import { shapeDef } from './shapes';
+import { fitInset } from './shapes';
 
 // 字卡排版（純計算，不碰 canvas，所以可以單元測試）。
 // 規格見 docs/TEXT_CARDS.md §2：逐字排、用「墨跡邊界」而不是字型的 ascent/descent 來算字塊大小，
@@ -188,14 +188,20 @@ export function layoutCard(card: TextCard, scale: number, measure: Measurer): Ca
     : { top: 0, right: 0, bottom: 0, left: 0 };
   const nudge = b ? b.nudgeY * scale : 0;
   // 圖形（橢圓、星形、愛心…）能放文字的範圍比外框小：外框 = 文字區 × inset，文字區在圖形裡置中（dy：往下移）
-  const def = b ? shapeDef(b.shape) : null;
-  const [kx, ky] = def?.inset ?? [1, 1];
   const tw = inkW + pad.left + pad.right;
   const th = inkH + pad.top + pad.bottom;
+  const fit = b
+    ? fitInset(
+        b.shape,
+        { radius: (b.radius ?? 28) * scale, tail: b.tailDir, adj: b.adj },
+        tw / Math.max(th, 1),
+      )
+    : { kx: 1, ky: 1, dy: 0 };
+  const [kx, ky] = [fit.kx, fit.ky];
   const w = tw * kx;
   const h = th * ky;
   const ex = (w - tw) / 2;
-  const ey = (h - th) / 2 + (def?.dy ?? 0) * h;
+  const ey = (h - th) / 2 + fit.dy * h;
   const dx = pad.left - textL + ex;
   for (const g of glyphs) {
     g.x += dx;

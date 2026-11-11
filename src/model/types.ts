@@ -15,6 +15,8 @@ export type Asset = {
   hasAudio: boolean;
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
+  /** 只放在記憶體（手機存不下）：關掉網頁後素材會遺失，要重新匯入 */
+  unsaved?: boolean;
 };
 
 export type Transform = { x: number; y: number; scale: number; rotation: number; opacity: number };
@@ -76,7 +78,15 @@ export type DecorationKind =
   | 'check'
   | 'corner-brackets';
 /** 字卡裝飾。width：線寬，佔文字墨跡高度的比例（星星、愛心、螢光筆不用） */
-export type Decoration = { kind: DecorationKind; color: string; width: number };
+export type Decoration = {
+  kind: DecorationKind;
+  color: string;
+  width: number;
+  /** 與文字的距離，佔字高的比例（−0.3 ~ 1.0，預設 0）；螢光筆是上下位置 */
+  gap?: number;
+  /** 大小倍數（0.5 ~ 2，預設 1）：星星、愛心、打勾、彎箭頭 */
+  scale?: number;
+};
 export type BoxShape =
   | 'rect'
   | 'roundRect'
@@ -121,6 +131,8 @@ export type CardBox = {
   radius?: number; // roundRect / speech-round 的圓角 px；pill 固定半圓
   stroke?: Stroke; // 字塊外框（畫在圖形邊緣）
   tailDir?: 'bottom-left' | 'bottom-right'; // 對話框尾巴方向（預設左下）
+  /** 圖形調整值（凹槽深度、角的圓滑、尾巴位置…），key 見 engine/shapes.ts 的 ADJUST；沒有＝預設長相 */
+  adj?: Record<string, number>;
 };
 export type TextCard = {
   runs: TextRun[];

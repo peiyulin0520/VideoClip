@@ -12,6 +12,7 @@ import {
   seekTo,
   selectedIndex,
   timeText,
+  showTimeline,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/phase1';
@@ -224,7 +225,8 @@ test('修剪頭尾：拖把手會改片段長度，素材範圍受限', async ({
 test('長按拖曳片段可以重新排序', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm', 'clip-c.webm']);
   const ids = await clipIds(page);
-  // 把第 1 個（2 秒）拖到最後面
+  // 把第 1 個（2 秒）拖到最後面（編輯器整頁捲動：先捲到看得到時間軸）
+  await showTimeline(page);
   const first = (await clips(page).nth(0).boundingBox())!;
   const x = first.x + first.width / 2;
   const y = first.y + first.height / 2;

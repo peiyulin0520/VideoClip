@@ -143,17 +143,6 @@ export function Timeline({
     return player.subscribe((t) => syncScroll(t));
   }, [player, syncScroll]);
 
-  // 選取的物件在看不到的那一列時，上下捲到看得到（只動垂直，水平要跟著播放頭）
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || !selectedId) return;
-    const row = rows.find((r) => r.track.items.some((x) => x.id === selectedId));
-    if (!row) return;
-    if (row.top < el.scrollTop) el.scrollTop = row.top - RULER_H;
-    else if (row.top + row.h > el.scrollTop + el.clientHeight)
-      el.scrollTop = row.top + row.h - el.clientHeight + 8;
-  }, [selectedId, rows]);
-
   const onScroll = () => {
     const el = scrollRef.current!;
     if (Math.abs(el.scrollLeft - lastSet.current) < 1.5) return;
@@ -360,10 +349,11 @@ export function Timeline({
 
   const menuTrack = project.tracks.find((t) => t.id === menuTrackId) ?? null;
   const menuIndex = menuTrack ? project.tracks.indexOf(menuTrack) : -1;
-  const viewH = Math.min(Math.max(contentH, 112), 140);
+  // 時間軸高度＝全部軌道（不在裡面上下捲；上下交給整頁捲動）
+  const viewH = Math.max(contentH, 112);
 
   return (
-    <div className="timeline" style={{ height: viewH }}>
+    <div className="timeline" style={{ height: viewH, minHeight: viewH }}>
       <div
         className="tl-scroll"
         ref={scrollRef}

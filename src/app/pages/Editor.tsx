@@ -38,7 +38,8 @@ function EditorLoader({ projectId }: { projectId: string }) {
       useProjectStore.getState().load(p);
       autosave = startAutosave();
       setStatus('ready');
-      if (missing.length) toast(`找不到素材檔：${missing.join('、')}`);
+      if (missing.length)
+        toast(`找不到素材檔：${missing.join('、')}（可能是上次存不下、沒有留在手機裡，請重新匯入）`, 8000);
     })();
     return () => {
       cancelled = true;
@@ -74,6 +75,7 @@ function EditorBody() {
   const canUndo = useProjectStore((s) => s.past.length > 0);
   const canRedo = useProjectStore((s) => s.future.length > 0);
   const player = useUI((s) => s.player);
+  const previewFull = useUI((s) => s.previewFull);
   const fileInput = useRef<HTMLInputElement>(null);
   const [pps, setPps] = useState(60);
   const [time, setTime] = useState(0);
@@ -105,13 +107,14 @@ function EditorBody() {
     const pid = useProjectStore.getState().project!.id;
     setBusy(`匯入中… 0/${files.length}`);
     try {
-      const res = await importFiles(pid, files, (d, n) => setBusy(`匯入中… ${d}/${n}`));
+      const res = await importFiles(pid, files, (d, n, detail) =>
+        setBusy(`匯入中… ${d}/${n}${detail ? `（${detail}）` : ''}`),
+      );
       if (res.assets.length) {
         await ensureUrls(pid, res.assets);
         const player = useUI.getState().player;
         if (importMode.current === 'overlay') {
           // 疊加：放在播放頭這一秒，同一秒疊多個就各佔一條軌道
-          useProjectStore.getState().apply((d) => void d.assets.push(...res.assets));
           addOverlayClips(res.assets, player?.time ?? 0);
         } else {
           const startOfNew = totalDuration(useProjectStore.getState().project!);
@@ -129,8 +132,9 @@ function EditorBody() {
         }
       }
       if (res.failed.length)
-        toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`);
+        toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`, 9000);
       else if (res.assets.length) toast(`已匯入 ${res.assets.length} 個素材`);
+      if (res.warnings.length) toast(res.warnings.join('；'), 9000);
     } finally {
       setBusy(null);
     }
@@ -139,7 +143,7 @@ function EditorBody() {
   const empty = mainItems(project).length === 0;
 
   return (
-    <main className="editor">
+    <main className={`editor${previewFull ? ' preview-full' : ''}`}>
       <header className="ed-top">
         <Link className="icon-btn" to="/" aria-label="回首頁">
           <ChevronLeft />
@@ -179,12 +183,12 @@ function EditorBody() {
         </button>
       </header>
 
-      <Preview projectId={project.id} width={project.width} height={project.height} />
-      {empty && (
-        <button className="empty-import" onClick={() => pick('main')}>
-          ＋ 匯入影片或照片
-        </button>
-      )}
+      <Preview
+        projectId={project.id}
+        width={project.width}
+        height={project.height}
+        emptyAction={empty ? () => pick('main') : undefined}
+      />
 
       <div className="playbar">
         <button

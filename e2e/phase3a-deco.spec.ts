@@ -165,3 +165,43 @@ test('驗收截圖：13 種裝飾總覽、尾端圈圈跟示意圖的樣子（�
   save('decorations-sheet.png', sheet);
   expect(fs.statSync(`${SHOT}/decorations-sheet.png`).size).toBeGreaterThan(5000);
 });
+
+test('裝飾的「與文字距離」「大小」滑桿：資料與預覽都會變；波浪線變粗不會碰到字', async ({ page }) => {
+  await createProjectWith(page, ['solid-blue.webm']);
+  await openTab(page, '文字');
+  await page
+    .getByRole('button', { name: /新增文字/ })
+    .first()
+    .tap();
+  await page.getByLabel('文字內容').fill('吃飯');
+  await page.getByRole('tab', { name: '裝飾', exact: true }).tap();
+  await page.getByRole('button', { name: '裝飾 波浪底線' }).tap();
+  // 波浪線粗細 25%、預設距離：線不會碰到字（用字下方到線上緣之間有藍色背景像素）
+  await setRange(page, '波浪底線粗細', 25);
+  const d = async () => (await decos(page))[0] as { gap?: number; scale?: number; width: number };
+  expect((await d()).width).toBeCloseTo(0.25);
+  await page.screenshot({ path: `${SHOT}/deco-wave-thick.png` });
+
+  // 距離滑桿
+  const shot = async () => countColor(page, [255, 77, 141], 40, [0.05, 0.3, 0.95, 0.75]);
+  await expect.poll(shot).toBeGreaterThan(50); // 桃紅色波浪線在預覽上
+  await setRange(page, '波浪底線與文字距離', 60);
+  expect((await d()).gap).toBeCloseTo(0.6);
+  await page.screenshot({ path: `${SHOT}/deco-wave-gap60.png` });
+  await setRange(page, '波浪底線與文字距離', -30);
+  expect((await d()).gap).toBeCloseTo(-0.3);
+
+  // 愛心有「大小」，螢光筆的距離叫「上下位置」，粗細滑桿只在有線寬的裝飾出現
+  await page.getByRole('button', { name: '裝飾 愛心' }).tap();
+  await page.getByRole('button', { name: '裝飾 螢光筆' }).tap();
+  await expect(page.getByRole('slider', { name: '愛心大小', exact: true })).toBeVisible();
+  await expect(page.getByRole('slider', { name: '愛心粗細', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('slider', { name: '螢光筆上下位置', exact: true })).toBeVisible();
+  await expect(page.getByRole('slider', { name: '螢光筆粗細', exact: true })).toHaveCount(0);
+  await setRange(page, '愛心大小', 150);
+  const heart = (await decos(page)).find((x) => x.kind === 'hearts') as { scale?: number };
+  expect(heart.scale).toBeCloseTo(1.5);
+  await setRange(page, '螢光筆上下位置', 20);
+  const mk = (await decos(page)).find((x) => x.kind === 'marker') as { gap?: number };
+  expect(mk.gap).toBeCloseTo(0.2);
+});

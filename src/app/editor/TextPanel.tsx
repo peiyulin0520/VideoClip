@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import type { CardBox, Stroke, TextItem } from '../../model/types';
-import { editText } from '../../store/actions';
+import { editText, removeAnyItem } from '../../store/actions';
+import { useProjectStore } from '../../store/projectStore';
 import { DECORATION_KINDS } from '../../engine/decorations';
 import { SHAPE_CATS, SHAPES, shapeDef } from '../../engine/shapes';
+import { ColorPicker } from '../../ui/ColorPicker';
 import { Slider } from '../../ui/Slider';
 import { DecoThumb } from './DecoThumb';
+import { TransformControls } from './TransformControls';
 import { ShapeThumb } from './ShapeThumb';
 import { FontSelect } from '../fonts/FontSelect';
 
-const COLORS = ['#ffffff', '#111111', '#ff4d8d', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
-const BOX_COLORS = ['#ff4d8d', '#ffffff', '#111111', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
 const SECTIONS = ['文字', '版面', '字塊', '描邊陰影', '裝飾'] as const;
 type Section = (typeof SECTIONS)[number];
 const SIDES = [
@@ -28,32 +29,6 @@ export const DEFAULT_BOX: CardBox = {
   nudgeY: 0,
   radius: 28,
 };
-
-function Swatches({
-  colors,
-  value,
-  label,
-  onPick,
-}: {
-  colors: string[];
-  value: string;
-  label: string;
-  onPick: (c: string) => void;
-}) {
-  return (
-    <div className="chips">
-      {colors.map((c) => (
-        <button
-          key={c}
-          className={`swatch${value.toLowerCase() === c.toLowerCase() ? ' active' : ''}`}
-          style={{ background: c }}
-          aria-label={`${label} ${c}`}
-          onClick={() => onPick(c)}
-        />
-      ))}
-    </div>
-  );
-}
 
 export function TextPanel({
   item,
@@ -127,8 +102,7 @@ export function TextPanel({
             step={1}
             onChange={(v) => edit((c) => void (c.runs[0]!.size = v), 'size')}
           />
-          <Swatches
-            colors={COLORS}
+          <ColorPicker
             value={run.color}
             label="文字顏色"
             onPick={(col) => edit((c) => void (c.runs[0]!.color = col))}
@@ -150,12 +124,23 @@ export function TextPanel({
             >
               斜體
             </button>
+            <button
+              className="chip danger"
+              aria-label="刪除這個文字"
+              onClick={() => {
+                removeAnyItem(id);
+                useProjectStore.getState().select(null);
+              }}
+            >
+              刪除
+            </button>
           </div>
         </>
       )}
 
       {section === '版面' && (
         <>
+          <TransformControls item={item} />
           <Slider
             label="字距"
             value={run.letterSpacing}
@@ -257,8 +242,10 @@ export function TextPanel({
                   className={`shape-cell${on ? ' active' : ''}`}
                   onClick={() =>
                     edit((c) => {
-                      if (c.box) c.box.shape = s.id;
-                      else c.box = { ...DEFAULT_BOX, padding: { ...DEFAULT_BOX.padding }, shape: s.id };
+                      if (c.box) {
+                        c.box.shape = s.id;
+                        delete c.box.adj; // 調整值是各圖形自己的，換圖形就回到預設長相
+                      } else c.box = { ...DEFAULT_BOX, padding: { ...DEFAULT_BOX.padding }, shape: s.id };
                     })
                   }
                 >
@@ -275,8 +262,7 @@ export function TextPanel({
           </div>
           {box ? (
             <>
-              <Swatches
-                colors={BOX_COLORS}
+              <ColorPicker
                 value={box.fill}
                 label="字塊顏色"
                 onPick={(col) => edit((c) => void (c.box!.fill = col))}
@@ -303,7 +289,12 @@ export function TextPanel({
                       role="radio"
                       aria-checked={(box.tailDir ?? 'bottom-left') === d}
                       className={`chip${(box.tailDir ?? 'bottom-left') === d ? ' active' : ''}`}
-                      onClick={() => edit((c) => void (c.box!.tailDir = d))}
+                      onClick={() =>
+                        edit((c) => {
+                          c.box!.tailDir = d;
+                          if (c.box!.adj) delete c.box!.adj.tailPos; // 位置回到左下／右下的預設
+                        })
+                      }
                     >
                       {label}
                     </button>
@@ -337,14 +328,49 @@ export function TextPanel({
                 }
               />
               {box.stroke && (
-                <Swatches
-                  colors={COLORS}
+                <ColorPicker
                   value={box.stroke.color}
                   label="字塊外框顏色"
                   onPick={(col) =>
                     edit((c) => void (c.box!.stroke = { color: col, width: c.box!.stroke?.width ?? 4 }))
                   }
                 />
+              )}
+              {shapeDef(box.shape).adjust.length > 0 && (
+                <>
+                  <div className="panel-head">
+                    <span>圖形調整（像 Office 的黃色調整點）</span>
+                    {box.adj && Object.keys(box.adj).length > 0 && (
+                      <button
+                        className="chip sm"
+                        aria-label="圖形調整還原預設"
+                        onClick={() => edit((c) => void delete c.box!.adj)}
+                      >
+                        還原預設
+                      </button>
+                    )}
+                  </div>
+                  {shapeDef(box.shape).adjust.map((a) => {
+                    const def = a.key === 'tailPos' ? (box.tailDir === 'bottom-right' ? 0.72 : 0.28) : a.def;
+                    return (
+                      <Slider
+                        key={a.key}
+                        label={a.label}
+                        value={box.adj?.[a.key] ?? def}
+                        min={a.min}
+                        max={a.max}
+                        step={a.step}
+                        format={(v) => (a.key === 'count' ? `${Math.round(v)}` : `${Math.round(v * 100)}%`)}
+                        onChange={(v) =>
+                          edit((c) => {
+                            const b2 = c.box!;
+                            b2.adj = { ...(b2.adj ?? {}), [a.key]: v };
+                          }, `adj-${a.key}`)
+                        }
+                      />
+                    );
+                  })}
+                </>
               )}
               <div className="panel-head">
                 <span>內距（字到色塊邊緣的距離）</span>
@@ -408,8 +434,7 @@ export function TextPanel({
             format={px}
             onChange={(v) => setStroke(0, { width: v }, 'st0')}
           />
-          <Swatches
-            colors={COLORS}
+          <ColorPicker
             value={stroke(0).color}
             label="外層描邊顏色"
             onPick={(col) => setStroke(0, { color: col, width: stroke(0).width || 6 })}
@@ -426,8 +451,7 @@ export function TextPanel({
             format={px}
             onChange={(v) => setStroke(1, { width: v }, 'st1')}
           />
-          <Swatches
-            colors={COLORS}
+          <ColorPicker
             value={stroke(1).color}
             label="內層描邊顏色"
             onPick={(col) => setStroke(1, { color: col, width: stroke(1).width || 3 })}
@@ -510,13 +534,13 @@ export function TextPanel({
                     移除
                   </button>
                 </div>
-                <Swatches
-                  colors={[def.color, ...COLORS.filter((c) => c !== def.color)]}
+                <ColorPicker
                   value={d.color}
+                  extra={def.color}
                   label={`${def.label}顏色`}
                   onPick={(col) => edit((c) => void (c.decorations![i]!.color = col))}
                 />
-                {d.kind !== 'marker' && d.kind !== 'sparkles' && d.kind !== 'hearts' && (
+                {def.hasWidth && (
                   <Slider
                     label={`${def.label}粗細`}
                     value={Math.round(d.width * 100)}
@@ -525,6 +549,26 @@ export function TextPanel({
                     step={1}
                     format={(v) => `${v}%`}
                     onChange={(v) => edit((c) => void (c.decorations![i]!.width = v / 100), `deco${i}`)}
+                  />
+                )}
+                <Slider
+                  label={`${def.label}${def.gapLabel}`}
+                  value={Math.round((d.gap ?? 0) * 100)}
+                  min={-30}
+                  max={100}
+                  step={5}
+                  format={(v) => `${v}%`}
+                  onChange={(v) => edit((c) => void (c.decorations![i]!.gap = v / 100), `decogap${i}`)}
+                />
+                {def.hasScale && (
+                  <Slider
+                    label={`${def.label}大小`}
+                    value={Math.round((d.scale ?? 1) * 100)}
+                    min={50}
+                    max={200}
+                    step={5}
+                    format={(v) => `${v}%`}
+                    onChange={(v) => edit((c) => void (c.decorations![i]!.scale = v / 100), `decosc${i}`)}
                   />
                 )}
               </div>

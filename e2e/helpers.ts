@@ -68,6 +68,7 @@ export const isWhite = (c: RGBA | null) => !!c && c[0] > 230 && c[1] > 230 && c[
 
 type Hook = {
   project: () => {
+    assets: { id: string; name: string; unsaved?: boolean; thumbs: string[] }[];
     tracks: {
       id: string;
       kind: string;
@@ -169,3 +170,64 @@ export const regionHash = (page: Page, r: [number, number, number, number]) =>
     (region) => (window as unknown as { __videoclip: Hook }).__videoclip.regionHash(...region),
     r,
   );
+
+/** 預覽舞台的位置：先捲回頁面最上面（編輯器是整頁捲動，預覽在最上面） */
+export async function previewBox(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  return (await page.getByTestId('stage').boundingBox())!;
+}
+
+/**
+ * 雙指手勢（用 CDP 送真的兩點觸控，Chromium 會轉成 pointer 事件，跟 iPhone 上一樣）。
+ * 兩指以 (cx, cy) 為中心、距離從 from 變到 to，同時旋轉 angle 度。座標是 CSS px（視窗座標）。
+ */
+export async function pinch(
+  page: Page,
+  o: { cx: number; cy: number; from: number; to: number; angle?: number; steps?: number },
+) {
+  const cdp = await page.context().newCDPSession(page);
+  const steps = o.steps ?? 8;
+  const pts = (dist: number, deg: number) => {
+    const a = (deg * Math.PI) / 180;
+    const dx = (Math.cos(a) * dist) / 2;
+    const dy = (Math.sin(a) * dist) / 2;
+    return [
+      { x: o.cx - dx, y: o.cy - dy, id: 1 },
+      { x: o.cx + dx, y: o.cy + dy, id: 2 },
+    ];
+  };
+  const send = (type: string, touchPoints: { x: number; y: number; id: number }[]) =>
+    cdp.send('Input.dispatchTouchEvent', { type, touchPoints } as never);
+  const start = pts(o.from, 0);
+  await send('touchStart', [start[0]!]);
+  await send('touchStart', start);
+  for (let i = 1; i <= steps; i++) {
+    const f = i / steps;
+    await send('touchMove', pts(o.from + (o.to - o.from) * f, (o.angle ?? 0) * f));
+  }
+  await send('touchEnd', []);
+  await cdp.detach();
+}
+
+/** 單指觸控拖曳（CDP），用來測「在預覽空白處上下滑會捲頁面」 */
+export async function touchDrag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+  const cdp = await page.context().newCDPSession(page);
+  const send = (type: string, touchPoints: { x: number; y: number }[]) =>
+    cdp.send('Input.dispatchTouchEvent', { type, touchPoints } as never);
+  await send('touchStart', [from]);
+  for (let i = 1; i <= 10; i++) {
+    await send('touchMove', [
+      { x: from.x + ((to.x - from.x) * i) / 10, y: from.y + ((to.y - from.y) * i) / 10 },
+    ]);
+  }
+  await send('touchEnd', []);
+  await cdp.detach();
+}
+
+/** 把整頁捲到看得到時間軸（不會動到時間軸的水平捲動／播放頭） */
+export async function showTimeline(page: Page) {
+  await page.locator('.timeline').evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    if (r.top < 60 || r.bottom > window.innerHeight) window.scrollBy(0, r.top - window.innerHeight / 3);
+  });
+}

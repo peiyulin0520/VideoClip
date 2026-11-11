@@ -86,6 +86,13 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 | 不放進網站的 3 款字體 | 授權：All rights reserved／禁止散布／無授權說明（見 FONTS.md） |
 | TypeScript 5.9 | typescript-eslint 不支援 ≥ 6.1 |
 | 新專案比例預設「自動：跟主軌第一個素材」，編輯器頂列可隨時改（可復原）；比例多加 3:4、4:3 | 使用者 2026-11-11 選 A；位置/大小本來就是「佔畫面比例」，改比例不用搬資料 |
+| （2026-11-11 使用者更正）整頁往下捲：預覽在最上面、大小永遠不變，往下滑是時間軸／分頁／設定，往上滑回來看預覽；選取框只留框線、雙指縮放旋轉（取代四角點／旋轉點／時間軸精簡） | 使用者：「頁面可以整體往下滑新增功能，但往上滑可以看到不會縮小的預覽畫面」「選取框一率不需要小圓點」 |
+| 貼圖＝Fluent Emoji（npm iconify 套件，MIT），點了畫成 512px PNG 當照片素材 | GitHub 被擋拿不到原始 repo；當照片素材就能沿用拖移／縮放／圖層／匯出 |
+| 選取框用「看得到的內容」（`selectionBox`：字塊∪文字含描邊∪裝飾），渲染仍用整張畫布 | 畫布為了裝飾/陰影對稱多留透明邊，選取框會比看得到的大很多 |
+| 預覽選取操作：四角小點縮放＋上方旋轉點，沒有 ✕ 與大圓鈕；文字面板／疊加／圖層展開時時間軸精簡；全螢幕預覽 | 使用者：預覽太小、icon 太大；iPhone 13 實測預覽只佔 40% |
+| 匯入：OPFS 分段寫（8MB）→ IndexedDB → 記憶體；錯誤訊息分步驟；縮圖失敗不算匯入失敗；>1920 或 >150MB 不用 WebCodecs 解縮圖 | iPhone 大影片 UnknownError / out of memory |
+| 裝飾底線的上緣固定、線變粗往下長；每個裝飾有 gap／scale | 使用者：波浪線太靠近文字 |
+| 圖形調整值 `CardBox.adj`＋`fitInset` 執行時重算外框大小（沒調過用 inset 表） | 像 Office 圖形的調整點；舊字卡大小不變 |
 | 字卡大小/外框粗細跟畫面短邊走（`uiScale = min(w,h)/1080`） | 改成橫式時字不會被放大 1.78 倍；9:16、3:4、1:1 不受影響 |
 | 安全區參考線預設關（localStorage `vc-safe-zone-v2`），只在拖移時自動出現；拖移一律吸附安全區邊界 | 使用者誤以為粉紅斜線是背景 |
 | 主軌：匯入不自動選、預覽單點不選也不拖、選取時只有細框和縮放鈕（沒有 ✕） | 主軌滿版，選取框像「需要手動縮小」 |
@@ -107,6 +114,17 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 
 > 坑（2026-11-11）：Pixi `Application.destroy` 後不能在**同一個 `<canvas>`** 上重建 WebGL（頁面會卡死）。改比例要重建預覽時，`Preview.tsx` 用 `key={width x height}` 換新的 canvas。
 > 坑：e2e 裡 `window.__videoclip` 要等預覽引擎建好才有，進編輯器後先等它再讀 `project()`。
+
+> 坑（2026-11-11 第 2 次實測）：iPhone 匯入大影片出現「The operation failed for an unknown transient reason (e.g. out of memory).」＝WebKit `UnknownError`。`importFiles` 把存檔與讀資訊包在同一個 try，看不出哪一步失敗——錯誤訊息要分步驟。OPFS 不要一次 `write(整個 Blob)`。
+> 坑：文字的選取框／點選範圍用的是整張字卡畫布（含為了裝飾、陰影對稱多留的透明邊），裝飾一多就比看得到的大很多。
+> 坑：`.empty-import` 用 `top:38%` 相對整個編輯器，預覽變小時會蓋到時間軸。
+
+> 坑（2026-11-11）：很小的物件，四個角點和旋轉點的 40px 觸控區會互相蓋住（最上面那個吞掉事件）→ 依物件大小把點推遠。
+> 坑：`fitInset` 的外框長寬比要和最後結果一致（kx、ky 夾到 1 時比例會變）；扇貝邊圓的控制點會超出曲線，量範圍要用 `flattenPath` / `opsExtent`（取樣），不要用控制點。
+> 坑：range 輸入的值會被吸到 `step` 的格子上顯示；預設值不在格子上時（例如 0.72）顯示會差一點，資料不受影響。
+
+> 坑（2026-11-11 預覽優先版面）：Pixi 會在 canvas 上寫 inline 的 `touch-action:none`，要在 CSS 用 `touch-action: pan-y !important` 蓋掉，預覽空白處才能上下滑捲頁面。物件可拖靠的是 `.hit` 觸控區（`touch-action:none`）。
+> 坑：e2e 的雙指／觸控用 CDP `Input.dispatchTouchEvent`（helpers 的 `pinch`、`touchDrag`）；觸控滑動後有慣性捲動，要等停下再量 `scrollY`。整頁捲動後，用滑鼠座標的測試要先 `previewBox`（捲回頂端）或 `showTimeline`。
 
 ## 6. 現況與下一步
 **已完成**（細節與驗證看 PROGRESS.md 日誌）：Phase 0（骨架/PWA/部署）、Phase 1（專案管理＋多影片拼接）、Phase 2（多圖層＋選取框手勢＋圖層屬性）、Phase 3B（字體管線＋首次使用精靈＋設定頁＋字體選單＋匯入字體）。

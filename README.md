@@ -14,6 +14,7 @@
 |---|---|
 | [docs/PLAN.md](docs/PLAN.md) | 總規劃、技術架構、分階段實作與驗收 |
 | [docs/TEXT_CARDS.md](docs/TEXT_CARDS.md) | 字卡、字塊形狀、裝飾、尾端圈圈、雲朵字、模板 |
+| [docs/LAYOUTS.md](docs/LAYOUTS.md) | 多格影片模板（拍貼機、膠卷…） |
 | [docs/EFFECTS.md](docs/EFFECTS.md) | 字卡動畫、轉場、特效、調色、筆刷、自由剪裁 |
 | [docs/FONTS.md](docs/FONTS.md) | 字體清單、來源、授權 |
 | [AGENTS.md](AGENTS.md) | **給任何 AI／工程師的接手說明與規則（先讀這份）** |

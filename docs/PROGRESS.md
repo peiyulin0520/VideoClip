@@ -4,15 +4,14 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`。實測修正 A/B/C/D＋Phase 3A 第 1–4 步前半已開 **PR #3** 等使用者合併（2026-11-11，使用者選「合併讓我用 iPhone 測」）；合併後 Actions 部署，上線網址才會更新。合併後分支對齊 main：`git fetch origin main && git merge --ff-only origin/main`
-- **最後一個程式 commit**：見 `git log -1`（Phase 3A-4：圖形庫）
-- **測試**：218 個單元測試、42 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅、第 4 步前半（33 種圖形當字塊／獨立圖形）✅；4 後半（貼圖 icon）未做**；Phase 4–7 未開始
-- **下一步**：（等使用者在 iPhone 重測、回報）Phase 3A 第 4 步後半「貼圖 icon」（Fluent Emoji 約 300 個常用子集，MIT；沙盒只能連 `raw.githubusercontent.com`，下載要用 raw 網址＋`NODE_USE_ENV_PROXY=1`；要附授權檔；貼圖可加白邊/陰影）。也可補規格裡沒做的 `cloud-frame`／`speech-frame`／`dot-line`／`number-badge`／`tail-loop-double` 裝飾與缺的圖形。之後第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
+- **分支**：`claude/zen-tesla-v3brj5`。第 2 次實測修正 ①–⑤＋預覽優先版面＋貼圖＋多格模板規格已開 **PR #4** 等使用者合併（2026-11-11，使用者選「先合併上線，用 iPhone 測」）；合併後 Actions 部署，上線網址才會更新。合併後分支對齊 main：`git fetch origin main && git merge --ff-only origin/main`
+- **最後一個程式 commit**：見 `git log -1`（貼圖 icon）
+- **測試**：560 個單元測試、64 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
+- **下一步**：使用者合併 PR #4 後用 iPhone 重測（清單 `docs/PLAN.md §7`；匯入大影片若仍失敗請回報新錯誤訊息全文）。之後：多格影片模板（R22，`docs/LAYOUTS.md`，先給使用者看草圖或參考圖）→ 物件動畫核心（Phase 4）→ 雲朵字、字卡模板
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
-  - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是修正 A/B/C/D 要等合併上線後才測得到
-  - 要不要把修正 A–D 合併到 main（目前使用者選先不合併）
+  - 要不要開 PR 合併（之後用 iPhone 重測）
   - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
 - **目前沒有進行到一半的修改**（工作目錄乾淨、已 push）
 
@@ -28,6 +27,8 @@
 ```
 
 ## 使用者已確認的偏好
+- **預覽畫面優先**：預覽大小永遠不變、不能被設定面板擠小；整頁往下滑看其他功能，往上滑回來看預覽（預覽不必固定在螢幕上）（2026-11-11）
+- **選取框只要框線**，不要任何圓點／按鈕；縮放旋轉用手指（雙指）（2026-11-11）
 - 新專案比例預設「自動：跟第一支影片一樣」，但之後可以調整修改（2026-11-11 使用者選 A：「跟第一支影片一樣，但保留之後影片可以調整修改」；先前誤記為 B）
 - **每次的進度都要記錄成檔案，之後可以用 ChatGPT 等其他 AI 直接讀檔無縫接手**（2026-11-11 使用者要求）→ 見 AGENTS.md「紀錄規則」
 - 字體選擇用下拉式選單，放在字卡頁籤
@@ -47,12 +48,72 @@
 - 備份資料夾保持私人；只貼網址不登入無法寫入（Google 限制），已向使用者說明
 
 ## 使用者的修正紀錄（時間順序）
+- 2026-11-11 選 B（先不合併、繼續做貼圖），並提出新需求：「希望還可以增加不同模板，例如拍貼機或膠卷，可以有多格影片呈現在不同格子裡面，然後可以以特效方式滑過等」→ 記成需求 R22，規格 docs/LAYOUTS.md
+- 2026-11-11 看完第 2 次修正後：「選取框一率不需要小圓點，只需要有框框可以選取字串並用手指控制縮放就行」「預覽不要太小，如果需要其他功能，可以往下滑新增相關功能，不要擠到預覽畫面」→ 規劃見 docs/plans/2026-11-11-preview-first-layout.md（取代 feedback-2 §② 的角點／旋轉點／時間軸精簡）
+- 2026-11-11 更正上面第二點：「第一點可以，第二點我的意思是頁面可以整體往下滑新增功能，但往上滑可以看到不會縮小的預覽畫面」→ **整頁一起捲**，預覽不固定在螢幕上、往下滑會捲走，往上滑回來是原尺寸；規劃 §2-① 已改寫
+- 2026-11-11 第 2 次 iPhone 實測（PR #3 上線版）：①「在任何上傳影片的地方要上傳影片都會顯示無法上傳影片」（錄影顯示：無法匯入 IMG_8177.mov（The operation failed for an unknown transient reason (e.g. out of memory).））②「預覽畫面太小，我新增的文字都看不到，縮放等 icon 太大了，或是直接不要那個 icon，到可以在點選的文字或圖塊直接縮放也可以」③「文字可選擇的顏色太少，建議可以更彈性化」④「裝飾…應該還要能夠調整跟文字的貼近程度，才不會像圖中波浪線太靠近文字」⑤「字塊應該也要能夠彈性調整邊界光滑程度、明顯凹槽處的程度，像是 excel word 字塊那樣」→ 規劃見 docs/plans/2026-11-11-iphone-feedback-2.md
 - 2026-11-11 iPhone 實測回報：「預覽畫面中會有粉色斜底區塊，不懂那個意思，是因為我前面選了尺寸 9:16？但不是應該影片要直接 match 整個黑框比較好嗎，多了一個粉底還需要手動縮小調整很麻煩」→ 原因是平台安全區參考線（預設開）＋主軌被選取時的選取框；修改規劃見 docs/plans/2026-11-11-safe-zone-and-selection.md。另從截圖看到：iPhone 上時間軸片段沒有縮圖
 - 2026-11-11 要求把每次進度都記錄下來，供其他 AI（如 ChatGPT）銜接 → 新增 AGENTS.md、docs/HANDOFF.md、交接快照與日誌格式
 - 2026-11-11 選 B：先做字體下載＋首次使用精靈，再做字卡引擎
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 Phase 3A 第 4 步後半：貼圖 icon（分支 claude/zen-tesla-v3brj5，Opus）
+  - 做了什麼：新管線 `scripts/build-stickers.mjs`（`npm run stickers`）：用 `npm pack` 取 `@iconify-json/fluent-emoji@1.2.7`（彩色 Fluent Emoji，**授權 MIT、作者 Microsoft，腳本會檢查 info.json，不符就停**），分類取自 `@iconify-json/fluent-emoji-flat` 的 metadata；每個分類用人工挑的常用清單（照順序），不足時用該分類其他的補；排除膚色變體。輸出 **397 個** `public/stickers/*.svg`（4.7MB，寬高設 512）＋ `LICENSE.txt`（MIT 全文）＋ `src/stickers/catalog.generated.json`。疊加分頁新增「貼圖」：9 個分類（表情、愛心、手勢、動物植物、食物、慶祝活動、旅行天氣、物品、符號）＋ 6 欄格子。點貼圖 → 畫成 512px PNG → 當照片素材加到目前這一秒（大小 30%，**素材與片段同一步復原**——順便把一般疊加匯入也改成同一步）。設定頁加「素材授權」。貼圖不進 PWA 預快取（用到才下載）
+  - 動了哪些檔：scripts/build-stickers.mjs（新）、public/stickers/（新）、src/stickers/（新）、src/app/editor/{StickerPicker（新）,Toolbar}.tsx、src/store/actions.ts（addOverlayClips 一併加入素材、可指定大小）、src/app/pages/{Editor,Settings}.tsx、styles.css、vite.config.ts、package.json、e2e/phase3a-stickers.spec.ts、AGENTS.md、docs/TEXT_CARDS.md
+  - 驗證：✅ e2e：9 個分類都點得動、每類 ≥ 20 個、縮圖都載入；點紅心 → 疊加軌多一個照片素材、大小 30%、預覽中間出現紅色；拖移；兩次復原（拖、加入）貼圖與素材都不見、重做回來；重新整理後還在；設定頁授權連結與 LICENSE.txt；截圖 docs/screenshots/phase3a/sticker-picker.png、sticker-added.png；560 單元＋64 e2e 全過，連跑 2 次  🟡 只在 Chromium  🔴 沒做：貼紙白邊、循環動畫、搜尋
+  - 踩到的坑：GitHub 被擋時用 npm 上的 iconify 套件拿 Fluent Emoji（`npm pack` 下載到 `.font-cache/stickers/`，不進 git）；SVG 直接當貼圖會用原始 32px 取樣而糊掉，所以先畫成 512px PNG；`addOverlayClips` 以前不加素材（呼叫端另外 push，變成兩步復原）
+  - 下一步：寫多格影片模板（拍貼機／膠卷）規格，給使用者確認
+- 2026-11-11 寫多格影片模板規格（R22，只有文件，Opus）
+  - 做了什麼：新 `docs/LAYOUTS.md`：使用者看到的樣子、第一批 8 個版型（拍貼機直條／2×2、膠卷橫／直、拍立得、上下雙格、三格、九宮格）、技術做法（版型＝外框物件＋一群普通疊加物件用 `groupId` 綁住，格內平移縮放，遮罩；動畫靠 Phase 4 物件動畫核心）、iPhone 同時解碼上限（一次最多 4 支影片）、順序 L0 草圖 → L1 靜態 → L2 動畫核心 → L3 版型動畫。`docs/PLAN.md` 加需求 R22；README、AGENTS 加索引
+  - 驗證：🔴 程式未改
+  - 下一步：請使用者選先看草圖或提供參考圖
+- 2026-11-11 預覽優先版面＋選取框只留框線（分支 claude/zen-tesla-v3brj5，Opus）
+  - 做了什麼：照 `docs/plans/2026-11-11-preview-first-layout.md`。①**整頁捲動**：編輯器改成一般可往下捲的頁面（頂列→預覽→播放列→時間軸→分頁→面板），預覽寬度撐滿、高度＝`min(寬×比例, 100svh − 頂列 − 播放列)`，**大小永遠不變**；頂列（返回／復原／重做）和分頁列、字卡子分頁列 sticky；拿掉時間軸精簡模式與所有面板最高高度；時間軸高度＝全部軌道（不在裡面上下捲）；切分頁時若分頁列已黏在上面就停在分頁列位置。**預覽空白處上下滑＝捲頁面**（舞台與 canvas `touch-action: pan-y`），每個可拖的物件有看不見的觸控區 `.hit`（`touch-action:none`，最小 44px，選取中外擴 24px），按在物件上才是拖。②**選取框只留框線**：拿掉四角點、旋轉點；雙指補強：兩指可在框外、沒選取時選中兩指中點下的物件、旋轉吸附 0/90/180/270、一次手勢一步復原、擋 iOS `gesturestart`。③**不用手勢也能調**：新 `TransformControls`（整體大小 5–400%、旋轉 ±180°、置中、轉正），放在圖層分頁與文字「版面」
+  - 動了哪些檔：src/app/pages/Editor.tsx（無結構變動，靠 CSS）、src/app/editor/{Preview,Timeline,Toolbar,TextPanel,TransformControls}.tsx、src/store/uiStore.ts、src/app/styles.css、e2e/{helpers,preview-first,phase1,phase2,fix-safe-zone}.spec.ts（刪 fix-preview-size.spec.ts，內容併入 preview-first）
+  - 驗證：✅ e2e（iPhone 13 尺寸）：捲到頂端預覽高 ≥ 80% 螢幕且播放鈕在畫面內；剪輯／疊加／文字／圖層、面板開合、選取前後**預覽寬高完全一樣**；頁面可往下捲、最後一個控制項按得到、頂列與分頁列黏住、切分頁不跳回頁首；**CDP 真觸控**：預覽空白處上滑會捲頁面、按在文字上拖會移動文字且頁面不捲；**CDP 兩點觸控**：雙指放大＋旋轉 88°→吸附 90°、一次手勢一步復原、兩指在框外仍可縮放、沒選取時雙指選中物件；多軌時間軸全部列都在；沒有任何圓點；小字仍點得到；大小／旋轉／置中／轉正。截圖 docs/screenshots/preview-first/（top、scrolled-to-settings、frame-only、timeline-all-rows、empty-project）。560 單元＋62 e2e，整套連跑 5 次：4 次全過、1 次 `fix-safe-zone`「主軌…」失敗一次，之後單獨重複 4 輪（40 次）都沒重現，原因未查明（記錄在案）  🔴 iPhone 真機：觸控捲動與雙指（列入 PLAN §7）
+  - 踩到的坑：**Pixi 會在 canvas 上寫 inline `touch-action:none`**，CSS 要用 `!important` 蓋掉，不然預覽上滑不動頁面；CDP 觸控滑動後有慣性捲動，`scrollTo(0)` 之後還會再捲，測試要等慣性停下；舊測試用 `boundingBox` 加滑鼠座標的，元素在畫面下方時要先捲到看得到（新 helper `previewBox`、`showTimeline`）
+  - 下一步：等使用者決定合併與 iPhone 重測
+- 2026-11-11 寫修改規劃：預覽優先版面＋選取框只留框線（分支 claude/zen-tesla-v3brj5，只有文件，Opus）
+  - 做了什麼：依使用者 2 點回饋寫 `docs/plans/2026-11-11-preview-first-layout.md`：編輯器分上（頂列＋預覽＋播放列，固定）下（時間軸＋分頁＋面板，可往下捲）兩區、預覽高 `clamp(300px,56svh,720px)` 不隨面板變；拿掉四角點／旋轉點／時間軸精簡；雙指補強（框外也可、沒選取時選中點物件、旋轉吸附、一步復原、擋 iOS 整頁縮放）；圖層／版面加大小、旋轉滑桿；e2e 用 CDP 兩點觸控測雙指
+  - 動了哪些檔：docs/plans/2026-11-11-preview-first-layout.md（新）、docs/PROGRESS.md、docs/HANDOFF.md
+  - 驗證：🔴 程式未改
+  - 更正：使用者說明第二點是「整頁往下滑」，預覽不固定在螢幕上 → 規劃 §2-① 改寫：整頁捲動、預覽撐滿（捲到頂端約 85% 螢幕高）、頂列與分頁列 sticky、預覽空白處 `pan-y` 可捲頁面、物件有看不見的觸控區（`touch-action:none`）可拖
+  - 下一步：照規劃 ①→③ 實作
+- 2026-11-11 回報 2-⑤：圖形可調整（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：`CardBox.adj`（調整值，沒有＝預設長相）＋每個圖形的調整項目（`ShapeDef.adjust`，像 Office 的黃色調整點，做成滑桿）：**雲朵／思考泡泡**：凸起數量、凹槽深度（0＝平滑橢圓）、凹槽圓滑；**波浪印章**：波浪數量、深度；**星形／爆炸**：凹槽深度、角的圓滑；**所有多邊形**：角的圓滑（每個頂點換成圓弧）；斜切色塊／梯形：斜度；剪角：剪角大小；橫幅／標籤／粗箭頭／V 形／步驟條：缺口或箭頭大小；**對話框**：尾巴位置、長度、寬度（左下／右下快捷會重設位置）。共 25 個圖形有調整項目。換圖形調整值就清掉；「還原預設」鈕。**文字放得進圖形**：沒調過用原本的 `inset` 表（舊字卡大小完全不變）；調過之後 `fitInset` 把路徑取樣、二分搜尋文字區剛好放得進去的倍數（有快取）
+  - 動了哪些檔：src/engine/{shapes,cardLayout,textRender}.ts（＋shapes.test.ts）、src/model/types.ts、src/app/editor/TextPanel.tsx、e2e/fix-shape-adjust.spec.ts
+  - 驗證：✅ 單元（451 個圖形測試）：預設值下路徑與沒調整時一致、每個調整項目的最小／中間／最大 × 2 種長寬比：座標有限且文字區放得進圖形；雲朵深度 0 接近橢圓、深度越大凹槽越明顯、凸起數量＝路徑段數、圓滑讓接縫轉折變緩；星形深度越大越尖、圓滑出現曲線；多邊形圓滑最大時每個頂點都是曲線；尾巴位置／長度／寬度。✅ e2e：雲朵三個滑桿預覽變化、字塊與白字仍在、復原、還原預設、換圖形清除；星形／多邊形；對話框尾巴與快捷；截圖 docs/screenshots/fix-feedback-2/shapes-adjust.png（4 排：雲朵／星形／六邊形與三角形／對話框，各三～四種調整值）；560 單元＋58 e2e 全過，連跑 2 次穩定  🟡 只在 Chromium  🔴 沒做：預覽上直接拖黃色調整點
+  - 踩到的坑：雲朵凹槽深度 0 時是八邊形（弦直線），改成淺凹槽時控制點順著橢圓切線（e 混合）；`fitInset` 的外框長寬比要跟最後結果一致（kx/ky 夾到 1 時比例會變），否則測試和實際不一致；range 輸入會把值吸到 step 的格子上顯示，資料裡的預設值（0.72）和滑桿顯示（0.7）不同是正常的
+  - 下一步：回報全部 5 項做完，請使用者合併並重測
+- 2026-11-11 回報 2-④：裝飾距離與大小（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：`Decoration` 加選填 `gap`（與文字的距離，佔字高比例 −0.3~1.0）、`scale`（大小 0.5~2）。底線類（波浪、虛線、點點、雙底線）改成「線的**上緣**離字底 0.32 字高 ＋ gap」，**線變粗時往下長**，不會往上碰到字（使用者回報的問題）；尾端圈圈整條往下移 gap；手繪圈住、角括號往外擴；愛心、星星、斜線、打勾、彎箭頭往外側推開；螢光筆的距離改叫「上下位置」。星星、愛心、打勾、彎箭頭多一條「大小」。面板每個裝飾列：粗細（有線寬的才有）、與文字距離、大小（有的才有）。⚠ 預設的底線位置比以前遠（舊專案裡的底線會往下移一點，這是使用者要的）
+  - 動了哪些檔：src/engine/decorations.ts（＋test）、src/model/types.ts、src/app/editor/TextPanel.tsx、e2e/phase3a-deco.spec.ts
+  - 驗證：✅ 單元：每種裝飾 gap=0.5 離墨跡更遠；底線粗細 5%→25% 線的上緣 y 幾乎不變且永遠在字下方；預設值下底線離字底 ≥ 0.28 字高；包圍類四邊外擴、兩側類推開、打勾與彎箭頭單邊推開、螢光筆上下位置；大小變大而線寬不變；調整項目旗標。✅ e2e：拖距離／大小滑桿 → 資料與預覽改變；愛心有大小沒粗細、螢光筆叫「上下位置」；截圖 docs/screenshots/phase3a/deco-wave-thick.png、deco-wave-gap60.png；243 單元＋54 e2e 全過，連跑 2 次穩定  🟡 只在 Chromium
+  - 下一步：回報 2-⑤ 圖形可調整（雲朵凹槽、星形內徑、角圓滑、對話框尾巴位置）
+- 2026-11-11 回報 2-③：顏色選擇器（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：新 `src/ui/ColorPicker.tsx`，文字、字塊、字塊外框、描邊兩層、裝飾**全部**換成它：「最近用過」（最多 8 色，存在這台裝置 localStorage `vc-recent-colors`，最新在最前面）→ 基本 8 色（裝飾會把自己的預設色放最前面）→「更多顏色」展開粉嫩／莫蘭迪／螢光各 8 色（共 **32 色**）→「自訂顏色」（`<input type=color>`，iPhone 上會跳系統取色盤）＋色碼輸入（`#RRGGBB`，沒輸入完或不合法不套用）。色票 40px。資料格式仍是色碼字串，舊專案不用轉換
+  - 動了哪些檔：src/ui/{ColorPicker,ColorPicker.test}.ts(x)、src/app/editor/TextPanel.tsx、styles.css、e2e/fix-colors.spec.ts
+  - 驗證：✅ 單元：色碼正規化、32 色不重複且合法、最近用過的排序／去重／上限／壞資料；✅ e2e：32 色**每一格都點過**且資料對得上、最近用過 8 個＋點選套用＋重新整理後還在、色碼輸入（壞的不套用）、模擬取色器 change 事件、字塊／外框／描邊內外層／裝飾都用同一個選擇器；截圖 docs/screenshots/fix-feedback-2/color-picker-expanded.png；234 單元＋53 e2e 全過，連跑 2 次穩定  🔴 iPhone 真機：系統取色盤有沒有跳出來沒驗證（列進 PLAN §7，已列）  🔴 沒做：文字顏色透明度（規劃寫「可選」）
+  - 踩到的坑：「最近用過」和色票是同一個色碼時，兩顆按鈕無障礙名稱會重複（e2e strict mode 衝突）→ 最近用過用「最近用過 #xxxxxx」不同名稱
+  - 下一步：回報 2-④ 裝飾距離與大小
+- 2026-11-11 回報 2-②：預覽太小＋選取操作（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：(1) **拿掉 ✕ 和粉紅大縮放鈕**；改成選取框**四個角的小點**（看得到 12px、觸控區 40px、往框外偏不蓋住物件；拖角＝以中心縮放）＋**上方旋轉點**（拖＝旋轉，吸附 0/90/180/270）；物件很小時角點與旋轉點會自動推遠，避免觸控區互相蓋住；很小的物件點選範圍至少 40px。刪除改到文字面板「文字」分頁的「刪除」（其他物件用剪輯分頁的刪除）。(2) **選取框貼著看得到的內容**：新 `selectionBox`（字塊∪文字含描邊∪裝飾的實際範圍，曲線用取樣點量），選取框、點選、吸附都用它；渲染仍用整張畫布。(3) **時間軸精簡模式**：文字／疊加／圖層面板展開時時間軸縮成一條（選到哪條就捲到哪條，沒選就顯示主軌），面板最高 25dvh。(4) **全螢幕預覽鈕**（預覽右上角）：隱藏時間軸與面板。(5) 空專案的「匯入影片或照片」改在預覽中央，不再蓋到時間軸
+  - 動了哪些檔：src/engine/{geometry,textRender,decorations}.ts、src/app/editor/{Preview,Timeline,Toolbar,TextPanel}.tsx、src/app/pages/Editor.tsx、src/store/uiStore.ts、styles.css、e2e/fix-preview-size.spec.ts、phase2/fix-safe-zone 的選取框測試、geometry.test.ts
+  - 驗證：✅ 單元：`selectionBox`（偏移、縮放、旋轉）、`topHit` 最小範圍；✅ e2e（iPhone 13 尺寸 390×664）：文字分頁展開時預覽高 = 螢幕 **40.2%**（規劃目標 42%，沒有達到；再多要再犧牲別的東西，所以另外給了「收合面板」和「全螢幕」），時間軸 ≤ 90px，選取框不再橫跨整個畫面，收合 → 更大、全螢幕 → > 60%，四角縮放、旋轉到 90°、很小的字仍能縮放和點選、刪除、空專案按鈕位置；截圖 docs/screenshots/fix-feedback-2/；230 單元＋50 e2e 全過，連跑 2 次穩定  🔴 iPhone 真機：角點好不好按、精簡時間軸好不好用沒驗證
+  - 踩到的坑：很小的物件四個角點和旋轉點的 40px 觸控區互相蓋住，最上面那個吞掉事件（縮放變成旋轉）→ 依物件大小把點推遠；兩個「文字」分頁（底部分頁與字卡面板內分頁）名稱相同，e2e 要用容器區分
+  - 下一步：回報 2-③ 顏色選擇器
+- 2026-11-11 回報 2-①：匯入失敗修正（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：(1) 錯誤訊息分步驟（存到手機／讀取影片資訊）＋檔案大小＋白話原因（WebKit 的 UnknownError／out of memory → 「記憶體不足」，QuotaExceeded → 「手機儲存空間不足」），原始錯誤 `console.warn` 並記在 `window.__videoclip.lastImportErrors()`；toast 可指定停留時間，匯入失敗/提醒停 9 秒；首頁匯入也顯示原因（以前只列檔名）。(2) `putMedia` 改成 OPFS **分段寫入（每段 8MB）**，失敗刪掉半成品 → 退 IndexedDB → 最後退「只放記憶體」（素材標 `unsaved`，toast：「…沒辦法存在手機裡，可以先剪輯，但關掉網頁後要重新匯入」）；匯入前先看 `storage.estimate()`，已知空間不夠就直接放記憶體。重開專案找不到檔案時提示「請重新匯入」。(3) 縮圖失敗絕不讓匯入失敗；解析度 > 1920 或檔案 > 150MB 不用 WebCodecs 解碼（交給 `<video>`／播放器補）；`CanvasSink` 改成明確的寬＋高、每張之間讓出一下
+  - 動了哪些檔：src/storage/media.ts（＋media.test.ts）、src/engine/{importMedia,probe,debug}.ts（＋importMedia.test.ts）、src/model/types.ts（`Asset.unsaved`）、src/store/uiStore.ts、src/app/pages/{Editor,Home}.tsx、e2e/fix-import.spec.ts、e2e/helpers.ts
+  - 驗證：✅ 單元：分段 offset、各層退路、錯誤訊息對照、是否解碼縮圖；✅ e2e（Chromium 模擬 iPhone 失敗）：OPFS 寫入丟 UnknownError → 改存 IndexedDB、匯入成功、重新整理後素材還在；OPFS＋IndexedDB 都壞 → 放記憶體、有提醒、`unsaved`、還能繼續剪；VideoDecoder 壞掉 → 匯入成功且有縮圖；壞檔 → 提示檔名與原因、不是英文原文；228 單元＋46 e2e 全過  🔴 **iPhone 真機沒驗證**：使用者那支 IMG_8177.mov 能不能匯入。**請使用者回報新的錯誤訊息全文**（會寫是哪一步）
+  - 踩到的坑：jsdom 的假 IndexedDB 不保留 Blob 內容（單元測試只驗退路，內容在 e2e 驗證）
+  - 下一步：回報 2-②（預覽太小＋四角小點縮放）
+- 2026-11-11 寫修改規劃：第 2 次 iPhone 實測回報 5 項（分支 claude/zen-tesla-v3brj5，只有文件，Opus）
+  - 做了什麼：看使用者 3 張截圖＋螢幕錄影（用 ffmpeg 抽格，錄影沒放進 repo），查程式找原因，寫 `docs/plans/2026-11-11-iphone-feedback-2.md`。另外從截圖發現 2 個問題一起列入：文字選取框用的是含透明邊的整張畫布（比看得到的大很多）、空專案的匯入鈕蓋在時間軸上
+  - 動了哪些檔：docs/plans/2026-11-11-iphone-feedback-2.md（新）、docs/PROGRESS.md、docs/PLAN.md §7、docs/HANDOFF.md
+  - 驗證：🔴 程式未改。匯入失敗的確切步驟沙盒測不到（錯誤訊息是 WebKit 的 UnknownError，最可能是 OPFS 一次寫入大檔），規劃第一步是讓錯誤訊息分步驟，再請使用者回報
+  - 下一步：照規劃 ①→⑤ 實作
 - 2026-11-11 Phase 3A 第 4 步前半：圖形庫（分支 claude/zen-tesla-v3brj5，Sonnet）
   - 做了什麼：新 `engine/shapes.ts`：**33 種 Office 風格圖形**（自己用路徑畫，沒用任何現成圖檔）。基本：方形、圓角、膠囊、橢圓、三角形、菱形、斜切色塊、梯形、五邊形、六邊形、八邊形、十字、剪角、愛心、雲朵、圓柱。對話框：方／圓角／橢圓對話框（尾巴可選左下／右下）、思考泡泡、爆炸對話框。星形：4／5／6／8 角星、爆炸、波浪印章。標籤箭頭：橫幅、標籤、粗箭頭、V 形、步驟條、文件。當**字塊**用：外框大小＝文字區×`inset`（每個圖形一組，橢圓／星形／愛心可放文字的範圍比外框小），文字區在圖形裡置中。字塊新增**外框**（顏色、粗細）、尾巴方向。**獨立圖形**（貼圖用）：沒有文字的字卡，「＋新增圖形」，大小用內距調，時間軸顯示「圖形」。字塊分頁：4 個分類＋縮圖格（縮圖用同一套路徑函式畫的）
   - 動了哪些檔：src/engine/{shapes,shapes.test,cardLayout,textRender}.ts、src/model/{types,defaults}.ts、src/store/actions.ts、src/app/editor/{ShapeThumb,TextPanel,Toolbar,Timeline}.tsx、styles.css、e2e/phase3a-shapes.spec.ts、docs/TEXT_CARDS.md

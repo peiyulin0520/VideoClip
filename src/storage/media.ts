@@ -22,25 +22,76 @@ async function mediaDir(projectId: string, create: boolean): Promise<DirHandle> 
   return proj.getDirectoryHandle('media', { create });
 }
 
-export async function putMedia(projectId: string, assetId: string, blob: Blob): Promise<void> {
-  if (opfsUsable()) {
-    const dir = await mediaDir(projectId, true);
-    const fh = await dir.getFileHandle(assetId, { create: true });
-    const w = await fh.createWritable();
-    try {
-      await w.write(blob);
-      await w.close();
-    } catch (e) {
-      await w.abort().catch(() => {});
-      throw e;
+// 存放位置：OPFS → IndexedDB → 最後退路「只放在記憶體」（關掉網頁就沒了，會提醒使用者）
+export type Stored = 'opfs' | 'idb' | 'memory';
+const memory = new Map<string, Blob>();
+const memKey = (projectId: string, assetId: string) => `${projectId}/${assetId}`;
+
+/** 一次寫 8MB，避免 Safari 把整支大影片一次讀進記憶體（iPhone 4K 影片會 UnknownError / out of memory） */
+export const WRITE_CHUNK = 8 * 1024 * 1024;
+export function chunkRanges(size: number, chunk = WRITE_CHUNK): [number, number][] {
+  const out: [number, number][] = [];
+  for (let o = 0; o < size; o += chunk) out.push([o, Math.min(o + chunk, size)]);
+  return out;
+}
+
+async function putOpfs(projectId: string, assetId: string, blob: Blob, onProgress?: (f: number) => void) {
+  const dir = await mediaDir(projectId, true);
+  const fh = await dir.getFileHandle(assetId, { create: true });
+  const w = await fh.createWritable();
+  try {
+    let done = 0;
+    for (const [from, to] of chunkRanges(blob.size)) {
+      await w.write(blob.slice(from, to));
+      done = to;
+      onProgress?.(done / Math.max(blob.size, 1));
     }
-    return;
+    await w.close();
+  } catch (e) {
+    await w.abort().catch(() => {});
+    await dir.removeEntry(assetId).catch(() => {}); // 不要留下寫一半的檔案
+    throw e;
   }
-  const db = await getDB();
-  await db.put('blobs', blob, `${projectId}/${assetId}`);
+}
+
+/**
+ * 存素材原檔，回傳實際存在哪裡。每一層失敗都會往下一層退（失敗原因用 onFallback 回報，給除錯和錯誤訊息用）。
+ * persistent=false（已知空間不夠）時直接放記憶體。
+ */
+export async function putMedia(
+  projectId: string,
+  assetId: string,
+  blob: Blob,
+  opts: {
+    onProgress?: (fraction: number) => void;
+    onFallback?: (from: Stored, e: unknown) => void;
+    persistent?: boolean;
+  } = {},
+): Promise<Stored> {
+  if (opts.persistent !== false) {
+    if (opfsUsable()) {
+      try {
+        await putOpfs(projectId, assetId, blob, opts.onProgress);
+        return 'opfs';
+      } catch (e) {
+        opts.onFallback?.('opfs', e);
+      }
+    }
+    try {
+      const db = await getDB();
+      await db.put('blobs', blob, `${projectId}/${assetId}`);
+      return 'idb';
+    } catch (e) {
+      opts.onFallback?.('idb', e);
+    }
+  }
+  memory.set(memKey(projectId, assetId), blob);
+  return 'memory';
 }
 
 export async function getMedia(projectId: string, assetId: string, mime: string): Promise<File> {
+  const mem = memory.get(memKey(projectId, assetId));
+  if (mem) return new File([mem], assetId, { type: mime });
   if (opfsUsable()) {
     try {
       const dir = await mediaDir(projectId, false);
@@ -58,6 +109,7 @@ export async function getMedia(projectId: string, assetId: string, mime: string)
 }
 
 export async function deleteProjectMedia(projectId: string): Promise<void> {
+  for (const k of [...memory.keys()]) if (k.startsWith(`${projectId}/`)) memory.delete(k);
   if (opfsUsable()) {
     try {
       const root = await navigator.storage.getDirectory();

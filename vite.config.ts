@@ -31,6 +31,8 @@ export default defineConfig({
       workbox: {
         // 字體（Phase 3）另外用 Cache Storage 管理，不放進預快取
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // 貼圖（約 400 個 SVG、4.7 MB）用到才下載，不放進預快取
+        globIgnores: ['**/stickers/**'],
         navigateFallback: 'index.html',
       },
     }),

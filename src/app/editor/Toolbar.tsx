@@ -18,7 +18,7 @@ import {
   Volume2,
   type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { BLEND_LABELS } from '../../engine/geometry';
 import {
   findItem,
@@ -43,7 +43,9 @@ import {
 import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Slider } from '../../ui/Slider';
+import { StickerPicker } from './StickerPicker';
 import { TextPanel } from './TextPanel';
+import { TransformControls } from './TransformControls';
 
 export type Tab = 'edit' | 'overlay' | 'text' | 'layers';
 type Panel = 'speed' | 'volume' | null;
@@ -93,6 +95,7 @@ export function BottomBar({
 
   const found = findItem(project, selectedId);
   const items = mainItems(project);
+  const barRef = useRef<HTMLDivElement>(null);
 
   // 點目前的分頁＝收合/展開下面的面板（讓出空間給預覽畫面）
   const switchTab = (t: Tab) => {
@@ -102,10 +105,17 @@ export function BottomBar({
       setTab(t);
       setCollapsed(false);
     }
+    // 分頁列黏在頂端時（已經往下捲過），切分頁後停在分頁列的位置，不要停在新面板的一半
+    const el = barRef.current;
+    if (el) {
+      const stickTop = parseFloat(getComputedStyle(el).getPropertyValue('--top-h')) || 52;
+      if (el.getBoundingClientRect().top <= stickTop + 1)
+        requestAnimationFrame(() => window.scrollTo({ top: el.offsetTop - stickTop }));
+    }
   };
 
   return (
-    <div className="bottombar">
+    <div className="bottombar" ref={barRef}>
       <div className="tabs" role="tablist">
         {TABS.map((t) => (
           <button
@@ -321,11 +331,15 @@ function OverlayTab({ onImportOverlay }: { onImportOverlay: () => void }) {
   return (
     <div className="panel">
       <p className="hint">
-        疊加的影片或照片會放在播放頭這一秒，同一秒可以疊很多個（每個放在自己的軌道）。加好後在預覽畫面上拖移、右上角的鈕縮放旋轉，細節到「圖層」調整。
+        疊加的影片、照片、貼圖會放在播放頭這一秒，同一秒可以疊很多個（每個放在自己的軌道）。加好後在預覽上拖移、雙指縮放旋轉，細節到「圖層」調整。
       </p>
       <button className="btn primary done" onClick={onImportOverlay}>
         ＋ 加入影片或照片（疊在目前這一秒）
       </button>
+      <div className="panel-head">
+        <span>貼圖</span>
+      </div>
+      <StickerPicker />
     </div>
   );
 }
@@ -335,7 +349,7 @@ function TextTab({ found }: { found: Found }) {
   const item = found?.item.type === 'text' ? found.item : null;
   const add = () => addText(player?.time ?? 0);
   return (
-    <div className="panel tall">
+    <div className="panel text-panel">
       {item ? (
         <TextPanel item={item} onAdd={add} onAddShape={() => addText(player?.time ?? 0, true)} />
       ) : (
@@ -364,7 +378,7 @@ function LayersTab() {
   const it = found?.item;
 
   return (
-    <div className="panel scroll">
+    <div className="panel">
       <div className="panel-head">
         <span>這一秒的圖層（上面的會蓋住下面的）</span>
       </div>
@@ -441,6 +455,7 @@ function LayersTab() {
           <div className="panel-head">
             <span>選取的圖層</span>
           </div>
+          <TransformControls item={it} />
           <Slider
             label="透明度"
             value={Math.round(it.transform.opacity * 100)}

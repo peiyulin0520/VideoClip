@@ -81,13 +81,21 @@ function canvasFor(w: number, h: number) {
  * iPhone Safari 沒有使用者手勢時，隱藏的 <video> 常常不載入畫面，舊方法會拿不到縮圖。
  * 瀏覽器不能解碼這個格式時回傳空陣列（由呼叫端改用 <video> 方法）。
  */
+/** 解析度或檔案太大就不用 WebCodecs 解碼縮圖（iPhone 4K HEVC 解碼會吃光記憶體），交給播放器之後補 */
+export const THUMB_DECODE_MAX_SIDE = 1920;
+export const THUMB_DECODE_MAX_BYTES = 150 * 1024 * 1024;
+export function canDecodeThumbs(width: number, height: number, bytes: number): boolean {
+  return Math.max(width, height) <= THUMB_DECODE_MAX_SIDE && bytes <= THUMB_DECODE_MAX_BYTES;
+}
+
 export async function mediabunnyThumbs(file: Blob, duration: number, count: number): Promise<string[]> {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   const out: string[] = [];
   try {
     const track = await input.getPrimaryVideoTrack();
     if (!track || !(await track.canDecode())) return out;
-    const sink = new CanvasSink(track, { height: THUMB_H, fit: 'contain' });
+    const tw = Math.max(Math.round((THUMB_H * track.displayWidth) / Math.max(track.displayHeight, 1)), 1);
+    const sink = new CanvasSink(track, { width: tw, height: THUMB_H, fit: 'fill' });
     const times = Array.from({ length: count }, (_, i) =>
       Math.min(((i + 0.5) / count) * duration, Math.max(duration - 0.05, 0)),
     );
@@ -99,6 +107,7 @@ export async function mediabunnyThumbs(file: Blob, duration: number, count: numb
         last = c.toDataURL('image/jpeg', 0.6);
       }
       if (last) out.push(last); // 某一格拿不到就沿用前一格
+      await new Promise((r) => setTimeout(r, 0)); // 讓出一下，頁面有機會回收記憶體
     }
   } catch {
     /* 解碼失敗：交給備用方法 */
@@ -176,8 +185,16 @@ export async function probeMedia(file: File, kind: MediaKind): Promise<ProbeResu
     const meta = (await probeVideoContainer(file)) ?? (await probeVideoElement(url));
     if (!meta || !(meta.duration > 0)) return { ok: false, reason: '讀不到影片資訊' };
     const count = Math.min(Math.max(Math.ceil(meta.duration), 1), 8);
-    let thumbs = await mediabunnyThumbs(file, meta.duration, count);
-    if (thumbs.length === 0) thumbs = await videoThumbs(url, meta.duration, count);
+    // 縮圖失敗絕對不能讓匯入失敗：任何錯誤都當作「沒有縮圖」，之後預覽播放器拿到畫面時會補
+    let thumbs: string[] = [];
+    try {
+      if (canDecodeThumbs(meta.width, meta.height, file.size))
+        thumbs = await mediabunnyThumbs(file, meta.duration, count);
+      if (thumbs.length === 0) thumbs = await videoThumbs(url, meta.duration, count);
+    } catch (e) {
+      console.warn('[import] 縮圖失敗，之後補', e);
+      thumbs = [];
+    }
     return { ok: true, info: { kind, ...meta, thumbs } };
   } finally {
     URL.revokeObjectURL(url);

@@ -13,6 +13,8 @@ import {
   samplePreview,
   selectedItemId,
   type RGBA,
+  previewBox,
+  pinch,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/phase2';
@@ -82,44 +84,42 @@ test('同一秒疊 3 支影片＋1 個字卡：換圖層順序後預覽正確，
   }
 });
 
-test('預覽上的選取框：點選、拖移、右上角縮放旋轉鈕、刪除鈕', async ({ page }) => {
+test('預覽上的選取框：只有框線（沒有圓點）、拖移、雙指縮放旋轉（一次手勢一步復原）、用剪輯分頁刪除', async ({
+  page,
+}) => {
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
   await expect(clips(page)).toHaveCount(2);
 
-  // 新加的疊加素材自動被選取，出現選取框與兩顆圓鈕
+  // 新加的疊加素材自動被選取：只有框線，沒有任何圓點或按鈕
   await expect(page.getByTestId('selbox')).toBeVisible();
-  const handle = page.getByTestId('scale-handle');
-  await expect(handle).toBeVisible();
-  const hb = (await handle.boundingBox())!;
-  expect(hb.width).toBeGreaterThanOrEqual(44);
-  expect(hb.height).toBeGreaterThanOrEqual(44);
-  const del = page.getByRole('button', { name: '刪除圖層' });
-  expect((await del.boundingBox())!.width).toBeGreaterThanOrEqual(44);
-
+  await expect(page.locator('.sel-dot, [data-handle]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '刪除圖層' })).toHaveCount(0);
   const tf0 = (await project(page)).tracks[1]!.items[0]!.transform;
   expect(tf0.scale).toBeCloseTo(0.5);
 
-  // 拖右上角的鈕往外 → 變大
-  const hx = hb.x + hb.width / 2;
-  const hy = hb.y + hb.height / 2;
-  await page.mouse.move(hx, hy);
-  await page.mouse.down();
-  await page.mouse.move(hx + 20, hy - 20, { steps: 5 });
-  await page.mouse.move(hx + 40, hy - 40, { steps: 5 });
-  await page.mouse.up();
-  const tf1 = (await project(page)).tracks[1]!.items[0]!.transform;
-  expect(tf1.scale).toBeGreaterThan(0.6);
-  await page.screenshot({ path: `${SHOT}/selection-box-scaled.png` });
-
-  // 拖框內 → 移動位置
-  const stage = (await page.getByTestId('stage').boundingBox())!;
+  // 雙指（真的兩點觸控）在物件上張開＋轉 90° → 變大、轉成 90°（吸附）
+  const stage = await previewBox(page);
   const cx = stage.x + stage.width * 0.5;
   const cy = stage.y + stage.height * 0.5;
+  await pinch(page, { cx, cy, from: 40, to: 80, angle: 88 });
+  const tf1 = (await project(page)).tracks[1]!.items[0]!.transform;
+  expect(tf1.scale).toBeGreaterThan(0.85);
+  expect(Math.abs(tf1.rotation - 90)).toBeLessThan(0.01); // 88° 吸附到 90°
+  await page.screenshot({ path: `${SHOT}/selection-box-scaled.png` });
+  // 一次雙指手勢＝一步復原
+  await page.getByRole('button', { name: '復原' }).tap();
+  const tfu = (await project(page)).tracks[1]!.items[0]!.transform;
+  expect(tfu.scale).toBeCloseTo(0.5);
+  expect(tfu.rotation).toBe(0);
+  await page.getByRole('button', { name: '重做' }).tap();
+
+  // 拖框內 → 移動位置
+  const st2 = await previewBox(page);
   await page.mouse.move(cx, cy);
   await page.mouse.down();
   await page.mouse.move(cx + 15, cy + 5, { steps: 4 });
-  await page.mouse.move(cx + stage.width * 0.2, cy + stage.height * 0.1, { steps: 6 });
+  await page.mouse.move(cx + st2.width * 0.2, cy + st2.height * 0.1, { steps: 6 });
   await page.mouse.up();
   const tf2 = (await project(page)).tracks[1]!.items[0]!.transform;
   expect(tf2.x).toBeGreaterThan(0.6);
@@ -130,8 +130,9 @@ test('預覽上的選取框：點選、拖移、右上角縮放旋轉鈕、刪�
   const tf3 = (await project(page)).tracks[1]!.items[0]!.transform;
   expect(tf3.x).toBeCloseTo(tf1.x, 1);
 
-  // 刪除鈕
-  await page.getByRole('button', { name: '刪除圖層' }).tap();
+  // 刪除：用剪輯分頁的刪除鈕（預覽上不放 ✕）
+  await openTab(page, '剪輯');
+  await page.getByRole('button', { name: '刪除', exact: true }).tap();
   await expect(clips(page)).toHaveCount(1);
   await expect(page.getByTestId('selbox')).toHaveCount(0);
 });
@@ -144,7 +145,7 @@ test('點預覽畫面會選到最上面那個物件；鎖定的軌道不會被�
 
   // 開關底部分頁會讓舞台大小改變，所以每次點擊前重新量舞台的位置
   const click = async (nx: number, ny: number) => {
-    const stage = (await page.getByTestId('stage').boundingBox())!;
+    const stage = await previewBox(page);
     await page.mouse.click(stage.x + stage.width * nx, stage.y + stage.height * ny);
   };
 
@@ -298,14 +299,18 @@ test('文字：新增、改內容與顏色、在預覽上可拖移，也能分�
   await expect(clips(page)).toHaveCount(3);
 });
 
-test('底部分頁：點目前的分頁會收合面板，預覽畫面變大；再點展開', async ({ page }) => {
+test('底部分頁：點目前的分頁會收合／展開面板，預覽大小永遠不變（使用者：預覽不能被擠小）', async ({
+  page,
+}) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '文字');
   const stage = page.getByTestId('stage');
   const h1 = (await stage.boundingBox())!.height;
+  const w1 = (await stage.boundingBox())!.width;
   await page.getByRole('tab', { name: '文字' }).tap(); // 再點一次：收合
   await expect(page.getByRole('button', { name: /新增文字/ })).toHaveCount(0);
-  await expect.poll(async () => (await stage.boundingBox())!.height).toBeGreaterThan(h1 + 20);
+  expect((await stage.boundingBox())!.height).toBeCloseTo(h1, 0);
+  expect((await stage.boundingBox())!.width).toBeCloseTo(w1, 0);
   await page.getByRole('tab', { name: '文字' }).tap(); // 展開
   await expect(page.getByRole('button', { name: /新增文字/ })).toBeVisible();
 });

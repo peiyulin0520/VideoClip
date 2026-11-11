@@ -6,7 +6,7 @@
 > **接手的第一件事（照順序）**
 > 1. 讀 `docs/PROGRESS.md` 最上面的「交接快照」：現在做到哪、下一步是什麼、在等使用者什麼。
 > 2. 讀 `docs/HANDOFF.md`：架構地圖、決策與原因、踩過的坑、下一步的具體做法。
-> 3. 要做哪個功能，再讀 `docs/PLAN.md`（總規劃與驗收）＋對應的規格：字卡 `docs/TEXT_CARDS.md`、動畫/轉場/調色/筆刷/遮罩 `docs/EFFECTS.md`、字體 `docs/FONTS.md`。
+> 3. 要做哪個功能，再讀 `docs/PLAN.md`（總規劃與驗收）＋對應的規格：字卡 `docs/TEXT_CARDS.md`、動畫/轉場/調色/筆刷/遮罩 `docs/EFFECTS.md`、多格影片模板 `docs/LAYOUTS.md`、字體 `docs/FONTS.md`。
 > 4. `npm ci && npm run check && npm run e2e -- --trace off` 確認一開始是綠的，再動手。
 
 ## 指令
@@ -17,6 +17,7 @@
 | `npm run check` | lint ＋ 單元測試 ＋ build（每次提交前必跑） |
 | `npm test` | Vitest 單元測試 |
 | `npm run e2e -- --trace off` | Playwright（iPhone 13 尺寸、Chromium；會先 build 再開 preview） |
+| `npm run stickers` | 貼圖管線（從 npm 取 Fluent Emoji、挑約 400 個輸出到 `public/stickers/`）。一般改程式**不用**重跑，成品已 commit |
 | `npm run fonts:setup` / `npm run fonts` | 字體管線（一次性建 `.venv`／下載＋裁切＋產生目錄）。一般改程式**不用**重跑，成品已 commit |
 
 ## 一定要遵守的規則

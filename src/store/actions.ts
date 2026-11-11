@@ -53,12 +53,16 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
 }
 
 /** 把一群疊加素材放在 t 秒：各自放進第一條有空位的疊加軌，沒有就新增一條（所以會疊在同一秒） */
-export function addOverlayClips(assets: Asset[], t: number): string | null {
+/** scale：預設大小（貼圖用比較小的 0.3）；整個加入是一步復原 */
+export function addOverlayClips(assets: Asset[], t: number, opts: { scale?: number } = {}): string | null {
   if (assets.length === 0) return null;
   let firstId: string | null = null;
   store().apply((d) => {
+    // 素材和片段在同一步加入（一次復原就整個拿掉）；已經在專案裡的素材不重複加
+    for (const asset of assets) if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
     for (const asset of assets) {
       const clip = createOverlayClip(asset, t);
+      if (opts.scale) clip.transform.scale = opts.scale;
       let ti = firstFreeTrack(d as never, 'overlay', clip.start, clip.duration);
       if (ti < 0) {
         d.tracks.push(createTrack('overlay', d.tracks as Track[]));

@@ -81,14 +81,18 @@ export function Home() {
     }
     setBusy(`匯入中… 0/${files.length}`);
     try {
-      const res = await importFiles(p.id, files, (d, n) => setBusy(`匯入中… ${d}/${n}`));
+      const res = await importFiles(p.id, files, (d, n, detail) =>
+        setBusy(`匯入中… ${d}/${n}${detail ? `（${detail}）` : ''}`),
+      );
       p.assets = res.assets;
       mainTrack(p).items = relayout(res.clips);
       // 自動：照第一個素材的形狀決定專案比例（之後在編輯器還可以改）
       const first = res.assets[0];
       if (auto && first) assignAspect(p, pickAspect(first.width, first.height), true);
       await saveProject(p);
-      if (res.failed.length) toast(`無法匯入：${res.failed.map((f) => f.name).join('、')}`);
+      if (res.failed.length)
+        toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`, 9000);
+      if (res.warnings.length) toast(res.warnings.join('；'), 9000);
       navigate(`/p/${p.id}`);
     } finally {
       setBusy(null);

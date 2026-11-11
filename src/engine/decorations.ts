@@ -17,21 +17,46 @@ export type Op = {
   alpha?: number;
 };
 
-export const DECORATION_KINDS: { kind: DecorationKind; label: string; width: number; color: string }[] = [
-  { kind: 'tail-loop', label: '尾端圈圈', width: 0.15, color: '#E2006E' },
-  { kind: 'wave-underline', label: '波浪底線', width: 0.07, color: '#ff4d8d' },
-  { kind: 'dashed-underline', label: '虛線', width: 0.06, color: '#4dd0ff' },
-  { kind: 'dotted-underline', label: '點點線', width: 0.09, color: '#ffd23f' },
-  { kind: 'double-line', label: '雙底線', width: 0.05, color: '#ff4d8d' },
-  { kind: 'marker', label: '螢光筆', width: 1, color: '#ffe14d' },
-  { kind: 'scribble-circle', label: '手繪圈住', width: 0.07, color: '#ff4d8d' },
-  { kind: 'arrow-curve', label: '彎箭頭', width: 0.07, color: '#ffd23f' },
-  { kind: 'sparkles', label: '星星', width: 1, color: '#ffd23f' },
-  { kind: 'hearts', label: '愛心', width: 1, color: '#ff4d8d' },
-  { kind: 'slashes', label: '斜線', width: 0.08, color: '#ffffff' },
-  { kind: 'check', label: '打勾', width: 0.12, color: '#7CFC6A' },
-  { kind: 'corner-brackets', label: '角括號', width: 0.06, color: '#ffffff' },
-];
+export type DecoKindDef = {
+  kind: DecorationKind;
+  label: string;
+  width: number;
+  color: string;
+  /** 有線寬可以調 */
+  hasWidth: boolean;
+  /** 有「大小」可以調 */
+  hasScale: boolean;
+  /** 距離滑桿的名稱（螢光筆是上下位置） */
+  gapLabel: string;
+};
+const BASE: Omit<DecoKindDef, 'kind' | 'label' | 'width' | 'color'> = {
+  hasWidth: true,
+  hasScale: false,
+  gapLabel: '與文字距離',
+};
+export const DECORATION_KINDS: DecoKindDef[] = (
+  [
+    { kind: 'tail-loop', label: '尾端圈圈', width: 0.15, color: '#E2006E' },
+    { kind: 'wave-underline', label: '波浪底線', width: 0.07, color: '#ff4d8d' },
+    { kind: 'dashed-underline', label: '虛線', width: 0.06, color: '#4dd0ff' },
+    { kind: 'dotted-underline', label: '點點線', width: 0.09, color: '#ffd23f' },
+    { kind: 'double-line', label: '雙底線', width: 0.05, color: '#ff4d8d' },
+    { kind: 'marker', label: '螢光筆', width: 1, color: '#ffe14d' },
+    { kind: 'scribble-circle', label: '手繪圈住', width: 0.07, color: '#ff4d8d' },
+    { kind: 'arrow-curve', label: '彎箭頭', width: 0.07, color: '#ffd23f' },
+    { kind: 'sparkles', label: '星星', width: 1, color: '#ffd23f' },
+    { kind: 'hearts', label: '愛心', width: 1, color: '#ff4d8d' },
+    { kind: 'slashes', label: '斜線', width: 0.08, color: '#ffffff' },
+    { kind: 'check', label: '打勾', width: 0.12, color: '#7CFC6A' },
+    { kind: 'corner-brackets', label: '角括號', width: 0.06, color: '#ffffff' },
+  ] as Pick<DecoKindDef, 'kind' | 'label' | 'width' | 'color'>[]
+).map((k) => ({
+  ...BASE,
+  ...k,
+  ...(k.kind === 'marker' ? { hasWidth: false, gapLabel: '上下位置' } : {}),
+  ...(k.kind === 'sparkles' || k.kind === 'hearts' ? { hasWidth: false, hasScale: true } : {}),
+  ...(k.kind === 'check' || k.kind === 'arrow-curve' ? { hasScale: true } : {}),
+}));
 
 const M = (x: number, y: number): PathCmd => ['M', x, y];
 const L = (x: number, y: number): PathCmd => ['L', x, y];
@@ -140,12 +165,16 @@ export function decorationOps(d: Decoration, ink: Rect): Op[] {
   const b = y + h;
   const cy = y + h / 2;
   const lw = Math.max(d.width * h, 1);
+  const gap = (d.gap ?? 0) * h; // 與文字的距離（px）：往外推開
+  const sc = d.scale ?? 1; // 大小倍數（星星、愛心、打勾、箭頭）
+  // 底線類：線的「上緣」離字底 0.32 字高 + gap；線變粗時往下長，不會往上碰到字
+  const under = (extra = 0) => b + h * 0.32 + gap + lw / 2 + extra;
   switch (d.kind) {
     case 'tail-loop':
-      return tailLoop(ink, lw);
+      return tailLoop({ ...ink, y: ink.y + gap }, lw); // 整條往下移 gap
     case 'wave-underline': {
-      const y0 = b + h * 0.28;
       const amp = h * 0.08;
+      const y0 = under(amp);
       const wl = h * 0.55;
       const x0 = x - h * 0.05;
       const x1 = r + h * 0.05;
@@ -159,25 +188,18 @@ export function decorationOps(d: Decoration, ink: Rect): Op[] {
       return [{ type: 'stroke', cmds, width: lw }];
     }
     case 'dashed-underline':
-      return [
-        {
-          type: 'stroke',
-          cmds: line(x, b + h * 0.28, r, b + h * 0.28),
-          width: lw,
-          dash: [lw * 2.4, lw * 1.6],
-        },
-      ];
+      return [{ type: 'stroke', cmds: line(x, under(), r, under()), width: lw, dash: [lw * 2.4, lw * 1.6] }];
     case 'dotted-underline':
-      return [{ type: 'stroke', cmds: line(x, b + h * 0.28, r, b + h * 0.28), width: lw, dash: [0, lw * 2] }];
+      return [{ type: 'stroke', cmds: line(x, under(), r, under()), width: lw, dash: [0, lw * 2] }];
     case 'double-line':
       return [
-        { type: 'stroke', cmds: line(x, b + h * 0.22, r, b + h * 0.22), width: lw },
-        { type: 'stroke', cmds: line(x, b + h * 0.22 + lw * 2.4, r, b + h * 0.22 + lw * 2.4), width: lw },
+        { type: 'stroke', cmds: line(x, under(), r, under()), width: lw },
+        { type: 'stroke', cmds: line(x, under(lw * 2.4), r, under(lw * 2.4)), width: lw },
       ];
     case 'marker': {
-      // 斜、不規則邊的半透明色塊，畫在字後面
-      const t = y + h * 0.4;
-      const bt = b + h * 0.06;
+      // 斜、不規則邊的半透明色塊，畫在字後面；gap＝上下位置（正＝往下、負＝往上）
+      const t = y + h * 0.4 + gap;
+      const bt = b + h * 0.06 + gap;
       return [
         {
           type: 'fill',
@@ -194,8 +216,8 @@ export function decorationOps(d: Decoration, ink: Rect): Op[] {
     }
     case 'scribble-circle': {
       // 橢圓、頭尾不閉合、稍微超出；半徑慢慢變大（螺旋），像手繪
-      const rx = w / 2 + h * 0.55;
-      const ry = h * 0.78;
+      const rx = w / 2 + h * 0.55 + gap;
+      const ry = h * 0.78 + gap;
       const cx = x + w / 2;
       const cmds: PathCmd[] = [];
       const steps = 56;
@@ -212,51 +234,63 @@ export function decorationOps(d: Decoration, ink: Rect): Op[] {
       return [{ type: 'stroke', cmds, width: lw }];
     }
     case 'arrow-curve': {
-      const sx = r + h * 1.3;
-      const sy = y - h * 0.5;
-      const ex = r + h * 0.3;
+      const ex = r + h * 0.3 + gap;
       const ey = cy + h * 0.1;
-      const c2x = r + h * 1.4;
-      const c2y = cy + h * 0.5;
+      const sx = ex + h * 1.0 * sc;
+      const sy = ey - h * 1.1 * sc;
+      const c2x = ex + h * 1.1 * sc;
+      const c2y = ey + h * 0.4 * sc;
       const ang = Math.atan2(ey - c2y, ex - c2x);
-      const hl = h * 0.35;
+      const hl = h * 0.35 * sc;
       const head = (da: number): PathCmd[] =>
         line(ex, ey, ex - Math.cos(ang + da) * hl, ey - Math.sin(ang + da) * hl);
       return [
-        { type: 'stroke', cmds: [M(sx, sy), C(sx + h * 0.2, sy + h * 0.3, c2x, c2y, ex, ey)], width: lw },
+        {
+          type: 'stroke',
+          cmds: [M(sx, sy), C(sx + h * 0.2 * sc, sy + h * 0.3 * sc, c2x, c2y, ex, ey)],
+          width: lw,
+        },
         { type: 'stroke', cmds: [...head(0.5), ...head(-0.5)], width: lw },
       ];
     }
     case 'sparkles':
       return [
-        { type: 'fill', cmds: star(r + h * 0.15, y - h * 0.15, h * 0.4) },
-        { type: 'fill', cmds: star(x - h * 0.25, y + h * 0.15, h * 0.26) },
-        { type: 'fill', cmds: star(r + h * 0.45, b - h * 0.1, h * 0.22) },
+        { type: 'fill', cmds: star(r + h * 0.15 + gap, y - h * 0.15 - gap, h * 0.4 * sc) },
+        { type: 'fill', cmds: star(x - h * 0.25 - gap, y + h * 0.15, h * 0.26 * sc) },
+        { type: 'fill', cmds: star(r + h * 0.45 + gap, b - h * 0.1 + gap * 0.5, h * 0.22 * sc) },
       ];
     case 'hearts':
       return [
-        { type: 'fill', cmds: heart(x - h * 0.55, cy - h * 0.1, h * 0.28) },
-        { type: 'fill', cmds: heart(r + h * 0.55, cy + h * 0.1, h * 0.28) },
+        { type: 'fill', cmds: heart(x - (h * 0.55 * sc + gap), cy - h * 0.1, h * 0.28 * sc) },
+        { type: 'fill', cmds: heart(r + (h * 0.55 * sc + gap), cy + h * 0.1, h * 0.28 * sc) },
       ];
     case 'slashes':
       return [
-        { type: 'stroke', cmds: line(x - h * 0.7, y - h * 0.05, x - h * 0.3, b + h * 0.05), width: lw },
-        { type: 'stroke', cmds: line(r + h * 0.3, b + h * 0.05, r + h * 0.7, y - h * 0.05), width: lw },
-      ];
-    case 'check':
-      return [
         {
           type: 'stroke',
-          cmds: [
-            M(x - h * 1.05, cy + h * 0.02),
-            L(x - h * 0.75, cy + h * 0.32),
-            L(x - h * 0.25, cy - h * 0.38),
-          ],
+          cmds: line(x - h * 0.7 - gap, y - h * 0.05, x - h * 0.3 - gap, b + h * 0.05),
+          width: lw,
+        },
+        {
+          type: 'stroke',
+          cmds: line(r + h * 0.3 + gap, b + h * 0.05, r + h * 0.7 + gap, y - h * 0.05),
           width: lw,
         },
       ];
+    case 'check': {
+      // 以勾的右上端為錨點，往左下畫；scale 放大整個勾，gap 往左推開
+      const ax = x - h * 0.25 - gap;
+      const ay = cy - h * 0.38;
+      return [
+        {
+          type: 'stroke',
+          cmds: [M(ax - h * 0.8 * sc, ay + h * 0.4 * sc), L(ax - h * 0.5 * sc, ay + h * 0.7 * sc), L(ax, ay)],
+          width: lw,
+        },
+      ];
+    }
     case 'corner-brackets': {
-      const m = h * 0.28;
+      const m = h * 0.28 + gap;
       const arm = h * 0.4;
       const [l, t, rr, bb] = [x - m, y - m, r + m, b + m];
       return [
@@ -303,6 +337,34 @@ export function opsBounds(ops: Op[]): { l: number; t: number; r: number; b: numb
     }
   }
   return Number.isFinite(l) ? { l, t, r, b } : null;
+}
+
+/** 同上，但貝茲曲線用曲線上的點量（不是控制點），範圍比較貼近看得到的線條 */
+export function opsExtent(ops: Op[]): { l: number; t: number; r: number; b: number } | null {
+  const flat: Op[] = ops.map((op) => {
+    const cmds: PathCmd[] = [];
+    let cur: [number, number] = [0, 0];
+    for (const c of op.cmds) {
+      if (c[0] === 'M' || c[0] === 'L') {
+        cur = [c[1], c[2]];
+        cmds.push(c);
+      } else if (c[0] === 'C') {
+        const [x0, y0] = cur;
+        for (let i = 1; i <= 12; i++) {
+          const t = i / 12;
+          const u = 1 - t;
+          cmds.push([
+            'L',
+            u * u * u * x0 + 3 * u * u * t * c[1] + 3 * u * t * t * c[3] + t * t * t * c[5],
+            u * u * u * y0 + 3 * u * u * t * c[2] + 3 * u * t * t * c[4] + t * t * t * c[6],
+          ]);
+        }
+        cur = [c[5], c[6]];
+      }
+    }
+    return { ...op, cmds };
+  });
+  return opsBounds(flat);
 }
 
 export function drawOps(ctx: CanvasRenderingContext2D, ops: Op[], color: string) {
