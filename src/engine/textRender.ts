@@ -120,7 +120,8 @@ export function renderText(card: TextCard, scale: number): TextRender {
     ctx.font = fontOf(run.weight, run.size * scale, run.fontId);
   };
   const glyphs = lay.glyphs.filter((g) => g.ch.trim() !== '');
-  const strokesOf = (g: GlyphBox) => [...(runOf(g).strokes ?? [])].sort((a, b) => b.width - a.width);
+  const strokesOf = (g: GlyphBox) =>
+    (runOf(g).strokes ?? []).filter((s) => s.width > 0).sort((a, b) => b.width - a.width);
   const maxStrokes = Math.max(0, ...glyphs.map((g) => strokesOf(g).length));
   // 陰影只畫一次：有描邊就跟著最外層，沒有就跟著填色
   const shadowFor = (g: GlyphBox, layer: 'outer' | 'fill') => {

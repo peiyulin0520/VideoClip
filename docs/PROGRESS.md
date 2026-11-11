@@ -5,10 +5,10 @@
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
 - **分支**：`claude/zen-tesla-v3brj5`（Phase 1–3B 已在 `main`；分支上多了：實測修正 A/B/C/D＋Phase 3A 第 1 步。**都還沒合併到 main，上線網址是舊版**——使用者選 B：先不合併，繼續做字卡）
-- **最後一個程式 commit**：見 `git log -1`（Phase 3A-1：字卡排版引擎）
-- **測試**：65 個單元測試、36 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅**；Phase 4–7 未開始
-- **下一步**：Phase 3A 第 2 步「字塊與內距 UI」：文字分頁加字塊（形狀 rect/roundRect/pill、顏色、透明度、四邊內距＋連動鎖、垂直微調）、字距、行距、寬度、對齊、粗體、斜體、描邊、陰影的控制項；每個按鈕要有 e2e 點擊測試；截圖給使用者看。之後第 3 步尾端圈圈與裝飾（拆法見 `docs/HANDOFF.md §6`）
+- **最後一個程式 commit**：見 `git log -1`（Phase 3A-2：字卡面板）
+- **測試**：65 個單元測試、37 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板：文字／版面／字塊／描邊陰影）✅**；Phase 4–7 未開始
+- **下一步**：Phase 3A 第 3 步「尾端圈圈與裝飾」：`tail-loop` 照 `docs/TEXT_CARDS.md §3.1` 路徑、波浪、虛線、螢光筆、手繪圈住、箭頭、星星、愛心；風格選單用即時渲染縮圖；**驗收：與 `docs/reference/tail-loop-underline.jpg` 疊圖對照截圖**。之後第 4 步圖形庫、第 5 步雲朵字、第 6 步模板（拆法見 `docs/HANDOFF.md §6`）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 用 iPhone 實測（清單在 `docs/PLAN.md §7`），特別是修正 A/B/C/D 要等合併上線後才測得到
@@ -53,6 +53,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 Phase 3A 第 2 步：字卡面板（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：文字分頁改成 4 個子頁。**文字**：內容、字體、大小、顏色、粗體、斜體。**版面**：字距、行距、寬度（依文字／固定寬度滑桿）、對齊。**字塊**：無／方形／圓角／膠囊、顏色、透明度、圓角、**內距上下左右四個滑桿＋四邊連動鎖**、文字上下微調。**描邊陰影**：外層／內層兩層描邊（顏色＋粗細）、陰影開關與模糊。「＋新增」放在分頁列上；字卡面板比其他面板高（34dvh）、分頁列捲動時固定、控制項縮小（≥38px，滑桿 44px）
+  - 動了哪些檔：src/app/editor/TextPanel.tsx（新）、src/ui/Slider.tsx（新，從 Toolbar 抽出）、Toolbar.tsx、textRender.ts（描邊厚度 0 的層略過）、styles.css、e2e/phase3a-panel.spec.ts
+  - 驗證：✅ e2e 逐一點過每個按鈕／滑桿並檢查專案資料與預覽像素（字塊顏色出現在預覽）；截圖 docs/screenshots/phase3a/（box-default、box-padding-separate、stroke-two-layers）；65 單元＋37 e2e 全過  🟡 只在 Chromium；🔴 iPhone 觸控手感、滑桿好不好拖未驗證  🔴 尚未做：漸層、發光、直排、多段文字（面板只編輯第一段）、字塊的尾巴／斜切／描邊
+  - 踩到的坑：字卡面板太高會把預覽擠很小（iPhone 13 尺寸下預覽只剩約 200px 高）→ 控制項縮小、分頁列固定；需要大預覽時點底部「文字」分頁可收合面板。flex 容器裡的圓形色票會被壓成橢圓，要 `flex:none` 加 `min-height`
+  - 下一步：第 3 步尾端圈圈與裝飾
 - 2026-11-11 Phase 3A 第 1 步：字卡型別擴充＋逐字排版引擎（分支 claude/zen-tesla-v3brj5，Sonnet）
   - 做了什麼：`TextRun` 加 `italic/strokes/shadow`、`TextCard` 加 `width/box`、新 `CardBox`（形狀 rect/roundRect/pill、顏色、透明度、四邊內距、垂直微調、圓角）——全是選填，舊字卡不用轉換。新 `engine/cardLayout.ts`（純計算、量字器可注入）：逐字排、字距（em）、固定寬度自動換行（中文逐字、英文在單字邊界、太長硬斷、避頭尾）、對齊、字塊尺寸＝墨跡邊界＋四邊內距。`textRender.ts` 改成用它畫：字塊→多層描邊（由外到內）→陰影→文字，斜體用斜切。新字卡預設帶陰影（舊字卡不再有預設陰影）
   - 動了哪些檔：src/model/{types,defaults}.ts、src/engine/{cardLayout,cardLayout.test,textRender,debug}.ts、e2e/phase3a-layout.spec.ts
