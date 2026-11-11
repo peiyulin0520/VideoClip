@@ -43,6 +43,7 @@ import {
 import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Slider } from '../../ui/Slider';
+import { StickerPicker } from './StickerPicker';
 import { TextPanel } from './TextPanel';
 import { TransformControls } from './TransformControls';
 
@@ -330,11 +331,15 @@ function OverlayTab({ onImportOverlay }: { onImportOverlay: () => void }) {
   return (
     <div className="panel">
       <p className="hint">
-        疊加的影片或照片會放在播放頭這一秒，同一秒可以疊很多個（每個放在自己的軌道）。加好後在預覽畫面上拖移、右上角的鈕縮放旋轉，細節到「圖層」調整。
+        疊加的影片、照片、貼圖會放在播放頭這一秒，同一秒可以疊很多個（每個放在自己的軌道）。加好後在預覽上拖移、雙指縮放旋轉，細節到「圖層」調整。
       </p>
       <button className="btn primary done" onClick={onImportOverlay}>
         ＋ 加入影片或照片（疊在目前這一秒）
       </button>
+      <div className="panel-head">
+        <span>貼圖</span>
+      </div>
+      <StickerPicker />
     </div>
   );
 }

@@ -115,7 +115,6 @@ function EditorBody() {
         const player = useUI.getState().player;
         if (importMode.current === 'overlay') {
           // 疊加：放在播放頭這一秒，同一秒疊多個就各佔一條軌道
-          useProjectStore.getState().apply((d) => void d.assets.push(...res.assets));
           addOverlayClips(res.assets, player?.time ?? 0);
         } else {
           const startOfNew = totalDuration(useProjectStore.getState().project!);

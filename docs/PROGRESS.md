@@ -5,9 +5,9 @@
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
 - **分支**：`claude/zen-tesla-v3brj5`（上次合併 PR #3 之後的工作都在這裡：第 2 次實測修正 ①–⑤＋預覽優先版面，**還沒合併到 main，上線網址是 PR #3 的版本**）
-- **最後一個程式 commit**：見 `git log -1`（預覽優先版面＋選取框只留框線＋大小旋轉滑桿）
-- **測試**：560 個單元測試、62 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步前半 ✅，4 後半（貼圖 icon）、5（雲朵字）、6（模板）未做；Phase 4–7 未開始
+- **最後一個程式 commit**：見 `git log -1`（貼圖 icon）
+- **測試**：560 個單元測試、64 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
 - **下一步**：請使用者決定是否開 PR 合併上線，用 iPhone 重測（清單 `docs/PLAN.md §7`，特別是：預覽空白處上下滑能不能捲頁面、雙指縮放、匯入大影片的新錯誤訊息）。之後：貼圖 icon（Fluent Emoji 子集，MIT）→ 雲朵字 → 模板
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
@@ -48,6 +48,7 @@
 - 備份資料夾保持私人；只貼網址不登入無法寫入（Google 限制），已向使用者說明
 
 ## 使用者的修正紀錄（時間順序）
+- 2026-11-11 選 B（先不合併、繼續做貼圖），並提出新需求：「希望還可以增加不同模板，例如拍貼機或膠卷，可以有多格影片呈現在不同格子裡面，然後可以以特效方式滑過等」→ 記成需求 R22，規格 docs/LAYOUTS.md
 - 2026-11-11 看完第 2 次修正後：「選取框一率不需要小圓點，只需要有框框可以選取字串並用手指控制縮放就行」「預覽不要太小，如果需要其他功能，可以往下滑新增相關功能，不要擠到預覽畫面」→ 規劃見 docs/plans/2026-11-11-preview-first-layout.md（取代 feedback-2 §② 的角點／旋轉點／時間軸精簡）
 - 2026-11-11 更正上面第二點：「第一點可以，第二點我的意思是頁面可以整體往下滑新增功能，但往上滑可以看到不會縮小的預覽畫面」→ **整頁一起捲**，預覽不固定在螢幕上、往下滑會捲走，往上滑回來是原尺寸；規劃 §2-① 已改寫
 - 2026-11-11 第 2 次 iPhone 實測（PR #3 上線版）：①「在任何上傳影片的地方要上傳影片都會顯示無法上傳影片」（錄影顯示：無法匯入 IMG_8177.mov（The operation failed for an unknown transient reason (e.g. out of memory).））②「預覽畫面太小，我新增的文字都看不到，縮放等 icon 太大了，或是直接不要那個 icon，到可以在點選的文字或圖塊直接縮放也可以」③「文字可選擇的顏色太少，建議可以更彈性化」④「裝飾…應該還要能夠調整跟文字的貼近程度，才不會像圖中波浪線太靠近文字」⑤「字塊應該也要能夠彈性調整邊界光滑程度、明顯凹槽處的程度，像是 excel word 字塊那樣」→ 規劃見 docs/plans/2026-11-11-iphone-feedback-2.md
@@ -57,6 +58,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 Phase 3A 第 4 步後半：貼圖 icon（分支 claude/zen-tesla-v3brj5，Opus）
+  - 做了什麼：新管線 `scripts/build-stickers.mjs`（`npm run stickers`）：用 `npm pack` 取 `@iconify-json/fluent-emoji@1.2.7`（彩色 Fluent Emoji，**授權 MIT、作者 Microsoft，腳本會檢查 info.json，不符就停**），分類取自 `@iconify-json/fluent-emoji-flat` 的 metadata；每個分類用人工挑的常用清單（照順序），不足時用該分類其他的補；排除膚色變體。輸出 **397 個** `public/stickers/*.svg`（4.7MB，寬高設 512）＋ `LICENSE.txt`（MIT 全文）＋ `src/stickers/catalog.generated.json`。疊加分頁新增「貼圖」：9 個分類（表情、愛心、手勢、動物植物、食物、慶祝活動、旅行天氣、物品、符號）＋ 6 欄格子。點貼圖 → 畫成 512px PNG → 當照片素材加到目前這一秒（大小 30%，**素材與片段同一步復原**——順便把一般疊加匯入也改成同一步）。設定頁加「素材授權」。貼圖不進 PWA 預快取（用到才下載）
+  - 動了哪些檔：scripts/build-stickers.mjs（新）、public/stickers/（新）、src/stickers/（新）、src/app/editor/{StickerPicker（新）,Toolbar}.tsx、src/store/actions.ts（addOverlayClips 一併加入素材、可指定大小）、src/app/pages/{Editor,Settings}.tsx、styles.css、vite.config.ts、package.json、e2e/phase3a-stickers.spec.ts、AGENTS.md、docs/TEXT_CARDS.md
+  - 驗證：✅ e2e：9 個分類都點得動、每類 ≥ 20 個、縮圖都載入；點紅心 → 疊加軌多一個照片素材、大小 30%、預覽中間出現紅色；拖移；兩次復原（拖、加入）貼圖與素材都不見、重做回來；重新整理後還在；設定頁授權連結與 LICENSE.txt；截圖 docs/screenshots/phase3a/sticker-picker.png、sticker-added.png；560 單元＋64 e2e 全過，連跑 2 次  🟡 只在 Chromium  🔴 沒做：貼紙白邊、循環動畫、搜尋
+  - 踩到的坑：GitHub 被擋時用 npm 上的 iconify 套件拿 Fluent Emoji（`npm pack` 下載到 `.font-cache/stickers/`，不進 git）；SVG 直接當貼圖會用原始 32px 取樣而糊掉，所以先畫成 512px PNG；`addOverlayClips` 以前不加素材（呼叫端另外 push，變成兩步復原）
+  - 下一步：寫多格影片模板（拍貼機／膠卷）規格，給使用者確認
 - 2026-11-11 預覽優先版面＋選取框只留框線（分支 claude/zen-tesla-v3brj5，Opus）
   - 做了什麼：照 `docs/plans/2026-11-11-preview-first-layout.md`。①**整頁捲動**：編輯器改成一般可往下捲的頁面（頂列→預覽→播放列→時間軸→分頁→面板），預覽寬度撐滿、高度＝`min(寬×比例, 100svh − 頂列 − 播放列)`，**大小永遠不變**；頂列（返回／復原／重做）和分頁列、字卡子分頁列 sticky；拿掉時間軸精簡模式與所有面板最高高度；時間軸高度＝全部軌道（不在裡面上下捲）；切分頁時若分頁列已黏在上面就停在分頁列位置。**預覽空白處上下滑＝捲頁面**（舞台與 canvas `touch-action: pan-y`），每個可拖的物件有看不見的觸控區 `.hit`（`touch-action:none`，最小 44px，選取中外擴 24px），按在物件上才是拖。②**選取框只留框線**：拿掉四角點、旋轉點；雙指補強：兩指可在框外、沒選取時選中兩指中點下的物件、旋轉吸附 0/90/180/270、一次手勢一步復原、擋 iOS `gesturestart`。③**不用手勢也能調**：新 `TransformControls`（整體大小 5–400%、旋轉 ±180°、置中、轉正），放在圖層分頁與文字「版面」
   - 動了哪些檔：src/app/pages/Editor.tsx（無結構變動，靠 CSS）、src/app/editor/{Preview,Timeline,Toolbar,TextPanel,TransformControls}.tsx、src/store/uiStore.ts、src/app/styles.css、e2e/{helpers,preview-first,phase1,phase2,fix-safe-zone}.spec.ts（刪 fix-preview-size.spec.ts，內容併入 preview-first）

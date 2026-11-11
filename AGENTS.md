@@ -17,6 +17,7 @@
 | `npm run check` | lint ＋ 單元測試 ＋ build（每次提交前必跑） |
 | `npm test` | Vitest 單元測試 |
 | `npm run e2e -- --trace off` | Playwright（iPhone 13 尺寸、Chromium；會先 build 再開 preview） |
+| `npm run stickers` | 貼圖管線（從 npm 取 Fluent Emoji、挑約 400 個輸出到 `public/stickers/`）。一般改程式**不用**重跑，成品已 commit |
 | `npm run fonts:setup` / `npm run fonts` | 字體管線（一次性建 `.venv`／下載＋裁切＋產生目錄）。一般改程式**不用**重跑，成品已 commit |
 
 ## 一定要遵守的規則

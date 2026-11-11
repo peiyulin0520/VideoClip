@@ -153,6 +153,8 @@ C 1.14 0.62, 1.22 0.78, 1.285 0.89
 > 圖形調整（2026-11-11）：`CardBox.adj` ＋ `ShapeDef.adjust`，25 個圖形有調整項目（凹槽深度／圓滑、凸起數量、星形內徑、角的圓滑、尾巴位置長度寬度…）。沒調過 → `inset` 表；調過 → `fitInset` 執行時重算。裝飾也有 `gap`（與文字距離）、`scale`（大小），見 §3。顏色用 `src/ui/ColorPicker.tsx`（32 色＋最近用過＋自訂）。
 
 ### 4.1 貼圖 icon
+> 實作狀態（2026-11-11）：**397 個** Fluent Emoji（彩色版，`@iconify-json/fluent-emoji@1.2.7`，授權 MIT／Microsoft，`scripts/build-stickers.mjs` 會檢查 info.json 的授權欄位），9 個分類（表情、愛心、手勢、動物植物、食物、慶祝活動、旅行天氣、物品、符號），人工挑常用的；輸出 `public/stickers/*.svg`（寬高 512）＋`LICENSE.txt`＋`src/stickers/catalog.generated.json`。點貼圖 → 畫成 512px PNG → 當一般照片素材加進疊加軌（大小 30%）；所以能拖、雙指縮放、圖層屬性、匯出都跟照片一樣。不進 PWA 預快取。尚未做：白邊（貼紙感）、循環動畫、Tabler 線條 icon。
+
 - Fluent Emoji（3D/扁平/高對比，Microsoft MIT 授權）：表情、食物、動物、天氣、愛心、星星…最接近 Office 插入圖示的感覺。
 - Tabler / Fluent UI System Icons：線條 icon（可改顏色、線寬）。
 - 只打包使用到的子集（約 300 個常用），其他按分類延遲載入；附授權檔 `public/licenses/`。

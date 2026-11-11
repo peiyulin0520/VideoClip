@@ -238,6 +238,17 @@ export function Settings() {
           {persisted === false && '瀏覽器可能在空間不足時清掉資料。iPhone 請「加入主畫面」，並定期備份。'}
         </p>
       </section>
+
+      <section aria-label="素材授權">
+        <h2>素材授權</h2>
+        <p className="hint">
+          貼圖：Microsoft Fluent Emoji（MIT 授權，
+          <a href={`${import.meta.env.BASE_URL}stickers/LICENSE.txt`} target="_blank" rel="noreferrer">
+            授權全文
+          </a>
+          ）。圖形庫與裝飾是本 App 自己畫的。
+        </p>
+      </section>
     </main>
   );
 }
