@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（貼圖 icon）
 - **測試**：560 個單元測試、64 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：請使用者決定是否開 PR 合併上線，用 iPhone 重測（清單 `docs/PLAN.md §7`，特別是：預覽空白處上下滑能不能捲頁面、雙指縮放、匯入大影片的新錯誤訊息）。之後：貼圖 icon（Fluent Emoji 子集，MIT）→ 雲朵字 → 模板
+- **下一步**：等使用者回覆多格模板（R22，`docs/LAYOUTS.md`）的方向：先看 8 個版型的靜態草圖，或使用者提供參考圖。之後照 L1（靜態版型）→ L2（物件動畫核心，Phase 4）→ L3（閃白、膠卷捲動、依序滑入）。其他待做：雲朵字、字卡模板；合併上線與 iPhone 重測
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -64,6 +64,10 @@
   - 驗證：✅ e2e：9 個分類都點得動、每類 ≥ 20 個、縮圖都載入；點紅心 → 疊加軌多一個照片素材、大小 30%、預覽中間出現紅色；拖移；兩次復原（拖、加入）貼圖與素材都不見、重做回來；重新整理後還在；設定頁授權連結與 LICENSE.txt；截圖 docs/screenshots/phase3a/sticker-picker.png、sticker-added.png；560 單元＋64 e2e 全過，連跑 2 次  🟡 只在 Chromium  🔴 沒做：貼紙白邊、循環動畫、搜尋
   - 踩到的坑：GitHub 被擋時用 npm 上的 iconify 套件拿 Fluent Emoji（`npm pack` 下載到 `.font-cache/stickers/`，不進 git）；SVG 直接當貼圖會用原始 32px 取樣而糊掉，所以先畫成 512px PNG；`addOverlayClips` 以前不加素材（呼叫端另外 push，變成兩步復原）
   - 下一步：寫多格影片模板（拍貼機／膠卷）規格，給使用者確認
+- 2026-11-11 寫多格影片模板規格（R22，只有文件，Opus）
+  - 做了什麼：新 `docs/LAYOUTS.md`：使用者看到的樣子、第一批 8 個版型（拍貼機直條／2×2、膠卷橫／直、拍立得、上下雙格、三格、九宮格）、技術做法（版型＝外框物件＋一群普通疊加物件用 `groupId` 綁住，格內平移縮放，遮罩；動畫靠 Phase 4 物件動畫核心）、iPhone 同時解碼上限（一次最多 4 支影片）、順序 L0 草圖 → L1 靜態 → L2 動畫核心 → L3 版型動畫。`docs/PLAN.md` 加需求 R22；README、AGENTS 加索引
+  - 驗證：🔴 程式未改
+  - 下一步：請使用者選先看草圖或提供參考圖
 - 2026-11-11 預覽優先版面＋選取框只留框線（分支 claude/zen-tesla-v3brj5，Opus）
   - 做了什麼：照 `docs/plans/2026-11-11-preview-first-layout.md`。①**整頁捲動**：編輯器改成一般可往下捲的頁面（頂列→預覽→播放列→時間軸→分頁→面板），預覽寬度撐滿、高度＝`min(寬×比例, 100svh − 頂列 − 播放列)`，**大小永遠不變**；頂列（返回／復原／重做）和分頁列、字卡子分頁列 sticky；拿掉時間軸精簡模式與所有面板最高高度；時間軸高度＝全部軌道（不在裡面上下捲）；切分頁時若分頁列已黏在上面就停在分頁列位置。**預覽空白處上下滑＝捲頁面**（舞台與 canvas `touch-action: pan-y`），每個可拖的物件有看不見的觸控區 `.hit`（`touch-action:none`，最小 44px，選取中外擴 24px），按在物件上才是拖。②**選取框只留框線**：拿掉四角點、旋轉點；雙指補強：兩指可在框外、沒選取時選中兩指中點下的物件、旋轉吸附 0/90/180/270、一次手勢一步復原、擋 iOS `gesturestart`。③**不用手勢也能調**：新 `TransformControls`（整體大小 5–400%、旋轉 ±180°、置中、轉正），放在圖層分頁與文字「版面」
   - 動了哪些檔：src/app/pages/Editor.tsx（無結構變動，靠 CSS）、src/app/editor/{Preview,Timeline,Toolbar,TextPanel,TransformControls}.tsx、src/store/uiStore.ts、src/app/styles.css、e2e/{helpers,preview-first,phase1,phase2,fix-safe-zone}.spec.ts（刪 fix-preview-size.spec.ts，內容併入 preview-first）
