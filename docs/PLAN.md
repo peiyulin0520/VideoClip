@@ -1,0 +1,314 @@
+# VideoClip 手機剪輯網頁：總體規劃
+
+> 給之後實作的模型（Sonnet）讀的主文件。先讀 `CLAUDE.md`，再讀這份，再依 Phase 順序做。
+> 細節規格在：`docs/TEXT_CARDS.md`（字卡、雲朵字、字塊形狀、尾端圈圈）、`docs/EFFECTS.md`（動畫、轉場、筆刷、參考影片拆解）、`docs/FONTS.md`（字體清單與來源）。
+> 舊的 ffmpeg 工作流程筆記在 `docs/reference/legacy-notes/`（使用者先前整理，可參考規則，但本專案改為**純網頁、在手機瀏覽器內完成**）。
+
+---
+
+## 0. 一句話目標
+
+一個**公開、免登入**的網頁 App（可加到 iPhone 主畫面），可以：
+多專案管理 → 匯入多支影片/照片拼接 → 多圖層疊加（同一秒可疊多支影片、字卡、圖形、手繪）→ 豐富字卡（模板、字體、字塊、裝飾、雲朵字、逐字出現）→ 特效與轉場 → 調色 → 在影片上繪畫 → 匯出 1080×1920 MP4 → 推薦 IG 可用音源。
+
+**每台裝置的專案彼此獨立**：分享網址給別人，別人只會看到自己裝置上的專案。
+
+---
+
+## 1. 使用者需求清單（全部要做，對應到 Phase）
+
+| # | 需求 | Phase |
+|---|---|---|
+| R1 | 公開網址、免登入；每台裝置資料獨立，互相看不到 | P0 |
+| R2 | 首頁區分不同剪輯 project（新增/改名/複製/刪除，縮圖） | P1 |
+| R3 | 可匯入多支影片，主軌拼接（不只單一影片） | P1 |
+| R4 | **圖層**：同一秒可疊多支影片素材；圖層可上下調整順序 | P2 |
+| R5 | 字卡、icon、圖形被選取時，**右上角有一顆鈕**可拖曳縮放（含旋轉），本體可拖移位置；雙指縮放也可 | P2 |
+| R6 | 修好「icon 沒有反應」：所有按鈕、貼圖在手機觸控都要有反應 | P1（全程驗收） |
+| R7 | 字體選擇：**下拉式選單直接放在字卡頁籤**，選單裡每個字體用自己的字形預覽 | P3 |
+| R8 | 字卡可自由調整：底色、字距、行距、寬度、字級；**字塊上下左右內距分開調**，修正「字上方色塊多、下方貼底」問題 | P3 |
+| R9 | 字卡裝飾：尾端畫圈圈（照參考圖）、波浪、虛線、雲朵、對話框…；**字卡風格選單直接顯示預覽範例** | P3 |
+| R10 | 更多可愛字卡模板（參考截圖：美妝清單、片中序章、運動、收藏、Vlog 標題、書法電影感） | P3 |
+| R11 | 雲朵字效果（不必很蓬鬆，有那個感覺即可） | P3 |
+| R12 | 字塊形狀/icon 參考 Office PPT 圖案（方塊、圓角、雲朵、對話框、星形、爆炸、緞帶、箭頭…），可當**字卡底塊** | P3 |
+| R13 | 字卡出現方式（特效）：逐字出現、打字機、直接顯示、彈跳、淡入、手寫描繪… | P4 |
+| R14 | 影片進出場動畫、片段之間轉場特效 | P4 |
+| R15 | 在影片上**繪畫**：多種筆刷、橡皮擦、粗細、透明度、顏色；筆畫可做「逐筆描繪」動畫並與特效結合 | P5 |
+| R16 | **VLOG 疊層效果**：底層完整影片 → 中層文字「V L G」→ 上層只保留人頭的影片，嵌在 O 的位置。上層用**自己描邊剪裁/橡皮擦擦掉**不要的區域（不是自動去背） | P5 |
+| R17 | 調色功能（亮度、對比、飽和、色溫…＋濾鏡預設） | P4 |
+| R18 | 字體：下載好看、支援繁體的免費字體（含日文字體中繁體覆蓋率高的）；首次使用自動下載清單；之後從快取讀取 | P3 |
+| R19 | 佮逸體放入字庫；Zizi app 字體（饅頭黑體、中規中矩體、星光手體） | P3（見 FONTS.md 限制） |
+| R20 | 資料存到使用者的 Google Drive 資料夾（備份/同步） | P6 |
+| R21 | 依影片內容推薦 IG 音源 | P7 |
+
+---
+
+## 2. 關鍵技術決策（已定案，照做）
+
+### 2.1 部署：GitHub Pages（公開、免登入）
+- 純前端靜態網站，`vite build` 後由 GitHub Actions 部署到 GitHub Pages。
+- 網址預計：`https://peiyulin0520.github.io/VideoClip/`（Vite `base: '/VideoClip/'`）。
+- **注意**：免費帳號的 GitHub Pages 需要 repo 是 public（公開的是程式碼，不是使用者的影片）。若使用者不想公開 repo，替代方案是 Cloudflare Pages（private repo 也可部署）。
+- 路由用 **HashRouter**（`#/`、`#/p/<projectId>`、`#/settings`），避免 Pages 子路徑 404。
+
+### 2.2 資料隔離與儲存（R1）
+- **所有專案資料只存在該裝置的瀏覽器**：沒有後端、沒有帳號。分享網址 = 分享 App，本身不帶任何資料。
+- 專案中繼資料（JSON）：IndexedDB（用 `idb` 或 Dexie）。
+- 影片/圖片原檔：**OPFS**（Origin Private File System, `navigator.storage.getDirectory()`），每個專案一個資料夾 `projects/<id>/media/<assetId>.<ext>`。不要把大檔塞進 IndexedDB。
+- 字體：Cache Storage（`fonts-v1`）＋ IndexedDB 記錄已下載清單；使用者自行匯入的字體存 OPFS `fonts/`。
+- 啟動時呼叫 `navigator.storage.persist()`，並在設定頁顯示用量 `navigator.storage.estimate()`。
+- **iPhone 重要限制**：Safari 對「沒有加入主畫面」的網站，7 天未使用可能清掉儲存資料。→ 首次使用引導「加入主畫面」（PWA），並提供 Google Drive 備份（P6）與「匯出專案 .zip」。這點要在 UI 上清楚告知。
+
+### 2.3 技術棧
+| 用途 | 選擇 | 理由 |
+|---|---|---|
+| 建置 | Vite + TypeScript | |
+| UI | React 18 + Zustand（+ immer） | 狀態集中，方便 undo/redo |
+| 合成渲染 | **PixiJS v8**（WebGL2） | 圖層、遮罩、混合模式、濾鏡、iOS Safari 可跑；不要依賴 Canvas2D `ctx.filter`（Safari 支援不穩） |
+| 字卡繪製 | Canvas2D 離屏繪製 → 轉成 Pixi Texture（快取） | 字型/描邊/字塊/裝飾用 2D 畫最直接 |
+| 手繪筆畫 | `perfect-freehand`（MIT） | 平滑、有粗細變化 |
+| 手勢 | Pointer Events ＋ `@use-gesture/react` | 拖移、雙指縮放旋轉 |
+| 解碼/編碼/封裝 | **Mediabunny**（WebCodecs；MPL-2.0） | 逐格精準解碼與 MP4 匯出；預覽用 `<video>` |
+| 音訊 | Web Audio API（OfflineAudioContext 混音） | |
+| PWA | `vite-plugin-pwa` | 加入主畫面、離線、快取字體 |
+| UI 圖示 | `lucide-react`（ISC） | 介面按鈕 |
+| 貼圖 icon | Fluent Emoji（Microsoft，MIT）、Tabler Icons（MIT）、Fluent UI System Icons（MIT） | Office 風格、可商用 |
+| 測試 | Vitest（單元）、Playwright（行動裝置模擬 e2e＋截圖） | |
+
+> 沙盒內已預裝 Chromium＋Playwright，不要再 `playwright install`。WebKit 沒裝，iPhone Safari 的行為一定要請使用者在真機上確認（列在「待真機驗證」）。
+
+### 2.4 渲染架構（預覽與匯出共用同一套）
+- `Compositor.renderFrame(project, t)`：依時間 `t` 算出所有可見圖層 → 依 z-order 由下往上畫到 Pixi stage。
+- **預覽**：每個影片素材用一個 `<video>`（muted、playsinline）當 texture 來源，播放時以 `requestVideoFrameCallback` 同步；預覽解析度降為 540×960 以保順暢。
+- **匯出**：不播放，逐格走時間軸：用 Mediabunny 的 `VideoSampleSink` 取得精準影格 → 畫到 stage → `new VideoFrame(canvas)` → H.264 編碼；音訊用 OfflineAudioContext 混好後 AAC 編碼 → MP4。
+- 匯出規格：直式 1080×1920 / 30fps（預設）、橫式 1920×1080、方形 1080×1080；寬高偶數。
+- 若裝置不支援 AudioEncoder（AAC），退路：先輸出無聲 MP4（IG 上再加音樂本來就是推薦做法，見 P7），並在 UI 說明。不要偷偷失敗。
+- iPhone HDR（HLG/10-bit）素材在 canvas 中可能偏灰：先記錄為已知限制，P4 調色提供「HDR 校正」預設（提高對比/飽和）作為暫解。
+
+### 2.5 資料模型（`src/model/types.ts`）
+
+```ts
+type Project = {
+  id: string; name: string; createdAt: number; updatedAt: number;
+  aspect: '9:16' | '16:9' | '1:1'; width: number; height: number; fps: number;
+  assets: Asset[];          // 匯入的素材（影片/圖片/音訊/使用者字體）
+  tracks: Track[];          // 由下往上排列 = 圖層順序（index 越大越上層）
+  thumbnail?: string;       // dataURL，首頁顯示
+  version: 1;
+};
+
+type Track = {
+  id: string; kind: 'main' | 'overlay' | 'text' | 'sticker' | 'drawing' | 'adjust' | 'audio';
+  name: string; hidden: boolean; locked: boolean; muted?: boolean;
+  items: Item[];
+};
+// main：主軌，片段首尾相接，可設轉場；其他軌道：自由放置、可重疊於任何秒數
+
+type ItemBase = {
+  id: string; start: number; duration: number;      // 時間軸位置（秒）
+  transform: { x: number; y: number; scale: number; rotation: number; opacity: number }; // x,y 為畫面比例 0–1（中心點）
+  keyframes?: Keyframe[];                             // 位置/縮放/旋轉/透明度關鍵影格（P5 可選）
+  animIn?: Anim; animOut?: Anim; animLoop?: Anim;     // 進場/出場/循環
+  blend?: 'normal' | 'multiply' | 'screen' | 'overlay' | 'add';
+  mask?: Mask;                                        // 自由剪裁（R16）
+  grade?: Grade;                                      // 調色（R17）
+};
+
+type VideoItem = ItemBase & { type: 'video' | 'image'; assetId: string;
+  trimIn: number; speed: number; volume: number; crop?: Rect; fit: 'cover' | 'contain';
+  transitionOut?: Transition; };                      // 只有主軌片段用 transitionOut
+type TextItem = ItemBase & { type: 'text'; card: TextCard };     // 見 TEXT_CARDS.md
+type StickerItem = ItemBase & { type: 'sticker'; source: { kind: 'shape' | 'icon' | 'emoji'; id: string }; fill?: string; stroke?: Stroke; };
+type DrawingItem = ItemBase & { type: 'drawing'; strokes: BrushStroke[]; reveal: 'instant' | 'stroke-by-stroke'; revealDuration?: number }; // 見 EFFECTS.md
+type AdjustItem = ItemBase & { type: 'adjust'; grade: Grade };  // 調整圖層：作用在它下方所有圖層
+
+type Mask = {                                          // R16 自由剪裁
+  shapes: Array<
+    | { kind: 'lasso'; points: [number, number][] }    // 手指描邊的封閉路徑（素材座標 0–1）
+    | { kind: 'ellipse' | 'rect'; x: number; y: number; w: number; h: number; rotation: number }
+  >;
+  eraseStrokes: BrushStroke[];                         // 橡皮擦：再擦掉的部分
+  restoreStrokes: BrushStroke[];                       // 還原筆：補回的部分
+  feather: number;                                     // 羽化 px
+  invert: boolean;
+  outline?: { color: string; width: number };         // 貼紙白邊（參考影片 8a645cc7）
+  follow?: Keyframe[];                                 // 遮罩位置隨時間移動（人頭會動時手動對位）
+};
+```
+- 所有編輯動作走 store 的 action，並寫入 undo/redo 歷史（上限 100 步）。
+- 自動儲存：變更後 800ms debounce 寫入 IndexedDB。
+- 專案檔要有 `version` 欄位，之後改格式要寫 migration。
+
+---
+
+## 3. 介面規劃（手機優先，直式）
+
+```
+┌────────────────────────┐
+│ ← 專案名稱      ↶ ↷  匯出 │  頂列
+├────────────────────────┤
+│                        │
+│      預覽畫面 9:16      │  可點選物件；選取框＋右上角縮放鈕
+│                        │
+├────────────────────────┤
+│ ▶ 00:03.2 / 00:15.0  ⤢ │  播放列
+├────────────────────────┤
+│ 圖層軌道（可捲動、雙指縮放時間軸）│  上層在上、主軌在最下
+│ [文字] ▭▭      ▭       │  每軌左側：眼睛(隱藏)、鎖、拖曳把手(調圖層順序)
+│ [疊加] ▭▭▭▭            │
+│ [主軌] ▭▭▭|▭▭▭|▭▭       │  片段間的 | 點擊＝設定轉場
+├────────────────────────┤
+│ 剪輯 文字 貼圖 繪畫 特效 轉場 調色 圖層 音訊 │  底部工具列（可左右滑）
+└────────────────────────┘
+```
+
+- 首頁 `#/`：專案卡片網格（縮圖、名稱、長度、最後修改），右下「＋新專案」（選比例 → 選素材）。長按卡片：改名/複製/刪除/匯出 .zip。
+- 選取物件時，預覽上顯示選取框：
+  - **右上角圓形鈕**：拖曳 = 等比縮放＋旋轉（R5，使用者指定位置）。
+  - 左上角 ✕：刪除；拖曳框內 = 移動；雙指 = 縮放旋轉。
+  - 文字卡另有左右側邊把手：調整**字卡寬度**（自動換行）。
+- 所有可點元素 ≥ 44×44px；預覽層 `touch-action: none`；按鈕用 `onPointerUp`/`onClick`，不要只綁 `touchstart`（R6）。
+- 首次啟動流程（R18）：見 §5 Phase 3。
+
+---
+
+## 4. 檔案結構（建議）
+
+```
+src/
+  app/            路由、Layout、首次使用引導
+  model/          types.ts、defaults.ts、migrations.ts
+  store/          projectStore.ts（zustand + undo）、uiStore.ts
+  storage/        db.ts（IndexedDB）、opfs.ts、fontCache.ts、drive.ts（P6）、zipExport.ts
+  engine/
+    compositor.ts       renderFrame(project, t)
+    timeline.ts         可見圖層計算、時間換算
+    videoSource.ts      預覽用 <video> 池
+    exporter.ts         Mediabunny 匯出
+    audioMix.ts
+    transitions/        每種轉場一個檔（GLSL 或 Pixi filter）
+    animations/         進出場/逐字動畫
+    grade/              調色 shader、濾鏡預設
+  text/
+    layout.ts           字卡排版（逐字座標、實際墨跡邊界）
+    renderCard.ts       畫字塊、文字、描邊、裝飾 → canvas
+    cloudText.ts        雲朵字
+    decorations/        尾端圈圈、波浪、虛線、雲朵框、對話框…（path 產生器）
+    templates/          模板 JSON（每類一檔）
+  shapes/          Office 風格圖形 SVG path 產生器
+  drawing/         筆刷引擎、橡皮擦、遮罩繪製
+  fonts/           字體目錄 catalog.ts（名稱、來源、授權、檔案）
+  music/           分析與推薦（P7）
+  ui/              元件：Timeline、Preview、SelectionBox、ToolTabs、FontSelect、ColorPicker…
+public/
+  fonts/           自架 OFL 字體 woff2（含 OFL.txt）
+  music/ig-songs.json
+scripts/
+  fetch-fonts.mjs   下載字體原檔到暫存資料夾（不進 git）
+  build-fonts.py    fontTools 轉 woff2＋分塊、計算繁體覆蓋率
+docs/
+```
+
+---
+
+## 5. 實作階段（每個 Phase 結束都要：測試通過 → commit → push → 回報）
+
+### Phase 0：專案骨架與部署
+- Vite + React + TS + ESLint + Prettier + Vitest + Playwright 設定。
+- GitHub Actions：push 到 main 時 build 並部署 Pages（`.github/workflows/deploy.yml`）；在功能分支只跑 build＋test。
+- PWA manifest（名稱「VideoClip 剪輯」、圖示、`display: standalone`）。
+- **驗收**：`npm run build` 成功；Playwright 以 iPhone 13 模擬開首頁截圖無錯誤。
+
+### Phase 1：專案管理＋多影片拼接（R2、R3、R6）
+- 首頁專案列表、CRUD、縮圖。
+- 匯入：`<input type="file" accept="video/*,image/*" multiple>` → 複製到 OPFS → 讀 metadata（長度、尺寸、是否有音軌）→ 產生縮圖條。
+- 主軌：片段依序相接；可拖曳排序、修剪頭尾（拖片段邊緣）、分割（在播放頭處）、刪除、複製、變速（0.25–4x）、音量。
+- 照片素材預設 3 秒。
+- 預覽播放（跨片段無縫切換：預先載入下一支 `<video>`）。
+- Undo/Redo、自動儲存。
+- **驗收**：e2e：建 2 個專案 → 各匯入 2 支測試影片（用 ffmpeg 產生的色條/倒數測試片，放 `tests/fixtures/`）→ 重新整理後兩專案資料都在且互不影響；所有工具列按鈕點擊都有反應（寫一支 e2e 逐一點擊並斷言有 UI 變化）。
+
+### Phase 2：圖層系統＋選取變形（R4、R5）
+- 軌道種類：疊加影片（overlay）、文字、貼圖、繪畫、調整。可新增多條軌，每條軌可在**任意秒數**放物件，同一秒可疊多支影片。
+- 圖層面板（「圖層」頁籤）：列出目前播放頭位置的所有物件，拖曳改上下順序、隱藏、鎖定、混合模式、透明度。
+- 疊加影片可「畫中畫」：縮放、移動、裁切、圓角、外框。
+- 選取框＋右上角縮放旋轉鈕＋雙指手勢；吸附（中心線、安全區）。
+- 平台安全區參考線（底部約 250px、右側約 150px 半透明顯示，可關）。
+- **驗收**：同一秒疊 3 支影片＋1 個字卡，改變順序後預覽正確；匯出的單格截圖（用 exporter 的 `renderFrame` 輸出 PNG）與預覽一致。
+
+### Phase 3：字卡系統＋字體＋圖形（R7–R12、R18、R19）—— 最大的一塊
+規格全部在 `docs/TEXT_CARDS.md` 與 `docs/FONTS.md`。重點：
+1. 字卡排版引擎：**用實際墨跡邊界（`measureText().actualBoundingBoxAscent/Descent`）置中**，修正 CJK 字型上方空太多、下方貼底的問題；字塊內距上/下/左/右分開調，另有「垂直微調」。
+2. 字卡頁籤 UI：文字輸入 → **字體下拉選單**（每項用該字體渲染名稱＋「範例字」）→ 字級、顏色、字距、行距、寬度、對齊、粗體（描邊模擬）、斜體、描邊、陰影、發光 → 字塊（形狀、顏色、透明度、內距、圓角）→ 裝飾 → 動畫。
+3. 風格/模板選單是**縮圖格**，每格是即時渲染的範例（不是文字名稱）。
+4. Office 風格圖形庫（可當貼圖，也可當字卡底塊）。
+5. 雲朵字。
+6. 字體：首次使用引導下載字體包；字體快取；匯入自己的字體檔（.ttf/.otf/.woff2）。
+- **首次使用流程**：開 App 時若 IndexedDB 沒有 `appState`：
+  1. 對話框「第一次在這台裝置使用嗎？」
+  2. 「是」→ 顯示建議字體清單（勾選、每款大小、總大小，預設勾選「基本包」）→ 下載到 Cache Storage，顯示進度。
+  3. 「不是，我換了裝置/清過資料」→ 選項：「從 Google Drive 還原」（P6 完成後才出現）/「匯入專案 .zip」/「略過」。
+  4. 之後開啟：直接從快取讀字體，不再詢問；設定頁可「管理字體」（增刪、重新下載）。
+  - 若本機已有資料就**不詢問**（同一台裝置自然就是「不是初次」）。
+- **驗收**：每個模板截圖存到 `docs/screenshots/templates/`（給使用者審核）；尾端圈圈截圖與 `docs/reference/tail-loop-underline.jpg` 並排對照；繁體覆蓋率報告 `docs/font-coverage.md`。
+
+### Phase 4：動畫、轉場、調色（R13、R14、R17）
+規格在 `docs/EFFECTS.md`。
+- 字卡進場/出場/循環動畫（含逐字、打字機、手寫描繪、彈跳…）。
+- 片段進出場動畫、主軌轉場（含筆刷擦除、愛心/星形擦除等可愛款）。
+- 畫面特效（顆粒、暗角、色差故障、閃白、手震、光暈、VHS…）作為「特效軌」物件，可放在任意時間範圍。
+- 調色：每個片段可調，或用「調整圖層」作用於下方所有圖層；濾鏡預設 12 款以上。
+- **驗收**：每種動畫/轉場輸出 GIF 或關鍵 3 格對照圖到 `docs/screenshots/effects/`。
+
+### Phase 5：繪畫＋自由剪裁遮罩（R15、R16）
+- 繪畫模式：筆刷列（見 EFFECTS.md）、顏色、粗細、透明度、平滑度；橡皮擦（擦筆畫）、復原；筆畫可設「逐筆描繪」動畫。
+- 剪裁模式（對影片/圖片物件）：套索描邊、圓形/方形選取、橡皮擦擦掉、還原筆補回、羽化、反轉、白邊描邊；遮罩可設關鍵影格跟著人頭移動。
+- **VLOG 模板（一鍵建立）**：
+  1. 底層：使用者選的完整影片（主軌）。
+  2. 中層：文字物件「V」「L」「G」三個（或一個「V L G」字串留出 O 的空間），大字、可換字體。
+  3. 上層：同一支影片（或另一支）複製一份到疊加軌，預設套用圓形遮罩，提示使用者「描出人頭範圍」，並放到 O 的位置。
+  4. 上層可單獨縮放、移動，中層字放在不會被遮擋之處，只讓 O 被頭取代。
+- **驗收**：用測試影片做出 VLOG 疊層，輸出 3 個時間點截圖；遮罩與白邊正確。
+
+### Phase 6：Google Drive 備份/同步（R20）
+- 用 Google Identity Services（OAuth 2.0 token flow，純前端）＋ Drive API v3，scope `drive.file`。
+- 「連接 Google Drive」→ 用 Google Picker 選擇資料夾（使用者指定的資料夾 ID：`1fLGtxMS4oRFIOqpyn-jnBtifCRCclF2l`）→ App 在該資料夾內建立 `VideoClip/` 子資料夾：
+  - `projects/<id>/project.json`、`projects/<id>/media/*`（可選是否上傳原始影片，預設只上傳 project.json＋縮圖，因為影片很大）
+  - `fonts/`：使用者個人字體（佮逸體、Zizi 字體等）
+- 功能：備份目前專案、全部備份、從 Drive 還原、從 Drive 匯入字體。
+- **需要使用者先做（Sonnet 要用中文一步步帶）**：建立 Google Cloud 專案 → 啟用 Drive API 與 Picker API → 建立 OAuth Client ID（網頁應用程式，授權來源 `https://peiyulin0520.github.io`）→ 建立 API key（限制在 Picker API 與該網域）→ OAuth 同意畫面設為「測試」並把自己加入測試使用者。Client ID 與 API key 是公開值，可寫進前端設定檔。
+- 說明給使用者：別人用同一網址連 Drive，會存到**他們自己的** Drive，看不到你的資料夾。
+- **驗收**：實際授權需要使用者在真機操作；Sonnet 寫好 mock 測試，真機測試列入待驗證。
+
+### Phase 7：IG 音源推薦（R21）
+- **事實先講清楚**：Instagram 沒有公開的音樂庫 API，也無法從網頁直接把音樂加入 IG。可做的是「推薦歌名＋搜尋關鍵字」，使用者發 Reels 時在 IG 內搜尋加入（這樣也才有授權）。商業帳號只能用 Meta 授權音效庫，曲庫依地區不同。
+- 分析（全部在裝置上做）：總長度、剪接頻率（每秒幾刀）、畫面亮度/飽和/冷暖、動態量（相鄰影格差異）、字卡文字內容、使用者選的主題標籤（vlog/美食/旅行/運動/美妝/日常/可愛…）→ 得出情緒標籤與建議 BPM 範圍。
+- 推薦來源 A（預設，離線）：`public/music/ig-songs.json` 精選曲目表（歌名、歌手、語言、情緒標籤、BPM、適合主題、備註）。Sonnet 先建 60 首左右常見於 Reels 的歌曲作為初版，並標註「需定期更新」；推薦依標籤與 BPM 打分。
+- 推薦來源 B（選用，AI）：使用者在設定頁填入**自己的** Claude API key（只存在該裝置），同意後把 6 張縮小的關鍵影格（≤512px JPEG）＋分析 JSON 送到 Claude API，回傳 10 首推薦與 IG 搜尋關鍵字。
+  - 用官方 `@anthropic-ai/sdk`，瀏覽器端需設 `dangerouslyAllowBrowser: true`；圖片用 base64 `image` content block；用 structured outputs（`output_config.format`）拿 JSON；model 預設 `claude-opus-5-5`（設定頁可改）。實作前先讀 claude-api skill。
+  - 送出前清楚提示「影格會上傳到 Anthropic」，預設關閉；影片有家人小孩臉時要使用者明確同意。
+- UI：匯出頁下方「推薦音樂」卡片：歌名、歌手、為什麼適合、「複製歌名」按鈕、建議從第幾秒切入（若有）。
+- **驗收**：給 3 種不同測試專案（快節奏/慢節奏/暖色），推薦結果不同且合理。
+
+---
+
+## 6. 測試策略
+- Vitest：排版引擎（墨跡邊界置中）、時間軸計算、遮罩幾何、轉場插值、推薦打分。
+- Playwright（Chromium＋iPhone 13 裝置描述）：主要流程 e2e；**每個字卡模板、每種轉場的截圖**存檔給使用者審核（使用者只負責審核，見 legacy-notes 的溝通規則）。
+- 測試素材：用 ffmpeg 產生（`testsrc2`、色塊、倒數數字），**不要用真人素材**。
+- 每次回報時誠實區分：✅ 已驗證（附截圖）／🟡 寫好但只在 Chromium 驗證／🔴 做不到。
+
+## 7. 待真機驗證清單（Sonnet 無法在沙盒驗證，要請使用者在 iPhone 上試）
+- [ ] iOS Safari：OPFS 寫入大檔、`storage.persist()`、加入主畫面後資料保留
+- [ ] WebCodecs H.264 編碼與 AAC 音訊編碼
+- [ ] HDR 素材顏色
+- [ ] 觸控手勢（右上角縮放鈕、雙指、時間軸捲動與拖曳不衝突）
+- [ ] 大型 CJK 字體在手機上的載入速度與記憶體
+- [ ] Google Drive 授權與上傳
+- [ ] 匯出 1 分鐘影片的時間與是否當掉
+
+## 8. 使用者要先決定/準備的事
+1. GitHub Pages 需 repo 公開（或改 Cloudflare Pages）。
+2. Google Cloud OAuth Client ID / API key（P6 再做，Sonnet 會帶步驟）。
+3. 佮逸體與 Zizi 字體檔案：請放到 Drive 資料夾 `fonts/`，或直接上傳到 Sonnet 的對話（詳見 FONTS.md）。
+4. Sonnet 工作環境的網路需允許：`raw.githubusercontent.com`、`registry.npmjs.org`（已可用）；若要從 GitHub Release 下載字體還需 `github.com`、`objects.githubusercontent.com`；從 Drive 下載需 `drive.google.com`、`drive.usercontent.google.com`。

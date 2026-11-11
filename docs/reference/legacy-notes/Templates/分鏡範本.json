@@ -1,0 +1,60 @@
+{
+  "_說明": "這是格式範本。render 腳本要自己寫(Python 3 或 shell),讀這個檔、組出 ffmpeg 指令。欄位意思見下方。實際使用時刪掉所有以 _ 開頭的欄位。",
+  "_欄位": {
+    "output": "輸出檔名,寫到 output/",
+    "width/height/fps": "輸出尺寸,直式 1080x1920、30fps;寬高用偶數",
+    "fit": "crop(裁滿畫面)或 pad(留邊);每個片段可覆寫",
+    "fade": "全部片段預設的淡入淡出秒數;建議 0,不要全域開",
+    "music": "music/ 裡的檔名,沒有就留空字串",
+    "look": "整支最後套的 ffmpeg 濾鏡字串(例如輕微暗角、顆粒);可留空",
+    "clips[].file": "相對 input/ 的路徑;照片用 photos/xxx.jpg",
+    "clips[].start": "起點秒(照片不用)",
+    "clips[].duration": "長度秒(照片一定要給)",
+    "clips[].speed": "速度倍數,預設 1",
+    "clips[].volume": "音量 0–1;沒聲音的片段要補靜音",
+    "clips[].text / text_pos / text_scale / font": "字幕文字、位置(bottom 預設 / center / top)、字級倍數、字型檔",
+    "clips[].fit / bg": "fit=pad 時的底色(6 位 hex)",
+    "clips[].zoom": "照片慢慢放大的幅度,預設 0.05",
+    "clips[].fade_in / fade_out / fade_color": "淡入/淡出秒數與淡到的顏色(hex)",
+    "clips[].grade": "這一段套的調色 ffmpeg 濾鏡字串",
+    "clips[].overlays[]": "疊圖:img(PNG 檔名)、x/y(0–1,畫面比例)、w(寬度比例)、start/dur(秒)、anim(none / fade / float / slide)"
+  },
+  "output": "example_v1.mp4",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "fit": "crop",
+  "fade": 0,
+  "music": "",
+  "look": "",
+  "clips": [
+    {
+      "file": "clip_001.mp4",
+      "start": 0.0,
+      "duration": 2.5,
+      "volume": 0,
+      "fade_in": 0.3,
+      "text": "第一張字卡",
+      "text_pos": "top",
+      "text_scale": 1.5
+    },
+    {
+      "file": "clip_001.mp4",
+      "start": 10.2,
+      "duration": 2.0,
+      "volume": 0,
+      "overlays": [
+        { "img": "card_01.png", "x": 0.5, "y": 0.5, "w": 1, "start": 0.2, "dur": 1.6, "anim": "fade" }
+      ]
+    },
+    {
+      "file": "photos/photo_01.jpg",
+      "duration": 4.0,
+      "fit": "pad",
+      "bg": "F3EFE6",
+      "fade_in": 0.25,
+      "fade_out": 0.25,
+      "fade_color": "F3EFE6"
+    }
+  ]
+}
