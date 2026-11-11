@@ -6,7 +6,7 @@
 - **日期**：2026-11-11
 - **分支**：PR #3（實測修正 A/B/C/D＋Phase 3A 第 1–4 步前半）**已由使用者合併進 `main`**（2026-11-11，部署 run #21 啟動；上線網址 https://peiyulin0520.github.io/VideoClip/ 會更新成這版）。`claude/zen-tesla-v3brj5` 已用 `git merge --ff-only origin/main` 對齊 main，之後的新工作繼續在這個分支
 - **最後一個程式 commit**：見 `git log -1`（Phase 3A-4：圖形庫）
-- **測試**：218 個單元測試、42 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：228 個單元測試、46 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅；**Phase 3A（字卡引擎）進行中：第 1 步（型別＋排版引擎）✅、第 2 步（字卡面板）✅、第 3 步（13 種裝飾＋風格縮圖選單）✅、第 4 步前半（33 種圖形當字塊／獨立圖形）✅；4 後半（貼圖 icon）未做**；Phase 4–7 未開始
 - **下一步**：照 `docs/plans/2026-11-11-iphone-feedback-2.md` 實作使用者第 2 次 iPhone 實測回報的修正，順序 **① 匯入失敗（P0）→ ② 預覽太小＋操作鈕 → ③ 顏色 → ④ 裝飾距離 → ⑤ 字塊形狀調整**。貼圖 icon、雲朵字等這批修完再做
 - **等使用者的事**
@@ -54,6 +54,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 回報 2-①：匯入失敗修正（分支 claude/zen-tesla-v3brj5，Sonnet）
+  - 做了什麼：(1) 錯誤訊息分步驟（存到手機／讀取影片資訊）＋檔案大小＋白話原因（WebKit 的 UnknownError／out of memory → 「記憶體不足」，QuotaExceeded → 「手機儲存空間不足」），原始錯誤 `console.warn` 並記在 `window.__videoclip.lastImportErrors()`；toast 可指定停留時間，匯入失敗/提醒停 9 秒；首頁匯入也顯示原因（以前只列檔名）。(2) `putMedia` 改成 OPFS **分段寫入（每段 8MB）**，失敗刪掉半成品 → 退 IndexedDB → 最後退「只放記憶體」（素材標 `unsaved`，toast：「…沒辦法存在手機裡，可以先剪輯，但關掉網頁後要重新匯入」）；匯入前先看 `storage.estimate()`，已知空間不夠就直接放記憶體。重開專案找不到檔案時提示「請重新匯入」。(3) 縮圖失敗絕不讓匯入失敗；解析度 > 1920 或檔案 > 150MB 不用 WebCodecs 解碼（交給 `<video>`／播放器補）；`CanvasSink` 改成明確的寬＋高、每張之間讓出一下
+  - 動了哪些檔：src/storage/media.ts（＋media.test.ts）、src/engine/{importMedia,probe,debug}.ts（＋importMedia.test.ts）、src/model/types.ts（`Asset.unsaved`）、src/store/uiStore.ts、src/app/pages/{Editor,Home}.tsx、e2e/fix-import.spec.ts、e2e/helpers.ts
+  - 驗證：✅ 單元：分段 offset、各層退路、錯誤訊息對照、是否解碼縮圖；✅ e2e（Chromium 模擬 iPhone 失敗）：OPFS 寫入丟 UnknownError → 改存 IndexedDB、匯入成功、重新整理後素材還在；OPFS＋IndexedDB 都壞 → 放記憶體、有提醒、`unsaved`、還能繼續剪；VideoDecoder 壞掉 → 匯入成功且有縮圖；壞檔 → 提示檔名與原因、不是英文原文；228 單元＋46 e2e 全過  🔴 **iPhone 真機沒驗證**：使用者那支 IMG_8177.mov 能不能匯入。**請使用者回報新的錯誤訊息全文**（會寫是哪一步）
+  - 踩到的坑：jsdom 的假 IndexedDB 不保留 Blob 內容（單元測試只驗退路，內容在 e2e 驗證）
+  - 下一步：回報 2-②（預覽太小＋四角小點縮放）
 - 2026-11-11 寫修改規劃：第 2 次 iPhone 實測回報 5 項（分支 claude/zen-tesla-v3brj5，只有文件，Opus）
   - 做了什麼：看使用者 3 張截圖＋螢幕錄影（用 ffmpeg 抽格，錄影沒放進 repo），查程式找原因，寫 `docs/plans/2026-11-11-iphone-feedback-2.md`。另外從截圖發現 2 個問題一起列入：文字選取框用的是含透明邊的整張畫布（比看得到的大很多）、空專案的匯入鈕蓋在時間軸上
   - 動了哪些檔：docs/plans/2026-11-11-iphone-feedback-2.md（新）、docs/PROGRESS.md、docs/PLAN.md §7、docs/HANDOFF.md

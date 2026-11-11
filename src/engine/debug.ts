@@ -3,6 +3,7 @@ import { urlFor } from './assetUrls';
 import { ensureFont } from '../fonts/fontStore';
 import type { TextCard } from '../model/types';
 import { renderFrame } from './exportFrame';
+import { lastImportErrors } from './importMedia';
 import { renderText } from './textRender';
 import type { Player } from './player';
 
@@ -19,6 +20,7 @@ export function installDebugHook(player: Player) {
   const hook = {
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,
+    lastImportErrors: () => JSON.parse(JSON.stringify(lastImportErrors)),
     selected: () => useProjectStore.getState().selectedId,
     /** 預覽畫面某區塊（0–1 比例）裡，和 rgb 差不多（每個色版差 tol 以內）的像素有幾個 */
     countColor(

@@ -38,7 +38,8 @@ function EditorLoader({ projectId }: { projectId: string }) {
       useProjectStore.getState().load(p);
       autosave = startAutosave();
       setStatus('ready');
-      if (missing.length) toast(`找不到素材檔：${missing.join('、')}`);
+      if (missing.length)
+        toast(`找不到素材檔：${missing.join('、')}（可能是上次存不下、沒有留在手機裡，請重新匯入）`, 8000);
     })();
     return () => {
       cancelled = true;
@@ -105,7 +106,9 @@ function EditorBody() {
     const pid = useProjectStore.getState().project!.id;
     setBusy(`匯入中… 0/${files.length}`);
     try {
-      const res = await importFiles(pid, files, (d, n) => setBusy(`匯入中… ${d}/${n}`));
+      const res = await importFiles(pid, files, (d, n, detail) =>
+        setBusy(`匯入中… ${d}/${n}${detail ? `（${detail}）` : ''}`),
+      );
       if (res.assets.length) {
         await ensureUrls(pid, res.assets);
         const player = useUI.getState().player;
@@ -129,8 +132,9 @@ function EditorBody() {
         }
       }
       if (res.failed.length)
-        toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`);
+        toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`, 9000);
       else if (res.assets.length) toast(`已匯入 ${res.assets.length} 個素材`);
+      if (res.warnings.length) toast(res.warnings.join('；'), 9000);
     } finally {
       setBusy(null);
     }

@@ -15,6 +15,8 @@ export type Asset = {
   hasAudio: boolean;
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
+  /** 只放在記憶體（手機存不下）：關掉網頁後素材會遺失，要重新匯入 */
+  unsaved?: boolean;
 };
 
 export type Transform = { x: number; y: number; scale: number; rotation: number; opacity: number };

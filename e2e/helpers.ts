@@ -68,6 +68,7 @@ export const isWhite = (c: RGBA | null) => !!c && c[0] > 230 && c[1] > 230 && c[
 
 type Hook = {
   project: () => {
+    assets: { id: string; name: string; unsaved?: boolean; thumbs: string[] }[];
     tracks: {
       id: string;
       kind: string;
