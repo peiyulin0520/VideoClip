@@ -2,6 +2,7 @@ import { Maximize2, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { urlFor } from '../../engine/assetUrls';
 import { installDebugHook } from '../../engine/debug';
+import { useFonts } from '../../fonts/fontStore';
 import {
   boxCorners,
   itemBox,
@@ -50,6 +51,7 @@ export function Preview({ projectId, width, height }: { projectId: string; width
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
+  const fontEpoch = useFonts((s) => s.epoch); // 字體載入完成：字卡大小可能變，選取框要重算
 
   // ---- 建立 / 銷毀播放引擎（含 Pixi 合成器）----
   useEffect(() => {
@@ -66,9 +68,16 @@ export function Preview({ projectId, width, height }: { projectId: string; width
       created = player;
       useUI.setState({ player });
       player.seek(0);
-      unsub = useProjectStore.subscribe((s, prev) => {
+      const unsubProject = useProjectStore.subscribe((s, prev) => {
         if (s.project !== prev.project) player.refresh();
       });
+      const unsubFonts = useFonts.subscribe((s, prev) => {
+        if (s.epoch !== prev.epoch) player.refresh(); // 字體載入完成，字卡重畫
+      });
+      unsub = () => {
+        unsubProject();
+        unsubFonts();
+      };
       installDebugHook(player);
     });
     return () => {
@@ -103,7 +112,8 @@ export function Preview({ projectId, width, height }: { projectId: string; width
   }, [player, selectedId, project]);
 
   const k = cssW / width; // 專案座標 → CSS px
-  const geo = useMemo(() => geoCtx(project, width, height), [project, width, height]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const geo = useMemo(() => geoCtx(project, width, height), [project, width, height, fontEpoch]);
   const sel = findItem(project, selectedId);
   const box = sel && selVisible ? itemBox(sel.item, geo) : null;
   const selLocked = !!sel?.track.locked || !!sel?.track.hidden;

@@ -1,3 +1,4 @@
+import { cssFamily, FALLBACK_STACK, requestFont } from '../fonts/fontStore';
 import type { TextCard, TextItem } from '../model/types';
 
 // Phase 2 的最小文字繪製：多段/多行、系統字體、陰影。Phase 3 會換成完整字卡排版（見 docs/TEXT_CARDS.md）。
@@ -5,15 +6,19 @@ export type TextRender = { canvas: HTMLCanvasElement; w: number; h: number; key:
 
 const cache = new Map<string, TextRender>();
 const MAX_CACHE = 60;
-const FONT_STACK = '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif';
 
-function fontOf(weight: string, px: number) {
-  return `${weight === 'bold' ? '700' : '400'} ${px}px ${FONT_STACK}`;
+/** 這個字體在畫布上用的字型描述：已載入就用它，備用字體排在後面（缺字時補上） */
+function fontOf(weight: string, px: number, fontId: string) {
+  const fam = cssFamily(fontId);
+  return `${weight === 'bold' ? '700' : '400'} ${px}px ${fam ? `"${fam}", ` : ''}${FALLBACK_STACK}`;
 }
 
 /** scale：畫布寬度 / 1080。字級以 1080 寬為基準，所以預覽（較小）與輸出（1080）看起來一樣。 */
 export function renderText(card: TextCard, scale: number): TextRender {
-  const key = `${scale.toFixed(4)}|${JSON.stringify(card)}`;
+  // 字體還沒載入完成時畫的是備用字體，所以「各字體載入了沒」也要算進快取鍵，載入後才會重畫
+  for (const run of card.runs) requestFont(run.fontId);
+  const loaded = card.runs.map((r) => (cssFamily(r.fontId) ? 1 : 0)).join('');
+  const key = `${scale.toFixed(4)}|${loaded}|${JSON.stringify(card)}`;
   const hit = cache.get(key);
   if (hit) {
     cache.delete(key);
@@ -27,6 +32,7 @@ export function renderText(card: TextCard, scale: number): TextRender {
     size: number;
     color: string;
     weight: string;
+    fontId: string;
     lh: number;
     spacing: number;
     w: number;
@@ -34,7 +40,7 @@ export function renderText(card: TextCard, scale: number): TextRender {
   const lines: Line[] = [];
   for (const run of card.runs) {
     const size = run.size * scale;
-    probe.font = fontOf(run.weight, size);
+    probe.font = fontOf(run.weight, size, run.fontId);
     for (const t of run.text.split('\n')) {
       probe.letterSpacing = `${run.letterSpacing * size}px`;
       lines.push({
@@ -42,6 +48,7 @@ export function renderText(card: TextCard, scale: number): TextRender {
         size,
         color: run.color,
         weight: run.weight,
+        fontId: run.fontId,
         lh: run.lineHeight * size,
         spacing: run.letterSpacing * size,
         w: probe.measureText(t).width,
@@ -64,7 +71,7 @@ export function renderText(card: TextCard, scale: number): TextRender {
   ctx.shadowOffsetY = 2 * scale;
   let y = pad;
   for (const l of lines) {
-    ctx.font = fontOf(l.weight, l.size);
+    ctx.font = fontOf(l.weight, l.size, l.fontId);
     ctx.letterSpacing = `${l.spacing}px`;
     ctx.fillStyle = l.color;
     const x = card.align === 'left' ? pad : card.align === 'right' ? w - pad - l.w : (w - l.w) / 2;

@@ -43,6 +43,14 @@ export function installDebugHook(player: Player) {
       const c = player.compositor;
       return c.samplePixel(nx * c.width, ny * c.height);
     },
+    /** 預覽畫面某區塊的內容雜湊：畫面有沒有變，不需要知道顏色 */
+    regionHash(nx0: number, ny0: number, nx1: number, ny1: number) {
+      const c = player.compositor;
+      const px = c.readRegion(nx0 * c.width, ny0 * c.height, (nx1 - nx0) * c.width, (ny1 - ny0) * c.height);
+      let h = 2166136261;
+      for (let i = 0; i < px.length; i++) h = Math.imul(h ^ px[i]!, 16777619) >>> 0;
+      return h;
+    },
     /** 用輸出解析度畫出 t 秒那一格（匯出共用的流程），回傳 PNG 大小與幾個取樣點的顏色 */
     async exportFrame(t: number, points: [number, number][]) {
       const p = useProjectStore.getState().project!;

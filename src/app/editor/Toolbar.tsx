@@ -43,6 +43,7 @@ import {
 } from '../../store/actions';
 import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
+import { FontSelect } from '../fonts/FontSelect';
 
 export type Tab = 'edit' | 'overlay' | 'text' | 'layers';
 type Panel = 'speed' | 'volume' | null;
@@ -385,6 +386,12 @@ function TextTab({ found }: { found: Found }) {
               })
             }
           />
+          <div className="font-row-wrap">
+            <FontSelect
+              value={run.fontId}
+              onChange={(fontId) => editText(item.id, (c) => void (c.runs[0]!.fontId = fontId))}
+            />
+          </div>
           <Slider
             label="大小"
             value={run.size}

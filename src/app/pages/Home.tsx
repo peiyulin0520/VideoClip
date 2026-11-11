@@ -13,6 +13,8 @@ import {
   renameProject,
   saveProject,
 } from '../../storage/projects';
+import { useFonts } from '../../fonts/fontStore';
+import { useApp } from '../../store/appStore';
 import { toast, useUI } from '../../store/uiStore';
 import { ConfirmSheet, Sheet } from '../../ui/Sheet';
 
@@ -47,6 +49,10 @@ export function Home() {
   const [deleteFor, setDeleteFor] = useState<Project | null>(null);
   const [tipHidden, setTipHidden] = useState(() => safeGet('tip-ios-a2hs') === '1');
   const pickRef = useRef<HTMLInputElement>(null);
+  const fontCount = useFonts((st) => st.installed.size + st.userFonts.length);
+  const fontsReady = useFonts((st) => st.ready);
+  const bannerDismissed = useApp((st) => st.state.fontsBannerDismissed);
+  const appLoaded = useApp((st) => st.loaded);
 
   const refresh = useCallback(async () => setProjects(await listProjects()), []);
   useEffect(() => {
@@ -97,6 +103,20 @@ export function Home() {
           <Settings size={22} />
         </Link>
       </header>
+
+      {appLoaded && fontsReady && fontCount === 0 && !bannerDismissed && (
+        <div className="banner" role="note" data-testid="fonts-banner">
+          <span>還沒下載字體，字卡只能用系統字體。</span>
+          <Link to="/settings">去下載</Link>
+          <button
+            className="icon-btn"
+            aria-label="關閉提示"
+            onClick={() => void useApp.getState().update({ fontsBannerDismissed: true })}
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
 
       {isIOS && !isStandalone && !tipHidden && (
         <div className="tip" role="note">

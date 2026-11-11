@@ -11,7 +11,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "e2e": "playwright test",
-    "fonts": "echo 'Phase 3 才會實作 npm run fonts'"
+    "fonts": "NODE_USE_ENV_PROXY=1 node scripts/fetch-fonts.mjs && .venv/bin/python -I scripts/build-fonts.py",
+    "fonts:setup": "python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt"
   },
   "dependencies": {
     "idb": "^8.0.4",

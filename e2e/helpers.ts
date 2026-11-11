@@ -6,7 +6,10 @@ export const fixture = (name: string) => path.resolve(process.cwd(), 'tests/fixt
 /** 首頁按「＋」→ 選素材 → 自動建立專案並進入編輯器 */
 export async function createProjectWith(page: Page, files: string[]) {
   // 打開測試用的除錯掛鉤 window.__videoclip（正常使用者看不到）
-  await page.addInitScript(() => localStorage.setItem('vc-debug', '1'));
+  await page.addInitScript(() => {
+    localStorage.setItem('vc-debug', '1');
+    localStorage.setItem('vc-skip-onboarding', '1');
+  });
   await page.goto('./');
   await page.getByRole('button', { name: '新增專案' }).tap();
   await page.getByTestId('new-project-files').setInputFiles(files.map(fixture));
@@ -80,11 +83,12 @@ type Hook = {
         cornerRadius?: number;
         outline?: { width: number };
         crop?: Record<string, number>;
-        card?: { runs: { text: string; size: number; color: string }[] };
+        card?: { runs: { text: string; size: number; color: string; fontId: string }[] };
       }[];
     }[];
   };
   selected: () => string | null;
+  regionHash: (a: number, b: number, c: number, d: number) => number;
   countColor: (
     rgb: [number, number, number],
     tol: number,
@@ -156,3 +160,9 @@ export async function addOverlays(page: Page, files: string[]) {
   // 匯入是非同步的（讀檔、縮圖），等到時間軸上多出這幾個物件
   await expect(page.getByTestId('clip')).toHaveCount(before + files.length, { timeout: 20_000 });
 }
+
+export const regionHash = (page: Page, r: [number, number, number, number]) =>
+  page.evaluate(
+    (region) => (window as unknown as { __videoclip: Hook }).__videoclip.regionHash(...region),
+    r,
+  );

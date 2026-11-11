@@ -20,7 +20,7 @@
 ## 硬規則
 - **誠實回報**：分清楚 ✅ 已驗證（附截圖）／🟡 寫好但只在 Chromium 測過／🔴 做不到。iPhone Safari 的行為沙盒測不到，列入 PLAN.md §7 待真機驗證，不要說成已驗證。
 - 尾端圈圈照 `docs/TEXT_CARDS.md §3.1` 的路徑做，並與參考圖疊圖驗證，不要自由發揮。
-- 公開 repo 只放可再散布的字體（OFL 等）且附授權檔；個人授權字體不進 repo。不要把字體原始 TTF 放進 git（只放轉好的 woff2）。
+- 公開 repo 只放可再散布的字體（OFL 等）且附授權檔；個人授權字體（中規中矩體、星光小熊貓、851 手書き雜…）不進 repo，只能讓使用者自己匯入。字體原始 TTF 不進 git（只放轉好的 woff2）；唯一例外是授權書規定不能改作的字言手繪體（原檔照放，見 docs/FONTS.md）。新增字體前先讀字型檔 name table 的授權，不要只看使用者說「都是開源」。
 - 不要把第三方創作者的截圖/錄影放進 repo；測試素材用 ffmpeg 產生（testsrc2、色塊），不用真人臉。
 - 使用者資料永遠只在使用者裝置或使用者自己的 Google Drive；不要加任何會上傳影片的後端或分析服務。AI 音樂推薦要使用者自己填 API key 並明確同意才送出影格。
 - 觸控優先：所有可點元素 ≥ 44px；用 Pointer Events；每個按鈕都要有 e2e 點擊測試（使用者回報過「icon 沒有反應」）。
@@ -32,8 +32,13 @@
 - `npm test`：Vitest
 - `npm run e2e -- --trace off`：Playwright（iPhone 13 模擬）
 - `npm run build`：產出 `dist/`
-- `npm run fonts`：下載並建置字體（scripts/fetch-fonts.mjs → scripts/build-fonts.py）
+- `npm run fonts:setup`（一次）、`npm run fonts`：下載並建置字體（scripts/fetch-fonts.mjs → scripts/build-fonts.py，細節見 docs/FONTS.md）。產出的 `public/fonts/` 要 commit；一般改程式不用重跑。
 
 ## Git
 - 在指定的功能分支開發；commit 訊息用英文或中文皆可，清楚描述。
 - 不要在使用者沒要求時建立 PR。
+
+## 測試用旗標（localStorage）
+- `vc-skip-onboarding=1`：不顯示首次使用精靈（e2e 的 `createProjectWith` 會設）。
+- `vc-debug=1`：掛出 `window.__videoclip`（讀專案 JSON、取樣預覽顏色、算畫面雜湊、匯出單格）。正常使用者看不到。
+- 測試字體相關功能時，用 `tests/fixtures/mini-font.ttf`（小字體）測匯入；下載字體包的測試會真的抓 `public/fonts/`（基本包約 22 MB）。

@@ -8,3 +8,4 @@ playwright-report
 test-results
 package-lock.json
 *.md
+src/fonts/catalog.generated.json

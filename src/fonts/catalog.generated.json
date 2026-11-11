@@ -1,0 +1,1210 @@
+{
+ "packs": {
+  "basic": "基本包（常用黑體、宋體、楷體、圓體）",
+  "cute": "手寫可愛包（手寫、圓潤、點陣、波浪）",
+  "title": "標題設計包（明體、黑體）",
+  "brush": "毛筆書法包",
+  "japanese": "日文字體包（部分繁體缺字，會自動用備用字體補）",
+  "english": "英文字體（Vlog 標題用）"
+ },
+ "personal": [
+  {
+   "label": "中規中矩體 Proper Script",
+   "license": "字型檔寫明「All rights reserved，未經許可不得再散布或商用」",
+   "how": "請自己在「設定 → 字體 → 匯入字體」載入"
+  },
+  {
+   "label": "星光小熊貓幼兒體（星光手體）",
+   "license": "作者授權：可免費商用，但禁止把字型檔上傳到任何網站/雲端供他人下載",
+   "how": "請自己匯入；作者發布頁見字型檔內的授權說明"
+  },
+  {
+   "label": "851 手書き雜",
+   "license": "字型檔內沒有授權說明",
+   "how": "請自己匯入"
+  }
+ ],
+ "fonts": [
+  {
+   "key": "line-seed-en",
+   "label": "LINE Seed（英文）",
+   "pack": "basic",
+   "family": "vc-line-seed-en",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "LINESeedSans_W_Rg.woff2",
+     "bytes": 14100
+    },
+    {
+     "weight": 700,
+     "file": "LINESeedSans_W_Bd.woff2",
+     "bytes": 13828
+    },
+    {
+     "weight": 800,
+     "file": "LINESeedSans_W_XBd.woff2",
+     "bytes": 14456
+    }
+   ],
+   "preview": "LINESeedSans_W_Rg.woff2",
+   "previewKind": "font",
+   "bytes": 42384,
+   "license": "OFL-1.1",
+   "source": "https://seed.line.me/ （使用者提供官方下載包）",
+   "licenseFile": "OFL.txt",
+   "coverage": null,
+   "glyphs": 0,
+   "copyright": "© LY Corporation",
+   "unmodified": true,
+   "latinOnly": true
+  },
+  {
+   "key": "jf-openhuninn",
+   "label": "jf open 粉圓",
+   "pack": "basic",
+   "family": "vc-jf-openhuninn",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jf-openhuninn-400.woff2",
+     "bytes": 1753356
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 1757740,
+   "license": "OFL-1.1",
+   "source": "https://github.com/justfont/open-huninn-font",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.1,
+    "rare": 38.2,
+    "missingCommon": 47,
+    "bopomofo": true
+   },
+   "glyphs": 11988,
+   "copyright": "[Kosugi Maru] Copyright (c) 2010 MOTOYA CO.,LTD.              [Varela Round] Copyright (x) 2011-2016 The Varela Round Project Authors (https://github.com/alefalefalef/Varela-Round-Hebrew/), with Reserved Font Names 'Varela' and 'Varela Round'.              [jf open huninn] Copyright (c) 2020-2024 The jf open huninn font is redistributed by justfont Co., Ltd., with Reserved Font Names 'open huninn' and 'huninn' under SIL Open Font License. The Hanzi part of this project was derived from Kosugi Maru under Apache-2.0 (https://www.apache.org/licenses/LICENSE-2.0).",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "noto-serif-tc",
+   "label": "思源宋體",
+   "pack": "basic",
+   "family": "vc-noto-serif-tc",
+   "faces": [
+    {
+     "weight": "200 900",
+     "file": "noto-serif-tc-200-900.woff2",
+     "bytes": 5550252
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 5557820,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/notoseriftc",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 20748,
+   "copyright": "(c) 2017-2024 Adobe (http://www.adobe.com/).",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "noto-sans-tc",
+   "label": "思源黑體",
+   "pack": "basic",
+   "family": "vc-noto-sans-tc",
+   "faces": [
+    {
+     "weight": "100 900",
+     "file": "noto-sans-tc-100-900.woff2",
+     "bytes": 3873388
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3879576,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/notosanstc",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 20745,
+   "copyright": "(c) 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "iansui",
+   "label": "芫荽",
+   "pack": "basic",
+   "family": "vc-iansui",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "iansui-400.woff2",
+     "bytes": 2192752
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 2197356,
+   "license": "OFL-1.1",
+   "source": "https://github.com/ButTaiwan/iansui",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.1,
+    "rare": 36.9,
+    "missingCommon": 47,
+    "bopomofo": true
+   },
+   "glyphs": 12666,
+   "copyright": "Copyright 2025 The Iansui Project Authors (https://github.com/ButTaiwan/iansui)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "lxgw-wenkai-tc",
+   "label": "霞鶩文楷",
+   "pack": "basic",
+   "family": "vc-lxgw-wenkai-tc",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "lxgw-wenkai-tc-400.woff2",
+     "bytes": 3559016
+    },
+    {
+     "weight": 500,
+     "file": "lxgw-wenkai-tc-500.woff2",
+     "bytes": 3957856
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 7522168,
+   "license": "OFL-1.1",
+   "source": "https://github.com/lxgw/LxgwWenkaiTC",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 25693,
+   "copyright": "Copyright 2022-2026 LXGW (https://github.com/lxgw/LxgwWenkaiTC) Copyright 2020 The Klee Project Authors (https://github.com/fontworks-fonts/Klee)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "mantou-sans",
+   "label": "饅頭黑體",
+   "pack": "basic",
+   "family": "vc-mantou-sans",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "mantou-sans-400.woff2",
+     "bytes": 1062496
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 1065484,
+   "license": "OFL-1.1",
+   "source": "https://github.com/mant0u0/MantouSans",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 98.4,
+    "rare": 24.6,
+    "missingCommon": 87,
+    "bopomofo": true
+   },
+   "glyphs": 10058,
+   "copyright": "Mant0u / The Dela Gothic Project (https://github.com/mant0u0/MantouSans)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "naikai",
+   "label": "內海字體",
+   "pack": "cute",
+   "family": "vc-naikai",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "naikai-400.woff2",
+     "bytes": 3444672
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3450104,
+   "license": "OFL-1.1",
+   "source": "https://github.com/max32002/naikaifont",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 49611,
+   "copyright": "Nozomi Seto",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "pop-gothic",
+   "label": "大波浪圓體",
+   "pack": "cute",
+   "family": "vc-pop-gothic",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "pop-gothic-400.woff2",
+     "bytes": 2235600
+    },
+    {
+     "weight": 700,
+     "file": "pop-gothic-700.woff2",
+     "bytes": 2517108
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 4757224,
+   "license": "OFL-1.1",
+   "source": "https://github.com/max32002/pop-gothic",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.1,
+    "rare": 66.6,
+    "missingCommon": 48,
+    "bopomofo": true
+   },
+   "glyphs": 19779,
+   "copyright": "Copyright 2021 The PopGothic Project Authors (https://github.com/max32002/pop-gothic)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "fancy-free",
+   "label": "字言手繪體",
+   "pack": "cute",
+   "family": "vc-fancy-free",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "fancy-free-400.ttf",
+     "bytes": 7359872
+    }
+   ],
+   "preview": "preview.png",
+   "previewKind": "image",
+   "bytes": 7379955,
+   "license": "字言字型免費商用授權書（可原檔放上網站/雲端並附授權書、非營利分享；不可改作）",
+   "source": "（使用者提供）",
+   "licenseFile": "LICENSE.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 22.2,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 9300,
+   "copyright": "Copyright © 2026 字言字型 版權所有。\r Copyright © 2026 Fancytype foundry. All rights reserved.",
+   "unmodified": true,
+   "latinOnly": false
+  },
+  {
+   "key": "jason-handwriting-1",
+   "label": "清松手寫體 1",
+   "pack": "cute",
+   "family": "vc-jason-handwriting-1",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jason-handwriting-1-400.woff2",
+     "bytes": 3193996
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3199628,
+   "license": "OFL-1.1",
+   "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 96.8,
+    "rare": 31.9,
+    "missingCommon": 172,
+    "bopomofo": true
+   },
+   "glyphs": 11014,
+   "copyright": "© Copyright 2020, JasonHandwriting1 is created by Jason(Yu Ching Sung) under SIL Open Font License.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "jason-handwriting-2",
+   "label": "清松手寫體 2",
+   "pack": "cute",
+   "family": "vc-jason-handwriting-2",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jason-handwriting-2-400.woff2",
+     "bytes": 2262484
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 2268240,
+   "license": "OFL-1.1",
+   "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 91.6,
+    "rare": 4.6,
+    "missingCommon": 452,
+    "bopomofo": true
+   },
+   "glyphs": 7212,
+   "copyright": "© Copyright 2020, JasonHandwriting2 is created by Jason(Yu Ching Sung) under SIL Open Font License.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "jason-handwriting-3",
+   "label": "清松手寫體 3",
+   "pack": "cute",
+   "family": "vc-jason-handwriting-3",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jason-handwriting-3-400.woff2",
+     "bytes": 2669732
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 2674540,
+   "license": "OFL-1.1",
+   "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.7,
+    "rare": 25.5,
+    "missingCommon": 14,
+    "bopomofo": true
+   },
+   "glyphs": 8399,
+   "copyright": "© Copyright 2020, JasonHandwriting3 is created by Jason(Yu Ching Sung) under SIL Open Font License.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "jason-handwriting-4",
+   "label": "清松手寫體 4",
+   "pack": "cute",
+   "family": "vc-jason-handwriting-4",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jason-handwriting-4-400.woff2",
+     "bytes": 2028992
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 2037036,
+   "license": "OFL-1.1",
+   "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 89.6,
+    "rare": 0.4,
+    "missingCommon": 561,
+    "bopomofo": true
+   },
+   "glyphs": 5291,
+   "copyright": "(c) Copyright 2020, JasonHandwriting4 is created by Jason(Yu Ching Sung) under SIL Open Font License.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "jason-handwriting-5",
+   "label": "清松手寫體 5",
+   "pack": "cute",
+   "family": "vc-jason-handwriting-5",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jason-handwriting-5-400.woff2",
+     "bytes": 2978988
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 2985524,
+   "license": "OFL-1.1",
+   "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.8,
+    "rare": 7.1,
+    "missingCommon": 11,
+    "bopomofo": true
+   },
+   "glyphs": 6537,
+   "copyright": "© Copyright 2021, JasonHandwriting5 is created by Jason(Yu Ching Sung) under SIL Open Font License.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "jason-handwriting-6",
+   "label": "清松手寫體 6",
+   "pack": "cute",
+   "family": "vc-jason-handwriting-6",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jason-handwriting-6-400.woff2",
+     "bytes": 3676128
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3682324,
+   "license": "OFL-1.1",
+   "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.9,
+    "rare": 25.8,
+    "missingCommon": 4,
+    "bopomofo": true
+   },
+   "glyphs": 8553,
+   "copyright": "© Copyright 2022, JasonHandwriting6 is created by Jason(Yu Ching Sung) under SIL Open Font License.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "jason-handwriting-7",
+   "label": "清松手寫體 7",
+   "pack": "cute",
+   "family": "vc-jason-handwriting-7",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jason-handwriting-7-400.woff2",
+     "bytes": 3702880
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3709248,
+   "license": "OFL-1.1",
+   "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.9,
+    "rare": 27.3,
+    "missingCommon": 4,
+    "bopomofo": true
+   },
+   "glyphs": 10380,
+   "copyright": "© Copyright 2023, JasonHandwriting7 is created by Jason(Yu Ching Sung) under SIL Open Font License.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "jason-handwriting-8",
+   "label": "清松手寫體 8",
+   "pack": "cute",
+   "family": "vc-jason-handwriting-8",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jason-handwriting-8-400.woff2",
+     "bytes": 3498396
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3504552,
+   "license": "OFL-1.1",
+   "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.9,
+    "rare": 26.1,
+    "missingCommon": 4,
+    "bopomofo": true
+   },
+   "glyphs": 9461,
+   "copyright": "© Copyright 2024, JasonHandwriting8 is created by Jason(Yu Ching Sung) under SIL Open Font License.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "jason-handwriting-9",
+   "label": "清松手寫體 9",
+   "pack": "cute",
+   "family": "vc-jason-handwriting-9",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "jason-handwriting-9-400.woff2",
+     "bytes": 3664148
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3670444,
+   "license": "OFL-1.1",
+   "source": "https://github.com/jasonhandwriting/JasonHandwriting",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.9,
+    "rare": 26.1,
+    "missingCommon": 4,
+    "bopomofo": true
+   },
+   "glyphs": 9421,
+   "copyright": "© Copyright 2025, JasonHandwriting9 is created by Jason(Yu Ching Sung) under SIL Open Font License.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "gensen-rounded",
+   "label": "源泉圓體",
+   "pack": "cute",
+   "family": "vc-gensen-rounded",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "gensen-rounded-400.woff2",
+     "bytes": 3044596
+    },
+    {
+     "weight": 700,
+     "file": "gensen-rounded-700.woff2",
+     "bytes": 3195204
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 6244324,
+   "license": "OFL-1.1",
+   "source": "https://github.com/ButTaiwan/gensen-font",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 35382,
+   "copyright": "",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "boutique-bitmap",
+   "label": "精品點陣體",
+   "pack": "cute",
+   "family": "vc-boutique-bitmap",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "boutique-bitmap-400.woff2",
+     "bytes": 247720
+    },
+    {
+     "weight": 700,
+     "file": "boutique-bitmap-700.woff2",
+     "bytes": 233552
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 484196,
+   "license": "OFL-1.1",
+   "source": "https://github.com/scott0107000/BoutiqueBitmap9x9",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 28.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 13157,
+   "copyright": "[BoutiqueBitmap9x9]\r Copyright © 2026 字言字型 版權所有。\r Copyright © 2026 fancy type foundry. All rights reserved.\r 2020-2026《字言字語》Cen-cyun, Liu. Luke Liu.\r https://fontspeech.blogspot.com/\r These fonts are free software.\r Unlimited permission is granted to use, copy, and distribute them, with or without modification, either commercially or noncommercially.\r THESE FONTS ARE PROVIDED \"AS IS\" WITHOUT WARRANTY.\r 此字型是免費的。\r 無論您是否進行對本字型進行商業或非商業性修改，均可無限制地使用，複製和分發它們。\r 本字型的衍生品之授權必須與此字型相同，且不作任何擔保。\r 此字体是免费的。\r 无论您是否进行对本字型进行商业或非商业性修改，均可无限制地使用，复制和分发它们。\r 本字型的衍生品之授权必须与此字型相同，且不作任何担保。\r [M+ BITMAP FONTS]\r Copyright (C) 2002-2004 COZ\r These fonts are free software.\r Unlimited permission is granted to use, copy, and distribute it, with or without modification, either commercially and noncommercially.\r THESE FONTS ARE PROVIDED \"AS IS\" WITHOUT WARRANTY.\r これらのフォントはフリー（自由な）ソフトウエアです。\r あらゆる改変の有無に関わらず、また商業的な利用であっても、自由にご利用、複製、再配布することができますが、全て無保証とさせていただきます。\r [ベストテン（BestTen-DOT）]\r フリーフォントのベストテンは無料でダウンロードできるドットフォント。商用・非商用問わず使用可能なので、安心してダウンロードしてください。\r 作成した印刷物およびデジタル・コンテンツにつき、その商用・非商用にかかわらず印刷、放送、通信、各種記録メディアなどの媒体の形式も問わず、使用をすることができます。プログラムへの埋め込みが可能です。\r このフォントのライセンスは、\r M+のライセンスに準じます。\r M+ FONT LICENSEについては、配布物に含まれる\r mplus_bitmap_fonts をご覧ください。\r [Fusion Pixel]\r Copyright (c) 2022, TakWolf (https://takwolf.com), with Reserved Font Name 'Fusion Pixel'.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "chenyuluoyan-thin",
+   "label": "辰宇落雁",
+   "pack": "cute",
+   "family": "vc-chenyuluoyan-thin",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "chenyuluoyan-thin-400.woff2",
+     "bytes": 3965580
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3971328,
+   "license": "OFL-1.1",
+   "source": "https://github.com/Chenyu-otf/chenyuluoyan_thin",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.1,
+    "rare": 35.3,
+    "missingCommon": 46,
+    "bopomofo": true
+   },
+   "glyphs": 10137,
+   "copyright": "Copyright (c) 2022, Wang, Li-Yu & Liu, Wei-Chen.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "chocolate-classical",
+   "label": "Chocolate 古典黑",
+   "pack": "title",
+   "family": "vc-chocolate-classical",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "chocolate-classical-400.woff2",
+     "bytes": 2190960
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 2194136,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/chocolateclassicalsans",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 35979,
+   "copyright": "Copyright 2025 The Chocolate Classical Sans Project Authors (https://github.com/MoonlitOwen/ChocolateSans)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "ibm-plex-sans-tc",
+   "label": "IBM Plex 黑體",
+   "pack": "title",
+   "family": "vc-ibm-plex-sans-tc",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "ibm-plex-sans-tc-400.woff2",
+     "bytes": 1787128
+    },
+    {
+     "weight": 700,
+     "file": "ibm-plex-sans-tc-700.woff2",
+     "bytes": 1848972
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3639052,
+   "license": "OFL-1.1",
+   "source": "https://github.com/IBM/plex",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 23646,
+   "copyright": "Copyright 2018 IBM Corp. All rights reserved.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "genyo-min",
+   "label": "源樣明體",
+   "pack": "title",
+   "family": "vc-genyo-min",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "genyo-min-400.woff2",
+     "bytes": 3000284
+    },
+    {
+     "weight": 700,
+     "file": "genyo-min-700.woff2",
+     "bytes": 3162564
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 6167176,
+   "license": "OFL-1.1",
+   "source": "https://github.com/ButTaiwan/genyo-font",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 35349,
+   "copyright": "",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "genyo-gothic",
+   "label": "源樣黑體",
+   "pack": "title",
+   "family": "vc-genyo-gothic",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "genyo-gothic-400.woff2",
+     "bytes": 2264164
+    },
+    {
+     "weight": 700,
+     "file": "genyo-gothic-700.woff2",
+     "bytes": 2321864
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 4589644,
+   "license": "OFL-1.1",
+   "source": "https://github.com/ButTaiwan/genyog-font",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 35382,
+   "copyright": "",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "genryu-min",
+   "label": "源流明體",
+   "pack": "title",
+   "family": "vc-genryu-min",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "genryu-min-400.woff2",
+     "bytes": 3154452
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3159084,
+   "license": "OFL-1.1",
+   "source": "https://github.com/ButTaiwan/genryu-font",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 35349,
+   "copyright": "",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "genseki-gothic",
+   "label": "源石黑體",
+   "pack": "title",
+   "family": "vc-genseki-gothic",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "genseki-gothic-400.woff2",
+     "bytes": 2839932
+    },
+    {
+     "weight": 700,
+     "file": "genseki-gothic-700.woff2",
+     "bytes": 2856764
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 5701400,
+   "license": "OFL-1.1",
+   "source": "https://github.com/ButTaiwan/genseki-font",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 35382,
+   "copyright": "",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "genwan-min",
+   "label": "源雲明體",
+   "pack": "title",
+   "family": "vc-genwan-min",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "genwan-min-400.woff2",
+     "bytes": 5898980
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 5904964,
+   "license": "OFL-1.1",
+   "source": "https://github.com/ButTaiwan/genwan-font",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 100.0,
+    "rare": 100.0,
+    "missingCommon": 0,
+    "bopomofo": true
+   },
+   "glyphs": 35349,
+   "copyright": "",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "masa-brush",
+   "label": "正風毛筆",
+   "pack": "brush",
+   "family": "vc-masa-brush",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "masa-brush-400.woff2",
+     "bytes": 4484004
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 4491188,
+   "license": "OFL-1.1",
+   "source": "https://github.com/max32002/masafont",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.6,
+    "rare": 92.5,
+    "missingCommon": 21,
+    "bopomofo": true
+   },
+   "glyphs": 23700,
+   "copyright": "KouzanAoyagi",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "bakudai-brush",
+   "label": "莫大毛筆",
+   "pack": "brush",
+   "family": "vc-bakudai-brush",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "bakudai-brush-400.woff2",
+     "bytes": 4545904
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 4552944,
+   "license": "OFL-1.1",
+   "source": "https://github.com/max32002/bakudaifont",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 99.9,
+    "rare": 95.3,
+    "missingCommon": 3,
+    "bopomofo": true
+   },
+   "glyphs": 24495,
+   "copyright": "AoyagiKouzan",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "hachi-maru-pop",
+   "label": "Hachi Maru Pop（日）",
+   "pack": "japanese",
+   "family": "vc-hachi-maru-pop",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "hachi-maru-pop-400.woff2",
+     "bytes": 1709676
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 1714012,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/hachimarupop",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 82.7,
+    "rare": 13.8,
+    "missingCommon": 932,
+    "bopomofo": false
+   },
+   "glyphs": 7470,
+   "copyright": "Copyright 2020 The Hachi Maru Pop Project Authors (https://github.com/noriokanisawa/HachiMaruPop)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "kaisei-decol",
+   "label": "Kaisei Decol（日）",
+   "pack": "japanese",
+   "family": "vc-kaisei-decol",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "kaisei-decol-400.woff2",
+     "bytes": 1557952
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 1562760,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/kaiseidecol",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 83.2,
+    "rare": 13.8,
+    "missingCommon": 905,
+    "bopomofo": false
+   },
+   "glyphs": 7930,
+   "copyright": "Copyright 2020 The Kaisei Project Authors (https://github.com/Font-Kai/Kaisei)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "klee-one",
+   "label": "Klee One（日）",
+   "pack": "japanese",
+   "family": "vc-klee-one",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "klee-one-400.woff2",
+     "bytes": 1900076
+    },
+    {
+     "weight": 600,
+     "file": "klee-one-600.woff2",
+     "bytes": 2053132
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 3957140,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/kleeone",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 88.7,
+    "rare": 21.5,
+    "missingCommon": 613,
+    "bopomofo": false
+   },
+   "glyphs": 10178,
+   "copyright": "Copyright 2020 The Klee Project Authors (https://github.com/fontworks-fonts/Klee)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "shippori-mincho",
+   "label": "Shippori 明朝（日）",
+   "pack": "japanese",
+   "family": "vc-shippori-mincho",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "shippori-mincho-400.woff2",
+     "bytes": 2231292
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 2235268,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/shipporimincho",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 98.4,
+    "rare": 65.6,
+    "missingCommon": 87,
+    "bopomofo": false
+   },
+   "glyphs": 15363,
+   "copyright": "Copyright 2021 The Shippori Mincho Project Authors (https://github.com/fontdasu/ShipporiMincho)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "yomogi",
+   "label": "Yomogi（日）",
+   "pack": "japanese",
+   "family": "vc-yomogi",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "yomogi-400.woff2",
+     "bytes": 1398912
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 1402396,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/yomogi",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 82.8,
+    "rare": 13.8,
+    "missingCommon": 930,
+    "bopomofo": false
+   },
+   "glyphs": 8039,
+   "copyright": "Copyright 2020 The Yomogi Project Authors (https://github.com/satsuyako/YomogiFont), all rights reserved.",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "yusei-magic",
+   "label": "Yusei Magic（日）",
+   "pack": "japanese",
+   "family": "vc-yusei-magic",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "yusei-magic-400.woff2",
+     "bytes": 781692
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 785104,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/yuseimagic",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 82.8,
+    "rare": 13.8,
+    "missingCommon": 930,
+    "bopomofo": false
+   },
+   "glyphs": 7566,
+   "copyright": "Copyright 2020 The Yusei Magic Project Authors (https://github.com/tanukifont/YuseiMagic)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "zen-kaku-gothic",
+   "label": "Zen Kaku 黑體（日）",
+   "pack": "japanese",
+   "family": "vc-zen-kaku-gothic",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "zen-kaku-gothic-400.woff2",
+     "bytes": 855064
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 858156,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/zenkakugothicnew",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 82.7,
+    "rare": 13.8,
+    "missingCommon": 932,
+    "bopomofo": false
+   },
+   "glyphs": 7737,
+   "copyright": "Copyright 2022 The Zen Project Authors (https://github.com/googlefonts/zen-kakugothic)",
+   "unmodified": false,
+   "latinOnly": false
+  },
+  {
+   "key": "zen-old-mincho",
+   "label": "Zen Old 明朝（日）",
+   "pack": "japanese",
+   "family": "vc-zen-old-mincho",
+   "faces": [
+    {
+     "weight": 400,
+     "file": "zen-old-mincho-400.woff2",
+     "bytes": 1646664
+    }
+   ],
+   "preview": "preview.woff2",
+   "previewKind": "font",
+   "bytes": 1651380,
+   "license": "OFL-1.1",
+   "source": "https://github.com/google/fonts/tree/main/ofl/zenoldmincho",
+   "licenseFile": "OFL.txt",
+   "coverage": {
+    "common": 82.7,
+    "rare": 13.8,
+    "missingCommon": 932,
+    "bopomofo": false
+   },
+   "glyphs": 7815,
+   "copyright": "Copyright 2021 The Zen Old Mincho Project Authors (https://github.com/googlefonts/zen-oldmincho)",
+   "unmodified": false,
+   "latinOnly": false
+  }
+ ]
+}

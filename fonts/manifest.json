@@ -1,11 +1,12 @@
 {
   "_說明": "字體清單（來源、雜湊、授權、是否放進網站）。scripts/fetch-fonts.mjs 依此下載並核對 sha256；build=false 的只記錄不建置。資料來源：使用者 2026-11-08 下載紀錄。",
   "packs": {
-    "basic": "基本包（首次使用預設勾選）",
-    "cute": "手寫可愛包",
-    "title": "標題設計包",
+    "basic": "基本包（常用黑體、宋體、楷體、圓體）",
+    "cute": "手寫可愛包（手寫、圓潤、點陣、波浪）",
+    "title": "標題設計包（明體、黑體）",
     "brush": "毛筆書法包",
-    "japanese": "日文字體包（部分繁體缺字，自動 fallback）"
+    "japanese": "日文字體包（部分繁體缺字，會自動用備用字體補）",
+    "english": "英文字體（Vlog 標題用）"
   },
   "fonts": [
     {
@@ -23,7 +24,10 @@
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
-      }
+      },
+      "key": "line-seed-tw",
+      "label": "LINE Seed 繁中",
+      "weight": 700
     },
     {
       "id": "LINESeedTW__LINESeedTW_TTF_Eb",
@@ -40,7 +44,10 @@
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
-      }
+      },
+      "key": "line-seed-tw",
+      "label": "LINE Seed 繁中",
+      "weight": 800
     },
     {
       "id": "LINESeedTW__LINESeedTW_TTF_Rg",
@@ -57,7 +64,10 @@
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
-      }
+      },
+      "key": "line-seed-tw",
+      "label": "LINE Seed 繁中",
+      "weight": 400
     },
     {
       "id": "LINESeedTW__LINESeedTW_TTF_Th",
@@ -86,7 +96,10 @@
       "sha256": "9d5bf4932d31fe94c18cd8cfddc98bc1b14ce10f4e354c682179db290a99c825",
       "license": "OFL-1.1",
       "source": "https://github.com/justfont/open-huninn-font",
-      "build": true
+      "build": true,
+      "key": "jf-openhuninn",
+      "label": "jf open 粉圓",
+      "weight": 400
     },
     {
       "id": "notoseriftc__NotoSerifTC[wght]",
@@ -98,7 +111,10 @@
       "sha256": "0077e18f57c6908f4a000969880940bdb0dad057c0e8d98b49dc364c3d1b09c6",
       "license": "OFL-1.1",
       "source": "https://github.com/google/fonts/tree/main/ofl/notoseriftc",
-      "build": true
+      "build": true,
+      "key": "noto-serif-tc",
+      "label": "思源宋體",
+      "weight": "200 900"
     },
     {
       "id": "notosanstc__NotoSansTC[wght]",
@@ -110,7 +126,10 @@
       "sha256": "864727d210d54f2537bbe23b3a839436c3992af72de9322af5270897246bd44f",
       "license": "OFL-1.1",
       "source": "https://github.com/google/fonts/tree/main/ofl/notosanstc",
-      "build": true
+      "build": true,
+      "key": "noto-sans-tc",
+      "label": "思源黑體",
+      "weight": "100 900"
     },
     {
       "id": "iansui__Iansui-Regular",
@@ -122,7 +141,10 @@
       "sha256": "7f1aa62e9dcbf40d0ce41a5d3f1e5ea602e66c295778ac6fefb6b84d8ed08bd5",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/iansui",
-      "build": true
+      "build": true,
+      "key": "iansui",
+      "label": "芫荽",
+      "weight": 400
     },
     {
       "id": "LxgwWenkaiTC__LXGWWenKaiMonoTC-Light",
@@ -182,7 +204,10 @@
       "sha256": "649efd8516f42d36eacc05480d5dbd2713fb28fbd2bbee8ea76fc40875045c49",
       "license": "OFL-1.1",
       "source": "https://github.com/lxgw/LxgwWenkaiTC",
-      "build": true
+      "build": true,
+      "key": "lxgw-wenkai-tc",
+      "label": "霞鶩文楷",
+      "weight": 500
     },
     {
       "id": "LxgwWenkaiTC__LXGWWenKaiTC-Regular",
@@ -194,7 +219,10 @@
       "sha256": "6662480a3f95b4a90c80b189c679617a48adce3a505118a6af63ce5a482b83fa",
       "license": "OFL-1.1",
       "source": "https://github.com/lxgw/LxgwWenkaiTC",
-      "build": true
+      "build": true,
+      "key": "lxgw-wenkai-tc",
+      "label": "霞鶩文楷",
+      "weight": 400
     },
     {
       "id": "MantouSans__MantouSans-Regular",
@@ -206,7 +234,10 @@
       "sha256": "9ffe52b861b1b5f175c4aadf25dfcb95aff949e956f658b3072b1e2c6ff714bc",
       "license": "OFL-1.1",
       "source": "https://github.com/mant0u0/MantouSans",
-      "build": true
+      "build": true,
+      "key": "mantou-sans",
+      "label": "饅頭黑體",
+      "weight": 400
     },
     {
       "id": "ProperScript__ProperScript-Regular",
@@ -218,13 +249,14 @@
       "sha256": "8ee3c3a3bdff79b50d639a759124c99d04406e35937fa4a161c275235b115cb1",
       "license": "unverified",
       "source": "（使用者提供）",
-      "build": true,
+      "build": false,
       "needsUserFile": true,
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
       },
-      "licenseCheck": "讀字型 name table（nameID 13/14）與作者頁確認；可再散布才放進網站，否則改為使用者個人字體（只存使用者自己的裝置/Drive）"
+      "licenseCheck": "讀字型 name table（nameID 13/14）與作者頁確認；可再散布才放進網站，否則改為使用者個人字體（只存使用者自己的裝置/Drive）",
+      "personal": true
     },
     {
       "id": "Kahik__Kahikfontmonospaced",
@@ -252,7 +284,10 @@
       "source": "（使用者提供之作者分享資料夾，附作者 OFL 1.1 授權文字）",
       "build": true,
       "needsUserFile": true,
-      "note": "Google Drive 連結；沙盒與 GitHub Actions 可能下載不到，請使用者上傳檔案後核對 sha256"
+      "note": "Google Drive 連結；沙盒與 GitHub Actions 可能下載不到，請使用者上傳檔案後核對 sha256",
+      "key": "kahik",
+      "label": "佮逸體",
+      "weight": 400
     },
     {
       "id": "naikaifont__NaikaiFont-Bold",
@@ -300,7 +335,10 @@
       "sha256": "d3320b822131540d5e3cc9737f7b458aeb1c0ca76fe89aeaa1b76001f54e503e",
       "license": "OFL-1.1",
       "source": "https://github.com/max32002/naikaifont",
-      "build": true
+      "build": true,
+      "key": "naikai",
+      "label": "內海字體",
+      "weight": 400
     },
     {
       "id": "naikaifont__NaikaiFont-SemiBold",
@@ -322,7 +360,7 @@
       "url": null,
       "bytes": 7359872,
       "sha256": "24dd98822c0879bd3f9480e470aaa5994045a5d2b62a9f648e1f878a723192c8",
-      "license": "unverified",
+      "license": "字言字型免費商用授權書（可原檔放上網站/雲端並附授權書、非營利分享；不可改作）",
       "source": "（使用者提供）",
       "build": true,
       "needsUserFile": true,
@@ -330,7 +368,12 @@
         "percent": 100.0,
         "missing": ""
       },
-      "licenseCheck": "讀字型 name table（nameID 13/14）與作者頁確認；可再散布才放進網站，否則改為使用者個人字體（只存使用者自己的裝置/Drive）"
+      "licenseCheck": "讀字型 name table（nameID 13/14）與作者頁確認；可再散布才放進網站，否則改為使用者個人字體（只存使用者自己的裝置/Drive）",
+      "key": "fancy-free",
+      "label": "字言手繪體",
+      "weight": 400,
+      "unmodified": true,
+      "licenseFile": "fancy-free/LICENSE.txt"
     },
     {
       "id": "StarPandaKidsFonts__StarPandaKidsBeta2.1",
@@ -342,13 +385,14 @@
       "sha256": "554ead9138199803806a82b2918da1ca55e6789a05c2c236772a6bf6ded51040",
       "license": "unverified",
       "source": "（使用者提供）",
-      "build": true,
+      "build": false,
       "needsUserFile": true,
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
       },
-      "licenseCheck": "讀字型 name table（nameID 13/14）與作者頁確認；可再散布才放進網站，否則改為使用者個人字體（只存使用者自己的裝置/Drive）"
+      "licenseCheck": "讀字型 name table（nameID 13/14）與作者頁確認；可再散布才放進網站，否則改為使用者個人字體（只存使用者自己的裝置/Drive）",
+      "personal": true
     },
     {
       "id": "JasonHandwriting__JasonHandwriting1",
@@ -360,7 +404,10 @@
       "sha256": "de76a15b1e2c1a7050d061485e28195f5b682d45e37499cf730c2b8554c44cf3",
       "license": "OFL-1.1",
       "source": "https://github.com/jasonhandwriting/JasonHandwriting",
-      "build": true
+      "build": true,
+      "key": "jason-handwriting-1",
+      "label": "清松手寫體 1",
+      "weight": 400
     },
     {
       "id": "JasonHandwriting__JasonHandwriting2",
@@ -372,7 +419,10 @@
       "sha256": "b67dce349d32e92e4ee7befeb0339d04ca69551bb523e60cfb5ea8f5fbd5d669",
       "license": "OFL-1.1",
       "source": "https://github.com/jasonhandwriting/JasonHandwriting",
-      "build": true
+      "build": true,
+      "key": "jason-handwriting-2",
+      "label": "清松手寫體 2",
+      "weight": 400
     },
     {
       "id": "JasonHandwriting__JasonHandwriting3",
@@ -384,7 +434,10 @@
       "sha256": "7747c276f3b16306c7ab7d52465647c566d01f91faeefa70c271a3890ed35fb0",
       "license": "OFL-1.1",
       "source": "https://github.com/jasonhandwriting/JasonHandwriting",
-      "build": true
+      "build": true,
+      "key": "jason-handwriting-3",
+      "label": "清松手寫體 3",
+      "weight": 400
     },
     {
       "id": "JasonHandwriting__JasonHandwriting3p",
@@ -408,7 +461,10 @@
       "sha256": "1db91107a80c78e6d04b6d78f86a4b8946f083cb0b41ff5864009c4e1698ee4b",
       "license": "OFL-1.1",
       "source": "https://github.com/jasonhandwriting/JasonHandwriting",
-      "build": true
+      "build": true,
+      "key": "jason-handwriting-4",
+      "label": "清松手寫體 4",
+      "weight": 400
     },
     {
       "id": "JasonHandwriting__JasonHandwriting5",
@@ -420,7 +476,10 @@
       "sha256": "2f0a54b56a79961e44f38d95ea293d113362e6eff438a2c351e60390d60f7960",
       "license": "OFL-1.1",
       "source": "https://github.com/jasonhandwriting/JasonHandwriting",
-      "build": true
+      "build": true,
+      "key": "jason-handwriting-5",
+      "label": "清松手寫體 5",
+      "weight": 400
     },
     {
       "id": "JasonHandwriting__JasonHandwriting5p",
@@ -444,7 +503,10 @@
       "sha256": "2fa5886c15b4053eb32f3dc9e83fd7a8bf8fc599dcddd37e6c706b3fefe32ffd",
       "license": "OFL-1.1",
       "source": "https://github.com/jasonhandwriting/JasonHandwriting",
-      "build": true
+      "build": true,
+      "key": "jason-handwriting-6",
+      "label": "清松手寫體 6",
+      "weight": 400
     },
     {
       "id": "JasonHandwriting__JasonHandwriting6p",
@@ -468,7 +530,10 @@
       "sha256": "415a3b569ae977de87377a892f250e53c8d12139e0f47ef7cadd8a8a359c288e",
       "license": "OFL-1.1",
       "source": "https://github.com/jasonhandwriting/JasonHandwriting",
-      "build": true
+      "build": true,
+      "key": "jason-handwriting-7",
+      "label": "清松手寫體 7",
+      "weight": 400
     },
     {
       "id": "JasonHandwriting__JasonHandwriting7p",
@@ -492,7 +557,10 @@
       "sha256": "1437de4a5fee29a5c6b43450df56e734af9cddb5b3a68d236cf5f42be178c93f",
       "license": "OFL-1.1",
       "source": "https://github.com/jasonhandwriting/JasonHandwriting",
-      "build": true
+      "build": true,
+      "key": "jason-handwriting-8",
+      "label": "清松手寫體 8",
+      "weight": 400
     },
     {
       "id": "JasonHandwriting__JasonHandwriting8p",
@@ -516,7 +584,10 @@
       "sha256": "b50728e2c7442a76a661c4d43c8ec22142e8edc83909a9d40b7c25d04bd04cf5",
       "license": "OFL-1.1",
       "source": "https://github.com/jasonhandwriting/JasonHandwriting",
-      "build": true
+      "build": true,
+      "key": "jason-handwriting-9",
+      "label": "清松手寫體 9",
+      "weight": 400
     },
     {
       "id": "JasonHandwriting__JasonHandwriting9p",
@@ -540,7 +611,10 @@
       "sha256": "050f9ebf394faab3c0ba59092ae3e4b6686b349eadb3018d76d385c5829a1267",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/gensen-font",
-      "build": true
+      "build": true,
+      "key": "gensen-rounded",
+      "label": "源泉圓體",
+      "weight": 700
     },
     {
       "id": "gensen-font__GenSenRounded2TW-R",
@@ -552,7 +626,10 @@
       "sha256": "092285878f1d9441c790e5d6a98e806bd508602ad0a8a55511b6fb0a71a25fed",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/gensen-font",
-      "build": true
+      "build": true,
+      "key": "gensen-rounded",
+      "label": "源泉圓體",
+      "weight": 400
     },
     {
       "id": "BoutiqueBitmap9x9__BoutiqueBitmap9x9_1.93",
@@ -569,7 +646,10 @@
         "percent": 100.0,
         "missing": ""
       },
-      "note": "raw 路徑 2026-11-11 確認可下載；repo 若更新版本，sha256 可能不同，要重新核對"
+      "note": "raw 路徑 2026-11-11 確認可下載；repo 若更新版本，sha256 可能不同，要重新核對",
+      "key": "boutique-bitmap",
+      "label": "精品點陣體",
+      "weight": 400
     },
     {
       "id": "BoutiqueBitmap9x9__BoutiqueBitmap9x9_Bold_1.93",
@@ -586,7 +666,10 @@
         "percent": 100.0,
         "missing": ""
       },
-      "note": "raw 路徑 2026-11-11 確認可下載；repo 若更新版本，sha256 可能不同，要重新核對"
+      "note": "raw 路徑 2026-11-11 確認可下載；repo 若更新版本，sha256 可能不同，要重新核對",
+      "key": "boutique-bitmap",
+      "label": "精品點陣體",
+      "weight": 700
     },
     {
       "id": "chenyuluoyan_thin__ChenYuluoyan-2.0-Thin",
@@ -598,7 +681,10 @@
       "sha256": "1289e42a6d1ec995d0cb23aee89efc69fc95749fbd54a610057a3e992dc453db",
       "license": "OFL-1.1",
       "source": "https://github.com/Chenyu-otf/chenyuluoyan_thin",
-      "build": true
+      "build": true,
+      "key": "chenyuluoyan-thin",
+      "label": "辰宇落雁",
+      "weight": 400
     },
     {
       "id": "chenyuluoyan_thin__ChenYuluoyan-Thin-Monospaced",
@@ -622,7 +708,10 @@
       "sha256": "e6345f3d92c7a9b7044c31a87d9b61f50220b08c0f1dcc2736e94c2aa587ce03",
       "license": "OFL-1.1",
       "source": "https://github.com/google/fonts/tree/main/ofl/chocolateclassicalsans",
-      "build": true
+      "build": true,
+      "key": "chocolate-classical",
+      "label": "Chocolate 古典黑",
+      "weight": 400
     },
     {
       "id": "plex__IBMPlexSansTC-Bold",
@@ -638,7 +727,10 @@
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
-      }
+      },
+      "key": "ibm-plex-sans-tc",
+      "label": "IBM Plex 黑體",
+      "weight": 700
     },
     {
       "id": "plex__IBMPlexSansTC-Light",
@@ -670,7 +762,10 @@
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
-      }
+      },
+      "key": "ibm-plex-sans-tc",
+      "label": "IBM Plex 黑體",
+      "weight": 400
     },
     {
       "id": "genyo-font__GenKiMin2TW-B",
@@ -706,7 +801,10 @@
       "sha256": "0b464ceee812b354878d03a5e41fde037bca8b8fcfbb54a3df2551395ff8f6f3",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/genyo-font",
-      "build": true
+      "build": true,
+      "key": "genyo-min",
+      "label": "源樣明體",
+      "weight": 700
     },
     {
       "id": "genyo-font__GenYoMin2TW-R",
@@ -718,7 +816,10 @@
       "sha256": "d5fb9f21c533263e727268fadb3155cd7255468d48d666aed1b886a80b4b8c92",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/genyo-font",
-      "build": true
+      "build": true,
+      "key": "genyo-min",
+      "label": "源樣明體",
+      "weight": 400
     },
     {
       "id": "genyog-font__GenKiGothic2TW-B",
@@ -754,7 +855,10 @@
       "sha256": "3aec8c192dc49bef72875b370ff8cdffc2fd242185a43bab3db2733a24debff3",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/genyog-font",
-      "build": true
+      "build": true,
+      "key": "genyo-gothic",
+      "label": "源樣黑體",
+      "weight": 700
     },
     {
       "id": "genyog-font__GenYoGothic2TW-R",
@@ -766,7 +870,10 @@
       "sha256": "425f22fe1e7cf51d6afb5a6a0608f6c6e45b69a71ca3a1f73f13fedc5253f3c3",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/genyog-font",
-      "build": true
+      "build": true,
+      "key": "genyo-gothic",
+      "label": "源樣黑體",
+      "weight": 400
     },
     {
       "id": "genryu-font__GenRyuMin2TW-B",
@@ -790,7 +897,10 @@
       "sha256": "d244c6115431b2a18b5dfb0066e08381f56e6a33532915a0f517dd3f7063b646",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/genryu-font",
-      "build": true
+      "build": true,
+      "key": "genryu-min",
+      "label": "源流明體",
+      "weight": 400
     },
     {
       "id": "genseki-font__GenSekiGothic2TW-B",
@@ -802,7 +912,10 @@
       "sha256": "911bc231c346f1e377796ccd1b85959184a547d1fce356da882a2f1abb9bfaa4",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/genseki-font",
-      "build": true
+      "build": true,
+      "key": "genseki-gothic",
+      "label": "源石黑體",
+      "weight": 700
     },
     {
       "id": "genseki-font__GenSekiGothic2TW-R",
@@ -814,7 +927,10 @@
       "sha256": "bb3cccb9594a5a9c759a92bbbf147eb87826b8317d07d20f48ee7ebdcec684fa",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/genseki-font",
-      "build": true
+      "build": true,
+      "key": "genseki-gothic",
+      "label": "源石黑體",
+      "weight": 400
     },
     {
       "id": "genwan-font__GenWanMin2TW-R",
@@ -826,7 +942,10 @@
       "sha256": "4c1cea221f35ccfd7c27e295238012d3b48e57d149b92b4eb7d71aeb25d798cf",
       "license": "OFL-1.1",
       "source": "https://github.com/ButTaiwan/genwan-font",
-      "build": true
+      "build": true,
+      "key": "genwan-min",
+      "label": "源雲明體",
+      "weight": 400
     },
     {
       "id": "ZhiyiSerif__致一宋體-Regular",
@@ -844,7 +963,10 @@
         "percent": 100.0,
         "missing": ""
       },
-      "licenseCheck": "讀字型 name table（nameID 13/14）與作者頁確認；可再散布才放進網站，否則改為使用者個人字體（只存使用者自己的裝置/Drive）"
+      "licenseCheck": "讀字型 name table（nameID 13/14）與作者頁確認；可再散布才放進網站，否則改為使用者個人字體（只存使用者自己的裝置/Drive）",
+      "key": "zhiyi-serif",
+      "label": "致一宋體",
+      "weight": 400
     },
     {
       "id": "masafont__MasaFont-Bold",
@@ -868,7 +990,10 @@
       "sha256": "f5a449d3a9ce2170e404050cc2b44bfa16ae48ef8fb06aa5968383ed74e5ed4d",
       "license": "OFL-1.1",
       "source": "https://github.com/max32002/masafont",
-      "build": true
+      "build": true,
+      "key": "masa-brush",
+      "label": "正風毛筆",
+      "weight": 400
     },
     {
       "id": "bakudaifont__Bakudai-Bold",
@@ -892,7 +1017,10 @@
       "sha256": "19fad0c294f3d3013bdee7471cd5e79015ee7a03acb2c47d9955937fc3dc8e4e",
       "license": "OFL-1.1",
       "source": "https://github.com/max32002/bakudaifont",
-      "build": true
+      "build": true,
+      "key": "bakudai-brush",
+      "label": "莫大毛筆",
+      "weight": 400
     },
     {
       "id": "hachimarupop__HachiMaruPop-Regular",
@@ -908,7 +1036,10 @@
       "sampleCoverage": {
         "percent": 95.1,
         "missing": "歲爸你溫"
-      }
+      },
+      "key": "hachi-maru-pop",
+      "label": "Hachi Maru Pop（日）",
+      "weight": 400
     },
     {
       "id": "kaiseidecol__KaiseiDecol-Regular",
@@ -924,7 +1055,10 @@
       "sampleCoverage": {
         "percent": 95.1,
         "missing": "歲爸你溫"
-      }
+      },
+      "key": "kaisei-decol",
+      "label": "Kaisei Decol（日）",
+      "weight": 400
     },
     {
       "id": "kleeone__KleeOne-Regular",
@@ -940,7 +1074,10 @@
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
-      }
+      },
+      "key": "klee-one",
+      "label": "Klee One（日）",
+      "weight": 400
     },
     {
       "id": "kleeone__KleeOne-SemiBold",
@@ -956,7 +1093,10 @@
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
-      }
+      },
+      "key": "klee-one",
+      "label": "Klee One（日）",
+      "weight": 600
     },
     {
       "id": "shipporimincho__ShipporiMincho-Bold",
@@ -988,7 +1128,10 @@
       "sampleCoverage": {
         "percent": 100.0,
         "missing": ""
-      }
+      },
+      "key": "shippori-mincho",
+      "label": "Shippori 明朝（日）",
+      "weight": 400
     },
     {
       "id": "yomogi__Yomogi-Regular",
@@ -1004,7 +1147,10 @@
       "sampleCoverage": {
         "percent": 95.1,
         "missing": "歲爸你溫"
-      }
+      },
+      "key": "yomogi",
+      "label": "Yomogi（日）",
+      "weight": 400
     },
     {
       "id": "yuseimagic__YuseiMagic-Regular",
@@ -1020,7 +1166,10 @@
       "sampleCoverage": {
         "percent": 95.1,
         "missing": "歲爸你溫"
-      }
+      },
+      "key": "yusei-magic",
+      "label": "Yusei Magic（日）",
+      "weight": 400
     },
     {
       "id": "zenkakugothicnew__ZenKakuGothicNew-Regular",
@@ -1036,7 +1185,10 @@
       "sampleCoverage": {
         "percent": 95.1,
         "missing": "歲爸你溫"
-      }
+      },
+      "key": "zen-kaku-gothic",
+      "label": "Zen Kaku 黑體（日）",
+      "weight": 400
     },
     {
       "id": "zenoldmincho__ZenOldMincho-Regular",
@@ -1052,7 +1204,99 @@
       "sampleCoverage": {
         "percent": 95.1,
         "missing": "歲爸你溫"
-      }
+      },
+      "key": "zen-old-mincho",
+      "label": "Zen Old 明朝（日）",
+      "weight": 400
+    },
+    {
+      "id": "pop-gothic__Regular",
+      "family": "大波浪圓體 Pop Gothic",
+      "pack": "cute",
+      "file": "pop-gothic/PopGothicCjkTc-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/max32002/pop-gothic/master/CJK%20TC/PopGothicCjkTc-Regular.ttf",
+      "bytes": 8371820,
+      "sha256": "3094ba8fa82bebdfbe4fd168c7460f1023d7bf8a515696a3dedc960f74bbba4a",
+      "license": "OFL-1.1",
+      "source": "https://github.com/max32002/pop-gothic",
+      "build": true,
+      "key": "pop-gothic",
+      "label": "大波浪圓體",
+      "weight": 400,
+      "note": "はちまるポップ補字版（含注音符號）；raw 路徑 2026-11-11 確認"
+    },
+    {
+      "id": "pop-gothic__Bold",
+      "family": "大波浪圓體 Pop Gothic",
+      "pack": "cute",
+      "file": "pop-gothic/PopGothicCjkTc-Bold.ttf",
+      "url": "https://raw.githubusercontent.com/max32002/pop-gothic/master/CJK%20TC/PopGothicCjkTc-Bold.ttf",
+      "bytes": 10298960,
+      "sha256": "6f40a3fcfed7128bebca12b0b27c5cf4a0982e4312143df1390d1645fa4e12e7",
+      "license": "OFL-1.1",
+      "source": "https://github.com/max32002/pop-gothic",
+      "build": true,
+      "key": "pop-gothic",
+      "label": "大波浪圓體",
+      "weight": 700,
+      "note": "はちまるポップ補字版（含注音符號）；raw 路徑 2026-11-11 確認"
+    },
+    {
+      "id": "851tegaki-zatsu",
+      "family": "851 手書き雜",
+      "pack": "cute",
+      "file": "851tegaki/851tegaki_zatsu_normal_0883.ttf",
+      "bytes": 28588168,
+      "sha256": "e5290d6583e1aef725f07921aad69b9eaa83cf3408273cf840ff31842d118f0e",
+      "license": "unverified",
+      "source": "（使用者提供）",
+      "build": false,
+      "personal": true,
+      "needsUserFile": true,
+      "note": "字型檔內沒有授權說明；先當個人字體，請使用者自己匯入"
+    }
+  ],
+  "prebuilt": [
+    {
+      "key": "line-seed-en",
+      "label": "LINE Seed（英文）",
+      "pack": "basic",
+      "license": "OFL-1.1",
+      "source": "https://seed.line.me/ （使用者提供官方下載包）",
+      "latin_only": true,
+      "faces": [
+        {
+          "weight": 400,
+          "file": "LINESeedSans_W_Rg.woff2"
+        },
+        {
+          "weight": 700,
+          "file": "LINESeedSans_W_Bd.woff2"
+        },
+        {
+          "weight": 800,
+          "file": "LINESeedSans_W_XBd.woff2"
+        }
+      ],
+      "dir": "line-seed-en",
+      "licenseFile": "line-seed-en/OFL.txt"
+    }
+  ],
+  "personal_fonts": [
+    {
+      "label": "中規中矩體 Proper Script",
+      "license": "字型檔寫明「All rights reserved，未經許可不得再散布或商用」",
+      "how": "請自己在「設定 → 字體 → 匯入字體」載入"
+    },
+    {
+      "label": "星光小熊貓幼兒體（星光手體）",
+      "license": "作者授權：可免費商用，但禁止把字型檔上傳到任何網站/雲端供他人下載",
+      "how": "請自己匯入；作者發布頁見字型檔內的授權說明"
+    },
+    {
+      "label": "851 手書き雜",
+      "license": "字型檔內沒有授權說明",
+      "how": "請自己匯入"
     }
   ]
 }
