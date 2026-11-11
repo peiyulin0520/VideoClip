@@ -58,6 +58,7 @@
   - 動了哪些檔：src/app/editor/TextPanel.tsx（新）、src/ui/Slider.tsx（新，從 Toolbar 抽出）、Toolbar.tsx、textRender.ts（描邊厚度 0 的層略過）、styles.css、e2e/phase3a-panel.spec.ts
   - 驗證：✅ e2e 逐一點過每個按鈕／滑桿並檢查專案資料與預覽像素（字塊顏色出現在預覽）；截圖 docs/screenshots/phase3a/（box-default、box-padding-separate、stroke-two-layers）；65 單元＋37 e2e 全過  🟡 只在 Chromium；🔴 iPhone 觸控手感、滑桿好不好拖未驗證  🔴 尚未做：漸層、發光、直排、多段文字（面板只編輯第一段）、字塊的尾巴／斜切／描邊
   - 踩到的坑：字卡面板太高會把預覽擠很小（iPhone 13 尺寸下預覽只剩約 200px 高）→ 控制項縮小、分頁列固定；需要大預覽時點底部「文字」分頁可收合面板。flex 容器裡的圓形色票會被壓成橢圓，要 `flex:none` 加 `min-height`
+  - 順手修：`fix-thumbs` 的「有縮圖」測試在機器忙（整套平行跑）時偶爾失敗（縮圖晚到）→ 改成輪詢；整套連跑 2 次 37/37 過
   - 下一步：第 3 步尾端圈圈與裝飾
 - 2026-11-11 Phase 3A 第 1 步：字卡型別擴充＋逐字排版引擎（分支 claude/zen-tesla-v3brj5，Sonnet）
   - 做了什麼：`TextRun` 加 `italic/strokes/shadow`、`TextCard` 加 `width/box`、新 `CardBox`（形狀 rect/roundRect/pill、顏色、透明度、四邊內距、垂直微調、圓角）——全是選填，舊字卡不用轉換。新 `engine/cardLayout.ts`（純計算、量字器可注入）：逐字排、字距（em）、固定寬度自動換行（中文逐字、英文在單字邊界、太長硬斷、避頭尾）、對齊、字塊尺寸＝墨跡邊界＋四邊內距。`textRender.ts` 改成用它畫：字塊→多層描邊（由外到內）→陰影→文字，斜體用斜切。新字卡預設帶陰影（舊字卡不再有預設陰影）

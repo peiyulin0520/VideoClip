@@ -8,9 +8,10 @@ const thumbsOf = async (page: import('@playwright/test').Page) =>
 
 test('一般情況：匯入後時間軸有縮圖（不顯示檔名）', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm']);
-  const p = await thumbsOf(page);
-  expect(p.assets[0]!.thumbs.length).toBeGreaterThan(0);
-  expect(p.assets[0]!.thumbs[0]).toMatch(/^data:image\/jpeg/);
+  // 機器忙的時候縮圖可能晚一點才到（匯入先放行、播放器補圖），所以用輪詢
+  await expect
+    .poll(async () => (await thumbsOf(page)).assets[0]!.thumbs[0] ?? '', { timeout: 15_000 })
+    .toMatch(/^data:image\/jpeg/);
   await expect(page.getByTestId('clip-name')).toHaveCount(0);
 });
 
