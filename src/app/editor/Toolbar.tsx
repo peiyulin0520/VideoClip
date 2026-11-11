@@ -18,7 +18,7 @@ import {
   Volume2,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import { BLEND_LABELS } from '../../engine/geometry';
 import {
   findItem,
@@ -44,6 +44,7 @@ import { setMainItems, setTrackItems, useProjectStore } from '../../store/projec
 import { toast, useUI } from '../../store/uiStore';
 import { Slider } from '../../ui/Slider';
 import { TextPanel } from './TextPanel';
+import { TransformControls } from './TransformControls';
 
 export type Tab = 'edit' | 'overlay' | 'text' | 'layers';
 type Panel = 'speed' | 'volume' | null;
@@ -93,13 +94,7 @@ export function BottomBar({
 
   const found = findItem(project, selectedId);
   const items = mainItems(project);
-
-  // 文字／疊加／圖層面板展開時，時間軸縮成精簡模式（預覽畫面才夠大）
-  const compact = tab !== 'edit' && !collapsed;
-  useEffect(() => {
-    useUI.setState({ compactTimeline: compact });
-    return () => useUI.setState({ compactTimeline: false });
-  }, [compact]);
+  const barRef = useRef<HTMLDivElement>(null);
 
   // 點目前的分頁＝收合/展開下面的面板（讓出空間給預覽畫面）
   const switchTab = (t: Tab) => {
@@ -109,10 +104,17 @@ export function BottomBar({
       setTab(t);
       setCollapsed(false);
     }
+    // 分頁列黏在頂端時（已經往下捲過），切分頁後停在分頁列的位置，不要停在新面板的一半
+    const el = barRef.current;
+    if (el) {
+      const stickTop = parseFloat(getComputedStyle(el).getPropertyValue('--top-h')) || 52;
+      if (el.getBoundingClientRect().top <= stickTop + 1)
+        requestAnimationFrame(() => window.scrollTo({ top: el.offsetTop - stickTop }));
+    }
   };
 
   return (
-    <div className="bottombar">
+    <div className="bottombar" ref={barRef}>
       <div className="tabs" role="tablist">
         {TABS.map((t) => (
           <button
@@ -342,7 +344,7 @@ function TextTab({ found }: { found: Found }) {
   const item = found?.item.type === 'text' ? found.item : null;
   const add = () => addText(player?.time ?? 0);
   return (
-    <div className="panel tall">
+    <div className="panel text-panel">
       {item ? (
         <TextPanel item={item} onAdd={add} onAddShape={() => addText(player?.time ?? 0, true)} />
       ) : (
@@ -371,7 +373,7 @@ function LayersTab() {
   const it = found?.item;
 
   return (
-    <div className="panel scroll">
+    <div className="panel">
       <div className="panel-head">
         <span>這一秒的圖層（上面的會蓋住下面的）</span>
       </div>
@@ -448,6 +450,7 @@ function LayersTab() {
           <div className="panel-head">
             <span>選取的圖層</span>
           </div>
+          <TransformControls item={it} />
           <Slider
             label="透明度"
             value={Math.round(it.transform.opacity * 100)}

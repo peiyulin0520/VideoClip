@@ -7,6 +7,7 @@ import { SHAPE_CATS, SHAPES, shapeDef } from '../../engine/shapes';
 import { ColorPicker } from '../../ui/ColorPicker';
 import { Slider } from '../../ui/Slider';
 import { DecoThumb } from './DecoThumb';
+import { TransformControls } from './TransformControls';
 import { ShapeThumb } from './ShapeThumb';
 import { FontSelect } from '../fonts/FontSelect';
 
@@ -139,6 +140,7 @@ export function TextPanel({
 
       {section === '版面' && (
         <>
+          <TransformControls item={item} />
           <Slider
             label="字距"
             value={run.letterSpacing}

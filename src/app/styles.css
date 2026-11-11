@@ -294,18 +294,24 @@ button {
 }
 
 /* ---------- 編輯器 ---------- */
+/* 編輯器是一般可往下捲的頁面：最上面是預覽（大小永遠不變），往下滑是時間軸、分頁、各項設定。
+   頂列與分頁列捲動時黏在上面。見 docs/plans/2026-11-11-preview-first-layout.md */
 .editor {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  padding-top: var(--safe-top);
-  overflow: hidden;
+  --top-h: calc(52px + var(--safe-top));
+  --playbar-h: 52px;
+  min-height: 100svh;
+  padding-bottom: calc(24px + var(--safe-bottom));
 }
 .ed-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  height: var(--top-h);
+  padding: var(--safe-top) 8px 0;
+  background: var(--bg);
 }
 .name-btn {
   flex: 1;
@@ -320,8 +326,11 @@ button {
 }
 .stage-wrap {
   position: relative;
-  flex: 1;
-  min-height: 150px;
+  /* 寬度撐滿；高度依專案比例，但最高＝一個螢幕扣掉頂列與播放列（捲到最上面時整個預覽都看得到）。用 svh：Safari 網址列伸縮時不會抖 */
+  height: max(
+    300px,
+    min(calc(100vw * var(--inv-ratio, 1.7778)), calc(100svh - var(--top-h) - var(--playbar-h)))
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -340,10 +349,12 @@ button {
   inset: 0;
   width: 100%;
   height: 100%;
-  touch-action: none;
+  /* 跟舞台一樣：空白處上下滑可以捲頁面。Pixi 會在 canvas 上寫 inline 的 touch-action:none，要用 !important 蓋掉 */
+  touch-action: pan-y !important;
 }
 .stage {
-  touch-action: none;
+  /* 預覽空白處上下滑＝捲頁面；物件上有看不見的觸控區（.hit，touch-action:none）可以拖 */
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -476,6 +487,7 @@ button {
   transform: translate(-50%, -50%);
 }
 .playbar {
+  height: var(--playbar-h);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -496,7 +508,8 @@ button {
 }
 .tl-scroll {
   height: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   touch-action: pan-x pan-y;
   scrollbar-width: none;
 }
@@ -661,9 +674,6 @@ button {
   color: var(--accent);
 }
 .panel {
-  flex: none;
-  max-height: 26dvh;
-  overflow-y: auto;
   padding: 10px 16px calc(12px + var(--safe-bottom));
   background: var(--panel);
 }
@@ -720,10 +730,13 @@ button {
 }
 
 .bottombar {
-  flex: none;
   background: var(--panel);
 }
 .tabs {
+  position: sticky;
+  top: var(--top-h);
+  z-index: 15;
+  background: var(--panel);
   display: flex;
   border-bottom: 1px solid var(--line);
 }
@@ -747,9 +760,6 @@ button {
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted);
-}
-.panel.scroll {
-  max-height: 26dvh;
 }
 .text-input.area {
   min-height: 64px;
@@ -1122,12 +1132,9 @@ button {
 }
 
 /* 字卡面板：設定很多，面板高一點；分頁（文字／版面／字塊／描邊陰影）捲動時固定在上面 */
-.panel.tall {
-  max-height: 25dvh;
-}
 .sticky-tabs {
   position: sticky;
-  top: -10px;
+  top: calc(var(--top-h) + 45px); /* 黏在主分頁列下面 */
   z-index: 2;
   margin: 0 -16px 4px;
   padding: 8px 16px;
@@ -1143,28 +1150,28 @@ button {
   background: var(--accent);
 }
 /* 字卡面板：控制項多，縮小一點（仍 ≥ 36px 高；滑桿維持 44px 好拖） */
-.panel.tall .chips {
+.panel.text-panel .chips {
   gap: 6px;
   margin: 4px 0;
 }
-.panel.tall .chip {
+.panel.text-panel .chip {
   min-height: 38px;
   padding: 0 12px;
   font-size: 14px;
 }
-.panel.tall .swatch {
+.panel.text-panel .swatch {
   flex: none;
   width: 38px;
   height: 38px;
   min-width: 38px;
   min-height: 38px;
 }
-.panel.tall .sticky-tabs {
+.panel.text-panel .sticky-tabs {
   flex-wrap: nowrap;
   margin: 0 -16px 4px;
   padding: 8px 16px;
 }
-.panel.tall .sticky-tabs .chip {
+.panel.text-panel .sticky-tabs .chip {
   flex: none;
   padding: 0 11px;
   white-space: nowrap;
@@ -1225,36 +1232,6 @@ button {
   height: 40px;
 }
 
-/* 選取框的角點：看得到的點 12px，觸控區 40px（往框外偏，不蓋住物件） */
-.sel-dot {
-  position: absolute;
-  z-index: 3;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  background: transparent;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
-  touch-action: none;
-}
-.sel-dot::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 12px;
-  height: 12px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-  transform: translate(-50%, -50%);
-}
-.sel-dot.rotate::after {
-  background: var(--accent);
-  border-color: #fff;
-}
-
 .chip.danger {
   color: #ff6b6b;
 }
@@ -1289,7 +1266,7 @@ button {
   justify-items: center;
 }
 .color-row .swatch,
-.panel.tall .color-row .swatch {
+.panel.text-panel .color-row .swatch {
   width: 40px;
   height: 40px;
   min-width: 0;
@@ -1330,4 +1307,10 @@ button {
 }
 .more-colors {
   margin-top: 4px;
+}
+
+/* 物件的觸控區：看不見，位置／大小／旋轉跟選取框一樣（最小 44px）；按在上面才是拖物件，其他地方上下滑是捲頁面 */
+.hit {
+  position: absolute;
+  touch-action: none;
 }

@@ -4,15 +4,16 @@ import { urlFor } from '../../engine/assetUrls';
 import { installDebugHook } from '../../engine/debug';
 import { useFonts } from '../../fonts/fontStore';
 import {
-  boxCorners,
   selectionBox,
   snapMove,
   snapRotation,
   SAFE_BOTTOM,
   SAFE_RIGHT,
   topHit,
+  type Box,
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
+import type { Item } from '../../model/types';
 import { geoCtx } from '../../engine/scene';
 import { findItem, visibleLayers } from '../../engine/timeline';
 import { setTransform } from '../../store/actions';
@@ -61,6 +62,7 @@ export function Preview({
   const [dragging, setDragging] = useState(false); // 拖移/縮放中：安全區參考線暫時出現
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [selVisible, setSelVisible] = useState(true);
+  const [hitIds, setHitIds] = useState(''); // 這一秒可以拖的物件（逗號分隔），給觸控區用
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
@@ -112,7 +114,15 @@ export function Preview({
     const el = stageRef.current!;
     const ro = new ResizeObserver(() => setCssW(el.clientWidth || 1));
     ro.observe(el);
-    return () => ro.disconnect();
+    // iOS Safari：雙指在預覽上不要變成整頁縮放（touch-action 之外的保險）
+    const stop = (e: Event) => e.preventDefault();
+    el.addEventListener('gesturestart', stop);
+    el.addEventListener('gesturechange', stop);
+    return () => {
+      ro.disconnect();
+      el.removeEventListener('gesturestart', stop);
+      el.removeEventListener('gesturechange', stop);
+    };
   }, []);
 
   // 選取的物件目前在不在畫面上（不在就不顯示選取框）
@@ -124,6 +134,15 @@ export function Preview({
       const f = p && findItem(p, id);
       setSelVisible(
         !!f && (f.track.kind === 'main' || (t >= f.item.start && t < f.item.start + f.item.duration)),
+      );
+      // 字串相同 React 不會重畫，播放時不會每一格都重畫
+      setHitIds(
+        p
+          ? visibleLayers(p, t)
+              .filter((l) => l.track.kind !== 'main' && !l.track.locked)
+              .map((l) => l.item.id)
+              .join(',')
+          : '',
       );
     };
     check(player.time);
@@ -166,16 +185,27 @@ export function Preview({
     const st = useProjectStore.getState();
     const cur = findItem(st.project!, st.selectedId);
 
-    if (pointers.current.size === 2 && cur && !cur.track.locked) {
+    if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()] as [Pt, Pt];
+      // 沒有選取時：選兩指中點下最上面的物件（主軌除外）
+      let target: { item: Item } | null = cur && !cur.track.locked ? cur : null;
+      if (!target) {
+        const t = useUI.getState().player?.time ?? 0;
+        const hit = topHit(visibleLayers(st.project!, t), geo, (a.x + b.x) / 2, (a.y + b.y) / 2, 40 / k);
+        if (hit && hit.track.kind !== 'main') {
+          st.select(hit.item.id);
+          target = hit;
+        }
+      }
+      if (!target) return;
       setDragging(true);
       gesture.current = {
         type: 'pinch',
-        id: cur.item.id,
+        id: target.item.id,
         startDist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
         startAngle: Math.atan2(b.y - a.y, b.x - a.x),
-        startScale: cur.item.transform.scale,
-        startRot: cur.item.transform.rotation,
+        startScale: target.item.transform.scale,
+        startRot: target.item.transform.rotation,
       };
       return;
     }
@@ -212,10 +242,15 @@ export function Preview({
       const [a, b] = [...pointers.current.values()] as [Pt, Pt];
       const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       const ang = Math.atan2(b.y - a.y, b.x - a.x);
-      setTransform(g.id, {
-        scale: clamp((g.startScale * dist) / g.startDist, 0.05, 10),
-        rotation: g.startRot + ((ang - g.startAngle) * 180) / Math.PI,
-      });
+      // 一次雙指手勢＝一步復原；旋轉吸附 0/90/180/270
+      setTransform(
+        g.id,
+        {
+          scale: clamp((g.startScale * dist) / g.startDist, 0.05, 10),
+          rotation: snapRotation(g.startRot + ((ang - g.startAngle) * 180) / Math.PI),
+        },
+        `pinch:${g.id}`,
+      );
       return;
     }
     if (g.type === 'move' && pointers.current.size === 1) {
@@ -252,45 +287,6 @@ export function Preview({
     }
   };
 
-  // ---- 四角小點：縮放（以中心為準）；上方小點：旋轉 ----
-  const onHandleDown = (kind: 'scale' | 'rotate') => (e: RPointerEvent) => {
-    if (!sel || !box || selLocked) return;
-    e.stopPropagation();
-    e.preventDefault();
-    useUI.getState().player?.pause();
-    const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
-    const id = sel.item.id;
-    const r = stageRef.current!.getBoundingClientRect();
-    const cx = r.left + (box.cx / width) * r.width;
-    const cy = r.top + (box.cy / height) * r.height;
-    const v0 = { x: e.clientX - cx, y: e.clientY - cy };
-    const d0 = Math.hypot(v0.x, v0.y) || 1;
-    const a0 = Math.atan2(v0.y, v0.x);
-    setDragging(true);
-    const s0 = sel.item.transform.scale;
-    const r0 = sel.item.transform.rotation;
-    const move = (ev: PointerEvent) => {
-      const v = { x: ev.clientX - cx, y: ev.clientY - cy };
-      if (kind === 'scale') {
-        const d = Math.hypot(v.x, v.y);
-        setTransform(id, { scale: clamp((s0 * d) / d0, 0.05, 10) }, `scale:${id}`);
-      } else {
-        const rot = snapRotation(r0 + ((Math.atan2(v.y, v.x) - a0) * 180) / Math.PI);
-        setTransform(id, { rotation: rot }, `rotate:${id}`);
-      }
-    };
-    const up = () => {
-      setDragging(false);
-      target.removeEventListener('pointermove', move);
-      target.removeEventListener('pointerup', up);
-      target.removeEventListener('pointercancel', up);
-    };
-    target.addEventListener('pointermove', move);
-    target.addEventListener('pointerup', up);
-    target.addEventListener('pointercancel', up);
-  };
-
   const toggleSafe = () => {
     const v = !safe;
     setSafe(v);
@@ -302,30 +298,20 @@ export function Preview({
     }
   };
 
-  // 四角小點與旋轉點：貼著方框，往框外偏一點（不蓋住物件），但夾在舞台內，方框比畫面大時（例如填滿的影片）也按得到
-  let handles: { corners: Pt[]; rotate: Pt } | null = null;
-  if (box) {
-    const m = 18;
-    const stageH = (height / width) * cssW;
-    const c = { x: box.cx * k, y: box.cy * k };
-    const out = (p: [number, number], d: number): Pt => {
-      const vx = p[0] * k - c.x;
-      const vy = p[1] * k - c.y;
-      const len = Math.hypot(vx, vy) || 1;
-      return {
-        x: clamp(p[0] * k + (vx / len) * d, m, cssW - m),
-        y: clamp(p[1] * k + (vy / len) * d, m, stageH - m),
-      };
-    };
-    const cs = boxCorners(box);
-    const topMid: [number, number] = [(cs[0]![0] + cs[1]![0]) / 2, (cs[0]![1] + cs[1]![1]) / 2];
-    // 物件很小時，角點和旋轉點會擠在一起、觸控區互相蓋住：越小就推得越遠
-    const extra = clamp((72 - Math.min(box.w, box.h) * k) / 2, 0, 18);
-    handles = { corners: cs.map((p) => out(p, 10 + extra)), rotate: out(topMid, 28 + extra * 1.8) };
+  // 物件的觸控區（看不見）：按在上面＝拖物件；預覽其他地方上下滑＝捲頁面
+  const hitBoxes: { id: string; b: Box }[] = [];
+  if (hitIds) {
+    for (const id of hitIds.split(',')) {
+      const f = findItem(project, id);
+      const b = f && selectionBox(f.item, geo);
+      if (b) hitBoxes.push({ id, b });
+    }
   }
+  if (sel && box && sel.track.kind === 'main') hitBoxes.push({ id: sel.item.id, b: box }); // 從時間軸選了主軌
+  const minHit = 44 / k;
 
   return (
-    <div className="stage-wrap">
+    <div className="stage-wrap" style={{ ['--inv-ratio' as string]: `${height / width}` }}>
       <div
         ref={stageRef}
         className="stage"
@@ -366,29 +352,26 @@ export function Preview({
             }}
           />
         )}
-        {box && sel && !selLocked && handles && (
-          <>
-            {handles.corners.map((p, i) => (
-              <button
-                key={i}
-                data-handle="scale"
-                className="sel-dot"
-                aria-label="縮放（拖曳角落）"
-                data-testid="scale-handle"
-                style={{ left: p.x, top: p.y }}
-                onPointerDown={onHandleDown('scale')}
-              />
-            ))}
-            <button
-              data-handle="rotate"
-              className="sel-dot rotate"
-              aria-label="旋轉（拖曳上方圓點）"
-              data-testid="rotate-handle"
-              style={{ left: handles.rotate.x, top: handles.rotate.y }}
-              onPointerDown={onHandleDown('rotate')}
+        {hitBoxes.map(({ id, b }) => {
+          const pad = id === selectedId ? 24 / k : 0; // 選取中的物件觸控區外擴一點，雙指比較好放
+          const w = Math.max(b.w, minHit) + pad * 2;
+          const h = Math.max(b.h, minHit) + pad * 2;
+          return (
+            <div
+              key={id}
+              className="hit"
+              data-hit={id}
+              aria-hidden="true"
+              style={{
+                left: b.cx * k,
+                top: b.cy * k,
+                width: w * k,
+                height: h * k,
+                transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
+              }}
             />
-          </>
-        )}
+          );
+        })}
       </div>
       {emptyAction && (
         <button className="empty-import" onClick={emptyAction}>

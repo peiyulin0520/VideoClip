@@ -4,14 +4,14 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`（上次合併 PR #3 後對齊 main；之後新增 5 個 commit：第 2 次 iPhone 實測回報的 5 項修正 ①–⑤，**還沒合併到 main，上線網址是 PR #3 的版本**）
-- **最後一個程式 commit**：見 `git log -1`（回報 2-⑤ 圖形可調整）
-- **測試**：560 個單元測試、58 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0 ✅、1 ✅、2 ✅、3B ✅、實測修正 A/B/C/D ✅、第 2 次實測修正 ①–⑤ ✅（Chromium 驗證，iPhone 待真機）；Phase 3A（字卡引擎）第 1–4 步前半 ✅，4 後半（貼圖 icon）、5（雲朵字）、6（模板）未做；Phase 4–7 未開始
-- **下一步**：照 `docs/plans/2026-11-11-preview-first-layout.md` 改版面與選取：① 整頁往下捲：預覽在最上面、大小永遠不變（捲到頂端 ≥80% 螢幕高），時間軸／分頁／面板在下面往下滑；預覽空白處上下滑也能捲頁面 → ② 選取框只留框線（拿掉四角點、旋轉點），雙指縮放旋轉補強 → ③ 圖層／版面加「大小／旋轉」滑桿。做完再請使用者合併、iPhone 重測。之後才是貼圖 icon、雲朵字、模板
+- **分支**：`claude/zen-tesla-v3brj5`（上次合併 PR #3 之後的工作都在這裡：第 2 次實測修正 ①–⑤＋預覽優先版面，**還沒合併到 main，上線網址是 PR #3 的版本**）
+- **最後一個程式 commit**：見 `git log -1`（預覽優先版面＋選取框只留框線＋大小旋轉滑桿）
+- **測試**：560 個單元測試、62 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步前半 ✅，4 後半（貼圖 icon）、5（雲朵字）、6（模板）未做；Phase 4–7 未開始
+- **下一步**：請使用者決定是否開 PR 合併上線，用 iPhone 重測（清單 `docs/PLAN.md §7`，特別是：預覽空白處上下滑能不能捲頁面、雙指縮放、匯入大影片的新錯誤訊息）。之後：貼圖 icon（Fluent Emoji 子集，MIT）→ 雲朵字 → 模板
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
-  - 合併新的 PR 並用 iPhone 實測（清單在 `docs/PLAN.md §7`）：匯入大影片、預覽大小與角點縮放、自訂顏色取色盤、裝飾距離、圖形調整
+  - 要不要開 PR 合併（之後用 iPhone 重測）
   - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
 - **目前沒有進行到一半的修改**（工作目錄乾淨、已 push）
 
@@ -57,6 +57,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-11 預覽優先版面＋選取框只留框線（分支 claude/zen-tesla-v3brj5，Opus）
+  - 做了什麼：照 `docs/plans/2026-11-11-preview-first-layout.md`。①**整頁捲動**：編輯器改成一般可往下捲的頁面（頂列→預覽→播放列→時間軸→分頁→面板），預覽寬度撐滿、高度＝`min(寬×比例, 100svh − 頂列 − 播放列)`，**大小永遠不變**；頂列（返回／復原／重做）和分頁列、字卡子分頁列 sticky；拿掉時間軸精簡模式與所有面板最高高度；時間軸高度＝全部軌道（不在裡面上下捲）；切分頁時若分頁列已黏在上面就停在分頁列位置。**預覽空白處上下滑＝捲頁面**（舞台與 canvas `touch-action: pan-y`），每個可拖的物件有看不見的觸控區 `.hit`（`touch-action:none`，最小 44px，選取中外擴 24px），按在物件上才是拖。②**選取框只留框線**：拿掉四角點、旋轉點；雙指補強：兩指可在框外、沒選取時選中兩指中點下的物件、旋轉吸附 0/90/180/270、一次手勢一步復原、擋 iOS `gesturestart`。③**不用手勢也能調**：新 `TransformControls`（整體大小 5–400%、旋轉 ±180°、置中、轉正），放在圖層分頁與文字「版面」
+  - 動了哪些檔：src/app/pages/Editor.tsx（無結構變動，靠 CSS）、src/app/editor/{Preview,Timeline,Toolbar,TextPanel,TransformControls}.tsx、src/store/uiStore.ts、src/app/styles.css、e2e/{helpers,preview-first,phase1,phase2,fix-safe-zone}.spec.ts（刪 fix-preview-size.spec.ts，內容併入 preview-first）
+  - 驗證：✅ e2e（iPhone 13 尺寸）：捲到頂端預覽高 ≥ 80% 螢幕且播放鈕在畫面內；剪輯／疊加／文字／圖層、面板開合、選取前後**預覽寬高完全一樣**；頁面可往下捲、最後一個控制項按得到、頂列與分頁列黏住、切分頁不跳回頁首；**CDP 真觸控**：預覽空白處上滑會捲頁面、按在文字上拖會移動文字且頁面不捲；**CDP 兩點觸控**：雙指放大＋旋轉 88°→吸附 90°、一次手勢一步復原、兩指在框外仍可縮放、沒選取時雙指選中物件；多軌時間軸全部列都在；沒有任何圓點；小字仍點得到；大小／旋轉／置中／轉正。截圖 docs/screenshots/preview-first/（top、scrolled-to-settings、frame-only、timeline-all-rows、empty-project）。560 單元＋62 e2e，整套連跑 5 次：4 次全過、1 次 `fix-safe-zone`「主軌…」失敗一次，之後單獨重複 4 輪（40 次）都沒重現，原因未查明（記錄在案）  🔴 iPhone 真機：觸控捲動與雙指（列入 PLAN §7）
+  - 踩到的坑：**Pixi 會在 canvas 上寫 inline `touch-action:none`**，CSS 要用 `!important` 蓋掉，不然預覽上滑不動頁面；CDP 觸控滑動後有慣性捲動，`scrollTo(0)` 之後還會再捲，測試要等慣性停下；舊測試用 `boundingBox` 加滑鼠座標的，元素在畫面下方時要先捲到看得到（新 helper `previewBox`、`showTimeline`）
+  - 下一步：等使用者決定合併與 iPhone 重測
 - 2026-11-11 寫修改規劃：預覽優先版面＋選取框只留框線（分支 claude/zen-tesla-v3brj5，只有文件，Opus）
   - 做了什麼：依使用者 2 點回饋寫 `docs/plans/2026-11-11-preview-first-layout.md`：編輯器分上（頂列＋預覽＋播放列，固定）下（時間軸＋分頁＋面板，可往下捲）兩區、預覽高 `clamp(300px,56svh,720px)` 不隨面板變；拿掉四角點／旋轉點／時間軸精簡；雙指補強（框外也可、沒選取時選中點物件、旋轉吸附、一步復原、擋 iOS 整頁縮放）；圖層／版面加大小、旋轉滑桿；e2e 用 CDP 兩點觸控測雙指
   - 動了哪些檔：docs/plans/2026-11-11-preview-first-layout.md（新）、docs/PROGRESS.md、docs/HANDOFF.md

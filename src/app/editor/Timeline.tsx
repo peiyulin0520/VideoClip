@@ -102,16 +102,15 @@ export function Timeline({
   const main = mainItems(project);
 
   // 由上到下顯示（最上層的軌道在最上面），主軌在最底
-  const compact = useUI((s) => s.compactTimeline);
   const rows = useMemo(() => {
     const list = project.tracks.map((track, index) => ({ track, index })).reverse();
-    const heights = list.map((r) => (r.track.kind === 'main' && !compact ? MAIN_H : ROW_H));
+    const heights = list.map((r) => (r.track.kind === 'main' ? MAIN_H : ROW_H));
     return list.map((r, i) => ({
       ...r,
       h: heights[i]!,
       top: RULER_H + ROW_GAP + heights.slice(0, i).reduce((sum, h) => sum + h + ROW_GAP, 0),
     }));
-  }, [project.tracks, compact]);
+  }, [project.tracks]);
   const contentH = (rows.length ? rows[rows.length - 1]!.top + rows[rows.length - 1]!.h : RULER_H) + 12;
 
   useLayoutEffect(() => {
@@ -143,24 +142,6 @@ export function Timeline({
     if (!player) return;
     return player.subscribe((t) => syncScroll(t));
   }, [player, syncScroll]);
-
-  // 選取的物件在看不到的那一列時，上下捲到看得到（只動垂直，水平要跟著播放頭）
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || !selectedId) return;
-    const row = rows.find((r) => r.track.items.some((x) => x.id === selectedId));
-    if (!row) return;
-    if (row.top < el.scrollTop) el.scrollTop = row.top - RULER_H;
-    else if (row.top + row.h > el.scrollTop + el.clientHeight)
-      el.scrollTop = row.top + row.h - el.clientHeight + 8;
-  }, [selectedId, rows]);
-
-  // 精簡模式沒有選取物件時，露出主軌（最底下那條）
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || !compact || selectedId) return;
-    el.scrollTop = el.scrollHeight;
-  }, [compact, selectedId, rows]);
 
   const onScroll = () => {
     const el = scrollRef.current!;
@@ -368,11 +349,11 @@ export function Timeline({
 
   const menuTrack = project.tracks.find((t) => t.id === menuTrackId) ?? null;
   const menuIndex = menuTrack ? project.tracks.indexOf(menuTrack) : -1;
-  // 精簡模式：只露出一條軌道（選到哪條就捲到哪條），其他軌道捲動才看得到
-  const viewH = compact ? RULER_H + ROW_GAP + ROW_H + 12 : Math.min(Math.max(contentH, 112), 140);
+  // 時間軸高度＝全部軌道（不在裡面上下捲；上下交給整頁捲動）
+  const viewH = Math.max(contentH, 112);
 
   return (
-    <div className={`timeline${compact ? ' compact' : ''}`} style={{ height: viewH, minHeight: viewH }}>
+    <div className="timeline" style={{ height: viewH, minHeight: viewH }}>
       <div
         className="tl-scroll"
         ref={scrollRef}
