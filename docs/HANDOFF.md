@@ -86,6 +86,11 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 | 不放進網站的 3 款字體 | 授權：All rights reserved／禁止散布／無授權說明（見 FONTS.md） |
 | TypeScript 5.9 | typescript-eslint 不支援 ≥ 6.1 |
 | 新專案比例預設「自動：跟主軌第一個素材」，編輯器頂列可隨時改（可復原）；比例多加 3:4、4:3 | 使用者 2026-11-11 選 A；位置/大小本來就是「佔畫面比例」，改比例不用搬資料 |
+| 選取框用「看得到的內容」（`selectionBox`：字塊∪文字含描邊∪裝飾），渲染仍用整張畫布 | 畫布為了裝飾/陰影對稱多留透明邊，選取框會比看得到的大很多 |
+| 預覽選取操作：四角小點縮放＋上方旋轉點，沒有 ✕ 與大圓鈕；文字面板／疊加／圖層展開時時間軸精簡；全螢幕預覽 | 使用者：預覽太小、icon 太大；iPhone 13 實測預覽只佔 40% |
+| 匯入：OPFS 分段寫（8MB）→ IndexedDB → 記憶體；錯誤訊息分步驟；縮圖失敗不算匯入失敗；>1920 或 >150MB 不用 WebCodecs 解縮圖 | iPhone 大影片 UnknownError / out of memory |
+| 裝飾底線的上緣固定、線變粗往下長；每個裝飾有 gap／scale | 使用者：波浪線太靠近文字 |
+| 圖形調整值 `CardBox.adj`＋`fitInset` 執行時重算外框大小（沒調過用 inset 表） | 像 Office 圖形的調整點；舊字卡大小不變 |
 | 字卡大小/外框粗細跟畫面短邊走（`uiScale = min(w,h)/1080`） | 改成橫式時字不會被放大 1.78 倍；9:16、3:4、1:1 不受影響 |
 | 安全區參考線預設關（localStorage `vc-safe-zone-v2`），只在拖移時自動出現；拖移一律吸附安全區邊界 | 使用者誤以為粉紅斜線是背景 |
 | 主軌：匯入不自動選、預覽單點不選也不拖、選取時只有細框和縮放鈕（沒有 ✕） | 主軌滿版，選取框像「需要手動縮小」 |
@@ -111,6 +116,10 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 > 坑（2026-11-11 第 2 次實測）：iPhone 匯入大影片出現「The operation failed for an unknown transient reason (e.g. out of memory).」＝WebKit `UnknownError`。`importFiles` 把存檔與讀資訊包在同一個 try，看不出哪一步失敗——錯誤訊息要分步驟。OPFS 不要一次 `write(整個 Blob)`。
 > 坑：文字的選取框／點選範圍用的是整張字卡畫布（含為了裝飾、陰影對稱多留的透明邊），裝飾一多就比看得到的大很多。
 > 坑：`.empty-import` 用 `top:38%` 相對整個編輯器，預覽變小時會蓋到時間軸。
+
+> 坑（2026-11-11）：很小的物件，四個角點和旋轉點的 40px 觸控區會互相蓋住（最上面那個吞掉事件）→ 依物件大小把點推遠。
+> 坑：`fitInset` 的外框長寬比要和最後結果一致（kx、ky 夾到 1 時比例會變）；扇貝邊圓的控制點會超出曲線，量範圍要用 `flattenPath` / `opsExtent`（取樣），不要用控制點。
+> 坑：range 輸入的值會被吸到 `step` 的格子上顯示；預設值不在格子上時（例如 0.72）顯示會差一點，資料不受影響。
 
 ## 6. 現況與下一步
 **已完成**（細節與驗證看 PROGRESS.md 日誌）：Phase 0（骨架/PWA/部署）、Phase 1（專案管理＋多影片拼接）、Phase 2（多圖層＋選取框手勢＋圖層屬性）、Phase 3B（字體管線＋首次使用精靈＋設定頁＋字體選單＋匯入字體）。

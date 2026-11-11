@@ -83,6 +83,7 @@ export function renderText(card: TextCard, scale: number): TextRender {
           cmds: shapePath(card.box.shape, lay.w, lay.h, {
             radius: (card.box.radius ?? 28) * scale,
             tail: card.box.tailDir,
+            adj: card.box.adj,
           }),
         },
       ]

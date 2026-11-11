@@ -240,8 +240,10 @@ export function TextPanel({
                   className={`shape-cell${on ? ' active' : ''}`}
                   onClick={() =>
                     edit((c) => {
-                      if (c.box) c.box.shape = s.id;
-                      else c.box = { ...DEFAULT_BOX, padding: { ...DEFAULT_BOX.padding }, shape: s.id };
+                      if (c.box) {
+                        c.box.shape = s.id;
+                        delete c.box.adj; // 調整值是各圖形自己的，換圖形就回到預設長相
+                      } else c.box = { ...DEFAULT_BOX, padding: { ...DEFAULT_BOX.padding }, shape: s.id };
                     })
                   }
                 >
@@ -285,7 +287,12 @@ export function TextPanel({
                       role="radio"
                       aria-checked={(box.tailDir ?? 'bottom-left') === d}
                       className={`chip${(box.tailDir ?? 'bottom-left') === d ? ' active' : ''}`}
-                      onClick={() => edit((c) => void (c.box!.tailDir = d))}
+                      onClick={() =>
+                        edit((c) => {
+                          c.box!.tailDir = d;
+                          if (c.box!.adj) delete c.box!.adj.tailPos; // 位置回到左下／右下的預設
+                        })
+                      }
                     >
                       {label}
                     </button>
@@ -326,6 +333,42 @@ export function TextPanel({
                     edit((c) => void (c.box!.stroke = { color: col, width: c.box!.stroke?.width ?? 4 }))
                   }
                 />
+              )}
+              {shapeDef(box.shape).adjust.length > 0 && (
+                <>
+                  <div className="panel-head">
+                    <span>圖形調整（像 Office 的黃色調整點）</span>
+                    {box.adj && Object.keys(box.adj).length > 0 && (
+                      <button
+                        className="chip sm"
+                        aria-label="圖形調整還原預設"
+                        onClick={() => edit((c) => void delete c.box!.adj)}
+                      >
+                        還原預設
+                      </button>
+                    )}
+                  </div>
+                  {shapeDef(box.shape).adjust.map((a) => {
+                    const def = a.key === 'tailPos' ? (box.tailDir === 'bottom-right' ? 0.72 : 0.28) : a.def;
+                    return (
+                      <Slider
+                        key={a.key}
+                        label={a.label}
+                        value={box.adj?.[a.key] ?? def}
+                        min={a.min}
+                        max={a.max}
+                        step={a.step}
+                        format={(v) => (a.key === 'count' ? `${Math.round(v)}` : `${Math.round(v * 100)}%`)}
+                        onChange={(v) =>
+                          edit((c) => {
+                            const b2 = c.box!;
+                            b2.adj = { ...(b2.adj ?? {}), [a.key]: v };
+                          }, `adj-${a.key}`)
+                        }
+                      />
+                    );
+                  })}
+                </>
               )}
               <div className="panel-head">
                 <span>內距（字到色塊邊緣的距離）</span>

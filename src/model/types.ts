@@ -131,6 +131,8 @@ export type CardBox = {
   radius?: number; // roundRect / speech-round 的圓角 px；pill 固定半圓
   stroke?: Stroke; // 字塊外框（畫在圖形邊緣）
   tailDir?: 'bottom-left' | 'bottom-right'; // 對話框尾巴方向（預設左下）
+  /** 圖形調整值（凹槽深度、角的圓滑、尾巴位置…），key 見 engine/shapes.ts 的 ADJUST；沒有＝預設長相 */
+  adj?: Record<string, number>;
 };
 export type TextCard = {
   runs: TextRun[];
