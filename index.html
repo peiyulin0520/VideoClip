@@ -17,7 +17,7 @@
       // 先套用主題，避免打開時閃一下暗色（跟 src/ui/theme.ts 對得上）
       try {
         var t = localStorage.getItem('vc-theme');
-        var bars = { mono: '#ffffff', fresh: '#f4fbf9', warm: '#2a1f18' };
+        var bars = { mono: '#ffffff', fresh: '#f4fbf9', warm: '#f6f0e6' };
         if (bars[t]) {
           document.documentElement.setAttribute('data-theme', t);
           document.querySelector('meta[name="theme-color"]').setAttribute('content', bars[t]);

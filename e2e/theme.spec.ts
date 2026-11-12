@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, openTab } from './helpers';
+import { createProjectWith, fixture, openTab, showTimeline } from './helpers';
 
-const SHOT = 'docs/screenshots/feedback-5/theme';
+const SHOT = 'docs/screenshots/feedback-6/theme';
 const bg = (page: Page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 const attr = (page: Page) => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
 const lum = (rgb: string) => {
@@ -35,8 +35,9 @@ test('設定頁可以換介面主題：暗黑（預設）、黑白、清新、�
   await page.getByRole('radio', { name: '主題 溫暖' }).tap();
   expect(await attr(page)).toBe('warm');
   const warm = await bg(page);
-  expect(lum(warm)).toBeLessThan(90);
-  expect(warm).not.toBe('rgb(17, 17, 17)'); // 不是暗黑的底色，是棕色
+  expect(lum(warm)).toBeGreaterThan(220); // 米色（淺色基底）
+  expect(warm).not.toBe('rgb(255, 255, 255)'); // 不是純白
+  expect(warm).toBe('rgb(246, 240, 230)');
   await page.screenshot({ path: `${SHOT}/settings-warm.png` });
 
   // 重新整理仍是溫暖；手機狀態列顏色也跟著
@@ -44,7 +45,7 @@ test('設定頁可以換介面主題：暗黑（預設）、黑白、清新、�
   expect(await attr(page)).toBe('warm');
   expect(
     await page.evaluate(() => document.querySelector('meta[name="theme-color"]')!.getAttribute('content')),
-  ).toBe('#2a1f18');
+  ).toBe('#f6f0e6');
 
   // 換回暗黑：不留記錄
   await page.getByRole('radio', { name: '主題 暗黑' }).tap();
@@ -96,4 +97,28 @@ test('首頁在每個主題下也看得到專案卡片與「新增專案」', as
   expect(await attr(page)).toBe('mono');
   await expect(page.getByRole('button', { name: '新增專案' })).toBeVisible();
   await page.screenshot({ path: `${SHOT}/home-mono.png` });
+});
+
+test('清新／溫暖：時間軸上字卡與音樂片段的字看得清楚（深底配淺字）', async ({ page }) => {
+  await createProjectWith(page, ['solid-red.webm']);
+  await openTab(page, '文字');
+  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await openTab(page, '疊加');
+  await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
+  await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
+  await showTimeline(page);
+
+  for (const id of ['fresh', 'warm', 'mono'] as const) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), id);
+    for (const kind of ['text', 'audio']) {
+      const c = await page.evaluate((k) => {
+        const clip = document.querySelector(`[data-testid="clip"][data-kind="${k}"]`) as HTMLElement;
+        const label = clip.querySelector('.clip-label') as HTMLElement;
+        return { fg: getComputedStyle(label).color, bg: getComputedStyle(clip).backgroundColor };
+      }, kind);
+      // 亮度差夠大＝看得清楚（片段是深底就要淺字）
+      expect(Math.abs(lum(c.fg) - lum(c.bg)), `${id}/${kind}: ${c.fg} on ${c.bg}`).toBeGreaterThan(110);
+    }
+    await page.screenshot({ path: `docs/screenshots/feedback-6/theme/clips-${id}.png` });
+  }
 });
