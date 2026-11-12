@@ -4,7 +4,7 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-12
-- **分支**：PR #8（feedback-6 F1–F5）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊。網站部署成功後手機會自動更新成新版（設定頁看版本號）
+- **分支**：PR #8（feedback-6 F1–F5）與 PR #9（修正 CI 排版）**都已由使用者合併進 `main`**（2026-11-12）。PR #8 合併後 CI 在 `prettier --check` 失敗、沒有部署；PR #9 修好後 `main` 的 CI（run 71）全綠、**GitHub Pages 已部署**。`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊
 - **最後一個程式 commit**：見 `git log -1`（F5 長按拖移素材到別軌）
 - **測試**：770 個單元測試、135 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：feedback-6 的 F1–F5 全部做完（淺色主題、預覽點選、七個分頁、影像軌統一、長按拖到別軌）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
@@ -72,6 +72,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 修正 CI：PR #8 合併後 lint 失敗、沒部署（PR #9）
+  - 做了什麼：CI 的 `npm run lint` 是 `eslint . && prettier --check .`，19 個新檔案排版不符 → 用 `prettier --write` 排好（只有空白與換行）；`AGENTS.md`、`HANDOFF.md` 寫明提交前要跑完整的 `npm run check`
+  - 驗證：✅ 本機 `npm run check` 通過；✅ 分支 CI run 70、`main` CI run 71 全綠，deploy 成功
+  - 使用者的決定/回饋：「你沒讓我 merge pull request 耶，而且有失敗訊息」→ 誠實回報：我只開了 PR，沒有呼叫合併；PR #8 顯示由使用者帳號在開好後約 1 分鐘合併（原因不明）；失敗是我沒跑 prettier。使用者選 A：再開小 PR（#9），自己合併
+  - 踩到的坑：只跑 `eslint src e2e` 不夠，CI 還會跑 `prettier --check .`；`npm run check` 的輸出要看結束碼，不要只 grep 「error」（prettier 的錯誤是 `[warn]`）
+  - 下一步：使用者用 iPhone 測 feedback-6
 - 2026-11-12 F4 影像軌統一＋分區＋舊專案轉換；F5 長按拖移素材到別軌（feedback-6 F4、F5）
   - 做了什麼：**F4**：①主軌與疊加軌合併成「影像軌」（`TrackKind` 改 `media|effect|text|audio`），**每一條都一樣**：都能上下換順序、放在任何時間；沒有磁吸、沒有 `gap`（舊的 gap 效果已在 `start` 裡）②軌道依種類分區：影像 → 特效 → 字卡 → 音訊，同一區可換順序、不能跨區（`reorderTrack`／`moveTrack` 夾在同區），新軌道用 `insertIndexFor` 插入；時間軸上音訊畫在最下面 ③「刪除」只刪一段留空位、新增「刪除並補齊」（`rippleDelete`）；影像軌的空位畫虛線框（最下面那條連開場留白），點一下選取、再點一下補齊（`closeGap`）④修剪、變速、分割、複製全部用自由軌的函式（`setSpeedFree` 新、`setTrimWindowFree`）；匯入接在最下面那條影像軌後面（`importToBase`）⑤`Project.version` 2，舊專案讀進來由 `migrateProject` 轉換（`main`/`overlay` → `media`、預設名稱「主軌」「疊加 N」→「影像 N」、刪 gap、字卡搬到影像上面並提醒一次），編輯器載入時存回新格式；最後一格（t ≥ 總長）仍顯示最後結束的物件。**F5**：長按 400ms 拖起來後，左右＝改時間（吸附），上下＝換軌道：同種類的軌道亮起來、不同種類變灰（放開彈回原位並提示）、同一區上下各一條「＋ 新增一軌」放置區（放開就新增一條）、目標位置有東西＝移到最近的空位、原軌道空了不自動刪；純函式 `dropTarget`／`moveItemToTrack`，動作 `moveItemTo`；沒長按直接滑＝捲動
   - 動了哪些檔：`src/model/{types,defaults,migrate}.ts`、`src/engine/{timeline,player}.ts`、`src/store/{actions,projectStore}.ts`、`src/storage/projects.ts`、`src/app/pages/{Editor,Home}.tsx`、`src/app/editor/{Timeline,Preview,TrimPanel,Toolbar}.tsx`、`src/app/editor/tabs/*`、`styles.css`；測試 新 `migrate.test.ts`、`timeline.drop.test.ts`、改寫 `timeline.test.ts`（舊的 `timeline.gap.test.ts` 刪除，每個行為都有對應的新測試）、`timeline.free.test.ts`、`e2e/{media-tracks,clip-drag}.spec.ts`，改 `trim/track-drag/phase1/phase2/tabs/export/music/fix-safe-zone`
