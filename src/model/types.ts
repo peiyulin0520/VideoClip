@@ -73,6 +73,10 @@ export type VideoItem = ItemBase & {
   visible?: { x: number; y: number; w: number; h: number };
   /** 版型外框專用：整個版型的動畫（捲動＝由下往上捲過畫面；滑入滑出＝開頭從右邊滑進來、結尾往左滑出去） */
   motion?: 'drift' | 'slide';
+  /** 動態模板的格子：格子的範圍從 from（佔畫面寬、高的比例）在 t0–t1 秒（片段開始後）滑到 cell；之前停在 from */
+  cellAnim?: { from: { x: number; y: number; w: number; h: number }; t0: number; t1: number };
+  /** 動態模板外框：這個版型是哪一種動態模板（有整套的時間表，見 engine/story.ts） */
+  template?: 'story3';
   /** 進場轉場：跟前面緊接的片段之間的效果（以兩個片段的接縫為中心，前半在前一個片段、後半在這個片段） */
   transitionIn?: { kind: TransitionKind; duration: number };
 };
@@ -217,7 +221,14 @@ export type TextCard = {
   box?: CardBox;
   decorations?: Decoration[];
 };
-export type TextItem = ItemBase & { type: 'text'; card: TextCard };
+export type TextItem = ItemBase & {
+  type: 'text';
+  card: TextCard;
+  /** 屬於哪個動態模板（標題、副標）：模板整個移動、拿掉、改長度時它們跟著 */
+  group?: string;
+  /** 字體輪播：開始後 until 秒內每 interval 秒換下一個字體（依序輪流），之後固定用 fonts[0] */
+  fontCycle?: { fonts: string[]; interval: number; until: number };
+};
 
 export type Item = VideoItem | TextItem;
 

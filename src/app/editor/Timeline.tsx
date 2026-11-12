@@ -788,7 +788,7 @@ export function Timeline({
                         data-testid="tr-circle"
                         data-item-id={next.id}
                         aria-label={tr ? `轉場 ${transitionName(tr.kind)}` : '加轉場'}
-                        style={{ left: half + next.start * pps - 12, top: (h - 24) / 2 }}
+                        style={{ left: half + next.start * pps - 11, top: -9 }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();

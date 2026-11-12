@@ -5,6 +5,7 @@ import { renderText, measureTextItem, uiScale } from './textRender';
 import { visibleLayers } from './timeline';
 import { composeWith, motionOffset } from './groupTransform';
 import { cellRect } from './layouts';
+import { animatedCell, cycleFont, storyTint } from './story';
 import {
   applyLook,
   transitionLook,
@@ -115,7 +116,13 @@ export function buildScene(
       ? motionOffset(frame.item.motion, t - frame.item.start, frame.item.duration)
       : { x: 0, y: 0 };
     if (l) {
-      const layer = toLayer(l.item, track, project, ctx, provide);
+      const layer = toLayer(
+        shaped(l.item, t, frame?.item, project, canvasW, canvasH),
+        track,
+        project,
+        ctx,
+        provide,
+      );
       if (layer) {
         layer.box = { ...layer.box, cx: layer.box.cx + off.x * canvasW, cy: layer.box.cy + off.y * canvasH };
         const look = lookFor(i, l.item.id);
@@ -131,6 +138,7 @@ export function buildScene(
       if (t < fr.start || t >= fr.start + fr.duration) return;
       const ref = track.items.find((x) => x.type !== 'text' && x.cell);
       if (!ref || ref.type === 'text' || !ref.cell) return;
+      if (ref.cellAnim && t < ref.start) return; // 動態模板的格子還沒進場
       const r = cellRect(ref.cell, canvasW, canvasH);
       const c = composeWith(
         { x: (r.x + r.w / 2) / canvasW, y: (r.y + r.h / 2) / canvasH, scale: 1, rotation: 0, opacity: 1 },
@@ -160,6 +168,17 @@ export function buildScene(
       });
     }
   });
+  // 動態模板的結尾：暖橘色染色與白色閃光
+  for (const tr of project.tracks) {
+    if (tr.groupRole !== 'frame' || tr.hidden) continue;
+    const fr = tr.items[0];
+    if (!fr || fr.type === 'text' || fr.type === 'audio' || fr.template !== 'story3') continue;
+    if (t < fr.start || t >= fr.start + fr.duration) continue;
+    const k = storyTint(t - fr.start, fr.duration);
+    if (k.warm > 0.001) covers.set(`story-warm-${fr.id}`, { kind: 'flash', color: '#ffb457', alpha: k.warm });
+    if (k.white > 0.001)
+      covers.set(`story-white-${fr.id}`, { kind: 'solid', color: '#ffffff', alpha: k.white });
+  }
   // 轉場的顏色層：蓋在最上面
   for (const [id, c] of covers)
     out.push({
@@ -176,6 +195,34 @@ export function buildScene(
       cornerRadius: 0,
     });
   return out;
+}
+
+/**
+ * 這一刻實際要畫的樣子：動態模板的格子（範圍隨時間滑動／撐開，再套上整組的變形）、字體輪播的字卡。
+ * 其他物件原樣回傳。
+ */
+function shaped(
+  item: Item,
+  t: number,
+  frame: VideoItem | undefined,
+  project: Project,
+  W: number,
+  H: number,
+): Item {
+  if (item.type === 'text') {
+    if (!item.fontCycle) return item;
+    const fontId = cycleFont(item.fontCycle, t - item.start);
+    return {
+      ...item,
+      card: { ...item.card, runs: item.card.runs.map((r, i) => (i === 0 ? { ...r, fontId } : r)) },
+    };
+  }
+  if (item.type === 'audio' || !item.cell || !item.cellAnim) return item;
+  const asset = project.assets.find((a) => a.id === item.assetId);
+  if (!asset) return item;
+  const a = animatedCell(item, asset, t - item.start, W, H);
+  const transform = frame ? composeWith(a.transform, frame.transform, W, H) : a.transform;
+  return { ...item, crop: a.crop, transform: { ...transform, opacity: item.transform.opacity } };
 }
 
 function toLayer(
