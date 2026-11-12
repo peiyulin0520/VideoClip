@@ -68,6 +68,8 @@ export class Player {
   private accUpload = 0;
   private seg = { build: 0, comp: 0, upload: 0 };
   private videoInfo = '';
+  /** 裁切模式：暫時把某個物件換成「完整畫面」來畫（不改專案資料） */
+  private patch: { itemId: string; apply: (it: VideoItem) => VideoItem } | null = null;
 
   private constructor(
     readonly compositor: Compositor,
@@ -273,7 +275,8 @@ export class Player {
   }
 
   private render(t: number) {
-    const p = this.deps.getProject();
+    const p0 = this.deps.getProject();
+    const p = p0 ? this.effectiveProject(p0) : p0;
     const { compositor: comp } = this;
     if (!p) {
       comp.render([]);
@@ -362,6 +365,28 @@ export class Player {
       }
     }
     return out;
+  }
+
+  /** 預覽時暫時改某個影片／照片物件（裁切模式顯示整張畫面）；null＝還原。會馬上重畫。 */
+  setPreviewPatch(patch: { itemId: string; apply: (it: VideoItem) => VideoItem } | null) {
+    this.patch = patch;
+    if (!this.playing) this.render(this.t);
+  }
+
+  private effectiveProject(p: Project): Project {
+    const patch = this.patch;
+    if (!patch) return p;
+    return {
+      ...p,
+      tracks: p.tracks.map((tr) =>
+        tr.items.some((x) => x.id === patch.itemId)
+          ? {
+              ...tr,
+              items: tr.items.map((x) => (x.id === patch.itemId && x.type !== 'text' ? patch.apply(x) : x)),
+            }
+          : tr,
+      ) as Project['tracks'],
+    };
   }
 
   /** 預覽主軌目前的片段 id（測試用） */

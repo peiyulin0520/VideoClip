@@ -53,6 +53,8 @@ export type VideoItem = ItemBase & {
   speed: number; // 0.25–4；照片固定 1
   volume: number; // 0–1
   fit: 'cover' | 'contain';
+  /** 自由形狀裁切：多邊形的點，座標是「原始素材畫面」的比例 0–1（只留多邊形裡面，外面透明） */
+  mask?: [number, number][];
   /** 主軌專用：這個片段「前面」的空白秒數（黑畫面，疊加與文字照常）。沒有＝0＝首尾相接 */
   gap?: number;
 };

@@ -72,6 +72,7 @@ function toLayer(
   return {
     ...common,
     kind: item.type,
+    mask: item.mask,
     source: src.source,
     ready: src.ready,
     srcW: src.srcW,

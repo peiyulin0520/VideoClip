@@ -5,6 +5,7 @@ import {
   ArrowRight,
   ArrowUp,
   Copy,
+  Crop as CropIcon,
   Eye,
   EyeOff,
   Gauge,
@@ -49,7 +50,9 @@ import { toast, useUI } from '../../store/uiStore';
 import { Slider } from '../../ui/Slider';
 import { StickerPicker } from './StickerPicker';
 import { TextPanel } from './TextPanel';
+import { CropPanel } from './CropPanel';
 import { TrimPanel } from './TrimPanel';
+import { cancelCrop, startCrop, useCrop } from '../../store/cropStore';
 import { TransformControls } from './TransformControls';
 
 export type Tab = 'edit' | 'overlay' | 'text' | 'layers';
@@ -105,6 +108,7 @@ export function BottomBar({
   // 點目前的分頁＝收合/展開下面的面板（讓出空間給預覽畫面）
   const switchTab = (t: Tab) => {
     setPanel(null);
+    cancelCrop(); // 離開剪輯分頁就結束裁切模式（不套用）
     if (t === tab) setCollapsed((c) => !c);
     else {
       setTab(t);
@@ -162,6 +166,7 @@ function EditTab({
 }) {
   const project = useProjectStore((s) => s.project)!;
   const player = useUI((s) => s.player);
+  const cropping = useCrop((s) => !!s.s);
   const selected = found?.item;
   const isMain = found?.track.kind === 'main';
 
@@ -224,6 +229,8 @@ function EditTab({
     if (p === 'trim' && s.type === 'image') return toast('照片沒有素材區段，請拖時間軸上的把手調長度');
     setPanel(p);
   };
+
+  if (cropping) return <CropPanel />;
 
   if (panel === 'trim' && selected && isVideoItem(selected) && found) {
     const asset = project.assets.find((a) => a.id === selected.assetId);
@@ -331,6 +338,16 @@ function EditTab({
       <ToolButton icon={ArrowLeft} label="前移" onClick={() => move(-1)} />
       <ToolButton icon={ArrowRight} label="後移" onClick={() => move(1)} />
       <ToolButton icon={MoveHorizontal} label="修剪" onClick={() => openPanel('trim')} />
+      <ToolButton
+        icon={CropIcon}
+        label="裁切"
+        onClick={() => {
+          const s = need();
+          if (!s) return;
+          if (!isVideoItem(s)) return toast('文字不能裁切');
+          startCrop(s.id);
+        }}
+      />
       {isMain && selected && isVideoItem(selected) && gapOf(selected) > 0 && (
         <ToolButton icon={ArrowLeftToLine} label="刪除空白" onClick={() => removeMainGap(selected.id)} />
       )}
@@ -534,42 +551,6 @@ function LayersTab() {
               />
             ))}
           </div>
-          {isVideoItem(it) && (
-            <>
-              <div className="slider-label">裁切（切掉各邊的比例）</div>
-              {(
-                [
-                  ['l', '左'],
-                  ['r', '右'],
-                  ['t', '上'],
-                  ['b', '下'],
-                ] as const
-              ).map(([k, name]) => (
-                <Slider
-                  key={k}
-                  label={`裁切${name}`}
-                  value={Math.round((it.crop?.[k] ?? 0) * 100)}
-                  min={0}
-                  max={80}
-                  step={1}
-                  format={(v) => `${v}%`}
-                  onChange={(v) =>
-                    editItem(
-                      it.id,
-                      (x) => {
-                        const c = (x.crop ??= { l: 0, t: 0, r: 0, b: 0 });
-                        c[k] = v / 100;
-                        // 左右、上下加起來不能超過 90%
-                        const other = k === 'l' ? 'r' : k === 'r' ? 'l' : k === 't' ? 'b' : 't';
-                        if (c[k] + c[other] > 0.9) c[other] = Math.max(0.9 - c[k], 0);
-                      },
-                      { coalesce: `crop${k}:${it.id}` },
-                    )
-                  }
-                />
-              ))}
-            </>
-          )}
           <button
             className="btn"
             onClick={() =>
@@ -585,7 +566,9 @@ function LayersTab() {
           </button>
         </div>
       ) : (
-        <p className="hint">點一個圖層（或預覽畫面上的物件）後，可以調透明度、混合模式、圓角、外框和裁切。</p>
+        <p className="hint">
+          點一個圖層（或預覽畫面上的物件）後，可以調透明度、混合模式、圓角和外框。裁切在「剪輯」分頁。
+        </p>
       )}
     </div>
   );

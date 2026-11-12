@@ -6,9 +6,9 @@
 - **日期**：2026-11-11
 - **分支**：PR #6（播放順暢＋聲音、裝飾長度／透明度、選色彈窗）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
-- **測試**：615 個單元測試、86 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：630 個單元測試、91 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：`docs/plans/2026-11-12-feedback-5.md` 已做 **① 播放卡（效能框＋預覽用輕量影片）② 主軌修剪（空白＋修剪面板）③ 軌道圖示拖拉 ④ 字塊填滿／框線**（Chromium 驗證，iPhone 待真機）；還沒做 **⑤ 裁切（剪輯分頁、預覽上拖四邊拉霸、自由形狀；`cropKeepingPlace` 切完畫面不跳）⑥ GIPHY 會動**；再之後 feedback-4 的 B 匯出、C 音軌＋背景音樂。請使用者用 iPhone 測 ①～④（尤其設定頁打開「顯示播放效能」錄一段播放）
+- **下一步**：`docs/plans/2026-11-12-feedback-5.md` 已做 **①～⑤**（播放卡／主軌修剪／軌道拖拉／字塊填滿框線／裁切）；還沒做 **⑥ GIPHY 貼圖會動**；再之後 feedback-4 的 B 匯出、C 音軌＋背景音樂。請使用者用 iPhone 測 ①～⑤（尤其設定頁打開「顯示播放效能」錄一段播放）。**目前這些都還在分支上，沒有開 PR，網站與手機還是舊版**
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -68,6 +68,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 feedback-5 ⑤：裁切（剪輯分頁、預覽上直接拖、自由形狀）
+  - 做了什麼：「裁切」從圖層分頁（比例滑桿）搬到剪輯分頁。按了之後預覽顯示**完整原始畫面**（留下的那塊位置不變），四邊中間細拉霸、四個角、框內平移直接在預覽上拖；顯示「保留 72% × 100%」；比例 自由／原比例／1:1／9:16／4:5／16:9（鎖定後拖角仍保持比例）；「自由形狀」用手指沿著要留的範圍畫一圈（磨圓、自動閉合）→ 保留區域自動框住多邊形；預覽上有「自由形狀／重設／取消／完成」（不用捲到下面的面板）；完成才寫進專案、一步復原；切完留下的畫面**位置大小不跳**（`cropKeepingPlace`）；多邊形遮罩在合成器用 Graphics 遮罩，預覽與單格輸出共用；換分頁或選別的片段結束裁切（不套用）；完整畫面會超出預覽時（例如填滿的橫式影片）改縮進預覽中央，把手才按得到
+  - 動了哪些檔：新 `src/engine/crop.ts`（`cropKeepingPlace`、`dragCrop`、`applyRatio`、`polygonCrop`、`smoothPolygon`）、`src/store/cropStore.ts`、`src/app/editor/{CropOverlay,CropPanel}.tsx`；`src/engine/{compositor,scene,player}.ts`（多邊形遮罩、`setPreviewPatch`）、`Toolbar.tsx`（裁切鈕、拿掉圖層分頁的裁切滑桿）、`Preview.tsx`、`src/model/types.ts`（`VideoItem.mask`）、`styles.css`；測試 `src/engine/crop.test.ts`、`e2e/crop.spec.ts`、`e2e/phase2.spec.ts`（裁切改到剪輯分頁）；文件 `docs/EFFECTS.md`
+  - 驗證：✅ 單元（切完畫面不跳：多種填滿／旋轉／已切過再切／來回切、四角座標不變；dragCrop 自由與鎖比例、不出界；套比例；多邊形外框與磨圓）；✅ e2e（拖右邊與下邊拉霸→保留 60%×70%→完成後留下的位置不跳、被切掉的露出底下、一步復原還原位置大小；取消／重設／框內平移／拖角／再進來；比例鎖定；自由形狀畫圓→圈外透明圈內保留、復原／重做、重新進入看得到輪廓、清除形狀；沒選東西提示、換分頁結束）；全部 91 個 e2e、630 個單元、lint、build 過；截圖 `docs/screenshots/feedback-5/crop-*.png`  🔴 iPhone 沒測：手指拖把手好不好抓、有沒有誤捲頁面  🔴 沒做：自由形狀的邊緣柔化；雙指在框內縮放裡面的畫面；會動的人要跟著動（人物去背）
+  - 踩到的坑：Playwright 點下面面板會把頁面往下捲，預覽被推到 sticky 頂列後面 → 進裁切模式要 `scrollTo(0,0)`，測試用到面板後也要捲回來；控制按鈕（完成／取消）要放在預覽上，不然使用者得來回捲；圓角元素最邊角點不到
+  - 下一步：⑥ GIPHY 貼圖會動
 - 2026-11-12 feedback-5 ①～④：播放卡、主軌修剪、軌道拖拉、字塊填滿／框線
   - 做了什麼：①**播放卡**：設定頁「顯示播放效能」→ 預覽左上角顯示 fps、每格毫秒（場景／影片上傳／合成）、掉格、影片尺寸與編碼；匯入影片時讀 `codec`／`hdr`；背景做「預覽用輕量影片」（長邊 > 1280、HDR、非 H.264/VP 就做；H.264 長邊 960、SDR、30fps），預覽播放用它、匯出與單格輸出用原檔；做不出來就標 failed 照用原檔；時間軸片段顯示製作進度；影片貼圖只在「呈現了新畫面」時才上傳（`requestVideoFrameCallback`）；iPhone 上不微調 `playbackRate` ②**主軌修剪**：`VideoItem.gap`（片段前面的空白），左把手往右拉＝尾巴不動、切掉的變空白，往左拉先吃空白再往前延伸；空白在時間軸是虛線框，選到片段後工具列有「刪除空白」；剪輯分頁新「修剪」面板（整段素材縮圖條＋選取窗，拖左右把手／拖中間／前面多少 1 秒的按鈕，顯示「第 a 秒 → 第 b 秒，留 n 秒 / 素材共 m 秒」，片段位置不變只改長度）③**軌道圖示**按住上下拖換圖層順序（`reorderTrack`，主軌固定，拖動時其他列讓位，一步復原；點一下仍開選單）④**字塊**分成「填滿」（開關、顏色、透明度 0–100%）與「框線」（開關、顏色、透明度、粗細 1–40）；`CardBox.fillOn`、`Stroke.opacity`（沒有＝跟填滿一樣，舊專案不變）
   - 動了哪些檔：`src/engine/{proxy,proxyQueue,assetUrls,probe,player,compositor,audio,mediaPool,timeline,textRender,debug}.ts`、`src/app/editor/{PerfOverlay,TrimPanel,Timeline,Toolbar,TextPanel,Preview}.tsx`、`src/app/pages/{Editor,Settings}.tsx`、`src/store/{projectStore,actions}.ts`、`src/storage/media.ts`、`src/model/types.ts`、`styles.css`；新測試 `src/engine/{proxy,timeline.gap}.test.ts`、`e2e/{proxy,trim,track-drag,box-fill-border}.spec.ts`；新素材 `tests/fixtures/big-1080p.webm`

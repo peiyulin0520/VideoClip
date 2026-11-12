@@ -47,6 +47,8 @@ export type SceneLayer = {
   frameW?: number;
   frameH?: number;
   crop?: Crop;
+  /** 自由形狀遮罩：多邊形，座標是原始素材畫面的比例（搭配 crop 換算到方框內） */
+  mask?: [number, number][];
   opacity: number;
   blend: BlendMode;
   cornerRadius: number; // 0–0.5
@@ -70,6 +72,8 @@ type Obj = {
   outline: Graphics | null;
   maskKey: string;
   outlineKey: string;
+  shape: Graphics | null;
+  shapeKey: string;
 };
 
 export class Compositor {
@@ -164,6 +168,8 @@ export class Compositor {
       outline: null,
       maskKey: '',
       outlineKey: '',
+      shape: null,
+      shapeKey: '',
     };
     this.objs.set(layer.id, o);
     return o;
@@ -280,28 +286,62 @@ export class Compositor {
     o.sprite.height = box.h;
     o.sprite.blendMode = layer.blend;
 
-    // ---- 圓角遮罩 ----
+    // ---- 遮罩：自由形狀（多邊形）優先，沒有才用圓角 ----
     const radius = Math.min(layer.cornerRadius * Math.min(box.w, box.h), Math.min(box.w, box.h) / 2);
-    if (radius > 0.5) {
-      const key = `${box.w.toFixed(1)}|${box.h.toFixed(1)}|${radius.toFixed(1)}`;
-      if (!o.mask) {
-        o.mask = new Graphics();
-        o.container.addChild(o.mask);
+    const poly = layer.mask && layer.mask.length >= 3 ? layer.mask : null;
+    if (poly) {
+      const c = layer.crop ?? { l: 0, t: 0, r: 0, b: 0 };
+      const kw = Math.max(1 - c.l - c.r, 0.001);
+      const kh = Math.max(1 - c.t - c.b, 0.001);
+      const key = `${box.w.toFixed(1)}|${box.h.toFixed(1)}|${c.l}|${c.t}|${c.r}|${c.b}|${poly.length}|${poly[0]![0]}|${poly[poly.length >> 1]![1]}`;
+      if (!o.shape) {
+        o.shape = new Graphics();
+        o.container.addChild(o.shape);
       }
-      if (o.maskKey !== key) {
-        o.mask
-          .clear()
-          .roundRect(-box.w / 2, -box.h / 2, box.w, box.h, radius)
-          .fill(0xffffff);
-        o.maskKey = key;
+      if (o.shapeKey !== key) {
+        const pts = poly.flatMap(([u, v]) => [
+          ((u - c.l) / kw - 0.5) * box.w,
+          ((v - c.t) / kh - 0.5) * box.h,
+        ]);
+        o.shape.clear().poly(pts).fill(0xffffff);
+        o.shapeKey = key;
       }
-      o.sprite.mask = o.mask;
-    } else if (o.mask) {
-      o.sprite.mask = null;
-      o.container.removeChild(o.mask);
-      o.mask.destroy();
-      o.mask = null;
-      o.maskKey = '';
+      o.sprite.mask = o.shape;
+      if (o.mask) {
+        o.container.removeChild(o.mask);
+        o.mask.destroy();
+        o.mask = null;
+        o.maskKey = '';
+      }
+    } else {
+      if (o.shape) {
+        o.sprite.mask = null;
+        o.container.removeChild(o.shape);
+        o.shape.destroy();
+        o.shape = null;
+        o.shapeKey = '';
+      }
+      if (radius > 0.5) {
+        const key = `${box.w.toFixed(1)}|${box.h.toFixed(1)}|${radius.toFixed(1)}`;
+        if (!o.mask) {
+          o.mask = new Graphics();
+          o.container.addChild(o.mask);
+        }
+        if (o.maskKey !== key) {
+          o.mask
+            .clear()
+            .roundRect(-box.w / 2, -box.h / 2, box.w, box.h, radius)
+            .fill(0xffffff);
+          o.maskKey = key;
+        }
+        o.sprite.mask = o.mask;
+      } else if (o.mask) {
+        o.sprite.mask = null;
+        o.container.removeChild(o.mask);
+        o.mask.destroy();
+        o.mask = null;
+        o.maskKey = '';
+      }
     }
 
     // ---- 外框（畫在框內側，方框大小不變，選取框才對得準）----

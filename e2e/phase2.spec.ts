@@ -263,11 +263,24 @@ test('圖層屬性：透明度、混合模式、圓角、外框、裁切', async
     .toBe(true);
   await page.getByLabel('外框粗細').fill('0');
 
-  // 裁切左 50%：素材變窄（比例改變）；原本在 x≈0.3 的位置不再是綠
-  await page.getByLabel('裁切左').fill('50');
+  // 裁切（在剪輯分頁、直接在預覽上拖）：把左邊拉霸往右拖到一半；原本在 x≈0.3 的位置不再是綠，
+  // 留下來的那一半在畫面上的位置不變（x≈0.6 還是綠）
+  await expect(page.getByLabel('裁切左')).toHaveCount(0); // 圖層分頁沒有裁切滑桿了
+  await openTab(page, '剪輯');
+  await page.getByRole('button', { name: '裁切' }).tap();
+  const fr = (await page.getByTestId('crop-frame').boundingBox())!;
+  const hl = (await page.getByTestId('crop-h-l').boundingBox())!;
+  await page.mouse.move(hl.x + hl.width / 2, hl.y + hl.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hl.x + hl.width / 2 + fr.width / 4, hl.y + hl.height / 2, { steps: 4 });
+  await page.mouse.move(hl.x + hl.width / 2 + fr.width / 2, hl.y + hl.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await page.getByRole('button', { name: '完成' }).tap();
   const p = await project(page);
-  expect(p.tracks[1]!.items[0]!.crop!.l).toBeCloseTo(0.5);
+  expect(p.tracks[1]!.items[0]!.crop!.l).toBeCloseTo(0.5, 1);
   await expect.poll(async () => isRed(await samplePreview(page, 0.27, 0.5))).toBe(true);
+  expect(isGreen(await samplePreview(page, 0.6, 0.5))).toBe(true);
+  await openTab(page, '圖層');
   await page.screenshot({ path: `${SHOT}/layer-props.png` });
 
   // 位置、大小、旋轉歸位
