@@ -2,14 +2,31 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { execSync } from 'node:child_process';
+
+// 版本號：建置時間（台北時間）＋ commit，顯示在設定頁，讓使用者確認手機上是不是新版
+const sha = (
+  process.env.GITHUB_SHA ??
+  (() => {
+    try {
+      return execSync('git rev-parse HEAD').toString().trim();
+    } catch {
+      return 'dev';
+    }
+  })()
+).slice(0, 7);
+const built = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16);
 
 // GitHub Pages 網址：https://peiyulin0520.github.io/VideoClip/
 export default defineConfig({
   base: '/VideoClip/',
+  define: { __APP_VERSION__: JSON.stringify(`${built}（${sha}）`) },
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // 自己在 main.tsx 註冊：開網頁、回到前景時都檢查新版，新版接手後自動重新整理（不然 iPhone 會一直開到快取的舊版）
+      injectRegister: false,
       includeAssets: ['icons/apple-touch-icon.png', 'icons/favicon.png'],
       manifest: {
         name: 'VideoClip 剪輯',

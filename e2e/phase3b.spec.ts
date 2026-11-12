@@ -20,8 +20,12 @@ test('首次使用精靈：第一次嗎 → 備份位置 → 下載字體；完�
   await expect(welcome.getByRole('heading', { name: /歡迎使用/ })).toBeVisible();
   await page.screenshot({ path: `${SHOT}/wizard-1-first.png` });
 
-  // 「不是第一次」→ 還原選項（目前還不能用）→ 先略過
-  await welcome.getByRole('button', { name: /不是，我換了手機/ }).tap();
+  // 「我之前用過」→ 說明資料可能在哪（Safari 與主畫面分開、被清除、換手機）＋還原選項（目前還不能用）→ 先略過
+  await expect(welcome.getByRole('button', { name: '開始使用' })).toBeVisible();
+  await welcome.getByRole('button', { name: /我之前用過/ }).tap();
+  await expect(welcome).toContainText('主畫面');
+  await expect(welcome).toContainText('分開');
+  await page.screenshot({ path: `${SHOT}/wizard-restore-help.png` });
   await expect(welcome.getByRole('button', { name: /從 Google 雲端還原/ })).toBeDisabled();
   await expect(welcome.getByRole('button', { name: /匯入備份/ })).toBeDisabled();
   await welcome.getByRole('button', { name: /先略過，繼續設定/ }).tap();

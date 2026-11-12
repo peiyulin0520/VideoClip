@@ -105,21 +105,27 @@ type Hook = {
 };
 export type HookProject = ReturnType<Hook['project']>;
 
+/** 除錯掛鉤 window.__videoclip 要等預覽引擎建好才有（機器忙時會晚一點）：所有讀掛鉤的 helper 都先等它 */
+export const waitHook = (page: Page) =>
+  page.waitForFunction(() => !!(window as unknown as { __videoclip?: unknown }).__videoclip);
+
 export const project = async (page: Page): Promise<HookProject> => {
-  // 除錯掛鉤要等預覽引擎建好才有（機器忙時會晚一點）
-  await page.waitForFunction(() => !!(window as unknown as { __videoclip?: unknown }).__videoclip);
+  await waitHook(page);
   return page.evaluate(() => (window as unknown as { __videoclip: Hook }).__videoclip.project());
 };
 
-export const selectedItemId = (page: Page): Promise<string | null> =>
-  page.evaluate(() => (window as unknown as { __videoclip: Hook }).__videoclip.selected());
+export const selectedItemId = async (page: Page): Promise<string | null> => {
+  await waitHook(page);
+  return page.evaluate(() => (window as unknown as { __videoclip: Hook }).__videoclip.selected());
+};
 
-export const countColor = (
+export const countColor = async (
   page: Page,
   rgb: [number, number, number],
   tol: number,
   r: [number, number, number, number],
 ) =>
+  (await waitHook(page)) &&
   page.evaluate(
     ([c, t, region]) =>
       (window as unknown as { __videoclip: Hook }).__videoclip.countColor(
@@ -130,7 +136,8 @@ export const countColor = (
     [rgb, tol, r] as const,
   );
 
-export const exportFrame = (page: Page, t: number, pts: [number, number][]) =>
+export const exportFrame = async (page: Page, t: number, pts: [number, number][]) =>
+  (await waitHook(page)) &&
   page.evaluate(
     ([tt, p]) =>
       (window as unknown as { __videoclip: Hook }).__videoclip.exportFrame(
@@ -165,7 +172,8 @@ export async function addOverlays(page: Page, files: string[]) {
   await expect(page.getByTestId('clip')).toHaveCount(before + files.length, { timeout: 20_000 });
 }
 
-export const regionHash = (page: Page, r: [number, number, number, number]) =>
+export const regionHash = async (page: Page, r: [number, number, number, number]) =>
+  (await waitHook(page)) &&
   page.evaluate(
     (region) => (window as unknown as { __videoclip: Hook }).__videoclip.regionHash(...region),
     r,

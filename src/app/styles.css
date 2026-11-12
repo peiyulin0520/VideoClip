@@ -1347,3 +1347,58 @@ button {
 .hint.small {
   font-size: 11px;
 }
+
+/* GIPHY */
+.giphy-steps {
+  margin: 4px 0 8px;
+  padding-left: 22px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg);
+}
+.giphy-steps a,
+.hint a {
+  color: var(--accent);
+}
+.giphy-key-row,
+.giphy-search {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}
+.giphy-key-row .text-input,
+.giphy-search .text-input {
+  flex: 1;
+  min-width: 0;
+}
+.hint.warn {
+  color: #ffb36b;
+}
+
+.sticker-wrap {
+  position: relative;
+}
+.sticker-wrap .sticker-cell {
+  width: 100%;
+}
+.sticker-del {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+}
+.sticker-del span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  color: #fff;
+  background: #e5484d;
+  border-radius: 50%;
+}

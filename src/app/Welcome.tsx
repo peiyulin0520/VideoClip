@@ -67,20 +67,38 @@ export function Welcome() {
           <>
             <h1>歡迎使用 VideoClip 剪輯</h1>
             <p className="hint">專案和影片都只存在這台裝置，不會上傳到任何地方。</p>
-            <h2>這是第一次在這台裝置使用嗎？</h2>
+            <h2>這個瀏覽器裡還沒有 VideoClip 的資料</h2>
+            <p className="hint">
+              用過之後，專案、匯入的字體、我的貼圖都會記在這支手機，下次打開會直接進首頁，不會再看到這一頁。
+            </p>
             <button className="btn primary big" onClick={() => setStep('backup')}>
-              是，第一次使用
+              開始使用
             </button>
             <button className="btn big" onClick={() => setStep('restore')}>
-              不是，我換了手機或清除過資料
+              我之前用過，怎麼又看到這一頁？
             </button>
           </>
         )}
 
         {step === 'restore' && (
           <>
-            <h2>要把以前的專案找回來嗎？</h2>
-            <p className="hint">還原功能會跟「備份」一起在之後的版本開放，現在可以先略過、直接開始使用。</p>
+            <h2>之前的專案去哪了？</h2>
+            <p className="hint">同一支手機又看到這一頁，表示這個瀏覽器裡沒有資料，通常是：</p>
+            <ul className="hint restore-reasons">
+              <li>
+                <b>之前在 Safari 用，現在從主畫面的圖示打開（或反過來）</b>：iPhone
+                上這兩邊的資料是分開的，請回原本的地方打開，專案都還在。
+              </li>
+              <li>
+                <b>Safari 清除了網站資料</b>（手機空間不足、太久沒打開，或在設定裡清除過）。
+              </li>
+              <li>
+                <b>換了手機</b>。
+              </li>
+            </ul>
+            <p className="hint">
+              後兩種要從備份還原；備份與還原會在之後的版本開放，現在可以先略過、直接開始使用。
+            </p>
             <button className="btn big" disabled>
               從 Google 雲端還原（之後開放）
             </button>

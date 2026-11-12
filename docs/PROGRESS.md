@@ -4,11 +4,11 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`。第 2 次實測修正 ①–⑤＋預覽優先版面＋貼圖＋多格模板規格已開 **PR #4** 等使用者合併（2026-11-11，使用者選「先合併上線，用 iPhone 測」）；合併後 Actions 部署，上線網址才會更新。合併後分支對齊 main：`git fetch origin main && git merge --ff-only origin/main`
-- **最後一個程式 commit**：見 `git log -1`（貼圖 icon）
-- **測試**：560 個單元測試、64 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **分支**：`claude/zen-tesla-v3brj5`。第 3 次實測修正＋GIPHY＋我的貼圖＋精靈說明已開 **PR #5** 等使用者合併（2026-11-12）；合併後分支對齊 main：`git fetch origin main && git merge --ff-only origin/main`
+- **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
+- **測試**：566 個單元測試、70 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：使用者合併 PR #4 後用 iPhone 重測（清單 `docs/PLAN.md §7`；匯入大影片若仍失敗請回報新錯誤訊息全文）。之後：多格影片模板（R22，`docs/LAYOUTS.md`，先給使用者看草圖或參考圖）→ 物件動畫核心（Phase 4）→ 雲朵字、字卡模板
+- **下一步**：合併上線後請使用者在 iPhone 上：看設定頁版本號 → 重測匯入大影片 → 在設定頁或「疊加 → 貼圖 → GIPHY」貼上自己的 GIPHY key 試搜尋（沙盒連不到 GIPHY，只用模擬資料測過）→ 試「我的貼圖」。之後可做：缺字體提示＋重新匯入自動接回、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -27,6 +27,8 @@
 ```
 
 ## 使用者已確認的偏好
+- 自己上傳的貼圖／畫好的素材存在「我的素材庫」（這台手機、所有專案共用）；**GIPHY 搜尋結果不存**，每次各自搜尋（2026-11-12）
+- **API key 不能放進程式碼或 GitHub**（公開 repo）：使用者 2026-11-12 已申請 GIPHY API key，要求注意不要讓別人用到 → 做法：key 只在使用者手機的設定頁輸入、存在那台裝置（localStorage），**絕不寫進 repo、文件、commit、日誌**（本檔也不記 key 的值）
 - **預覽畫面優先**：預覽大小永遠不變、不能被設定面板擠小；整頁往下滑看其他功能，往上滑回來看預覽（預覽不必固定在螢幕上）（2026-11-11）
 - **選取框只要框線**，不要任何圓點／按鈕；縮放旋轉用手指（雙指）（2026-11-11）
 - 新專案比例預設「自動：跟第一支影片一樣」，但之後可以調整修改（2026-11-11 使用者選 A：「跟第一支影片一樣，但保留之後影片可以調整修改」；先前誤記為 B）
@@ -48,6 +50,10 @@
 - 備份資料夾保持私人；只貼網址不登入無法寫入（Google 限制），已向使用者說明
 
 ## 使用者的修正紀錄（時間順序）
+- 2026-11-12 ①「已客製化自己上傳的貼圖或畫好的素材可以直接存在 VideoClip 瀏覽器裡供其他剪輯專案使用，但如果是從 GIPHY 取得的，不需要存，每次各自搜尋即可」②同一支手機該選精靈哪個選項？（精靈選項講不清楚）③「api key 如果先前也已填過，可以存在網頁裡面？就不用每次都貼；如果先前沒貼過 Key，可以出一個簡短的申請說明（GIPHY 超連結 → 建帳號 → Dashboard Create API Key → 說明一律 VideoClip、使用 Web → 複製 key 貼上）」→ 已照做
+- 2026-11-12 問：選「不是第一次使用」時，之前匯入的字體、貼圖、畫畫素材會不會記住？還是每次都要重新匯入？未完成專案的字體會不會跑掉？→ 回答：同一台手機都會記住（字體在 IndexedDB、素材在專案的 OPFS／IndexedDB），不用重匯；風險是 Safari 清除網站資料（建議加入主畫面）或換手機（要等備份 Phase 6）。已知缺口：字體不見時現在會默默換成預設字體 → 規劃「缺字體提示＋重新匯入同一個字體自動接回」
+- 2026-11-12 提供 GIPHY API key（值不記錄），要求不要放進公開的程式碼
+- 2026-11-12 第 3 次 iPhone 實測：①「匯入影片一樣發生 operation 問題」（錄影的錯誤訊息是舊版格式＝手機開到快取舊版）②「加了字卡，但也沒有在預覽畫面看到」③「貼圖可以參考 IG 的 stickers 來源嗎？」④「影片可以加上自己描邊剪裁人體出現部位的影片就好嗎？相當於去背的概念」⑤「之前有給你附檔的三個字體檔案，但好像沒有在網頁中看到」⑥「背景風格可以彈性調整嗎？黑白網頁風格、清新（白色基底）、溫暖（棕色系）」→ 分析與規劃見 docs/plans/2026-11-12-feedback-3.md
 - 2026-11-11 選 B（先不合併、繼續做貼圖），並提出新需求：「希望還可以增加不同模板，例如拍貼機或膠卷，可以有多格影片呈現在不同格子裡面，然後可以以特效方式滑過等」→ 記成需求 R22，規格 docs/LAYOUTS.md
 - 2026-11-11 看完第 2 次修正後：「選取框一率不需要小圓點，只需要有框框可以選取字串並用手指控制縮放就行」「預覽不要太小，如果需要其他功能，可以往下滑新增相關功能，不要擠到預覽畫面」→ 規劃見 docs/plans/2026-11-11-preview-first-layout.md（取代 feedback-2 §② 的角點／旋轉點／時間軸精簡）
 - 2026-11-11 更正上面第二點：「第一點可以，第二點我的意思是頁面可以整體往下滑新增功能，但往上滑可以看到不會縮小的預覽畫面」→ **整頁一起捲**，預覽不固定在螢幕上、往下滑會捲走，往上滑回來是原尺寸；規劃 §2-① 已改寫
@@ -58,6 +64,18 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 GIPHY 貼圖＋我的貼圖素材庫＋精靈說明（分支 claude/zen-tesla-v3brj5，Opus）
+  - 做了什麼：(1) **GIPHY**（`src/stickers/giphy.ts`、`src/app/editor/GiphyPanel.tsx`）：key 只存在這台手機的 localStorage（`vc-giphy-key`），**不進 repo**；沒填過顯示申請說明（GIPHY Developers 超連結 → 建帳號 → Dashboard「Create an API Key」→ 選 API、名稱與說明填 VideoClip、平台 Web → 複製貼上），儲存前先試打一次確認 key 能用（連不到時先存）；填過就記住，設定頁顯示「已設定（…末四碼）」可更換／刪除；key 不對時顯示提示並回到填 key。貼圖分頁多「GIPHY」：熱門＋搜尋（中文自動用 zh-TW、rating g）、「Powered by GIPHY」、點了把**第一格**畫成 PNG 當照片素材加進專案（會動的版本還沒做）；搜尋結果不存。(2) **我的貼圖**（`src/storage/library.ts`、IndexedDB 升到 v3 新增 `library`、`MyStickers.tsx`）：上傳自己的圖（轉成最長邊 1024 的 PNG，HEIC 也能用）存在這支手機，**所有專案共用**；點了加進專案；「管理」可刪除。(3) **精靈**：第一頁改成「這個瀏覽器裡還沒有 VideoClip 的資料」＋「開始使用」／「我之前用過，怎麼又看到這一頁？」，後者說明 Safari 與主畫面資料分開、被清除、換手機三種情況。(4) 找到偶發失敗的根因：e2e helper `selectedItemId` 等在除錯掛鉤出現前就讀取 → 所有讀掛鉤的 helper 統一先 `waitHook`
+  - 動了哪些檔：src/stickers/{giphy,giphy.test}.ts、src/storage/{db,library,library.test}.ts、src/app/editor/{GiphyPanel,MyStickers,StickerPicker}.tsx、src/app/pages/Settings.tsx、src/app/Welcome.tsx、styles.css、e2e/{giphy,phase3a-stickers,phase3b,helpers}.ts
+  - 驗證：✅ 單元：key 存取、回應解析、沒 key 不送請求、search／trending 參數、錯誤分類（403／429／連不到）、素材庫新增／排序／取檔／刪除；✅ e2e（**用 page.route 模擬 GIPHY，假 key**）：申請說明的連結與文字、貼上後熱門出現、key 只在 localStorage 不在專案資料、重新整理不用再貼、中文搜尋參數、點貼圖加入、key 錯誤提示、設定頁只顯示末四碼並可刪除；我的貼圖上傳→加入→換新專案還在→刪除；精靈說明；566 單元＋70 e2e，整套連跑 3 次全過  🔴 **真的 GIPHY 沒測**（沙盒連不到 api.giphy.com）：key、搜尋、圖片 CORS 都要使用者在 iPhone 上試
+  - 踩到的坑：jsdom 的假 IndexedDB 存 Blob 會掉 type → 素材庫另外存 `mime`；react-hooks 規則不准在 effect 裡同步 setState（GIPHY 熱門改用 promise 回來再 set）
+  - 下一步：請使用者合併上線測試
+- 2026-11-12 第 3 次實測回報：修 2 項＋規劃 3 項（分支 claude/zen-tesla-v3brj5，Opus）
+  - 做了什麼：看錄影（ffmpeg 抽格）發現錯誤訊息還是舊版格式 → 手機一直開到 Service Worker 快取的舊版。改成在 `src/app/pwa.ts` 自己註冊（`injectRegister:false`）：開網頁、切回前景、每 30 分鐘檢查新版，新版接手自動重新整理；設定頁新增「版本」（建置時間台北時間＋commit，`__APP_VERSION__`）。重現「字卡看不到」：字卡有畫，但被預覽中央的大匯入鈕蓋住 → 大匯入鈕只在專案完全空的時候顯示。讀了使用者給的三個字體的 name table：星光小熊貓體禁止上傳網站與修改、851 手書き雜沒有授權 → 維持只能自己匯入。寫 `docs/plans/2026-11-12-feedback-3.md`（GIPHY 貼圖、人物去背、介面主題）
+  - 動了哪些檔：src/app/pwa.ts（新）、src/vite-env.d.ts（新）、src/main.tsx、vite.config.ts、src/app/pages/{Editor,Settings}.tsx、e2e/preview-first.spec.ts、docs/plans/2026-11-12-feedback-3.md
+  - 驗證：✅ e2e：只有字卡的專案沒有大匯入鈕、預覽中間有白字、選取框中心不是匯入鈕、時間軸的「加入素材」還在；設定頁版本格式；build 後 index.html 沒有內嵌 registerSW、版本字串有進 bundle；560 單元＋66 e2e 全過、連跑 2 次  🔴 iPhone：自動更新是否真的換新版、匯入大影片（要使用者更新後重測）
+  - 踩到的坑：PWA 預快取讓 iPhone 長時間停在舊版，使用者回報的問題可能是舊版的 → 以後回報先請使用者看設定頁版本號
+  - 下一步：等使用者選主題／去背／GIPHY
 - 2026-11-11 Phase 3A 第 4 步後半：貼圖 icon（分支 claude/zen-tesla-v3brj5，Opus）
   - 做了什麼：新管線 `scripts/build-stickers.mjs`（`npm run stickers`）：用 `npm pack` 取 `@iconify-json/fluent-emoji@1.2.7`（彩色 Fluent Emoji，**授權 MIT、作者 Microsoft，腳本會檢查 info.json，不符就停**），分類取自 `@iconify-json/fluent-emoji-flat` 的 metadata；每個分類用人工挑的常用清單（照順序），不足時用該分類其他的補；排除膚色變體。輸出 **397 個** `public/stickers/*.svg`（4.7MB，寬高設 512）＋ `LICENSE.txt`（MIT 全文）＋ `src/stickers/catalog.generated.json`。疊加分頁新增「貼圖」：9 個分類（表情、愛心、手勢、動物植物、食物、慶祝活動、旅行天氣、物品、符號）＋ 6 欄格子。點貼圖 → 畫成 512px PNG → 當照片素材加到目前這一秒（大小 30%，**素材與片段同一步復原**——順便把一般疊加匯入也改成同一步）。設定頁加「素材授權」。貼圖不進 PWA 預快取（用到才下載）
   - 動了哪些檔：scripts/build-stickers.mjs（新）、public/stickers/（新）、src/stickers/（新）、src/app/editor/{StickerPicker（新）,Toolbar}.tsx、src/store/actions.ts（addOverlayClips 一併加入素材、可指定大小）、src/app/pages/{Editor,Settings}.tsx、styles.css、vite.config.ts、package.json、e2e/phase3a-stickers.spec.ts、AGENTS.md、docs/TEXT_CARDS.md

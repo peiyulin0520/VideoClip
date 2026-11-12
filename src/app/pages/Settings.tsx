@@ -1,3 +1,5 @@
+import { APP_VERSION } from '../pwa';
+import { GiphyKeySetup } from '../editor/GiphyPanel';
 import { ChevronLeft, Download, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -239,6 +241,11 @@ export function Settings() {
         </p>
       </section>
 
+      <section aria-label="GIPHY 貼圖">
+        <h2>GIPHY 貼圖</h2>
+        <GiphyKeySetup />
+      </section>
+
       <section aria-label="素材授權">
         <h2>素材授權</h2>
         <p className="hint">
@@ -247,6 +254,15 @@ export function Settings() {
             授權全文
           </a>
           ）。圖形庫與裝飾是本 App 自己畫的。
+        </p>
+      </section>
+
+      <section aria-label="版本">
+        <h2>版本</h2>
+        <p className="hint" data-testid="app-version">
+          {APP_VERSION}
+          <br />
+          網站更新後，打開網頁或切回這個分頁時會自動換成新版。如果版本沒變，把 Safari 分頁完全關掉再打開。
         </p>
       </section>
     </main>
