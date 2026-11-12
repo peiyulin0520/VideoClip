@@ -5,13 +5,13 @@ import { countEditorRender } from '../../engine/debug';
 import { ensureUrls, releaseProjectUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { enqueueProxies } from '../../engine/proxyQueue';
-import { addOverlayClips } from '../../store/actions';
-import { relayout, totalDuration, formatTime } from '../../engine/timeline';
-import { getProject } from '../../storage/projects';
+import { addOverlayClips, importToBase } from '../../store/actions';
+import { formatTime, totalDuration } from '../../engine/timeline';
+import { getProjectMigrated, saveProject } from '../../storage/projects';
 import { startAutosave } from '../../store/autosave';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
-import { ASPECTS, assignAspect, pickAspect } from '../../model/defaults';
+import { ASPECTS } from '../../model/defaults';
 import type { Aspect } from '../../model/types';
 import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
@@ -33,15 +33,20 @@ function EditorLoader({ projectId }: { projectId: string }) {
     let cancelled = false;
     let autosave: ReturnType<typeof startAutosave> | null = null;
     (async () => {
-      const p = await getProject(projectId);
+      const migrated = await getProjectMigrated(projectId);
       if (cancelled) return;
-      if (!p) return setStatus('missing');
+      if (!migrated) return setStatus('missing');
+      const p = migrated.project;
+      if (migrated.changed) await saveProject(p); // 舊格式（v1）：轉成新格式存回去，下次打開就不用再轉
+      if (cancelled) return;
       const missing = await ensureUrls(p.id, p.assets);
       if (cancelled) return;
       useProjectStore.getState().load(p);
       autosave = startAutosave();
       enqueueProxies(p.id, p.assets); // 舊專案的大影片：背景補做預覽用輕量影片
       setStatus('ready');
+      if (migrated.reordered)
+        toast('為了讓字卡永遠在影像上面，這個專案的圖層順序已經調整過', 9000);
       if (missing.length)
         toast(`找不到素材檔：${missing.join('、')}（可能是上次存不下、沒有留在手機裡，請重新匯入）`, 8000);
     })();
@@ -152,17 +157,8 @@ function EditorBody() {
           // 疊加：放在播放頭這一秒，同一秒疊多個就各佔一條軌道
           addOverlayClips(res.assets, player?.time ?? 0);
         } else {
-          const startOfNew = totalDuration(useProjectStore.getState().project!);
-          // 匯入主軌素材後不自動選取（主軌是滿版的，選取框會像「要手動縮小」的框）
-          useProjectStore.getState().apply((d) => {
-            d.assets.push(...res.assets);
-            const tr = d.tracks.find((t) => t.kind === 'main')!;
-            // 比例設成「自動」、而且主軌還是空的：第一次匯入時照第一個素材的形狀決定專案比例
-            const first = res.assets[0];
-            if (d.aspectAuto && tr.items.length === 0 && first)
-              assignAspect(d, pickAspect(first.width, first.height), true);
-            tr.items = relayout([...(tr.items as typeof res.clips), ...res.clips]);
-          });
+          // 接在最下面那條影像軌的最後面；不自動選取（滿版的影片選取框會像「要手動縮小」的框）
+          const startOfNew = importToBase(res.assets, res.clips);
           player?.seek(startOfNew);
         }
       }

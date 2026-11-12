@@ -145,9 +145,7 @@ export function Preview({
       const p = useProjectStore.getState().project;
       const id = useProjectStore.getState().selectedId;
       const f = p && findItem(p, id);
-      setSelVisible(
-        !!f && (f.track.kind === 'main' || (t >= f.item.start && t < f.item.start + f.item.duration)),
-      );
+      setSelVisible(!!f && t >= f.item.start && t < f.item.start + f.item.duration);
       // 字串相同 React 不會重畫，播放時不會每一格都重畫
       setHitIds(
         p
@@ -382,7 +380,7 @@ export function Preview({
 
         {box && sel && !cropping && (
           <div
-            className={`selbox${selLocked ? ' locked' : ''}${sel.track.kind === 'main' ? ' main' : ''}`}
+            className={`selbox${selLocked ? ' locked' : ''}`}
             data-testid="selbox"
             style={{
               left: box.cx * k,

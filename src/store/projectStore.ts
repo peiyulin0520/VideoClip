@@ -1,6 +1,6 @@
 import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
-import type { Asset, Item, Project, VideoItem } from '../model/types';
+import type { Asset, Item, Project } from '../model/types';
 
 const HISTORY_LIMIT = 100;
 const COALESCE_MS = 800;
@@ -123,15 +123,7 @@ function patchAssetEverywhere(assetId: string, fields: Partial<Asset>) {
   });
 }
 
-/** 取代主軌的片段清單（呼叫端要先用 timeline.ts 的函式算好、包含 relayout） */
-export function setMainItems(items: VideoItem[], opts?: ApplyOpts) {
-  useProjectStore.getState().apply((d) => {
-    const tr = d.tracks.find((t) => t.kind === 'main');
-    if (tr) tr.items = items;
-  }, opts);
-}
-
-/** 取代某條軌道的物件清單（疊加/文字軌：呼叫端用 timeline.ts 的 *Free 函式算好） */
+/** 取代某條軌道的物件清單（呼叫端用 timeline.ts 的 *Free 函式算好） */
 export function setTrackItems(trackId: string, items: Item[], opts?: ApplyOpts) {
   useProjectStore.getState().apply((d) => {
     const tr = d.tracks.find((t) => t.id === trackId);

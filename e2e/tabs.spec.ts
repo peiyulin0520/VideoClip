@@ -34,18 +34,17 @@ test('七個分頁都在、390 寬點得到每一個（放不下時分頁列可�
   expect(bar.sw).toBeGreaterThanOrEqual(bar.cw);
 });
 
-test('剪輯分頁只留跟剪輯影片有關的；前後移在圖層、移除版型在版型、全部靜音在音訊', async ({ page }) => {
+test('剪輯分頁只留跟剪輯影片有關的（含刪除並補齊）；沒有前後移；移除版型在版型、全部靜音在音訊', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  for (const n of ['匯入', '分割', '刪除', '複製', '修剪', '裁切', '變速', '音量'])
+  for (const n of ['匯入', '分割', '刪除', '刪除並補齊', '複製', '修剪', '裁切', '變速', '音量'])
     await expect(page.getByRole('button', { name: n, exact: true })).toBeVisible();
   for (const n of ['前移', '後移', '全部影片靜音', '移除版型'])
     await expect(page.getByRole('button', { name: n })).toHaveCount(0);
 
   await openTab(page, '圖層');
-  await expect(page.getByRole('button', { name: '前移' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '後移' })).toBeVisible();
+  for (const n of ['前移', '後移']) await expect(page.getByRole('button', { name: n })).toHaveCount(0); // 每一層都是自由擺放，沒有順序可前後移
   await openTab(page, '音訊');
   await expect(page.getByRole('button', { name: '全部影片靜音' })).toBeVisible();
 });

@@ -4,7 +4,7 @@ import type { Asset, VideoItem } from '../model/types';
 import { fadeGain, fadeSpans } from './audio';
 import { audibleItems } from './exporter';
 import { mediaKindOf } from './probe';
-import { relayout, totalDuration, trimEndFree, trimStartFree, visibleLayers } from './timeline';
+import { placeSequential, totalDuration, trimEndFree, trimStartFree, visibleLayers } from './timeline';
 import { quantizeWave } from './wave';
 
 const asset = (id: string, kind: Asset['kind'], duration: number, hasAudio = true): Asset => ({
@@ -56,7 +56,7 @@ describe('背景音樂的資料', () => {
     const v = asset('v', 'video', 4);
     const m = asset('m', 'audio', 30);
     p.assets = [v, m];
-    p.tracks[0]!.items = relayout([createClip(v)]);
+    p.tracks[0]!.items = placeSequential([createClip(v)]);
     const tr = createTrack('audio', p.tracks);
     tr.items = [createAudioClip(m, 0)];
     p.tracks.push(tr);
@@ -67,11 +67,11 @@ describe('背景音樂的資料', () => {
     const v = asset('v', 'video', 4);
     const m = asset('m', 'audio', 4);
     p.assets = [v, m];
-    p.tracks[0]!.items = relayout([createClip(v)]);
+    p.tracks[0]!.items = placeSequential([createClip(v)]);
     const tr = createTrack('audio', p.tracks);
     tr.items = [createAudioClip(m, 0)];
     p.tracks.push(tr);
-    expect(visibleLayers(p, 1).map((l) => l.track.kind)).toEqual(['main']);
+    expect(visibleLayers(p, 1).map((l) => l.track.kind)).toEqual(['media']);
   });
   it('音樂軌的修剪：頭端不能超過素材起點、尾端不能超過素材長度、不壓到旁邊的音樂', () => {
     const m = asset('m', 'audio', 10);
@@ -88,7 +88,7 @@ describe('背景音樂的資料', () => {
     const v = asset('v', 'video', 4, false);
     const m = asset('m', 'audio', 4);
     p.assets = [v, m];
-    p.tracks[0]!.items = relayout([createClip(v)]);
+    p.tracks[0]!.items = placeSequential([createClip(v)]);
     const tr = createTrack('audio', p.tracks);
     tr.items = [createAudioClip(m, 0)];
     p.tracks.push(tr);

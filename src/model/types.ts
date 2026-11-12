@@ -40,7 +40,7 @@ export type Crop = { l: number; t: number; r: number; b: number };
 
 export type ItemBase = {
   id: string;
-  start: number; // 時間軸位置（秒）。主軌由 relayout 自動算出，首尾相接
+  start: number; // 時間軸位置（秒）。所有軌道都是自由擺放（2026-11-12 起沒有磁吸的主軌）
   duration: number; // 時間軸上的長度（秒）
   /** x、y：中心點，佔畫面寬/高的比例；scale：乘上「填滿/完整」算出的基本大小；rotation：度，順時針 */
   transform: Transform;
@@ -67,8 +67,6 @@ export type VideoItem = ItemBase & {
   cell?: { x: number; y: number; w: number; h: number };
   /** 同一個版型的物件（外框與各格）共用的 id，用來「刪除整個版型」 */
   group?: string;
-  /** 主軌專用：這個片段「前面」的空白秒數（黑畫面，疊加與文字照常）。沒有＝0＝首尾相接 */
-  gap?: number;
 };
 
 // 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
@@ -183,8 +181,13 @@ export type TextItem = ItemBase & { type: 'text'; card: TextCard };
 
 export type Item = VideoItem | TextItem;
 
-/** 軌道由下往上排列 = 圖層順序；index 0 一定是主軌 */
-export type TrackKind = 'main' | 'overlay' | 'text' | 'audio';
+/**
+ * 軌道種類：素材只能放進同種類的軌道。
+ * media＝影片／照片／貼圖（原本的主軌與疊加合併）、effect＝特效（之後）、text＝字卡、audio＝音樂／音效。
+ * tracks 陣列由下往上＝圖層順序，並且依種類分區排好：影像 → 特效 → 字卡 → 音訊（音訊沒有畫面，時間軸畫在最下面）。
+ * 同一區裡的軌道可以自由換順序，不能跨區。
+ */
+export type TrackKind = 'media' | 'effect' | 'text' | 'audio';
 
 export type Track = {
   id: string;
@@ -210,5 +213,6 @@ export type Project = {
   assets: Asset[];
   tracks: Track[];
   thumbnail?: string;
-  version: 1;
+  /** 2＝2026-11-12 起：影像軌統一、沒有主軌；舊的 1 讀進來時由 migrateProject 轉換 */
+  version: 2;
 };

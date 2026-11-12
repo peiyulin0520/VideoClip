@@ -1,4 +1,5 @@
 import { createProject, newId } from '../model/defaults';
+import { migrateProject, type Migrated } from '../model/migrate';
 import type { Project } from '../model/types';
 import { getDB } from './db';
 import { copyProjectMedia, deleteProjectMedia } from './media';
@@ -16,13 +17,20 @@ export async function listProjects(): Promise<Project[]> {
   await writes;
   const db = await getDB();
   const all = await db.getAll('projects');
-  return all.sort((a, b) => b.updatedAt - a.updatedAt);
+  // 舊格式（v1）讀進來時在記憶體裡轉成 v2；首頁只用來顯示，不寫回去
+  return all.map((p) => migrateProject(p).project).sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/** 讀專案並轉成最新格式；changed／reordered 讓編輯器決定要不要存回去、要不要提醒使用者 */
+export async function getProjectMigrated(id: string): Promise<Migrated | undefined> {
+  await writes;
+  const db = await getDB();
+  const p = await db.get('projects', id);
+  return p ? migrateProject(p) : undefined;
 }
 
 export async function getProject(id: string): Promise<Project | undefined> {
-  await writes;
-  const db = await getDB();
-  return db.get('projects', id);
+  return (await getProjectMigrated(id))?.project;
 }
 
 export function saveProject(p: Project): Promise<void> {

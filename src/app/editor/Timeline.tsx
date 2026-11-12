@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Film, Layers, Lock, Music, Plus, Type, Volume2, VolumeX } from 'lucide-react';
+import { Eye, EyeOff, Film, Lock, Music, Plus, Sparkles, Type, Volume2, VolumeX } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -9,26 +9,31 @@ import {
   type PointerEvent as RPointerEvent,
 } from 'react';
 import {
-  gapOf,
+  baseMediaTrack,
   isVideoItem,
   itemEnd,
-  mainItems,
-  moveItem,
   totalDuration,
-  trimEnd,
   trimEndFree,
-  trimStart,
   trimStartFree,
+  ZONE,
 } from '../../engine/timeline';
 import type { Asset, Item, Track, VideoItem } from '../../model/types';
 import { useProxyProgress } from '../../engine/proxyQueue';
 import { Wave } from './Wave';
-import { moveTrackTo, patchTrack, placeItem, removeTrack, shiftTrackLayer } from '../../store/actions';
-import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
+import {
+  closeGap,
+  moveTrackTo,
+  patchTrack,
+  placeItem,
+  removeTrack,
+  shiftTrackLayer,
+} from '../../store/actions';
+import { setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 
-const MAIN_H = 64;
+const BASE_H = 64; // 最下面那條影像軌高一點，縮圖看得清楚
+const GAP_MIN = 0.1; // 小於這個秒數的空位不畫
 const ROW_H = 44;
 const ROW_GAP = 6;
 const RULER_H = 24;
@@ -79,9 +84,20 @@ function Tiles({
   );
 }
 
-type Drag =
-  | { kind: 'reorder'; id: string; dx: number; target: number }
-  | { kind: 'move'; id: string; dx: number; snapX: number | null };
+/** 同一軌物件之間的空位（時間軸上畫虛線框）；最下面那條影像軌連「開頭」的空位也算（開場留白） */
+function gapsOf(items: Item[], includeLeading: boolean): { start: number; len: number }[] {
+  const sorted = [...items].sort((a, b) => a.start - b.start);
+  const out: { start: number; len: number }[] = [];
+  let end = 0;
+  sorted.forEach((it, i) => {
+    const len = it.start - end;
+    if (len >= GAP_MIN && (i > 0 || includeLeading)) out.push({ start: end, len });
+    end = Math.max(end, it.start + it.duration);
+  });
+  return out;
+}
+
+type Drag = { kind: 'move'; id: string; dx: number; snapX: number | null };
 
 export function Timeline({
   pps,
@@ -106,33 +122,36 @@ export function Timeline({
   const suppressChipClick = useRef(false);
 
   const total = totalDuration(project);
-  const main = mainItems(project);
+  const baseId = baseMediaTrack(project)?.id;
+  const [gapSel, setGapSel] = useState<{ trackId: string; at: number } | null>(null);
 
-  // 由上到下顯示（最上層的軌道在最上面），主軌在最底
+  // 由上到下顯示：字卡 → 特效 → 影像（最上層的軌道在最上面），音訊沒有畫面，畫在最下面、跟上面隔一小段
   const rows = useMemo(() => {
-    const list = project.tracks.map((track, index) => ({ track, index })).reverse();
-    const heights = list.map((r) => (r.track.kind === 'main' ? MAIN_H : ROW_H));
-    return list.map((r, i) => ({
-      ...r,
-      h: heights[i]!,
-      top: RULER_H + ROW_GAP + heights.slice(0, i).reduce((sum, h) => sum + h + ROW_GAP, 0),
-    }));
-  }, [project.tracks]);
-  // 拖到的位置（顯示列）：跟其他列的中心比較；主軌（最底下那列）固定不能被擠開
+    const all = project.tracks.map((track, index) => ({ track, index })).reverse();
+    const list = [...all.filter((r) => r.track.kind !== 'audio'), ...all.filter((r) => r.track.kind === 'audio')];
+    const heights = list.map((r) => (r.track.id === baseId ? BASE_H : ROW_H));
+    let y = RULER_H + ROW_GAP;
+    return list.map((r, i) => {
+      if (i > 0 && r.track.kind === 'audio' && list[i - 1]!.track.kind !== 'audio') y += ROW_GAP * 2;
+      const top = y;
+      y += heights[i]! + ROW_GAP;
+      return { ...r, h: heights[i]!, top };
+    });
+  }, [project.tracks, baseId]);
+  // 拖到的位置（顯示列）：只跟同一區（同種類）的列比；不能跨區
   const dropRow = (from: number, dy: number): number => {
     const me = rows[from];
     if (!me) return from;
     const center = me.top + me.h / 2 + dy;
-    let to = 0;
-    rows.forEach((r, i) => {
-      if (i !== from && i < rows.length - 1 && r.top + r.h / 2 < center) to++;
-    });
-    return Math.min(to, rows.length - 2);
+    const zone = ZONE[me.track.kind];
+    const same = rows.map((r, i) => ({ r, i })).filter((x) => ZONE[x.r.track.kind] === zone);
+    let to = same[0]!.i;
+    for (const { r, i } of same) if (i !== from && r.top + r.h / 2 < center) to++;
+    return Math.min(to, same[same.length - 1]!.i);
   };
 
   const startTrackDrag = (e: RPointerEvent, trackId: string, from: number) => {
     e.stopPropagation();
-    if (rows[from]?.track.kind === 'main') return; // 主軌不能拖，點一下還是開選單
     const startY = e.clientY;
     const el = e.currentTarget as HTMLElement;
     el.setPointerCapture(e.pointerId);
@@ -156,7 +175,7 @@ export function Timeline({
       setTrackDrag(null);
       if (cancelled) return;
       const to = dropRow(from, ev.clientY - startY);
-      if (to !== from) moveTrackTo(trackId, project.tracks.length - 1 - to); // 顯示列 → 圖層順序（反過來）
+      if (to !== from) moveTrackTo(trackId, rows[to]!.index); // 顯示列 → 軌道在陣列裡的位置（同一區內）
     };
     const up = (ev: PointerEvent) => end(ev, false);
     const cancel = (ev: PointerEvent) => end(ev, true);
@@ -244,33 +263,18 @@ export function Timeline({
     };
   }, [pps, setPps]);
 
-  // ---- 物件：點選 / 長按拖曳（主軌＝排序，其他軌＝移動時間）----
+  // ---- 物件：點選 / 長按拖曳（所有軌道都一樣：移動時間）----
   const startItemGesture = (e: RPointerEvent, item: Item, track: Track) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.stopPropagation();
     const startX = e.clientX;
     const startY = e.clientY;
-    const isMain = track.kind === 'main';
-    const startItems = track.items;
-    const idx = startItems.findIndex((x) => x.id === item.id);
     let mode: 'pending' | 'drag' | 'cancelled' = 'pending';
     player?.pause();
 
     const blockScroll = (ev: TouchEvent) => ev.cancelable && ev.preventDefault();
 
-    // 主軌排序
-    const widths = startItems.map((x) => x.duration * pps);
-    const lefts = startItems.map((x) => x.start * pps);
-    const calcTarget = (dx: number) => {
-      const center = lefts[idx]! + widths[idx]! / 2 + dx;
-      let target = 0;
-      startItems.forEach((_, i) => {
-        if (i !== idx && lefts[i]! + widths[i]! / 2 < center) target++;
-      });
-      return target;
-    };
-
-    // 其他軌：移動時間，吸附到 0、播放頭、其他物件的邊緣
+    // 移動時間，吸附到 0、播放頭、其他物件的邊緣
     const snapStart = (dx: number): { dx: number; snapX: number | null } => {
       if (!player) return { dx, snapX: null };
       const want = Math.max(item.start + dx / pps, 0);
@@ -293,11 +297,7 @@ export function Timeline({
       if (mode !== 'pending' || track.locked) return;
       mode = 'drag';
       window.addEventListener('touchmove', blockScroll, { passive: false });
-      setDrag(
-        isMain
-          ? { kind: 'reorder', id: item.id, dx: 0, target: idx }
-          : { kind: 'move', id: item.id, dx: 0, snapX: null },
-      );
+      setDrag({ kind: 'move', id: item.id, dx: 0, snapX: null });
       navigator.vibrate?.(15);
     }, LONG_PRESS_MS);
 
@@ -308,11 +308,8 @@ export function Timeline({
         clearTimeout(timer);
       }
       if (mode !== 'drag') return;
-      if (isMain) setDrag({ kind: 'reorder', id: item.id, dx, target: calcTarget(dx) });
-      else {
-        const s = snapStart(dx);
-        setDrag({ kind: 'move', id: item.id, dx: s.dx, snapX: s.snapX });
-      }
+      const s = snapStart(dx);
+      setDrag({ kind: 'move', id: item.id, dx: s.dx, snapX: s.snapX });
     };
     const finish = (ev: PointerEvent, cancelled: boolean) => {
       clearTimeout(timer);
@@ -327,12 +324,7 @@ export function Timeline({
         const dx = ev.clientX - startX;
         setDrag(null);
         if (cancelled) return;
-        if (isMain) {
-          const target = calcTarget(dx);
-          if (target !== idx) setMainItems(moveItem(startItems as VideoItem[], item.id, target));
-        } else {
-          placeItem(item.id, item.start + snapStart(dx).dx / pps);
-        }
+        placeItem(item.id, item.start + snapStart(dx).dx / pps);
       }
     };
     const up = (ev: PointerEvent) => finish(ev, false);
@@ -352,24 +344,13 @@ export function Timeline({
     const asset = isVideoItem(item) ? project.assets.find((a) => a.id === item.assetId) : undefined;
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
-    const isMain = track.kind === 'main';
     const move = (ev: PointerEvent) => {
       const delta = (ev.clientX - startX) / pps;
-      let next: Item[];
-      if (isMain) {
-        const list = startItems as VideoItem[];
-        next =
-          side === 'start'
-            ? trimStart(list, item.id, delta)
-            : trimEnd(list, item.id, item.duration + delta, asset);
-        setMainItems(next as VideoItem[], { coalesce: `trim:${item.id}` });
-      } else {
-        next =
-          side === 'start'
-            ? trimStartFree(startItems, item.id, delta)
-            : trimEndFree(startItems, item.id, item.duration + delta, asset);
-        setTrackItems(track.id, next, { coalesce: `trim:${item.id}` });
-      }
+      const next =
+        side === 'start'
+          ? trimStartFree(startItems, item.id, delta)
+          : trimEndFree(startItems, item.id, item.duration + delta, asset);
+      setTrackItems(track.id, next, { coalesce: `trim:${item.id}` });
       const cur = next.find((x) => x.id === item.id)!;
       player?.peek(side === 'start' ? cur.start : cur.start + cur.duration - 0.05);
     };
@@ -387,19 +368,6 @@ export function Timeline({
   const ticks: number[] = [];
   const step = tickStep(pps);
   for (let t = 0; t <= total + 1e-6; t += step) ticks.push(t);
-
-  // 主軌排序的插入位置提示線
-  let insertX: number | null = null;
-  if (drag?.kind === 'reorder') {
-    const others = main.filter((x) => x.id !== drag.id);
-    const dur = main.find((x) => x.id === drag.id)?.duration ?? 0;
-    insertX =
-      half +
-      (drag.target >= others.length
-        ? total - dur
-        : others.slice(0, drag.target).reduce((s, x) => s + gapOf(x) + x.duration, 0)) *
-        pps;
-  }
 
   const menuTrack = project.tracks.find((t) => t.id === menuTrackId) ?? null;
   const menuIndex = menuTrack ? project.tracks.indexOf(menuTrack) : -1;
@@ -455,7 +423,7 @@ export function Timeline({
                 }}
               >
                 <button
-                  className={`track-chip${track.kind === 'main' ? '' : ' draggable'}`}
+                  className="track-chip draggable"
                   aria-label={`${track.name} 軌道設定`}
                   data-testid="track-chip"
                   onPointerDown={(e) => startTrackDrag(e, track.id, rowIdx)}
@@ -463,14 +431,14 @@ export function Timeline({
                     if (!suppressChipClick.current) setMenuTrackId(track.id);
                   }}
                 >
-                  {track.kind === 'main' ? (
+                  {track.kind === 'media' ? (
                     <Film size={16} />
                   ) : track.kind === 'text' ? (
                     <Type size={16} />
                   ) : track.kind === 'audio' ? (
                     <Music size={16} />
                   ) : (
-                    <Layers size={16} />
+                    <Sparkles size={16} />
                   )}
                   {track.locked ? (
                     <Lock size={11} />
@@ -481,26 +449,28 @@ export function Timeline({
                   ) : null}
                 </button>
 
-                {track.kind === 'main' &&
-                  (track.items as VideoItem[]).map(
-                    (it) =>
-                      gapOf(it) > 0 && (
-                        <button
-                          key={`gap-${it.id}`}
-                          className="gap-block"
-                          data-testid="gap"
-                          data-item-id={it.id}
-                          aria-label={`空白 ${gapOf(it).toFixed(1)} 秒`}
-                          style={{
-                            left: half + (it.start - gapOf(it)) * pps,
-                            width: Math.max(gapOf(it) * pps, 4),
-                          }}
-                          onClick={() => useProjectStore.getState().select(it.id)}
-                        >
-                          {gapOf(it) * pps > 56 && `空白 ${gapOf(it).toFixed(1)}s`}
-                        </button>
-                      ),
-                  )}
+                {track.kind === 'media' &&
+                  gapsOf(track.items, track.id === baseId).map((g) => {
+                    const sel = gapSel?.trackId === track.id && Math.abs(gapSel.at - g.start) < 1e-6;
+                    return (
+                      <button
+                        key={`gap-${g.start}`}
+                        className={`gap-block${sel ? ' sel' : ''}`}
+                        data-testid="gap"
+                        aria-label={sel ? `補齊空白 ${g.len.toFixed(1)} 秒` : `空白 ${g.len.toFixed(1)} 秒`}
+                        style={{ left: half + g.start * pps, width: Math.max(g.len * pps, 4) }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => {
+                          // 第一下選取（顯示「補齊」），第二下才真的補齊，避免誤觸
+                          if (!sel) return setGapSel({ trackId: track.id, at: g.start });
+                          closeGap(track.id, g.start, g.start + g.len);
+                          setGapSel(null);
+                        }}
+                      >
+                        {sel ? '補齊' : g.len * pps > 56 && `空白 ${g.len.toFixed(1)}s`}
+                      </button>
+                    );
+                  })}
 
                 {track.items.map((it) => {
                   const asset = isVideoItem(it) ? project.assets.find((a) => a.id === it.assetId) : undefined;
@@ -562,19 +532,16 @@ export function Timeline({
                   );
                 })}
 
-                {track.kind === 'main' && (
-                  <>
-                    {insertX !== null && <div className="insert-line" style={{ left: insertX }} />}
-                    <button
-                      className="add-clip"
-                      aria-label="加入素材"
-                      style={{ left: half + total * pps + 8 }}
-                      onClick={onAdd}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <Plus size={22} />
-                    </button>
-                  </>
+                {track.id === baseId && (
+                  <button
+                    className="add-clip"
+                    aria-label="加入素材"
+                    style={{ left: half + total * pps + 8 }}
+                    onClick={onAdd}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <Plus size={22} />
+                  </button>
                 )}
               </div>
             );
@@ -620,14 +587,15 @@ export function Timeline({
                 {menuTrack.muted ? '取消靜音' : '這條軌道靜音'}
               </button>
             )}
-            {menuTrack.kind !== 'main' && (
+            {(
               <>
                 {menuTrack.kind !== 'audio' && (
                   <>
                     <button
                       className="menu-item"
                       onClick={() => {
-                        if (menuIndex >= project.tracks.length - 1) toast('已經在最上層');
+                        if (project.tracks[menuIndex + 1]?.kind !== menuTrack.kind)
+                          toast('已經是這一類最上面的軌道（影像、特效、字卡不能互相穿插）');
                         else shiftTrackLayer(menuTrack.id, 1);
                         setMenuTrackId(null);
                       }}
@@ -637,7 +605,8 @@ export function Timeline({
                     <button
                       className="menu-item"
                       onClick={() => {
-                        if (menuIndex <= 1) toast('不能放到主軌下面');
+                        if (project.tracks[menuIndex - 1]?.kind !== menuTrack.kind)
+                          toast('已經是這一類最下面的軌道（影像、特效、字卡不能互相穿插）');
                         else shiftTrackLayer(menuTrack.id, -1);
                         setMenuTrackId(null);
                       }}
@@ -646,15 +615,17 @@ export function Timeline({
                     </button>
                   </>
                 )}
-                <button
-                  className="menu-item danger"
-                  onClick={() => {
-                    removeTrack(menuTrack.id);
-                    setMenuTrackId(null);
-                  }}
-                >
-                  刪除這條軌道（含裡面的物件）
-                </button>
+                {!(menuTrack.kind === 'media' && project.tracks.filter((t) => t.kind === 'media').length <= 1) && (
+                  <button
+                    className="menu-item danger"
+                    onClick={() => {
+                      removeTrack(menuTrack.id);
+                      setMenuTrackId(null);
+                    }}
+                  >
+                    刪除這條軌道（含裡面的物件）
+                  </button>
+                )}
               </>
             )}
           </>

@@ -11,11 +11,11 @@ import {
   Trash2,
   Volume2,
 } from 'lucide-react';
-import { gapOf, isVideoItem, itemAt, removeGap } from '../../../engine/timeline';
-import type { Item, VideoItem } from '../../../model/types';
-import { duplicateAny, editItem, removeAnyItem, splitAny } from '../../../store/actions';
+import { isVideoItem, visibleLayers } from '../../../engine/timeline';
+import type { Item } from '../../../model/types';
+import { duplicateAny, editItem, removeAnyItem, rippleRemoveItem, splitAny } from '../../../store/actions';
 import { startCrop, useCrop } from '../../../store/cropStore';
-import { setMainItems, useProjectStore } from '../../../store/projectStore';
+import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { CropPanel } from '../CropPanel';
 import { ClipPanel, panelActive } from './ClipPanel';
@@ -27,18 +27,16 @@ export function EditTab({
   setPanel,
   onImport,
   found,
-  items,
 }: {
   panel: Panel;
   setPanel: (p: Panel) => void;
   onImport: () => void;
   found: Found;
-  items: VideoItem[];
 }) {
+  const project = useProjectStore((s) => s.project)!;
   const player = useUI((s) => s.player);
   const cropping = useCrop((s) => !!s.s);
   const selected = found?.item;
-  const isMain = found?.track.kind === 'main';
 
   const need = (): Item | undefined => {
     if (!selected) toast('請先點選一個片段');
@@ -48,8 +46,12 @@ export function EditTab({
   const split = () => {
     if (!player) return;
     const t = player.time;
-    // 有選取就切選取的那個；沒選取就切主軌上播放頭所在的片段
-    const target = selected ?? itemAt(items, t)?.item;
+    // 有選取就切選取的那個；沒選取就切播放頭這一秒最上面的影像物件
+    const target =
+      selected ??
+      visibleLayers(project, t)
+        .filter((l) => l.track.kind === 'media' && !l.track.locked)
+        .at(-1)?.item;
     if (!target) return toast('還沒有片段');
     if (!splitAny(target.id, t)) toast('播放頭要在片段中間才能分割（離邊緣至少 0.2 秒）');
   };
@@ -57,14 +59,15 @@ export function EditTab({
   const remove = () => {
     const s = need();
     if (!s) return;
-    const idx = found!.index;
-    const nextId = isMain
-      ? items[Math.min(idx + 1, items.length - 1)]?.id !== s.id
-        ? items[Math.min(idx + 1, items.length - 1)]?.id
-        : items[idx - 1]?.id
-      : null;
     removeAnyItem(s.id);
-    if (nextId) useProjectStore.getState().select(nextId);
+    setPanel(null);
+  };
+
+  /** 刪除並補齊：同一軌在它後面的物件整個往前移，填掉空位 */
+  const removeAndClose = () => {
+    const s = need();
+    if (!s) return;
+    rippleRemoveItem(s.id);
     setPanel(null);
   };
 
@@ -97,6 +100,7 @@ export function EditTab({
       <ToolButton icon={Plus} label="匯入" onClick={onImport} />
       <ToolButton icon={Scissors} label="分割" onClick={split} />
       <ToolButton icon={Trash2} label="刪除" onClick={remove} />
+      <ToolButton icon={ArrowLeftToLine} label="刪除並補齊" onClick={removeAndClose} />
       <ToolButton icon={Copy} label="複製" onClick={() => need() && duplicateAny(selected!.id)} />
       <ToolButton icon={MoveHorizontal} label="修剪" onClick={() => openPanel('trim')} />
       <ToolButton
@@ -109,13 +113,6 @@ export function EditTab({
           startCrop(s.id);
         }}
       />
-      {isMain && selected && isVideoItem(selected) && gapOf(selected) > 0 && (
-        <ToolButton
-          icon={ArrowLeftToLine}
-          label="刪除空白"
-          onClick={() => setMainItems(removeGap(items, selected.id))}
-        />
-      )}
       <ToolButton icon={Gauge} label="變速" onClick={() => openPanel('speed')} />
       <ToolButton icon={Volume2} label="音量" onClick={() => openPanel('volume')} />
       <ToolButton

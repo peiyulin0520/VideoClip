@@ -1,8 +1,8 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Eye, EyeOff, Layers, Lock, Type } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, Layers, Lock, Type } from 'lucide-react';
 import { BLEND_LABELS } from '../../../engine/geometry';
-import { findItem, isVideoItem, layersAt, mainItems, moveItem } from '../../../engine/timeline';
+import { baseMediaTrack, findItem, isVideoItem, layersAt } from '../../../engine/timeline';
 import { editItem, patchTrack, shiftTrackLayer } from '../../../store/actions';
-import { setMainItems, useProjectStore } from '../../../store/projectStore';
+import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
 import { TransformControls } from '../TransformControls';
@@ -32,7 +32,6 @@ export function LayersTab() {
                 ? '圖形'
                 : `文字：${item.card.runs[0]?.text.slice(0, 8) ?? ''}`
               : (asset?.name ?? '素材');
-          const isMain = track.kind === 'main';
           return (
             <li
               key={item.id}
@@ -45,7 +44,7 @@ export function LayersTab() {
                   {item.type === 'text' ? <Type size={16} /> : <Layers size={16} />}
                 </span>
                 <span className="layer-text">
-                  {isMain ? '主軌 · ' : `${track.name} · `}
+                  {`${track.name} · `}
                   {label}
                 </span>
               </button>
@@ -67,8 +66,8 @@ export function LayersTab() {
                 className="icon-btn sm"
                 aria-label={`${track.name} 往上一層`}
                 onClick={() =>
-                  isMain || trackIndex >= project.tracks.length - 1
-                    ? toast(isMain ? '主軌固定在最底層' : '已經在最上層')
+                  project.tracks[trackIndex + 1]?.kind !== track.kind
+                    ? toast('已經是這一類最上面的圖層（影像、特效、字卡不能互相穿插）')
                     : shiftTrackLayer(track.id, 1)
                 }
               >
@@ -78,8 +77,8 @@ export function LayersTab() {
                 className="icon-btn sm"
                 aria-label={`${track.name} 往下一層`}
                 onClick={() =>
-                  isMain || trackIndex <= 1
-                    ? toast(isMain ? '主軌固定在最底層' : '不能放到主軌下面')
+                  project.tracks[trackIndex - 1]?.kind !== track.kind
+                    ? toast('已經是這一類最下面的圖層（影像、特效、字卡不能互相穿插）')
                     : shiftTrackLayer(track.id, -1)
                 }
               >
@@ -157,41 +156,14 @@ export function LayersTab() {
               />
             ))}
           </div>
-          {found?.track.kind === 'main' && isVideoItem(it) && (
-            <div className="chips" role="group" aria-label="主軌順序">
-              <button
-                className="btn"
-                aria-label="前移"
-                onClick={() => {
-                  const items = mainItems(project);
-                  const idx = found.index;
-                  if (idx <= 0) return toast('已經是第一個');
-                  setMainItems(moveItem(items, it.id, idx - 1));
-                }}
-              >
-                <ArrowLeft size={16} /> 前移
-              </button>
-              <button
-                className="btn"
-                aria-label="後移"
-                onClick={() => {
-                  const items = mainItems(project);
-                  const idx = found.index;
-                  if (idx >= items.length - 1) return toast('已經是最後一個');
-                  setMainItems(moveItem(items, it.id, idx + 1));
-                }}
-              >
-                後移 <ArrowRight size={16} />
-              </button>
-            </div>
-          )}
           <button
             className="btn"
             onClick={() =>
               editItem(it.id, (x) => {
                 x.transform.x = 0.5;
                 x.transform.y = 0.5;
-                x.transform.scale = x.type === 'text' || found?.track.kind === 'main' ? 1 : 0.5;
+                // 最下面那條影像軌的片段原本是滿版；疊在上面的（畫中畫）預設縮小一半
+                x.transform.scale = x.type === 'text' || found?.track.id === baseMediaTrack(project)?.id ? 1 : 0.5;
                 x.transform.rotation = 0;
               })
             }

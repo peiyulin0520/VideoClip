@@ -80,7 +80,6 @@ test('主軌：匯入後不自動選取；預覽上點一下就選到（細框�
   const stage = await previewBox(page);
   await page.mouse.click(stage.x + stage.width * 0.5, stage.y + stage.height * 0.5);
   expect(await selectedItemId(page)).toBe((await project(page)).tracks[0]!.items[0]!.id);
-  await expect(page.getByTestId('selbox')).toHaveClass(/main/);
 
   // 選了之後在預覽上拖移＝移動它
   const before = (await project(page)).tracks[0]!.items[0]!.transform;
@@ -94,7 +93,6 @@ test('主軌：匯入後不自動選取；預覽上點一下就選到（細框�
   // 從時間軸選主軌片段 → 細框、沒有 ✕、有縮放鈕
   await clips(page).first().tap();
   await expect(page.getByTestId('selbox')).toBeVisible();
-  await expect(page.getByTestId('selbox')).toHaveClass(/main/);
   await expect(page.getByRole('button', { name: '刪除圖層' })).toHaveCount(0);
   await expect(page.locator('.sel-dot, [data-handle]')).toHaveCount(0);
   await page.screenshot({ path: `${SHOT}/after-main-selected.png` });

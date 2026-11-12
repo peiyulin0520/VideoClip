@@ -149,7 +149,7 @@ export const exportFrame = async (page: Page, t: number, pts: [number, number][]
 
 /** 切到底部分頁 */
 export async function openTab(page: Page, name: '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '素材' | '音訊') {
-  const tab = page.getByRole('tab', { name });
+  const tab = page.locator('.tabs').getByRole('tab', { name, exact: true }); // 只找底部分頁列（文字面板裡也有叫「文字」的小分頁）
   // 點「目前的分頁」會收合面板，所以已經在這個分頁且展開時就不用再點
   if (
     (await tab.getAttribute('aria-selected')) === 'true' &&
@@ -243,4 +243,5 @@ export async function showTimeline(page: Page) {
 /** 取消選取：點時間軸某一軌的空白處（預覽上點空白處不會取消選取了） */
 export async function deselect(page: Page) {
   await page.locator('[data-testid="track"]').first().click({ position: { x: 100, y: 4 } });
+  await page.evaluate(() => window.scrollTo(0, 0)); // 點時間軸會把頁面捲下去，回到預覽
 }

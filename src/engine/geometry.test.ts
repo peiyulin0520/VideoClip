@@ -106,7 +106,7 @@ describe('geometry', () => {
     const mk = (id: string) => ({ ...createOverlayClip(asset, 0), id });
     const track = (locked: boolean) => ({
       id: 't',
-      kind: 'overlay' as const,
+      kind: 'media' as const,
       name: '',
       hidden: false,
       locked,
@@ -126,7 +126,7 @@ describe('geometry', () => {
     const mk = (id: string) => ({ ...createOverlayClip(asset, 0), id });
     const track = (locked: boolean) => ({
       id: 't',
-      kind: 'overlay' as const,
+      kind: 'media' as const,
       name: '',
       hidden: false,
       locked,

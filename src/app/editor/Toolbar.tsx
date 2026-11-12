@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { findItem, mainItems } from '../../engine/timeline';
+import { findItem } from '../../engine/timeline';
 import { cancelCrop } from '../../store/cropStore';
 import { useProjectStore } from '../../store/projectStore';
 import { AssetsTab } from './tabs/AssetsTab';
@@ -37,7 +37,6 @@ export function BottomBar({
   const [collapsed, setCollapsed] = useState(false);
 
   const found = findItem(project, selectedId);
-  const items = mainItems(project);
   const barRef = useRef<HTMLDivElement>(null);
 
   // 選取的東西換了：自動切到對應的分頁（render 期間調整 state，React 建議的寫法）
@@ -94,7 +93,7 @@ export function BottomBar({
         ))}
       </div>
       {tab === 'edit' && (
-        <EditTab panel={panel} setPanel={setPanel} onImport={onImportMain} found={found} items={items} />
+        <EditTab panel={panel} setPanel={setPanel} onImport={onImportMain} found={found} />
       )}
       {!collapsed && tab === 'overlay' && <OverlayTab onImportOverlay={onImportOverlay} />}
       {!collapsed && tab === 'text' && <TextTab found={found} />}

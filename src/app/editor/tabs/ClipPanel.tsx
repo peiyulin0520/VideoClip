@@ -1,8 +1,8 @@
-import { findItem, isVideoItem, setSpeed } from '../../../engine/timeline';
+import { findItem, isVideoItem, setSpeedFree } from '../../../engine/timeline';
 import { MAX_SPEED, MIN_SPEED } from '../../../model/defaults';
-import type { Item, VideoItem } from '../../../model/types';
+import type { VideoItem } from '../../../model/types';
 import { editItem } from '../../../store/actions';
-import { setMainItems, setTrackItems, useProjectStore } from '../../../store/projectStore';
+import { setTrackItems, useProjectStore } from '../../../store/projectStore';
 import { toast } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
 import { TrimPanel } from '../TrimPanel';
@@ -37,24 +37,10 @@ export function ClipPanel({
       editItem(selected.id, (it) => void Object.assign(it, patch), coalesce ? { coalesce } : undefined);
     const applySpeed = (v: number, coalesce?: string) => {
       const f = findItem(project, selected.id)!;
-      if (f.track.kind === 'main')
-        setMainItems(
-          setSpeed(f.track.items as VideoItem[], selected.id, v),
-          coalesce ? { coalesce } : undefined,
-        );
-      else {
-        // 疊加軌：改速度時長度跟著變，但不能壓到後面的物件
-        const span = selected.duration * selected.speed;
-        const want = Math.max(span / v, 0.2);
-        const next = (f.track.items as Item[]).map((x) =>
-          x.id === selected.id ? { ...x, speed: v, duration: want } : x,
-        );
-        const nextStart = (f.track.items as Item[])
-          .filter((x) => x.id !== selected.id && x.start >= selected.start + 1e-6)
-          .reduce((m, x) => Math.min(m, x.start), Infinity);
-        if (selected.start + want > nextStart + 1e-6) return toast('後面有別的物件，這個速度會讓它們重疊');
-        setTrackItems(f.track.id, next, coalesce ? { coalesce } : undefined);
-      }
+      // 改速度時長度跟著變，但不能壓到同一軌後面的物件
+      const next = setSpeedFree(f.track.items, selected.id, v);
+      if (!next) return toast('後面有別的物件，這個速度會讓它們重疊');
+      setTrackItems(f.track.id, next, coalesce ? { coalesce } : undefined);
     };
     return (
       <div className="panel" role="group" aria-label={panel === 'speed' ? '變速' : '音量'}>
