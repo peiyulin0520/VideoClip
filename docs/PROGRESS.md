@@ -75,6 +75,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 G1 文字透明度、字塊／圖形預設透明、三層選單、專案封面（feedback-7 G1）
+  - 做了什麼：①**文字透明度**：文字分頁加「文字透明度」滑桿（`TextRun.opacity`，描邊、陰影、填色先畫在另一張畫布再整張乘透明度，描邊不會從半透明的字裡透出來）；②「**套用這個樣式到所有文字**」（`applyTextStyleToAll`，字體、大小、顏色、透明度、粗細、描邊、陰影，不動內容與位置，獨立圖形不算，一步復原）；③新增文字沿用上一次的樣式（`Project.lastTextStyle`，`editText` 每次更新）；④圖層分頁的透明度改名「整個圖層透明度」並提示文字透明度在文字分頁；⑤**字塊預設透明底＋棕色框線**（`DEFAULT_BOX`：`fillOn:false`、`stroke #8b5a44` 6）；獨立圖形（星形）同樣；形狀縮圖改線框；舊字卡不動；⑥**三層選單**：底部分頁（不變）／面板區塊用分段控制 `Segmented`（整條淺底、選中白底＋陰影、不用強調色，「＋新增」改成圓形按鈕）／分類用小外框膠囊 `.chip3`（選中＝淺底＋下方一道強調色，字塊分類、貼圖分類）；⑦**專案封面可自訂**（`Project.cover`，JPEG 長邊 480）：首頁卡片選單「更換封面」＝從專案素材縮圖橫條選／從相簿選照片／恢復預設；編輯器點專案名稱＞「用目前預覽畫面當封面」（`renderFrame` 輸出解析度那一格）
+  - 動了哪些檔：`src/model/{types,defaults}.ts`、`src/engine/{textRender,cover}.ts`、`src/store/actions.ts`、`src/storage/projects.ts`、`src/app/editor/{TextPanel,ShapeThumb,StickerPicker}.tsx`、`tabs/LayersTab.tsx`、`src/ui/Segmented.tsx`、`src/app/pages/{Home,Editor}.tsx`、`styles.css`；測試 新 `store/textStyle.test.ts`、`e2e/g1.spec.ts`，改 `box-fill-border/fix-colors/fix-shape-adjust/phase3a-panel/phase3a-shapes`（字塊預設改了，這些測試先用 `legacyBox` 打開填滿、關掉框線；helper `setSwitch`、`legacyBox`）
+  - 驗證：✅ 單元（樣式沿用、套用到所有文字、復原）；✅ e2e（透明度 30% 時白色像素少於 20%、套用、新增沿用；字塊預設 `fillOn:false`＋棕色框線、縮圖沒有粉紅有棕色、預覽沒有粉紅；三層選中背景色各不同；封面：從相簿選照片、重新整理還在、恢復預設回到紅色縮圖、預覽當封面是 JPEG、長邊 ≤ 480、中心是紅色）；截圖 `docs/screenshots/feedback-7/g1/`  🔴 iPhone 沒測
+  - 使用者的決定/回饋：使用者選 C（一路做到 G6）；星形改「透明底＋棕色框線」；追加專案封面自訂
+  - 下一步：G2 時間軸收合、命名
 - 2026-11-12 寫規劃：第 7 次回報（只有文件，Opus）
   - 做了什麼：讀了 `peiyulin0520/VideoClip_2`（版型＝一條軌道上的一組、共用時間、程式畫膠卷齒孔、drift／slide 動畫；音訊頁列出每個聲音來源可保留／關閉／分離原音）；寫 `docs/plans/2026-11-12-feedback-7.md`：G1 文字透明度、套用樣式到所有文字、字塊預設不填滿只有框線、分頁三層級不同樣式；G2 時間軸預設收合（只顯示最下面影像軌＋每區一條摘要列，選取中的軌道一定顯示）＋展開時每條 32px；G3 音訊分頁列出所有聲音來源＋分離原音、片段選取改成上方小旗標、可多段（套用時拆成多個物件）、拖旗標時顯示整個專案那一秒的小畫面；G4 版型改成 `TemplateItem` 一個物件（整組縮放、點格子只聚焦選片段、每格同長度不足補黑／白、可插入色塊、捲動／滑入滑出、v2→v3 轉換）；G5 特效分頁轉場（白閃、暖色閃光…）；G6 動態模板「三格故事」（自己設計、時間表、字體輪播、閃光轉場）
   - 動了哪些檔：`docs/plans/2026-11-12-feedback-7.md`、本檔

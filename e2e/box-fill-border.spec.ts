@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { countColor, createProjectWith, openTab, project } from './helpers';
+import { countColor, createProjectWith, legacyBox, openTab, project } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-5';
 type Box = {
@@ -34,6 +34,7 @@ test('字塊：填滿與框線分開，各自有顏色與透明度；可以不�
   await page.getByLabel('文字內容').fill('框線測試');
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
   await page.getByRole('radio', { name: '方形' }).tap();
+  await legacyBox(page);
   await page.getByRole('button', { name: '字塊顏色 #ffd23f' }).tap();
   await expect.poll(() => yellow(page)).toBeGreaterThan(500); // 黃色填滿
   const filled = await yellow(page);
@@ -100,6 +101,7 @@ test('框線不再被填滿的透明度牽動；填滿透明度可以到 0%', as
     .tap();
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
   await page.getByRole('radio', { name: '方形' }).tap();
+  await legacyBox(page);
   await page.getByRole('button', { name: '字塊顏色 #ffd23f' }).tap();
   await page.getByRole('switch', { name: '框線' }).tap();
   await page.getByRole('button', { name: '字塊外框顏色 #ffd23f' }).tap();

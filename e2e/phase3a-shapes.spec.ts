@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
-import { clips, countColor, createProjectWith, openTab, project } from './helpers';
+import { clips, countColor, createProjectWith, legacyBox, openTab, project, setSwitch } from './helpers';
 
 const SHOT = 'docs/screenshots/phase3a';
 
@@ -64,7 +64,8 @@ test('圖形庫：4 個分類、每個圖形都點得動、縮圖有畫、對話
   await page.screenshot({ path: `${SHOT}/speech-bubble.png` });
 
   // 字塊外框
-  await page.getByRole('switch', { name: '框線' }).tap();
+  await legacyBox(page);
+  await setSwitch(page, '框線', true);
   expect((await boxOf(page))!.stroke).toMatchObject({ width: 4 });
   await setRange(page, '框線粗細', 6);
   expect((await boxOf(page))!.stroke).toMatchObject({ width: 6 });
@@ -88,7 +89,10 @@ test('獨立圖形：新增、用內距調大小、時間軸顯示「圖形」�
   const cardOf = async () =>
     (await project(page)).tracks[1]!.items[0]!.card as unknown as { box: { shape: string } };
   expect((await cardOf()).box.shape).toBe('star5');
-  // 預覽中間有黃色星星
+  // 預設透明底＋棕色框線；打開填滿才有黃色星星
+  expect((await cardOf()).box).toMatchObject({ fillOn: false });
+  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await setSwitch(page, '填滿', true);
   await expect.poll(() => countColor(page, [255, 210, 63], 30, [0.2, 0.3, 0.8, 0.7])).toBeGreaterThan(300);
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
   await page.getByRole('button', { name: '圖形分類 基本' }).tap();
