@@ -1,8 +1,10 @@
+import { ALL_FORMATS, AudioBufferSink, BlobSource, CanvasSink, Input } from 'mediabunny';
 import { useProjectStore } from '../store/projectStore';
 import { urlFor } from './assetUrls';
 import { ensureFont } from '../fonts/fontStore';
 import type { TextCard } from '../model/types';
 import { __setProxyMaker } from './proxyQueue';
+import { exportProject, type ExportOptions } from './exporter';
 import { renderFrame } from './exportFrame';
 import { lastImportErrors } from './importMedia';
 import { renderText } from './textRender';
@@ -27,6 +29,76 @@ export function installDebugHook(player: Player) {
   const hook = {
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,
+    /** 測試用：匯出整支影片，再用 Mediabunny 讀回來檢查（長度、尺寸、有沒有聲音與音量、指定時間的畫面顏色） */
+    async exportAndInspect(
+      opts: Partial<ExportOptions>,
+      probe: { times: number[]; points: [number, number][] },
+    ) {
+      const p = useProjectStore.getState().project!;
+      const res = await exportProject(p, { longSide: 1280, fps: 30, quality: 'standard', ...opts });
+      const input = new Input({ source: new BlobSource(res.file), formats: ALL_FORMATS });
+      try {
+        const v = await input.getPrimaryVideoTrack();
+        const a = await input.getPrimaryAudioTrack();
+        const duration = await input.computeDuration();
+        let peak = 0;
+        // 每一秒的最大音量（看聲音有沒有放在對的時間）
+        const peaks: number[] = Array.from({ length: Math.ceil(duration) + 1 }, () => 0);
+        if (a) {
+          const sink = new AudioBufferSink(a);
+          for await (const wb of sink.buffers(0, Math.min(duration, 30))) {
+            const d = wb.buffer.getChannelData(0);
+            const sr = wb.buffer.sampleRate;
+            for (let i = 0; i < d.length; i++) {
+              const v = Math.abs(d[i]!);
+              peak = Math.max(peak, v);
+              const sec = Math.min(Math.floor(wb.timestamp + i / sr), peaks.length - 1);
+              if (v > peaks[sec]!) peaks[sec] = v;
+            }
+          }
+        }
+        const colors: number[][][] = [];
+        if (v) {
+          const sink = new CanvasSink(v);
+          for (const t of probe.times) {
+            const w = await sink.getCanvas(t);
+            const row: number[][] = [];
+            if (w) {
+              const cv = document.createElement('canvas');
+              cv.width = w.canvas.width;
+              cv.height = w.canvas.height;
+              const ctx = cv.getContext('2d')!;
+              ctx.drawImage(w.canvas as CanvasImageSource, 0, 0);
+              for (const [nx, ny] of probe.points)
+                row.push(
+                  Array.from(
+                    ctx.getImageData(Math.floor(nx * cv.width), Math.floor(ny * cv.height), 1, 1).data,
+                  ),
+                );
+            }
+            colors.push(row);
+          }
+        }
+        return {
+          ext: res.ext,
+          mime: res.mime,
+          bytes: res.file.size,
+          width: v?.displayWidth ?? 0,
+          height: v?.displayHeight ?? 0,
+          duration,
+          hasAudio: !!a,
+          audioPeak: peak,
+          audioPeaks: peaks,
+          videoCodec: res.videoCodec,
+          audioCodec: res.audioCodec,
+          warnings: res.warnings,
+          colors,
+        };
+      } finally {
+        input.dispose();
+        await res.dispose();
+      }
+    },
     /** 測試用：讓預覽用輕量影片做不出來（模擬手機編不出 H.264） */
     failProxies: (on: boolean) =>
       __setProxyMaker(

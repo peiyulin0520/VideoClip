@@ -1,4 +1,4 @@
-import { ChevronLeft, Pause, Play, Redo2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronLeft, Pause, Play, Redo2, Share, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { countEditorRender } from '../../engine/debug';
@@ -15,6 +15,7 @@ import { ASPECTS, assignAspect, pickAspect } from '../../model/defaults';
 import type { Aspect } from '../../model/types';
 import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
+import { ExportSheet } from '../editor/ExportSheet';
 import { Preview } from '../editor/Preview';
 import { Timeline, MAX_PPS, MIN_PPS } from '../editor/Timeline';
 import { BottomBar } from '../editor/Toolbar';
@@ -111,6 +112,7 @@ function EditorBody() {
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [ratioOpen, setRatioOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const total = totalDuration(project);
 
@@ -215,6 +217,16 @@ function EditorBody() {
         >
           <Redo2 size={22} />
         </button>
+        <button
+          className="icon-btn"
+          aria-label="匯出影片"
+          onClick={() => {
+            useUI.getState().player?.pause();
+            setExportOpen(true);
+          }}
+        >
+          <Share size={22} />
+        </button>
       </header>
 
       <Preview
@@ -265,6 +277,8 @@ function EditorBody() {
         data-testid="file-input"
         onChange={(e) => void onFiles(e.target.files)}
       />
+
+      <ExportSheet project={project} open={exportOpen} onClose={() => setExportOpen(false)} />
 
       <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
         <p className="hint">改了之後，影片和文字的位置、大小會跟著新的畫面。可以按「復原」改回來。</p>

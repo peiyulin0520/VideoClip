@@ -102,6 +102,9 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 
 ## 5. 踩過的坑（避免再踩）
 
+- **匯出整支影片**（`engine/exporter.ts`、`app/editor/ExportSheet.tsx`）：不播放，一格一格依時間走。影片格用 Mediabunny `CanvasSink.getCanvas(t)`（WebCodecs；解不了才退到 `<video>` seek），畫面走跟預覽同一套 `buildScene`＋`Compositor`（輸出解析度），`CanvasSource` 編碼；聲音用 `OfflineAudioContext` 依時間軸（開始時間、修剪、速度、音量、靜音／隱藏軌道）一次混好，`AudioBufferSource` 編碼；`chooseFormat` 決定封裝：H.264＋AAC→MP4；編不出 AAC→**無聲 MP4＋明講**；編不出 H.264→WebM（VP9＋Opus，測試用）。輸出寫到 OPFS 暫存檔（`StreamTarget`，沒有 OPFS 才用記憶體），關閉面板／取消／出錯都會刪，啟動時 `cleanupExportTemp()` 再清一次。沙盒 Chromium 能編 H.264 但**編不出 AAC**，所以測聲音要用 `preferWebm`（只給測試）。除錯掛鉤 `exportAndInspect` 匯出後用 Mediabunny 讀回來檢查。
+- 無頭 Chromium 下載中文檔名時 `suggestedFilename()` 會變成 `download`（真的瀏覽器不會），e2e 不要斷言檔名。
+
 - **會動的圖片（GIF／動態 WebP）**：`engine/animImage.ts` 解成 `ImageBitmap[]`＋每格長度（有 `ImageDecoder` 用它；沒有就 GIF 用 `gifuct-js`（MIT，npm 套件）自己處理 disposal；動態 WebP 在沒有 `ImageDecoder` 的瀏覽器解不了，所以 `giphyToFile` 那種情況改抓 GIF 版本）。`Asset.anim = { frames, duration }` 在匯入時決定（超過 150 格或解開後 > 96MB 就當一般照片）。預覽（`Player.render`）與單格輸出（`exportFrame`）都用 `frameIndexAt(delays, t − item.start)` 取格，循環播放。快取只存在記憶體，每個素材解一次。
 
 - **預覽用輕量影片（proxy）**：`engine/proxy.ts`（Mediabunny `Conversion`，先試 H.264/mp4，沒有再用 VP9/webm；HDR 在 `process` 裡畫到 OffscreenCanvas 轉 SDR）、`engine/proxyQueue.ts`（一次一支，狀態寫進 `Asset.proxy`，不進復原紀錄）、`assetUrls.urlFor(…, 'preview'|'export')`（預覽用 proxy、匯出一律原檔）。proxy 存在跟素材同一處，檔名 `<assetId>~p`。池子裡的 `<video>` 只有停著時才換網址。沙盒 Chromium 沒有 H.264，所以測試走 VP9；iPhone 實際走 H.264，沒驗證。

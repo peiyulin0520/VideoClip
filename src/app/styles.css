@@ -1810,3 +1810,20 @@ button {
 .crop-bar .btn.primary {
   background: var(--accent, #ff4d8d);
 }
+
+/* 匯出面板 */
+.export-bar {
+  height: 14px;
+  margin: 8px 0;
+  overflow: hidden;
+  background: #2a2a2e;
+  border-radius: 7px;
+}
+.export-bar > div {
+  height: 100%;
+  background: var(--accent, #ff4d8d);
+  transition: width 120ms;
+}
+.hint.warn {
+  color: #ffd23f;
+}

@@ -6,9 +6,9 @@
 - **日期**：2026-11-11
 - **分支**：PR #6（播放順暢＋聲音、裝飾長度／透明度、選色彈窗）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
-- **測試**：637 個單元測試、95 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：647 個單元測試、102 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：`docs/plans/2026-11-12-feedback-5.md` 的 **①～⑥ 全部做完**（播放卡／主軌修剪／軌道拖拉／字塊填滿框線／裁切／GIPHY 會動；Chromium 驗證，iPhone 待真機）。**這些都還在分支上，沒有開 PR，網站與手機還是舊版 → 下一步是開 PR 讓使用者合併、用 iPhone 測**（尤其設定頁打開「顯示播放效能」錄一段播放）；之後 feedback-4 的 B 匯出、C 音軌＋背景音樂
+- **下一步**：feedback-5 ①～⑥ 與 feedback-4 的 **B 匯出影片**（頂列「匯出影片」）都做完了（Chromium 驗證，iPhone 待真機）。**這些都還在分支上，沒有開 PR，網站與手機還是舊版 → 下一步是開 PR 讓使用者合併、用 iPhone 測**（尤其：設定頁「顯示播放效能」錄一段播放；匯出一支影片存到相簿）；還沒做 feedback-4 的 **C 音軌管理＋背景音樂**（匯出的混音已經支援每支影片的音量／靜音，加背景音樂時沿用 `mixAudio`）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -68,6 +68,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 feedback-4 B：匯出整支影片
+  - 做了什麼：頂列新增「匯出影片」→ 面板選解析度（1080p／720p）、更新率（30／60）、畫質（標準／高），顯示輸出尺寸與預估檔案大小 → 開始匯出：進度條＋階段（準備／聲音／畫面／收尾）＋剩餘時間，可取消 → 完成後顯示尺寸、更新率、檔案大小、有沒有聲音，「儲存到相簿／分享」（`navigator.share({files})`，不支援就下載）、「下載檔案」。**引擎**：不播放，一格一格依時間走；影片格用 Mediabunny `CanvasSink` 取精準那一格，畫面走預覽同一套 `buildScene`＋`Compositor`，WebCodecs 編碼；聲音用 `OfflineAudioContext` 依時間軸混好（開始時間、修剪、速度、音量；靜音／隱藏軌道、音量 0、沒音軌的素材都不混）；MP4（H.264＋AAC），這個瀏覽器編不出 AAC 就輸出無聲 MP4 並明講，編不出 H.264 才用 WebM；輸出寫到 OPFS 暫存檔（不整支放記憶體），取消／出錯／關閉面板都清掉，啟動時再清一次殘留
+  - 動了哪些檔：新 `src/engine/exporter.ts`、`src/app/editor/ExportSheet.tsx`；`src/app/pages/Editor.tsx`（頂列按鈕）、`src/engine/debug.ts`（`exportAndInspect`）、`src/main.tsx`（清暫存）、`styles.css`；測試 `src/engine/exporter.test.ts`、`e2e/export.spec.ts`
+  - 驗證：✅ 單元（輸出尺寸、位元率與預估大小、`chooseFormat` 各種組合含「編不出 AAC 一定有警告」、哪些影片要出聲）；✅ e2e（用 Mediabunny 讀回：長度 ±0.15 秒、尺寸 720×1280、不同時間點的畫面顏色對（主軌紅、疊加綠、後面換成 clip-a）；聲音放在對的時間（前 4 秒無聲、第 4 秒起有 440Hz）；音量 0 就沒有音軌、音量一半量到約一半；照片＋影片；預設走 MP4／H.264，沒有 AAC 時一定有警告；面板選項、預估大小、進度、完成、下載、關閉後暫存檔清掉；取消後回到選項且暫存檔清掉；空專案不能匯出）；全部 102 個 e2e、647 個單元、lint、build 過；截圖 `docs/screenshots/feedback-5/export-*.png`  🔴 iPhone 沒測：H.264／AAC 能不能編、4K HEVC 影片匯出多久與會不會被系統中斷、分享面板能不能「儲存影片」到相簿、相簿與 Instagram 能不能播  🔴 沒做：背景音樂（C 項）、轉場／特效（還沒有這些功能）、匯出時顯示預覽畫面
+  - 使用者的決定/回饋：「需要有最終剪輯好的影片匯出功能」
+  - 踩到的坑：沙盒 Chromium 編得出 H.264 但編不出 AAC → 測聲音要走 WebM（`preferWebm`，只給測試）；無頭 Chromium 下載中文檔名建議檔名會變 `download`；React lint 不准在 render 裡呼叫 `performance.now()`（剩餘時間改在進度回呼裡算）
+  - 下一步：開 PR 讓使用者合併，用 iPhone 測；再做 C 音軌管理＋背景音樂
 - 2026-11-12 feedback-5 ⑥：GIPHY 貼圖會動
   - 做了什麼：加 GIPHY 貼圖時改下載**會動的版本**（`fixed_height`：瀏覽器有 `ImageDecoder` 就抓動態 WebP，有半透明邊緣；沒有就抓 GIF），下載不到或沒有會動版本才退回靜態 PNG；新 `engine/animImage.ts` 把動圖解成一格一格（`ImageDecoder`，沒有時 GIF 用 `gifuct-js`），`Asset.anim` 記格數與一圈長度；預覽與單格輸出都用「物件開始後經過的時間」取格、循環播放（暫停、拖時間軸都定在準確的格）；「我的貼圖」上傳 GIF／動態 WebP 保留原檔（不再轉 PNG）；格子裡的縮圖原本就是會動的
   - 動了哪些檔：新 `src/engine/animImage.ts`；`src/engine/{player,exportFrame,probe}.ts`、`src/stickers/giphy.ts`、`src/app/editor/{GiphyPanel,MyStickers}.tsx`、`src/model/types.ts`（`Asset.anim`）、`package.json`（`gifuct-js`，MIT）；測試 `src/engine/animImage.test.ts`、`src/stickers/giphy.test.ts`、`e2e/giphy.spec.ts`；新素材 `tests/fixtures/anim-3frames.{gif,webp}`
