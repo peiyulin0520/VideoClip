@@ -2430,3 +2430,50 @@ button {
   gap: 8px;
   margin: 4px 0;
 }
+
+/* 音訊分頁：專案裡所有聲音來源的列表 */
+.audio-list {
+  padding: 0;
+  margin: 0 0 8px;
+  list-style: none;
+}
+.audio-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: var(--btn);
+  border-radius: 12px;
+}
+.audio-row.selected {
+  outline: 2px solid var(--accent);
+}
+.audio-name {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  text-align: left;
+  background: transparent;
+}
+.audio-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.audio-text small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.audio-vol {
+  flex-basis: 100%;
+}

@@ -63,6 +63,36 @@ export function editItem(id: string, recipe: (it: Draft<Item>) => void, opts?: O
   }, opts);
 }
 
+/**
+ * 把影片的原音分離成音樂軌上的一段（同一個素材、同樣的起點、長度、速度、音量與淡入淡出），
+ * 影片本身改成靜音。之後可以單獨移動、修剪、刪除這段聲音。回傳新的音訊物件 id；沒有聲音的影片回傳 null。一步復原。
+ */
+export function separateAudio(id: string): string | null {
+  const p = store().project;
+  const f = p && findItem(p, id);
+  if (!p || !f || f.item.type !== 'video') return null;
+  const asset = p.assets.find((a) => a.id === (f.item as VideoItem).assetId);
+  if (!asset?.hasAudio) return null;
+  let audioId = '';
+  store().apply((d) => {
+    const v = d.tracks[f.trackIndex]!.items.find((x) => x.id === id) as VideoItem;
+    const audio = JSON.parse(JSON.stringify(v)) as VideoItem;
+    audio.id = newId('i_');
+    audio.type = 'audio';
+    audio.fit = 'contain';
+    audio.label = v.label ? `${v.label} 原音` : '原音';
+    delete audio.crop;
+    delete audio.mask;
+    delete audio.cell;
+    delete audio.group;
+    v.volume = 0;
+    const ti = trackIndexFor(d.tracks as Track[], 'audio', audio.start, audio.duration);
+    d.tracks[ti]!.items.push(audio);
+    audioId = audio.id;
+  });
+  return audioId || null;
+}
+
 /** 幫物件命名（空字串＝恢復預設名稱）；一步復原 */
 export function renameItem(id: string, label: string) {
   editItem(id, (it) => {

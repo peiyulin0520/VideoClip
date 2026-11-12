@@ -137,11 +137,13 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await expect(clips(page)).toHaveCount(n + 1);
   // 播放頭在邊緣不能分割
   await seekTo(page, 0);
+  await page.waitForTimeout(450);
   await clips(page).first().tap();
   await page.getByRole('button', { name: '分割' }).tap();
   await expectToast(page, '播放頭要在片段中間');
 
-  // 刪除 / 復原 / 重做
+  // 刪除 / 復原 / 重做（隔一下再點同一個片段：連點兩下會跳出命名面板）
+  await page.waitForTimeout(450);
   await clips(page).first().tap();
   const count = await clips(page).count();
   await page.getByRole('button', { name: '刪除', exact: true }).tap();
