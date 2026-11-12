@@ -35,6 +35,21 @@ describe('GIPHY', () => {
     expect(parseGiphy({ id: 'y', images: {} })).toBeNull();
   });
 
+  it('解析會動的版本（加進專案用）：優先 fixed_height 的動態 WebP 與 GIF，沒有就退到 fixed_width；都沒有就沒有 anim', () => {
+    const base = {
+      fixed_width_small: { url: 'https://m/s.gif' },
+      original_still: { url: 'https://m/still.gif' },
+    };
+    const a = parseGiphy({
+      id: 'a',
+      images: { ...base, fixed_height: { url: 'https://m/h.gif', webp: 'https://m/h.webp' } },
+    })!;
+    expect(a.anim).toEqual({ webp: 'https://m/h.webp', gif: 'https://m/h.gif' });
+    const b = parseGiphy({ id: 'b', images: { ...base, fixed_width: { url: 'https://m/w.gif' } } })!;
+    expect(b.anim).toEqual({ webp: undefined, gif: 'https://m/w.gif' });
+    expect(parseGiphy({ id: 'c', images: base })!.anim).toBeUndefined();
+  });
+
   it('沒有 key：不送出請求，丟 no-key', async () => {
     const f = vi.spyOn(globalThis, 'fetch');
     await expect(giphyStickers('cat', null)).rejects.toMatchObject({ kind: 'no-key' });

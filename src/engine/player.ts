@@ -1,4 +1,5 @@
 import type { Asset, Project, Track, VideoItem } from '../model/types';
+import { frameIndexAt, loadAnim, peekAnim } from './animImage';
 import { AudioOut, isIOSDevice } from './audio';
 import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
@@ -288,6 +289,21 @@ export class Player {
     const scene = buildScene(p, t, comp.width, comp.height, (item, asset, track) => {
       const url = this.deps.urlFor(asset.id);
       if (!url) return null;
+      if (item.type === 'image' && asset.anim) {
+        // 會動的圖片：依「物件開始後經過的時間」取第幾格（預覽、暫停、拖時間軸都準確）
+        const anim = peekAnim(asset.id);
+        if (anim === undefined) {
+          void loadAnim(asset.id, async () => (await fetch(url)).blob()).then(() => this.scheduleRender());
+        } else if (anim) {
+          return {
+            source: anim.frames[frameIndexAt(anim.delays, t - item.start)]!,
+            ready: true,
+            srcW: anim.width,
+            srcH: anim.height,
+          };
+        }
+        // 還沒解好（或解不了）：先用第一格的靜態圖
+      }
       if (item.type === 'image') {
         const img = this.imageFor(asset.id);
         if (!img) return null;

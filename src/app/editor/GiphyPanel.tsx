@@ -5,7 +5,7 @@ import {
   getGiphyKey,
   giphyStickers,
   GiphyError,
-  giphyToPng,
+  giphyToFile,
   setGiphyKey,
   type GiphySticker,
 } from '../../stickers/giphy';
@@ -128,7 +128,7 @@ export async function addGiphySticker(s: GiphySticker): Promise<string | null> {
   const { setBusy, player } = useUI.getState();
   setBusy('加入貼圖…');
   try {
-    const res = await importFiles(pid, [await giphyToPng(s)]);
+    const res = await importFiles(pid, [await giphyToFile(s)]);
     if (!res.assets.length) {
       toast(`貼圖加不進去：${res.failed[0]?.reason ?? '不明原因'}`, 6000);
       return null;

@@ -15,6 +15,8 @@ export type Asset = {
   hasAudio: boolean;
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
+  /** 會動的圖片（GIF／動態 WebP，例如 GIPHY 貼圖）：格數與一圈的長度（秒）；沒有＝一般照片 */
+  anim?: { frames: number; duration: number };
   /** 影片的編碼（'avc'、'hevc'、'vp9'…）與是不是 HDR；匯入時讀容器得到，舊專案沒有 */
   codec?: string;
   hdr?: boolean;

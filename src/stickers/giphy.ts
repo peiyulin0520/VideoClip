@@ -2,6 +2,8 @@
 // ⚠ API key 只存在這台裝置（localStorage），絕不寫進程式碼或 GitHub（公開 repo）。別人打開網站沒有這把 key。
 // 只會把「搜尋關鍵字」送到 GIPHY，不會上傳影片。搜尋結果不存，每次各自搜尋（使用者 2026-11-12）。
 
+import { hasImageDecoder, sniffImageType } from '../engine/animImage';
+
 const KEY = 'vc-giphy-key';
 const API = 'https://api.giphy.com/v1/stickers';
 
@@ -26,8 +28,10 @@ export type GiphySticker = {
   title: string;
   /** 格子裡的縮圖（會動） */
   thumb: string;
-  /** 加進專案用的靜態圖（第一格） */
+  /** 加進專案用的靜態圖（第一格）：會動的版本下載不到時的備用 */
   still: string;
+  /** 加進專案用的會動版本（約 200px 高）：動態 WebP（有透明、檔案小）與 GIF（備用） */
+  anim?: { webp?: string; gif?: string };
   width: number;
   height: number;
 };
@@ -40,11 +44,14 @@ export function parseGiphy(raw: Raw): GiphySticker | null {
   const thumb = im.fixed_width_small?.webp || im.fixed_width_small?.url || im.fixed_width?.url;
   const still = im.original_still?.url || im.fixed_width_still?.url || im.fixed_width?.url;
   if (!thumb || !still) return null;
+  const a = im.fixed_height ?? im.fixed_width;
+  const anim = a && (a.webp || a.url) ? { webp: a.webp, gif: a.url } : undefined;
   return {
     id: raw.id,
     title: raw.title ?? '',
     thumb,
     still,
+    ...(anim ? { anim } : {}),
     width: Number(im.original?.width ?? im.fixed_width?.width ?? 200),
     height: Number(im.original?.height ?? im.fixed_width?.height ?? 200),
   };
@@ -80,7 +87,29 @@ export async function giphyStickers(q: string, key = getGiphyKey(), limit = 24):
   return (body.data ?? []).map(parseGiphy).filter((x): x is GiphySticker => !!x);
 }
 
-/** 把 GIPHY 貼圖的第一格畫成 512px PNG（之後當照片素材加進專案；會動的版本之後再做） */
+/**
+ * 加進專案用的檔案：優先下載會動的版本（瀏覽器有 ImageDecoder 就用動態 WebP——有半透明邊緣；沒有就用 GIF），
+ * 下載不到或沒有會動的版本，退回第一格的靜態 PNG。
+ */
+export async function giphyToFile(s: GiphySticker): Promise<File> {
+  const url = hasImageDecoder() ? (s.anim?.webp ?? s.anim?.gif) : (s.anim?.gif ?? undefined);
+  if (url) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const blob = await res.blob();
+        const type = await sniffImageType(blob);
+        if (type)
+          return new File([blob], `GIPHY-${s.id}.${type === 'image/webp' ? 'webp' : 'gif'}`, { type });
+      }
+    } catch {
+      /* 下載不到：用靜態圖 */
+    }
+  }
+  return giphyToPng(s);
+}
+
+/** 把 GIPHY 貼圖的第一格畫成 512px PNG（靜態備用版） */
 export async function giphyToPng(s: GiphySticker, size = 512): Promise<File> {
   const res = await fetch(s.still);
   if (!res.ok) throw new Error(`下載貼圖失敗（${res.status}）`);

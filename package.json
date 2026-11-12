@@ -17,6 +17,7 @@
     "check": "npm run lint && npm test && npm run build"
   },
   "dependencies": {
+    "gifuct-js": "^2.1.2",
     "idb": "^8.0.4",
     "immer": "^11.2.10",
     "lucide-react": "^1.72.0",

@@ -1,5 +1,6 @@
 import { ALL_FORMATS, BlobSource, CanvasSink, Input } from 'mediabunny';
 import type { Asset } from '../model/types';
+import { decodeAnimBlob } from './animImage';
 
 export type MediaKind = 'video' | 'image';
 
@@ -189,9 +190,26 @@ export async function probeMedia(file: File, kind: MediaKind): Promise<ProbeResu
     if (kind === 'image') {
       const info = await imageInfo(file, url);
       if (!info) return { ok: false, reason: '這個瀏覽器讀不了這張圖片' };
+      // GIF／動態 WebP：解一次看有幾格（超過上限或解不了就當一般照片）；解出來的格子立刻釋放，播放時才依需要再解
+      let anim: Asset['anim'];
+      if (file.size <= 12 * 1024 * 1024) {
+        const d = await decodeAnimBlob(file).catch(() => null);
+        if (d) {
+          anim = { frames: d.frames.length, duration: d.duration };
+          d.frames.forEach((f) => f.close());
+        }
+      }
       return {
         ok: true,
-        info: { kind, duration: 0, width: info.w, height: info.h, hasAudio: false, thumbs: [info.thumb] },
+        info: {
+          kind,
+          duration: 0,
+          width: info.w,
+          height: info.h,
+          hasAudio: false,
+          thumbs: [info.thumb],
+          ...(anim ? { anim } : {}),
+        },
       };
     }
     const meta = (await probeVideoContainer(file)) ?? (await probeVideoElement(url));

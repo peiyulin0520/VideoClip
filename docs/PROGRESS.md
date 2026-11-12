@@ -6,9 +6,9 @@
 - **日期**：2026-11-11
 - **分支**：PR #6（播放順暢＋聲音、裝飾長度／透明度、選色彈窗）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
-- **測試**：630 個單元測試、91 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：637 個單元測試、95 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：`docs/plans/2026-11-12-feedback-5.md` 已做 **①～⑤**（播放卡／主軌修剪／軌道拖拉／字塊填滿框線／裁切）；還沒做 **⑥ GIPHY 貼圖會動**；再之後 feedback-4 的 B 匯出、C 音軌＋背景音樂。請使用者用 iPhone 測 ①～⑤（尤其設定頁打開「顯示播放效能」錄一段播放）。**目前這些都還在分支上，沒有開 PR，網站與手機還是舊版**
+- **下一步**：`docs/plans/2026-11-12-feedback-5.md` 的 **①～⑥ 全部做完**（播放卡／主軌修剪／軌道拖拉／字塊填滿框線／裁切／GIPHY 會動；Chromium 驗證，iPhone 待真機）。**這些都還在分支上，沒有開 PR，網站與手機還是舊版 → 下一步是開 PR 讓使用者合併、用 iPhone 測**（尤其設定頁打開「顯示播放效能」錄一段播放）；之後 feedback-4 的 B 匯出、C 音軌＋背景音樂
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -68,6 +68,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 feedback-5 ⑥：GIPHY 貼圖會動
+  - 做了什麼：加 GIPHY 貼圖時改下載**會動的版本**（`fixed_height`：瀏覽器有 `ImageDecoder` 就抓動態 WebP，有半透明邊緣；沒有就抓 GIF），下載不到或沒有會動版本才退回靜態 PNG；新 `engine/animImage.ts` 把動圖解成一格一格（`ImageDecoder`，沒有時 GIF 用 `gifuct-js`），`Asset.anim` 記格數與一圈長度；預覽與單格輸出都用「物件開始後經過的時間」取格、循環播放（暫停、拖時間軸都定在準確的格）；「我的貼圖」上傳 GIF／動態 WebP 保留原檔（不再轉 PNG）；格子裡的縮圖原本就是會動的
+  - 動了哪些檔：新 `src/engine/animImage.ts`；`src/engine/{player,exportFrame,probe}.ts`、`src/stickers/giphy.ts`、`src/app/editor/{GiphyPanel,MyStickers}.tsx`、`src/model/types.ts`（`Asset.anim`）、`package.json`（`gifuct-js`，MIT）；測試 `src/engine/animImage.test.ts`、`src/stickers/giphy.test.ts`、`e2e/giphy.spec.ts`；新素材 `tests/fixtures/anim-3frames.{gif,webp}`
+  - 驗證：✅ 單元（取格與循環、檔頭判斷、壞檔回 null、解析 anim 網址）；✅ e2e（模擬 GIPHY：下載的是動態 WebP 不是靜態圖；0.1／0.4／0.7 秒取到黃／綠／洋紅、1.05 秒循環回黃；單格輸出取同一格；重新整理後還會動；沒有 `ImageDecoder` 時改抓 GIF、用備用解碼器一樣會動；下載失敗退回靜態圖；我的貼圖上傳 GIF 會動）；全部 95 個 e2e、637 個單元、lint、build 過；截圖 `docs/screenshots/giphy/anim-sticker.png`  🔴 iPhone 沒測：有沒有動、多個貼圖同時動順不順；真的 GIPHY API 沒測（沙盒連不到，用模擬）  🔴 沒做：動態 WebP 在沒有 `ImageDecoder` 的瀏覽器解不了（會改抓 GIF）；GIF 的邊緣只有 1 bit 透明（不是 GIPHY 的錯）
+  - 使用者的決定/回饋：「目前將 giphy 貼圖加上影片，他不會動！」
+  - 下一步：開 PR 讓使用者合併，用 iPhone 測 ①～⑥
 - 2026-11-12 feedback-5 ⑤：裁切（剪輯分頁、預覽上直接拖、自由形狀）
   - 做了什麼：「裁切」從圖層分頁（比例滑桿）搬到剪輯分頁。按了之後預覽顯示**完整原始畫面**（留下的那塊位置不變），四邊中間細拉霸、四個角、框內平移直接在預覽上拖；顯示「保留 72% × 100%」；比例 自由／原比例／1:1／9:16／4:5／16:9（鎖定後拖角仍保持比例）；「自由形狀」用手指沿著要留的範圍畫一圈（磨圓、自動閉合）→ 保留區域自動框住多邊形；預覽上有「自由形狀／重設／取消／完成」（不用捲到下面的面板）；完成才寫進專案、一步復原；切完留下的畫面**位置大小不跳**（`cropKeepingPlace`）；多邊形遮罩在合成器用 Graphics 遮罩，預覽與單格輸出共用；換分頁或選別的片段結束裁切（不套用）；完整畫面會超出預覽時（例如填滿的橫式影片）改縮進預覽中央，把手才按得到
   - 動了哪些檔：新 `src/engine/crop.ts`（`cropKeepingPlace`、`dragCrop`、`applyRatio`、`polygonCrop`、`smoothPolygon`）、`src/store/cropStore.ts`、`src/app/editor/{CropOverlay,CropPanel}.tsx`；`src/engine/{compositor,scene,player}.ts`（多邊形遮罩、`setPreviewPatch`）、`Toolbar.tsx`（裁切鈕、拿掉圖層分頁的裁切滑桿）、`Preview.tsx`、`src/model/types.ts`（`VideoItem.mask`）、`styles.css`；測試 `src/engine/crop.test.ts`、`e2e/crop.spec.ts`、`e2e/phase2.spec.ts`（裁切改到剪輯分頁）；文件 `docs/EFFECTS.md`
