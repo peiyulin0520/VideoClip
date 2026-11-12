@@ -184,4 +184,5 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **分頁**：`Toolbar.tsx` 只留分頁列＋自動切換（`tabForSelection`），每一頁一個檔在 `src/app/editor/tabs/`；`ClipPanel`（變速、音量、修剪）剪輯與音訊分頁共用。
 - **長按拖移素材**：`Timeline.tsx` 長按 400ms 後可以左右（改時間、吸附）、上下（換軌道）移動；同一區上下各出現「＋ 新增一軌」放置區（拖的時候版面會多出 26px 的列）；種類不符的軌道變灰、放開彈回並提示；放進去的位置有東西＝移到最近的空位；原軌道空了不自動刪。純函式在 `timeline.ts` 的 `dropTarget`／`moveItemToTrack`，動作 `actions.moveItemTo`。**沒做**：拖到時間軸邊緣自動捲動（時間軸的水平捲動＝播放頭，要另外設計）。
 - **坑**：①`deselect()`（e2e）點時間軸會把整頁捲下去，之後要先 `scrollTo(0,0)` 才能用舊座標點預覽 ②`openTab` 要限定在 `.tabs`（文字面板裡也有叫「文字」的小分頁）③新增軌道一律用 `insertIndexFor`＋`splice`，不要 `push`，否則會破壞分區順序（字卡跑到音訊後面）④「刪除」按鈕多了「刪除並補齊」，e2e 找「刪除」要 `exact: true`。
+- **提交前一定跑完整的 `npm run check`**（含 `prettier --check .`）。只跑 `eslint` 會漏掉排版：2026-11-12 PR #8 因此 CI 的 lint 步驟失敗、部署被跳過（19 個新檔案排版不符）。改完檔案先 `npx prettier --write .`。
 

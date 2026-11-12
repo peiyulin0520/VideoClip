@@ -45,8 +45,7 @@ function EditorLoader({ projectId }: { projectId: string }) {
       autosave = startAutosave();
       enqueueProxies(p.id, p.assets); // 舊專案的大影片：背景補做預覽用輕量影片
       setStatus('ready');
-      if (migrated.reordered)
-        toast('為了讓字卡永遠在影像上面，這個專案的圖層順序已經調整過', 9000);
+      if (migrated.reordered) toast('為了讓字卡永遠在影像上面，這個專案的圖層順序已經調整過', 9000);
       if (missing.length)
         toast(`找不到素材檔：${missing.join('、')}（可能是上次存不下、沒有留在手機裡，請重新匯入）`, 8000);
     })();

@@ -3,8 +3,14 @@ import { addOverlays, clips, createProjectWith, fixture, openTab, project, showT
 
 // 2026-11-12：主軌與疊加合併成「影像軌」；影像／特效／字卡／音訊分區；刪除並補齊；舊專案（v1）自動轉換
 
-type Tr = { id: string; kind: string; name: string; items: { id: string; start: number; duration: number }[] };
-const tracks = async (page: import('@playwright/test').Page) => (await project(page)).tracks as unknown as Tr[];
+type Tr = {
+  id: string;
+  kind: string;
+  name: string;
+  items: { id: string; start: number; duration: number }[];
+};
+const tracks = async (page: import('@playwright/test').Page) =>
+  (await project(page)).tracks as unknown as Tr[];
 
 test('舊專案（v1：主軌＋疊加，字卡在疊加下面）打開後自動轉成影像軌：名稱、片段時間不變，字卡搬到影像上面並提醒一次', async ({
   page,
@@ -92,7 +98,9 @@ test('軌道分區：新增字卡、音樂、影像後，順序永遠是 影像 
 
   // 時間軸由上到下：字卡、影像（上到下）、音訊
   await showTimeline(page);
-  const kinds = await page.getByTestId('track').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.kind));
+  const kinds = await page
+    .getByTestId('track')
+    .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.kind));
   expect(kinds).toEqual(['text', 'media', 'media', 'media', 'audio']);
 
   // 圖層分頁：最上面那條影像軌往上一層＝提示不能跨類；字卡軌的「往下一層」也一樣

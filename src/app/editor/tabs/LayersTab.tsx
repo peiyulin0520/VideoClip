@@ -163,7 +163,8 @@ export function LayersTab() {
                 x.transform.x = 0.5;
                 x.transform.y = 0.5;
                 // 最下面那條影像軌的片段原本是滿版；疊在上面的（畫中畫）預設縮小一半
-                x.transform.scale = x.type === 'text' || found?.track.id === baseMediaTrack(project)?.id ? 1 : 0.5;
+                x.transform.scale =
+                  x.type === 'text' || found?.track.id === baseMediaTrack(project)?.id ? 1 : 0.5;
                 x.transform.rotation = 0;
               })
             }

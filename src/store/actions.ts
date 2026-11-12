@@ -98,7 +98,11 @@ export function importToBase(assets: Asset[], clips: VideoItem[]): number {
     for (const a of assets) if (!d.assets.some((x) => x.id === a.id)) d.assets.push(a);
     let tr = baseMediaTrack(d as never);
     if (!tr) {
-      d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, createTrack('media', d.tracks as Track[]));
+      d.tracks.splice(
+        insertIndexFor(d.tracks as Track[], 'media'),
+        0,
+        createTrack('media', d.tracks as Track[]),
+      );
       tr = baseMediaTrack(d as never)!;
     }
     const noMediaYet = mediaItems(d as never).length === 0;

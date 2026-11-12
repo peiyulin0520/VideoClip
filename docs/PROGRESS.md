@@ -4,13 +4,13 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-12
-- **分支**：`claude/zen-tesla-v3brj5`（PR #7 已合併進 `main`；之後的 F1–F5 都在分支上，**還沒開 PR**，網站與手機還是舊版）
+- **分支**：PR #8（feedback-6 F1–F5）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊。網站部署成功後手機會自動更新成新版（設定頁看版本號）
 - **最後一個程式 commit**：見 `git log -1`（F5 長按拖移素材到別軌）
 - **測試**：770 個單元測試、135 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：feedback-6 的 F1–F5 全部做完（淺色主題、預覽點選、七個分頁、影像軌統一、長按拖到別軌）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：開 PR 讓使用者合併、用 iPhone 測 feedback-6（特別是預覽往上滑會不會誤選、長按拖移手感、舊專案轉換）；之後做關鍵影格 `docs/plans/2026-11-12-keyframes-film.md`（K1 → K5 → K6 → K2 → K3 → K4）。沒做的小項見 `docs/plans/2026-11-12-feedback-6.md §4`（時間軸拖到邊緣自動捲動、拖移中第二根手指取消、「畫畫」）
+- **下一步**：使用者用 iPhone 測 feedback-6（特別是預覽往上滑會不會誤選、長按拖移手感、舊專案轉換）；之後做關鍵影格 `docs/plans/2026-11-12-keyframes-film.md`（K1 → K5 → K6 → K2 → K3 → K4）。沒做的小項見 `docs/plans/2026-11-12-feedback-6.md §4`（時間軸拖到邊緣自動捲動、拖移中第二根手指取消、「畫畫」）
 - **等使用者的事**
-  - 要不要開 PR 合併（之後用 iPhone 重測）
+  - 用 iPhone 測 feedback-6（清單見 `docs/PLAN.md §7`）；選下一步：關鍵影格，或先補沒做的小項
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
   - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
 - **目前沒有進行到一半的修改**（工作目錄乾淨、已 push）

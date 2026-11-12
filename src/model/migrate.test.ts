@@ -33,7 +33,19 @@ const track = (id: string, kind: string, name: string, items: unknown[] = [], ex
   ...extra,
 });
 const v1 = (tracks: unknown[]) =>
-  ({ id: 'p', name: 'x', createdAt: 1, updatedAt: 1, aspect: '9:16', width: 1080, height: 1920, fps: 30, assets: [], tracks, version: 1 }) as unknown as Project;
+  ({
+    id: 'p',
+    name: 'x',
+    createdAt: 1,
+    updatedAt: 1,
+    aspect: '9:16',
+    width: 1080,
+    height: 1920,
+    fps: 30,
+    assets: [],
+    tracks,
+    version: 1,
+  }) as unknown as Project;
 
 describe('migrateProject v1 → v2', () => {
   it('只有主軌：變成「影像 1」，片段時間不變', () => {
@@ -51,7 +63,9 @@ describe('migrateProject v1 → v2', () => {
   });
 
   it('主軌有 gap：gap 欄位刪掉，start 保留（空白已經在 start 裡）', () => {
-    const m = migrateProject(v1([track('m', 'main', '主軌', [item('a', 1.5, { gap: 1.5 }), item('b', 3.5)])]));
+    const m = migrateProject(
+      v1([track('m', 'main', '主軌', [item('a', 1.5, { gap: 1.5 }), item('b', 3.5)])]),
+    );
     const items = m.project.tracks[0]!.items;
     expect(items.map((i) => i.start)).toEqual([1.5, 3.5]);
     expect(items.every((i) => !('gap' in i))).toBe(true);

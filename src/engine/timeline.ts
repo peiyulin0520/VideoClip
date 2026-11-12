@@ -57,7 +57,8 @@ export function placeSequential(clips: VideoItem[], from = 0): VideoItem[] {
 }
 
 /** 軌道上最後一個物件結束的時間（沒有物件＝0） */
-export const trackEnd = (items: Item[]): number => items.reduce((m, it) => Math.max(m, it.start + it.duration), 0);
+export const trackEnd = (items: Item[]): number =>
+  items.reduce((m, it) => Math.max(m, it.start + it.duration), 0);
 
 /** 刪除並補齊：拿掉這個物件，同一軌在它後面的物件整個往前移它的長度 */
 export function rippleDelete<T extends Item>(items: T[], id: string): T[] {
@@ -388,18 +389,21 @@ export function moveItemToTrack(
     const dst = tracks[dstIdx]!;
     const s = findFreeStart(dst.items, at, item.duration, itemId); // 同一軌時 itemId 自己不算擋路
     return tracks.map((t, i) => {
-      if (i === srcIdx && i === dstIdx) return { ...t, items: t.items.map((x) => (x.id === itemId ? { ...x, start: s } : x)) };
+      if (i === srcIdx && i === dstIdx)
+        return { ...t, items: t.items.map((x) => (x.id === itemId ? { ...x, start: s } : x)) };
       if (i === srcIdx) return { ...t, items: t.items.filter((x) => x.id !== itemId) };
       if (i === dstIdx) return { ...t, items: [...t.items, { ...item, start: s }] };
       return t;
     });
   }
   // 新增一條軌道：最上面＝同一區的最上面，最下面＝同一區的最下面
-  const without = tracks.map((t, i) => (i === srcIdx ? { ...t, items: t.items.filter((x) => x.id !== itemId) } : t));
+  const without = tracks.map((t, i) =>
+    i === srcIdx ? { ...t, items: t.items.filter((x) => x.id !== itemId) } : t,
+  );
   const fresh = makeTrack(kind, without);
   fresh.items = [{ ...item, start: at }];
   const range = zoneRange(without, kind);
-  const index = target.edge === 'top' ? insertIndexFor(without, kind) : range ? range[0] : insertIndexFor(without, kind);
+  const index =
+    target.edge === 'top' ? insertIndexFor(without, kind) : range ? range[0] : insertIndexFor(without, kind);
   return [...without.slice(0, index), fresh, ...without.slice(index)];
 }
-

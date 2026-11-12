@@ -2,7 +2,13 @@ import { Film, MoreHorizontal, Plus, Settings, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { importFiles } from '../../engine/importMedia';
-import { baseMediaTrack, formatTime, mediaItems, placeSequential, totalDuration } from '../../engine/timeline';
+import {
+  baseMediaTrack,
+  formatTime,
+  mediaItems,
+  placeSequential,
+  totalDuration,
+} from '../../engine/timeline';
 import { ASPECTS, assignAspect, createProject, nextProjectName, pickAspect } from '../../model/defaults';
 import type { Aspect, Project } from '../../model/types';
 import { requestPersistence } from '../../storage/media';

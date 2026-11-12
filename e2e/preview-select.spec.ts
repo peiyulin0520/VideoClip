@@ -64,7 +64,11 @@ test('在預覽上往上／往下滑是捲頁面，不會選到東西也不會�
   await page.evaluate(() => window.scrollTo(0, 0));
   const s = await previewBox(page);
   // 沒選取時，在滿版影片上滑 → 捲頁面、沒有選取
-  await touchDrag(page, { x: s.x + s.width / 2, y: s.y + s.height * 0.8 }, { x: s.x + s.width / 2, y: s.y + s.height * 0.2 });
+  await touchDrag(
+    page,
+    { x: s.x + s.width / 2, y: s.y + s.height * 0.8 },
+    { x: s.x + s.width / 2, y: s.y + s.height * 0.2 },
+  );
   expect(await selectedItemId(page)).toBeNull();
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(20);
 });

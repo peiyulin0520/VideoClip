@@ -15,7 +15,12 @@ const asset = (id: string): Asset => ({
   hasAudio: true,
   thumbs: [],
 });
-const clip = (id: string, start: number, dur = 2): VideoItem => ({ ...createClip(asset(id)), id, start, duration: dur });
+const clip = (id: string, start: number, dur = 2): VideoItem => ({
+  ...createClip(asset(id)),
+  id,
+  start,
+  duration: dur,
+});
 
 /** [影像0: a(0–2) b(2–4)] [影像1: c(1–3)] [字卡: t(0–3)] */
 function proj() {
@@ -44,17 +49,31 @@ describe('dropTarget：影像只能放影像、字卡只能放字卡', () => {
   const [m0, m1, tx] = p.tracks;
   it('同種類的軌道可以放；不同種類不行（彈回並提示）', () => {
     const a = m0!.items[0]!;
-    expect(dropTarget(p.tracks, a, { trackId: m1!.id, newEdge: null })).toEqual({ type: 'track', trackId: m1!.id });
-    expect(dropTarget(p.tracks, a, { trackId: tx!.id, newEdge: null })).toEqual({ type: 'invalid', kind: 'media' });
+    expect(dropTarget(p.tracks, a, { trackId: m1!.id, newEdge: null })).toEqual({
+      type: 'track',
+      trackId: m1!.id,
+    });
+    expect(dropTarget(p.tracks, a, { trackId: tx!.id, newEdge: null })).toEqual({
+      type: 'invalid',
+      kind: 'media',
+    });
     const t = tx!.items[0]!;
-    expect(dropTarget(p.tracks, t, { trackId: m0!.id, newEdge: null })).toEqual({ type: 'invalid', kind: 'text' });
+    expect(dropTarget(p.tracks, t, { trackId: m0!.id, newEdge: null })).toEqual({
+      type: 'invalid',
+      kind: 'text',
+    });
   });
   it('鎖住的軌道不能放；不在任何軌道上＝null；在「＋新增一軌」放置區＝新增', () => {
     const q = proj();
     q.tracks[1]!.locked = true;
-    expect(dropTarget(q.tracks, q.tracks[0]!.items[0]!, { trackId: q.tracks[1]!.id, newEdge: null })?.type).toBe('invalid');
+    expect(
+      dropTarget(q.tracks, q.tracks[0]!.items[0]!, { trackId: q.tracks[1]!.id, newEdge: null })?.type,
+    ).toBe('invalid');
     expect(dropTarget(p.tracks, m0!.items[0]!, { trackId: null, newEdge: null })).toBeNull();
-    expect(dropTarget(p.tracks, m0!.items[0]!, { trackId: null, newEdge: 'top' })).toEqual({ type: 'new', edge: 'top' });
+    expect(dropTarget(p.tracks, m0!.items[0]!, { trackId: null, newEdge: 'top' })).toEqual({
+      type: 'new',
+      edge: 'top',
+    });
   });
 });
 
@@ -72,10 +91,18 @@ describe('moveItemToTrack', () => {
 
   it('目標那個時間已經有東西：移到最近的空位（不重疊）', () => {
     const p = proj();
-    const out = moveItemToTrack(p.tracks, 'a', { type: 'track', trackId: p.tracks[1]!.id }, 1.5, createTrack)!;
+    const out = moveItemToTrack(
+      p.tracks,
+      'a',
+      { type: 'track', trackId: p.tracks[1]!.id },
+      1.5,
+      createTrack,
+    )!;
     const moved = out[1]!.items.find((x) => x.id === 'a')!;
     const c = out[1]!.items.find((x) => x.id === 'c')!;
-    expect(moved.start + moved.duration <= c.start + 1e-6 || moved.start >= c.start + c.duration - 1e-6).toBe(true);
+    expect(moved.start + moved.duration <= c.start + 1e-6 || moved.start >= c.start + c.duration - 1e-6).toBe(
+      true,
+    );
   });
 
   it('同一軌：只改時間', () => {
@@ -87,9 +114,13 @@ describe('moveItemToTrack', () => {
 
   it('種類不符、找不到：回傳 null', () => {
     const p = proj();
-    expect(moveItemToTrack(p.tracks, 'a', { type: 'track', trackId: p.tracks[2]!.id }, 0, createTrack)).toBeNull();
+    expect(
+      moveItemToTrack(p.tracks, 'a', { type: 'track', trackId: p.tracks[2]!.id }, 0, createTrack),
+    ).toBeNull();
     expect(moveItemToTrack(p.tracks, 'a', { type: 'invalid', kind: 'media' }, 0, createTrack)).toBeNull();
-    expect(moveItemToTrack(p.tracks, 'nope', { type: 'track', trackId: p.tracks[1]!.id }, 0, createTrack)).toBeNull();
+    expect(
+      moveItemToTrack(p.tracks, 'nope', { type: 'track', trackId: p.tracks[1]!.id }, 0, createTrack),
+    ).toBeNull();
   });
 
   it('拖到影像區最上面：新增一條影像軌（在字卡下面、其他影像軌上面）', () => {
