@@ -4,8 +4,71 @@
   --fg: #f4f4f4;
   --muted: #9a9a9a;
   --accent: #ff4d8d;
+  --on-accent: #fff;
+  --panel: #1c1c1c;
+  --line: #2c2c2c;
+  /* 按鈕、輸入框、邊線、片段、時間軸（跟著主題換） */
+  --btn: #222;
+  --btn2: #2a2a2e;
+  --field: #111;
+  --border: #444;
+  --clip: #333;
+  --bar: #555;
+  --timeline: #151515;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* 介面主題（設定頁切換；預覽畫面本身永遠是黑底）：dark 是預設，其他三個只覆蓋上面的變數 */
+:root[data-theme='mono'] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #666666;
+  --accent: #111111;
+  --on-accent: #ffffff;
+  --panel: #f4f4f4;
+  --line: #d9d9d9;
+  --btn: #ececec;
+  --btn2: #e2e2e2;
+  --field: #ffffff;
+  --border: #b5b5b5;
+  --clip: #cfcfcf;
+  --bar: #9a9a9a;
+  --timeline: #f0f0f0;
+}
+:root[data-theme='fresh'] {
+  color-scheme: light;
+  --bg: #f4fbf9;
+  --fg: #1d3b38;
+  --muted: #6b8884;
+  --accent: #14b8a6;
+  --on-accent: #ffffff;
+  --panel: #ffffff;
+  --line: #d7ebe7;
+  --btn: #e3f3f0;
+  --btn2: #d3ebe6;
+  --field: #ffffff;
+  --border: #b3d3cd;
+  --clip: #c8e6e0;
+  --bar: #96bfb7;
+  --timeline: #e9f6f3;
+}
+:root[data-theme='warm'] {
+  color-scheme: dark;
+  --bg: #2a1f18;
+  --fg: #f7ead8;
+  --muted: #bda58d;
+  --accent: #e3893f;
+  --on-accent: #2a1408;
+  --panel: #382a21;
+  --line: #4b392d;
+  --btn: #46352a;
+  --btn2: #523f32;
+  --field: #231912;
+  --border: #6e5646;
+  --clip: #5a4638;
+  --bar: #8a6f5b;
+  --timeline: #241a14;
 }
 * {
   box-sizing: border-box;
@@ -47,7 +110,7 @@ button {
   align-items: center;
   justify-content: center;
   color: inherit;
-  background: #222;
+  background: var(--btn);
   border: 0;
   border-radius: 12px;
   font-size: 20px;
@@ -68,10 +131,6 @@ button {
 }
 
 /* ---------- 共用 ---------- */
-:root {
-  --panel: #1c1c1c;
-  --line: #2c2c2c;
-}
 button {
   cursor: pointer;
   font-family: inherit;
@@ -90,7 +149,7 @@ button {
 }
 .btn.primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .btn.danger,
 .menu-item.danger {
@@ -113,7 +172,7 @@ button {
 }
 .chip.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .text-input {
   width: 100%;
@@ -121,8 +180,8 @@ button {
   padding: 0 14px;
   font-size: 16px;
   color: var(--fg);
-  background: #111;
-  border: 1px solid #444;
+  background: var(--field);
+  border: 1px solid var(--border);
   border-radius: 12px;
 }
 .sheet-backdrop {
@@ -181,8 +240,8 @@ button {
   padding: 10px 16px;
   font-size: 14px;
   line-height: 1.4;
-  background: rgba(40, 40, 40, 0.96);
-  border: 1px solid #444;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 12px;
 }
 .busy {
@@ -199,7 +258,7 @@ button {
 .spinner {
   width: 36px;
   height: 36px;
-  border: 4px solid #444;
+  border: 4px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -250,7 +309,7 @@ button {
   justify-content: center;
   aspect-ratio: 3 / 4;
   color: var(--muted);
-  background: #222 center / cover no-repeat;
+  background: var(--btn) center / cover no-repeat;
   border-radius: 14px;
 }
 .badge {
@@ -503,7 +562,7 @@ button {
   flex: none;
   height: 112px;
   min-height: 112px;
-  background: #151515;
+  background: var(--timeline);
   border-top: 1px solid var(--line);
 }
 .tl-scroll {
@@ -539,7 +598,7 @@ button {
   left: 50%;
   width: 1px;
   height: 4px;
-  background: #555;
+  background: var(--bar);
 }
 .track {
   position: absolute;
@@ -551,7 +610,7 @@ button {
   top: 0;
   height: 100%;
   box-sizing: border-box;
-  background: #333;
+  background: var(--clip);
   border: 2px solid transparent;
   border-radius: 8px;
   user-select: none;
@@ -559,7 +618,7 @@ button {
   -webkit-touch-callout: none;
 }
 .clip.selected {
-  border-color: #fff;
+  border-color: var(--fg);
 }
 .clip.dragging {
   z-index: 5;
@@ -581,7 +640,7 @@ button {
   color: rgba(255, 255, 255, 0.55);
   white-space: nowrap;
   text-overflow: ellipsis;
-  background: #2a2a2e;
+  background: var(--btn2);
 }
 .tiles span {
   flex: none;
@@ -648,9 +707,9 @@ button {
   left: 50%;
   z-index: 3;
   width: 2px;
-  background: #fff;
+  background: var(--fg);
   pointer-events: none;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
 }
 .toolbar {
   display: flex;
@@ -707,7 +766,7 @@ button {
   min-height: 0;
   padding: 0;
   font-size: 11px;
-  background: rgba(28, 28, 28, 0.92);
+  background: var(--panel);
   border-radius: 10px;
 }
 .clip.is-text {
@@ -749,7 +808,7 @@ button {
   border-radius: 0;
 }
 .tab.active {
-  color: #fff;
+  color: var(--fg);
   border-bottom: 2px solid var(--accent);
 }
 .bottombar .toolbar {
@@ -792,7 +851,7 @@ button {
   width: 44px;
   height: 44px;
   min-width: 44px;
-  border: 2px solid #444;
+  border: 2px solid var(--border);
   border-radius: 50%;
 }
 .swatch.active {
@@ -811,7 +870,7 @@ button {
   border-radius: 10px;
 }
 .layer-row.selected {
-  background: #2a2a2a;
+  background: var(--btn2);
   outline: 1px solid var(--accent);
 }
 .layer-name {
@@ -908,7 +967,7 @@ button {
   padding: 14px;
   font-size: 15px;
   text-align: left;
-  background: #1c1c1c;
+  background: var(--panel);
   border: 2px solid transparent;
   border-radius: 14px;
 }
@@ -945,7 +1004,7 @@ button {
   gap: 12px;
   min-height: 56px;
   padding: 8px 12px;
-  background: #1c1c1c;
+  background: var(--panel);
   border-radius: 12px;
 }
 .pack-row input {
@@ -966,7 +1025,7 @@ button {
 .progress {
   height: 10px;
   overflow: hidden;
-  background: #2a2a2a;
+  background: var(--btn2);
   border-radius: 5px;
 }
 .progress > div {
@@ -1011,7 +1070,7 @@ button {
 .install-box {
   padding: 10px;
   margin-bottom: 10px;
-  background: #1c1c1c;
+  background: var(--panel);
   border-radius: 12px;
 }
 
@@ -1025,8 +1084,8 @@ button {
   gap: 8px;
   padding: 0 12px;
   font-size: 15px;
-  background: #111;
-  border: 1px solid #444;
+  background: var(--field);
+  border: 1px solid var(--border);
 }
 .font-select-name {
   flex: 1;
@@ -1061,7 +1120,7 @@ button {
   border-radius: 10px;
 }
 .font-row.active {
-  background: #2a2a2a;
+  background: var(--btn2);
   outline: 1px solid var(--accent);
 }
 .font-row.import {
@@ -1204,7 +1263,7 @@ button {
 .deco-row {
   margin-top: 10px;
   padding-top: 6px;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--line);
 }
 .shape-grid {
   display: grid;
@@ -1220,7 +1279,7 @@ button {
   min-height: 64px;
   padding: 4px 2px;
   font-size: 11px;
-  background: #2a2a2e;
+  background: var(--btn2);
   border: 2px solid transparent;
   border-radius: 10px;
 }
@@ -1356,7 +1415,7 @@ button {
   align-items: flex-end;
   padding: 4px 8px;
   font-size: 12px;
-  border: 1px solid #555;
+  border: 1px solid var(--border);
   border-radius: 10px;
 }
 .cp-swatch span {
@@ -1391,7 +1450,7 @@ button {
   height: 44px;
   font-size: 20px;
   color: var(--fg);
-  background: #2a2a2e;
+  background: var(--btn2);
   border-radius: 10px;
 }
 .cp-val {
@@ -1426,7 +1485,7 @@ button {
   min-width: 0;
   aspect-ratio: 1;
   padding: 6px;
-  background: #2a2a2e;
+  background: var(--btn2);
   border-radius: 10px;
 }
 .sticker-cell img {
@@ -1537,7 +1596,7 @@ button {
   font-size: 11px;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.04);
-  border: 1px dashed #666;
+  border: 1px dashed var(--border);
   border-radius: 8px;
 }
 
@@ -1547,7 +1606,7 @@ button {
   height: 72px;
   margin: 8px 0 6px;
   overflow: hidden;
-  background: #222;
+  background: var(--btn);
   border-radius: 10px;
   user-select: none;
   -webkit-user-select: none;
@@ -1613,7 +1672,7 @@ button {
   width: 3px;
   height: 22px;
   margin: -11px 0 0 -1.5px;
-  background: #555;
+  background: var(--bar);
   border-radius: 2px;
 }
 .trim-info {
@@ -1816,7 +1875,7 @@ button {
   height: 14px;
   margin: 8px 0;
   overflow: hidden;
-  background: #2a2a2e;
+  background: var(--btn2);
   border-radius: 7px;
 }
 .export-bar > div {
@@ -1858,4 +1917,38 @@ button {
 }
 .music-note {
   margin-top: 6px;
+}
+
+/* 設定頁：主題選擇 */
+.theme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 8px 0;
+}
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  height: auto;
+  padding: 10px;
+  font-size: 15px;
+  text-align: left;
+  background: var(--btn);
+  border: 2px solid transparent;
+  border-radius: 14px;
+}
+.theme-card[aria-checked='true'] {
+  border-color: var(--accent);
+}
+.theme-swatches {
+  display: flex;
+  height: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  border-radius: 8px;
+}
+.theme-swatches i {
+  flex: 1;
 }

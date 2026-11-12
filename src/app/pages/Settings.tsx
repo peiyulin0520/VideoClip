@@ -1,5 +1,6 @@
 import { APP_VERSION } from '../pwa';
 import { isPerfOn, setPerfOn } from '../editor/PerfOverlay';
+import { getTheme, setTheme, THEMES, type ThemeId } from '../../ui/theme';
 import { GiphyKeySetup } from '../editor/GiphyPanel';
 import { ChevronLeft, Download, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -30,6 +31,7 @@ export function Settings() {
   const [driveUrl, setDriveUrl] = useState(backup.driveFolderUrl ?? '');
   const [openLicenses, setOpenLicenses] = useState(false);
   const [perf, setPerf] = useState(isPerfOn);
+  const [theme, setThemeState] = useState<ThemeId>(getTheme);
 
   useEffect(() => {
     let alive = true;
@@ -58,6 +60,35 @@ export function Settings() {
         </Link>
         <h1>設定</h1>
       </header>
+
+      <section aria-label="介面主題">
+        <h2>介面主題</h2>
+        <div className="theme-grid" role="radiogroup" aria-label="介面主題">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              role="radio"
+              aria-checked={theme === t.id}
+              aria-label={`主題 ${t.name}`}
+              data-theme-id={t.id}
+              className="theme-card"
+              onClick={() => {
+                setTheme(t.id);
+                setThemeState(t.id);
+              }}
+            >
+              <span className="theme-swatches" aria-hidden="true">
+                {t.colors.map((c) => (
+                  <i key={c} style={{ background: c }} />
+                ))}
+              </span>
+              <b>{t.name}</b>
+              <small className="hint">{t.desc}</small>
+            </button>
+          ))}
+        </div>
+        <p className="hint">只改操作介面的顏色，影片預覽和匯出的畫面不受影響。存在這台手機。</p>
+      </section>
 
       <section aria-label="字體">
         <h2>字體</h2>
