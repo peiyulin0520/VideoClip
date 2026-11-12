@@ -2267,3 +2267,166 @@ button {
   background: var(--btn2) center / cover;
   border-radius: 10px;
 }
+
+/* 時間軸收合：圖層清單鈕、摘要列、細軌道、片段兩行名稱 */
+.layers-toggle {
+  position: sticky;
+  left: 4px;
+  z-index: 6;
+  min-height: 0;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--btn);
+  border-radius: 11px;
+}
+.track-summary {
+  position: absolute;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+}
+.sum-bar {
+  position: absolute;
+  top: 7px;
+  height: 6px;
+  border-radius: 3px;
+  opacity: 0.75;
+}
+.sum-label {
+  position: sticky;
+  left: 4px;
+  z-index: 5;
+  min-height: 0;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.track-chip {
+  width: 36px;
+  min-width: 36px;
+}
+.track-chip::after {
+  content: '';
+  position: absolute;
+  inset: -6px -4px; /* 看起來細，手指還是好按 */
+}
+.clip-label .cl-dur {
+  white-space: pre;
+}
+.track.tall .clip-label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.track.tall .clip-label .cl-dur {
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+/* 片段範圍選取：上方小旗標＋縮圖／波形條；沒選的灰掉；拖旗標時旁邊有那一秒的小畫面 */
+.range-picker {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 6px 0;
+}
+.range-mini {
+  flex: none;
+  width: 96px;
+  background: #000;
+  border-radius: 8px;
+}
+.range-main {
+  flex: 1;
+  min-width: 0;
+}
+.range-wrap {
+  position: relative;
+  padding-top: 30px;
+}
+.range-flags {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+}
+.range-flag {
+  position: absolute;
+  top: 0;
+  width: 44px;
+  height: 30px;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  transform: translateX(-50%);
+  touch-action: none;
+}
+.range-flag::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 14px;
+  height: 20px;
+  background: var(--muted);
+  border-radius: 4px 4px 4px 0;
+  transform: translateX(-1px);
+}
+.range-flag.end::before {
+  border-radius: 4px 4px 0 4px;
+  transform: translateX(calc(-100% + 1px));
+}
+.range-flag.on::before {
+  background: var(--accent);
+}
+.range-line-wrap {
+  position: absolute;
+  top: 24px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.range-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  transform: translateX(-1px);
+}
+.range-gray {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: rgba(60, 60, 60, 0.6);
+  backdrop-filter: grayscale(1);
+}
+.range-body {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  touch-action: none;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+}
+.range-body.on {
+  border-color: var(--accent);
+}
+.range-wrap .trim-strip {
+  margin: 0 0 6px;
+}
+.range-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0;
+}

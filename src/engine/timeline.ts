@@ -407,3 +407,51 @@ export function moveItemToTrack(
     target.edge === 'top' ? insertIndexFor(without, kind) : range ? range[0] : insertIndexFor(without, kind);
   return [...without.slice(0, index), fresh, ...without.slice(index)];
 }
+
+// ---------- 修剪：保留多段（上方小旗標，每一對旗標是一段） ----------
+
+export type Range = [number, number];
+
+/**
+ * 整理使用者標的幾段：夾在 [0, total]、起點終點排好、重疊或相接的合併、短於 minLen 的丟掉。
+ * 單位是素材秒數。
+ */
+export function mergeRanges(ranges: Range[], total: number, minLen: number): Range[] {
+  const sorted = ranges
+    .map(([a, b]): Range => [Math.max(Math.min(a, b), 0), Math.min(Math.max(a, b), total)])
+    .filter(([a, b]) => b - a >= minLen - 1e-9)
+    .sort((x, y) => x[0] - y[0]);
+  const out: Range[] = [];
+  for (const r of sorted) {
+    const last = out[out.length - 1];
+    if (last && r[0] <= last[1] + 1e-9) last[1] = Math.max(last[1], r[1]);
+    else out.push([r[0], r[1]]);
+  }
+  return out;
+}
+
+/**
+ * 把一個影片／音樂片段依「素材要留的幾段」拆成幾個片段：每一段留在它原本在時間軸上的位置
+ * （start = 原本的 start + (段起點 − 原本的 trimIn) ÷ 速度），中間不要的地方變成空位。
+ * 第一段沿用原本的 id（選取、命名不變），其他段是新的 id。回傳依時間排好的陣列；沒有可用的段回傳空陣列。
+ */
+export function splitByRanges(item: VideoItem, ranges: Range[], assetDuration: number): VideoItem[] {
+  const minSrc = MIN_CLIP_DURATION * item.speed;
+  return mergeRanges(ranges, assetDuration, minSrc).map(([a, b], i) => {
+    let start = item.start + (a - item.trimIn) / item.speed;
+    let trimIn = a;
+    let duration = (b - a) / item.speed;
+    if (start < 0) {
+      // 往前延伸超過專案開頭：把超出的部分切掉
+      trimIn += -start * item.speed;
+      duration += start;
+      start = 0;
+    }
+    const piece: VideoItem = { ...item, start, trimIn, duration };
+    if (i > 0) {
+      piece.id = newId('i_');
+      delete piece.label; // 命名只留在第一段
+    }
+    return piece;
+  });
+}

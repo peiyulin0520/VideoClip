@@ -40,6 +40,8 @@ export type Crop = { l: number; t: number; r: number; b: number };
 
 export type ItemBase = {
   id: string;
+  /** 使用者自己取的名字（時間軸片段、圖層清單上顯示）；沒有＝用預設名稱 */
+  label?: string;
   start: number; // 時間軸位置（秒）。所有軌道都是自由擺放（2026-11-12 起沒有磁吸的主軌）
   duration: number; // 時間軸上的長度（秒）
   /** x、y：中心點，佔畫面寬/高的比例；scale：乘上「填滿/完整」算出的基本大小；rotation：度，順時針 */

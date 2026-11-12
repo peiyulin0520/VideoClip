@@ -26,6 +26,7 @@ import {
   baseMediaTrack,
   duplicateFree,
   type DropTarget,
+  type Range,
   findItem,
   findFreeStart,
   firstFreeTrack,
@@ -37,6 +38,7 @@ import {
   placeSequential,
   reorderTrack,
   rippleDelete,
+  splitByRanges,
   splitFree,
   totalDuration,
   trackEnd,
@@ -59,6 +61,14 @@ export function editItem(id: string, recipe: (it: Draft<Item>) => void, opts?: O
       }
     }
   }, opts);
+}
+
+/** 幫物件命名（空字串＝恢復預設名稱）；一步復原 */
+export function renameItem(id: string, label: string) {
+  editItem(id, (it) => {
+    if (label.trim()) it.label = label.trim();
+    else delete it.label;
+  });
 }
 
 export function setTransform(id: string, patch: Partial<Transform>, coalesce = `tf:${id}`) {
@@ -391,6 +401,33 @@ export function moveItemTo(id: string, target: DropTarget, start: number): boole
     d.tracks = next as never;
   });
   return true;
+}
+
+/**
+ * 修剪面板按「完成」：影片／音樂依標的幾段留下來。一段＝修剪；多段＝拆成多個物件，
+ * 每段留在原本的時間位置（不要的地方變空位；位置被占住就移到最近的空位）。回傳第一段的 id，一步復原。
+ */
+export function applyRanges(itemId: string, ranges: Range[]): string | null {
+  const p = store().project;
+  const f = p && findItem(p, itemId);
+  if (!p || !f || !isVideoItem(f.item) || f.item.type === 'image') return null;
+  const asset = p.assets.find((a) => a.id === (f.item as VideoItem).assetId);
+  if (!asset) return null;
+  const pieces = splitByRanges(f.item, ranges, asset.duration);
+  if (pieces.length === 0) return null;
+  store().apply(
+    (d) => {
+      const tr = d.tracks[f.trackIndex]!;
+      const placed: Item[] = tr.items.filter((x) => x.id !== itemId) as Item[];
+      for (const piece of pieces) {
+        piece.start = findFreeStart(placed, piece.start, piece.duration);
+        placed.push(piece);
+      }
+      tr.items = placed as never;
+    },
+    { select: pieces[0]!.id },
+  );
+  return pieces[0]!.id;
 }
 
 /** 物件放到新位置（自由放置，避開同軌其他物件） */

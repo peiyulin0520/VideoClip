@@ -1,15 +1,12 @@
 import { Lock } from 'lucide-react';
 import type { Item, Project } from '../../model/types';
+import { itemTitle } from '../../engine/labels';
 import { layersAt } from '../../engine/timeline';
 import { useProjectStore } from '../../store/projectStore';
 
-/** 一個物件在清單裡的名字 */
+/** 一個物件在清單裡的名字（使用者命名的優先） */
 export function itemName(item: Item): string {
-  if (item.type === 'text') {
-    const t = item.card.runs[0]?.text.replace(/\n/g, ' ') ?? '';
-    return t === '' ? '圖形' : `Aa ${t}`;
-  }
-  return item.type === 'image' ? '照片' : item.type === 'audio' ? '音樂' : '影片';
+  return itemTitle(item);
 }
 
 /**

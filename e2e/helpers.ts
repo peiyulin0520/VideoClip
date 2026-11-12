@@ -9,6 +9,8 @@ export async function createProjectWith(page: Page, files: string[]) {
   await page.addInitScript(() => {
     localStorage.setItem('vc-debug', '1');
     localStorage.setItem('vc-skip-onboarding', '1');
+    // 時間軸預設收合；舊測試要看到每一條軌道，所以沒設過就展開（收合的測試自己設成 '0'）
+    if (localStorage.getItem('vc-tl-expanded') === null) localStorage.setItem('vc-tl-expanded', '1');
   });
   await page.goto('./');
   await page.getByRole('button', { name: '新增專案' }).tap();
