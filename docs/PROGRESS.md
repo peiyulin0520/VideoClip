@@ -4,14 +4,14 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-12
-- **分支**：PR #7（feedback-5 ①～⑥、匯出、音樂、主題、版型、關鍵影格規劃）**已由使用者合併進 `main`**；`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊
-- **最後一個程式 commit**：PR #7 合併時的 `main`（之後只有文件）
-- **測試**：708 個單元測試、116 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
-- **階段**：Phase 0–2 ✅、3B ✅、feedback 1–5 ✅、介面主題 ✅、多格版型 L1 ✅、音樂與匯出 ✅（iPhone 大多待真機）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始
-- **下一步**：使用者 2026-11-12 第 6 次回報 → 規劃 `docs/plans/2026-11-12-feedback-6.md`：**F1 主題淺色＋米色系＋時間軸片段字看得到 → F2 預覽直接點影片選取縮放（含原主軌）＋查看圖層 → F3 分頁重整（剪輯／疊加／文字／圖層／版型／素材／音訊）→ F4 主軌與疊加合併成影像軌、軌道依種類分區（舊專案轉換 v1→v2）→ F5 時間軸長按拖移素材到別軌別時間**；之後才是關鍵影格 `2026-11-12-keyframes-film.md`（K1→K5→K6→K2→K3→K4）。都由 Sonnet 實作。**使用者已選 A：F1 → F2 → F3 → F4＋F5 依序做，每步可單獨上線**
+- **分支**：`claude/zen-tesla-v3brj5`（PR #7 已合併進 `main`；之後的 F1–F5 都在分支上，**還沒開 PR**，網站與手機還是舊版）
+- **最後一個程式 commit**：見 `git log -1`（F5 長按拖移素材到別軌）
+- **測試**：770 個單元測試、135 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **階段**：feedback-6 的 F1–F5 全部做完（淺色主題、預覽點選、七個分頁、影像軌統一、長按拖到別軌）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
+- **下一步**：開 PR 讓使用者合併、用 iPhone 測 feedback-6（特別是預覽往上滑會不會誤選、長按拖移手感、舊專案轉換）；之後做關鍵影格 `docs/plans/2026-11-12-keyframes-film.md`（K1 → K5 → K6 → K2 → K3 → K4）。沒做的小項見 `docs/plans/2026-11-12-feedback-6.md §4`（時間軸拖到邊緣自動捲動、拖移中第二根手指取消、「畫畫」）
 - **等使用者的事**
+  - 要不要開 PR 合併（之後用 iPhone 重測）
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
-  - iPhone 實測清單見 `docs/PLAN.md §7`
   - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
 - **目前沒有進行到一半的修改**（工作目錄乾淨、已 push）
 
@@ -72,6 +72,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 F4 影像軌統一＋分區＋舊專案轉換；F5 長按拖移素材到別軌（feedback-6 F4、F5）
+  - 做了什麼：**F4**：①主軌與疊加軌合併成「影像軌」（`TrackKind` 改 `media|effect|text|audio`），**每一條都一樣**：都能上下換順序、放在任何時間；沒有磁吸、沒有 `gap`（舊的 gap 效果已在 `start` 裡）②軌道依種類分區：影像 → 特效 → 字卡 → 音訊，同一區可換順序、不能跨區（`reorderTrack`／`moveTrack` 夾在同區），新軌道用 `insertIndexFor` 插入；時間軸上音訊畫在最下面 ③「刪除」只刪一段留空位、新增「刪除並補齊」（`rippleDelete`）；影像軌的空位畫虛線框（最下面那條連開場留白），點一下選取、再點一下補齊（`closeGap`）④修剪、變速、分割、複製全部用自由軌的函式（`setSpeedFree` 新、`setTrimWindowFree`）；匯入接在最下面那條影像軌後面（`importToBase`）⑤`Project.version` 2，舊專案讀進來由 `migrateProject` 轉換（`main`/`overlay` → `media`、預設名稱「主軌」「疊加 N」→「影像 N」、刪 gap、字卡搬到影像上面並提醒一次），編輯器載入時存回新格式；最後一格（t ≥ 總長）仍顯示最後結束的物件。**F5**：長按 400ms 拖起來後，左右＝改時間（吸附），上下＝換軌道：同種類的軌道亮起來、不同種類變灰（放開彈回原位並提示）、同一區上下各一條「＋ 新增一軌」放置區（放開就新增一條）、目標位置有東西＝移到最近的空位、原軌道空了不自動刪；純函式 `dropTarget`／`moveItemToTrack`，動作 `moveItemTo`；沒長按直接滑＝捲動
+  - 動了哪些檔：`src/model/{types,defaults,migrate}.ts`、`src/engine/{timeline,player}.ts`、`src/store/{actions,projectStore}.ts`、`src/storage/projects.ts`、`src/app/pages/{Editor,Home}.tsx`、`src/app/editor/{Timeline,Preview,TrimPanel,Toolbar}.tsx`、`src/app/editor/tabs/*`、`styles.css`；測試 新 `migrate.test.ts`、`timeline.drop.test.ts`、改寫 `timeline.test.ts`（舊的 `timeline.gap.test.ts` 刪除，每個行為都有對應的新測試）、`timeline.free.test.ts`、`e2e/{media-tracks,clip-drag}.spec.ts`，改 `trim/track-drag/phase1/phase2/tabs/export/music/fix-safe-zone`
+  - 驗證：✅ 單元 770 個（migrate 7 種情況：只有主軌、主軌有 gap、主軌＋疊加＋字卡＋音樂、字卡在疊加下面、自己改過的名字、版型專案、已是 v2；分區、rippleDelete、dropTarget／moveItemToTrack 10 個）；✅ e2e 135 個（舊專案轉換、刪除 vs 刪除並補齊、分區順序與時間軸顯示、影像軌換順序不能跨類、長按拖到另一條影像軌＋復原、拖到字卡軌彈回、拖到新增一軌、沒長按只捲動、補齊空位…）；截圖 `docs/screenshots/feedback-6/clip-drag/`  🔴 iPhone 沒測；🔴 沒做：拖到時間軸邊緣自動捲動
+  - 使用者的決定/回饋：使用者選 C（一路做到 F5）
+  - 踩到的坑：①剛拖起來時版面多出放置區、把列往下推，手指原本的位置變成別的目標（舊測試「長按拖曳移動時間」抓到：片段被拖進新增軌道）→ 上下移動不到 12px 當作還在原軌道，且片段位置補償推移量 ②新增軌道不能 `push`（破壞分區順序）要用 `insertIndexFor` ③e2e 找「刪除」要 `exact:true`（多了「刪除並補齊」）④`openTab` 要限定 `.tabs`
+  - 下一步：開 PR、使用者用 iPhone 測；之後關鍵影格 K1…
 - 2026-11-12 F2 預覽直接點影片選取、縮放＋查看圖層；F3 分頁重整（feedback-6 F2、F3）
   - 做了什麼：**F2**：①預覽上點影片就選到（含原本的主軌；取代 Fix-B「點預覽不選主軌」）②防誤觸：只有「按下到放開 < 350ms、移動 < 8px、沒被瀏覽器接手去捲頁面」才算點；點到空白**不取消選取**（取消選取改成點時間軸空白）；沒選取的大物件（佔舞台一半以上，例如滿版影片）的觸控區 `touch-action: pan-y`，上下滑是捲頁面、什麼都不改；小物件、已選取的物件照舊按下去就能拖 ③已選取的物件觸控區外擴 40px，雙指放在它旁邊也能縮放（**不是預覽任何地方**：整個預覽都 `touch-action:none` 就不能在預覽上捲頁面）④同一點已選的再點一次＝換下面那層（`nextHit`），到底回最上面 ⑤預覽右上角「圖層」鈕＝「查看圖層」清單（`LayerPeek`）：列出這一秒畫面上所有物件（上面的在前），點一個就選它，鎖住的顯示鎖頭不能選。**F3**：分頁改 7 個：剪輯／疊加／文字／圖層／版型／素材／音訊（分頁列可左右滑）；Toolbar 拆成 `tabs/` 每頁一個檔；剪輯只留匯入、分割、刪除、複製、修剪、裁切、變速、音量、填滿／完整（＋主軌空白的「刪除空白」）；前移／後移搬到圖層分頁、移除版型搬到版型分頁、全部影片靜音和音樂工具搬到音訊分頁；貼圖（含 GIPHY、我的貼圖）在素材分頁；選了字卡自動切文字、選了音樂切音訊、從文字／音訊分頁點影片切剪輯，其他分頁（疊加、素材、版型、圖層）不動（在那裡加東西會自動選取新的，不該被帶走）
   - 動了哪些檔：`src/engine/geometry.ts`（`hitTestAll`、`nextHit`）、`src/app/editor/Preview.tsx`、新 `LayerPeek.tsx`、`src/app/editor/Toolbar.tsx`＋新 `src/app/editor/tabs/*`、`styles.css`；測試 `geometry.test.ts`、新 `e2e/preview-select.spec.ts`、`e2e/tabs.spec.ts`，改 `phase1/phase2/fix-safe-zone/preview-first/music/layout/giphy/phase3a-stickers/theme`（分頁名稱、點預覽選主軌、取消選取改點時間軸空白 `deselect` helper）

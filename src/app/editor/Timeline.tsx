@@ -112,6 +112,8 @@ type Drag = {
   snapX: number | null;
   hover: Hover;
   target: DropTarget | null;
+  /** 拖起來那一刻，來源軌道那一列的位置（出現放置區後版面會往下推，片段要補償，才會一直在手指底下） */
+  startTop: number;
 };
 
 export function Timeline({
@@ -343,13 +345,17 @@ export function Timeline({
     };
     const targetFor = (hover: Hover): DropTarget | null =>
       dropTarget(useProjectStore.getState().project!.tracks, item, hover);
+    // 剛拖起來時版面會多出放置區、把列往下推：手指上下移動不到 12px 都當作還在原本的軌道上（只是左右移動時間）
+    const resolveHover = (clientY: number): Hover =>
+      Math.abs(clientY - startY) < 12 ? { trackId: track.id, newEdge: null } : hoverAt(clientY);
+    const startTop = layoutRef.current.rows.find((r) => r.track.id === track.id)?.top ?? 0;
 
     const timer = setTimeout(() => {
       if (mode !== 'pending' || track.locked) return;
       mode = 'drag';
       window.addEventListener('touchmove', blockScroll, { passive: false });
       const hover = { trackId: track.id, newEdge: null };
-      setDrag({ kind: 'move', id: item.id, dx: 0, dy: 0, snapX: null, hover, target: targetFor(hover) });
+      setDrag({ kind: 'move', id: item.id, dx: 0, dy: 0, snapX: null, hover, target: targetFor(hover), startTop });
       navigator.vibrate?.(15);
     }, LONG_PRESS_MS);
 
@@ -361,8 +367,8 @@ export function Timeline({
       }
       if (mode !== 'drag') return;
       const s = snapStart(dx);
-      const hover = hoverAt(ev.clientY);
-      setDrag({ kind: 'move', id: item.id, dx: s.dx, dy: ev.clientY - startY, snapX: s.snapX, hover, target: targetFor(hover) });
+      const hover = resolveHover(ev.clientY);
+      setDrag({ kind: 'move', id: item.id, dx: s.dx, dy: ev.clientY - startY, snapX: s.snapX, hover, target: targetFor(hover), startTop });
     };
     const finish = (ev: PointerEvent, cancelled: boolean) => {
       clearTimeout(timer);
@@ -378,7 +384,7 @@ export function Timeline({
         setDrag(null);
         if (cancelled) return;
         const start = item.start + snapStart(dx).dx / pps;
-        const target = targetFor(hoverAt(ev.clientY));
+        const target = targetFor(resolveHover(ev.clientY));
         if (!target || (target.type === 'track' && target.trackId === track.id)) placeItem(item.id, start);
         else if (target.type === 'invalid')
           toast(`${KIND_LABEL[target.kind]}只能放在${KIND_LABEL[target.kind]}的軌道上，已放回原位`);
@@ -553,7 +559,7 @@ export function Timeline({
                   const selected = it.id === selectedId;
                   const dragging = drag?.id === it.id;
                   const dx = dragging ? drag!.dx : 0;
-                  const dy = dragging ? drag!.dy : 0;
+                  const dy = dragging ? drag!.dy - (top - drag!.startTop) : 0; // 放置區把列往下推時補償回來
                   return (
                     <div
                       key={it.id}
