@@ -3,7 +3,7 @@ import { findItem } from '../../../engine/timeline';
 import { BLEND_LABELS } from '../../../engine/geometry';
 import type { BlendMode } from '../../../model/types';
 
-export type Tab = 'edit' | 'overlay' | 'text' | 'layers' | 'layout' | 'assets' | 'audio';
+export type Tab = 'edit' | 'overlay' | 'text' | 'layers' | 'layout' | 'effect' | 'assets' | 'audio';
 export type Panel = 'speed' | 'volume' | 'trim' | null;
 export type Found = ReturnType<typeof findItem>;
 
@@ -13,6 +13,7 @@ export const TABS: { id: Tab; label: string }[] = [
   { id: 'text', label: '文字' },
   { id: 'layers', label: '圖層' },
   { id: 'layout', label: '版型' },
+  { id: 'effect', label: '特效' },
   { id: 'assets', label: '素材' },
   { id: 'audio', label: '音訊' },
 ];

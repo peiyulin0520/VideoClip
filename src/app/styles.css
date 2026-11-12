@@ -2507,3 +2507,43 @@ button {
   color: var(--muted);
   font-size: 13px;
 }
+
+/* 轉場小圓圈：兩個緊接的片段之間。有轉場＝白底、代號；沒有＝虛線灰圈「＋」；目前選的＝實心 */
+.tr-circle {
+  position: absolute;
+  z-index: 6;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tr-circle::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+.tr-circle.none {
+  border-style: dashed;
+  border-color: var(--muted);
+  color: var(--muted);
+  opacity: 0.85;
+}
+.tr-circle.sel {
+  background: var(--accent);
+  border-color: var(--accent);
+  border-style: solid;
+  color: #fff;
+  opacity: 1;
+}
+.tcode {
+  font-weight: 700;
+}

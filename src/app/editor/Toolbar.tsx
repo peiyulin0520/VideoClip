@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { findItem } from '../../engine/timeline';
 import { cancelCrop } from '../../store/cropStore';
 import { useProjectStore } from '../../store/projectStore';
+import { useUI } from '../../store/uiStore';
 import { AssetsTab } from './tabs/AssetsTab';
 import { AudioTab } from './tabs/AudioTab';
 import { EditTab } from './tabs/EditTab';
 import { LayersTab } from './tabs/LayersTab';
 import { LayoutTab } from './tabs/LayoutTab';
+import { EffectTab } from './tabs/EffectTab';
 import { OverlayTab } from './tabs/OverlayTab';
 import { TABS, type Panel, type Tab } from './tabs/shared';
 import { TextTab } from './tabs/TextTab';
@@ -64,6 +66,22 @@ export function BottomBar({
     return () => clearTimeout(timer);
   }, [selectedId]);
 
+  // 其他地方要求切分頁（點時間軸的轉場小圓圈 → 特效）
+  const requestTab = useUI((s) => s.requestTab);
+  useEffect(() => {
+    if (!requestTab) return;
+    const want = TABS.find((x) => x.id === requestTab)?.id;
+    useUI.setState({ requestTab: null });
+    if (!want) return;
+    setTimeout(() => {
+      tabRef.current = want;
+      setTab(want);
+      setPanel(null);
+      setCollapsed(false);
+      cancelCrop();
+    }, 250);
+  }, [requestTab]);
+
   // 點目前的分頁＝收合/展開下面的面板（讓出空間給預覽畫面）
   const switchTab = (t: Tab) => {
     setPanel(null);
@@ -110,6 +128,7 @@ export function BottomBar({
       {!collapsed && tab === 'text' && <TextTab found={found} />}
       {!collapsed && tab === 'layers' && <LayersTab />}
       {!collapsed && tab === 'layout' && <LayoutTab found={found} />}
+      {!collapsed && tab === 'effect' && <EffectTab found={found} />}
       {!collapsed && tab === 'assets' && <AssetsTab />}
       {!collapsed && tab === 'audio' && <AudioTab found={found} panel={panel} setPanel={setPanel} />}
     </div>

@@ -34,6 +34,17 @@ export function transitionSpan(items: Item[], it: Item): TransitionSpan | null {
   return d > 0.05 ? { cut: it.start, d, prev } : null;
 }
 
+/** 一軌上緊接在一起的片段（接縫處）：可以在這裡加轉場 */
+export function seamsOf(items: Item[]): { prev: VideoItem; next: VideoItem }[] {
+  const vids = items.filter((x): x is VideoItem => x.type !== 'text' && x.type !== 'audio' && !x.group);
+  const out: { prev: VideoItem; next: VideoItem }[] = [];
+  for (const next of vids) {
+    const prev = vids.find((x) => x !== next && Math.abs(x.start + x.duration - next.start) < EPS);
+    if (prev) out.push({ prev, next });
+  }
+  return out;
+}
+
 /** 目前時間 t 在這個轉場的哪裡：0＝開始、0.5＝接縫、1＝結束；不在轉場裡就是 null */
 export function transitionProgress(span: TransitionSpan, t: number): number | null {
   const p = (t - (span.cut - span.d / 2)) / span.d;

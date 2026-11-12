@@ -39,6 +39,7 @@ import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemTitle, ordinalIn } from '../../engine/labels';
+import { seamsOf, transitionCode, transitionName } from '../../engine/transitions';
 import { renameItem } from '../../store/actions';
 
 const BASE_H = 44; // 最下面那條影像軌（主要影片）高一點，縮圖與兩行名稱看得清楚
@@ -774,6 +775,32 @@ export function Timeline({
                     </div>
                   );
                 })}
+
+                {track.kind === 'media' &&
+                  !track.groupRole &&
+                  seamsOf(track.items).map(({ next }) => {
+                    const sel = next.id === selectedId;
+                    const tr = next.transitionIn;
+                    return (
+                      <button
+                        key={`seam-${next.id}`}
+                        className={`tr-circle${tr ? '' : ' none'}${sel ? ' sel' : ''}`}
+                        data-testid="tr-circle"
+                        data-item-id={next.id}
+                        aria-label={tr ? `轉場 ${transitionName(tr.kind)}` : '加轉場'}
+                        style={{ left: half + next.start * pps - 12, top: (h - 24) / 2 }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          useProjectStore.getState().select(next.id);
+                          player?.seek(next.start + 0.02);
+                          useUI.setState({ requestTab: 'effect' });
+                        }}
+                      >
+                        {tr ? transitionCode(tr.kind) : '＋'}
+                      </button>
+                    );
+                  })}
 
                 {track.id === baseId && (
                   <button
