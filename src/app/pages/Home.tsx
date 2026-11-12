@@ -2,7 +2,7 @@ import { Film, MoreHorizontal, Plus, Settings, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { importFiles } from '../../engine/importMedia';
-import { formatTime, mainItems, mainTrack, relayout, totalDuration } from '../../engine/timeline';
+import { baseMediaTrack, formatTime, mediaItems, placeSequential, totalDuration } from '../../engine/timeline';
 import { ASPECTS, assignAspect, createProject, nextProjectName, pickAspect } from '../../model/defaults';
 import type { Aspect, Project } from '../../model/types';
 import { requestPersistence } from '../../storage/media';
@@ -19,7 +19,7 @@ import { toast, useUI } from '../../store/uiStore';
 import { ConfirmSheet, Sheet } from '../../ui/Sheet';
 
 function coverOf(p: Project): string | undefined {
-  const first = mainItems(p)[0];
+  const first = mediaItems(p)[0];
   return first ? p.assets.find((a) => a.id === first.assetId)?.thumbs[0] : undefined;
 }
 
@@ -85,7 +85,7 @@ export function Home() {
         setBusy(`匯入中… ${d}/${n}${detail ? `（${detail}）` : ''}`),
       );
       p.assets = res.assets;
-      mainTrack(p).items = relayout(res.clips);
+      baseMediaTrack(p)!.items = placeSequential(res.clips);
       // 自動：照第一個素材的形狀決定專案比例（之後在編輯器還可以改）
       const first = res.assets[0];
       if (auto && first) assignAspect(p, pickAspect(first.width, first.height), true);

@@ -11,21 +11,23 @@ import {
 } from '../model/defaults';
 import type { Aspect, Asset, Item, Project, TextItem, Track, Transform, VideoItem } from '../model/types';
 import {
+  baseMediaTrack,
   duplicateFree,
-  duplicateItem,
+  type DropTarget,
   findItem,
   findFreeStart,
   firstFreeTrack,
+  insertIndexFor,
   isVideoItem,
-  mainItems,
-  mainTrack,
+  mediaItems,
+  moveItemToTrack,
   moveTrack,
-  relayout,
-  removeItem,
+  placeSequential,
   reorderTrack,
+  rippleDelete,
   splitFree,
-  splitItem,
   totalDuration,
+  trackEnd,
 } from '../engine/timeline';
 import { cellItem, type Rect } from '../engine/layouts';
 import { useProjectStore } from './projectStore';
@@ -68,17 +70,44 @@ export function addOverlayClips(assets: Asset[], t: number, opts: { scale?: numb
     for (const asset of assets) {
       const clip = createOverlayClip(asset, t);
       if (opts.scale) clip.transform.scale = opts.scale;
-      let ti = firstFreeTrack(d as never, 'overlay', clip.start, clip.duration);
-      if (ti < 0) {
-        d.tracks.push(createTrack('overlay', d.tracks as Track[]));
-        ti = d.tracks.length - 1;
-      }
+      const ti = trackIndexFor(d.tracks as Track[], 'media', clip.start, clip.duration);
       d.tracks[ti]!.items.push(clip);
       firstId ??= clip.id;
     }
   });
   if (firstId) store().select(firstId);
   return firstId;
+}
+
+/** 同種類軌道裡第一條放得下的；沒有就在那一區的最上面新增一條（會直接改傳進來的軌道陣列），回傳 index */
+export function trackIndexFor(tracks: Track[], kind: Track['kind'], start: number, duration: number): number {
+  const ti = firstFreeTrack({ tracks } as never, kind, start, duration);
+  if (ti >= 0) return ti;
+  const at = insertIndexFor(tracks, kind);
+  tracks.splice(at, 0, createTrack(kind, tracks));
+  return at;
+}
+
+/**
+ * 匯入的影片／照片接在最下面那條影像軌的最後面（等於以前的「主軌」）；回傳新片段開始的時間。
+ * 專案裡還沒有任何影像、而且比例是「自動」：照第一個素材的形狀決定專案比例。不自動選取。
+ */
+export function importToBase(assets: Asset[], clips: VideoItem[]): number {
+  let startOfNew = 0;
+  store().apply((d) => {
+    for (const a of assets) if (!d.assets.some((x) => x.id === a.id)) d.assets.push(a);
+    let tr = baseMediaTrack(d as never);
+    if (!tr) {
+      d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, createTrack('media', d.tracks as Track[]));
+      tr = baseMediaTrack(d as never)!;
+    }
+    const noMediaYet = mediaItems(d as never).length === 0;
+    const first = assets[0];
+    if (d.aspectAuto && noMediaYet && first) assignAspect(d, pickAspect(first.width, first.height), true);
+    startOfNew = trackEnd(tr.items);
+    tr.items.push(...(placeSequential(clips, startOfNew) as never[]));
+  });
+  return startOfNew;
 }
 
 /** 背景音樂：放在播放頭這一秒（最長到專案結束），放在音樂軌；同一時間有別的音樂就開新的音樂軌 */
@@ -92,11 +121,7 @@ export function addMusic(assets: Asset[], t: number): string | null {
       const start = Math.min(Math.max(t, 0), Math.max(total - 0.5, 0));
       const dur = Math.max(Math.min(asset.duration, total - start), 0.5);
       const clip = createAudioClip(asset, start, dur);
-      let ti = firstFreeTrack(d as never, 'audio', clip.start, clip.duration);
-      if (ti < 0) {
-        d.tracks.push(createTrack('audio', d.tracks as Track[]));
-        ti = d.tracks.length - 1;
-      }
+      const ti = trackIndexFor(d.tracks as Track[], 'audio', clip.start, clip.duration);
       d.tracks[ti]!.items.push(clip);
       firstId ??= clip.id;
     }
@@ -105,16 +130,16 @@ export function addMusic(assets: Asset[], t: number): string | null {
   return firstId;
 }
 
-/** 影片的軌道（主軌、疊加）是不是全部靜音了 */
+/** 影片的軌道（影像軌）是不是全部靜音了 */
 export function videoTracksMuted(p: Project): boolean {
-  const tracks = p.tracks.filter((t) => (t.kind === 'main' || t.kind === 'overlay') && t.items.length > 0);
+  const tracks = p.tracks.filter((t) => t.kind === 'media' && t.items.length > 0);
   return tracks.length > 0 && tracks.every((t) => !!t.muted);
 }
 
-/** 一鍵把所有影片（主軌、疊加）的聲音關掉／恢復；背景音樂不受影響。一步復原。 */
+/** 一鍵把所有影片（影像軌）的聲音關掉／恢復；背景音樂不受影響。一步復原。 */
 export function setAllVideoMuted(muted: boolean) {
   store().apply((d) => {
-    for (const t of d.tracks) if (t.kind === 'main' || t.kind === 'overlay') t.muted = muted;
+    for (const t of d.tracks) if (t.kind === 'media') t.muted = muted;
   });
 }
 
@@ -140,9 +165,9 @@ export function addLayout(o: {
     for (const c of o.cells) {
       const dur = c.asset.kind === 'image' ? o.duration : Math.min(c.asset.duration, o.duration);
       const item = cellItem(c.asset, c.win, W, H, o.start, dur, group);
-      const tr = createTrack('overlay', d.tracks as Track[]);
+      const tr = createTrack('media', d.tracks as Track[]);
       tr.items.push(item);
-      d.tracks.push(tr);
+      d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, tr);
       firstId ??= item.id;
     }
     const frame = createOverlayClip(o.frame, o.start);
@@ -150,11 +175,11 @@ export function addLayout(o: {
     frame.fit = 'contain';
     frame.transform = { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 };
     frame.group = group;
-    const ft = createTrack('overlay', d.tracks as Track[]);
+    const ft = createTrack('media', d.tracks as Track[]);
     ft.name = o.frameName;
     ft.locked = true;
     ft.items.push(frame);
-    d.tracks.push(ft);
+    d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, ft);
   });
   if (firstId) store().select(firstId);
   return firstId;
@@ -165,7 +190,9 @@ export function removeGroup(group: string) {
   store().apply(
     (d) => {
       for (const t of d.tracks) t.items = t.items.filter((x) => (x as VideoItem).group !== group) as never;
-      d.tracks = d.tracks.filter((t, i) => i === 0 || t.items.length > 0) as never;
+      // 空掉的軌道拿掉；至少留一條影像軌
+      const keep = d.tracks.find((t) => t.kind === 'media')?.id;
+      d.tracks = d.tracks.filter((t) => t.id === keep || t.items.length > 0) as never;
     },
     { select: null },
   );
@@ -174,11 +201,7 @@ export function removeGroup(group: string) {
 export function addText(t: number, shape = false): string {
   const item = shape ? createShapeItem(t) : createTextItem(t);
   store().apply((d) => {
-    let ti = firstFreeTrack(d as never, 'text', item.start, item.duration);
-    if (ti < 0) {
-      d.tracks.push(createTrack('text', d.tracks as Track[]));
-      ti = d.tracks.length - 1;
-    }
+    const ti = trackIndexFor(d.tracks as Track[], 'text', item.start, item.duration);
     d.tracks[ti]!.items.push(item);
   });
   store().select(item.id);
@@ -202,11 +225,31 @@ export function removeAnyItem(id: string): boolean {
   store().apply(
     (d) => {
       const tr = d.tracks[f.trackIndex]!;
-      tr.items = (
-        f.track.kind === 'main'
-          ? removeItem(tr.items as VideoItem[], id)
-          : tr.items.filter((x) => x.id !== id)
-      ) as never;
+      tr.items = tr.items.filter((x) => x.id !== id) as never;
+    },
+    { select: null },
+  );
+  return true;
+}
+
+/** 補齊空位：這條軌道在 [from, to) 空位後面的物件整個往前移（to - from）秒 */
+export function closeGap(trackId: string, from: number, to: number) {
+  store().apply((d) => {
+    const tr = d.tracks.find((t) => t.id === trackId);
+    if (!tr) return;
+    const len = to - from;
+    for (const it of tr.items) if (it.start >= to - 1e-6) it.start = Math.max(it.start - len, 0);
+  });
+}
+
+/** 刪除並補齊：同一軌在它後面的物件整個往前移，填掉空位 */
+export function rippleRemoveItem(id: string): boolean {
+  const p = store().project;
+  const f = p && findItem(p, id);
+  if (!p || !f) return false;
+  store().apply(
+    (d) => {
+      d.tracks[f.trackIndex]!.items = rippleDelete(d.tracks[f.trackIndex]!.items as Item[], id) as never;
     },
     { select: null },
   );
@@ -217,10 +260,7 @@ export function splitAny(id: string, t: number): string | null {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f) return null;
-  const out =
-    f.track.kind === 'main'
-      ? splitItem(f.track.items as VideoItem[], id, t)
-      : splitFree(f.track.items, id, t);
+  const out = splitFree(f.track.items, id, t);
   if (!out) return null;
   const right = out[out.findIndex((x) => x.id === id) + 1]!;
   store().apply(
@@ -236,10 +276,7 @@ export function duplicateAny(id: string): boolean {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f) return false;
-  const r =
-    f.track.kind === 'main'
-      ? duplicateItem(f.track.items as VideoItem[], id)
-      : duplicateFree(f.track.items, id);
+  const r = duplicateFree(f.track.items, id);
   if (!r) return false;
   store().apply(
     (d) => {
@@ -277,25 +314,42 @@ export function removeTrack(trackId: string) {
   store().apply(
     (d) => {
       const i = d.tracks.findIndex((t) => t.id === trackId);
-      if (i > 0) d.tracks.splice(i, 1); // 主軌（0）不能刪
+      const medias = d.tracks.filter((t) => t.kind === 'media');
+      if (i < 0 || (d.tracks[i]!.kind === 'media' && medias.length <= 1)) return; // 至少留一條影像軌
+      d.tracks.splice(i, 1);
     },
     { select: null },
   );
 }
 
-/** 疊加影片/照片、文字物件放到新位置（自由放置，避開同軌其他物件） */
+/**
+ * 把物件搬到另一條軌道（同種類）或新增的軌道，並放在 start 秒（那裡有東西就移到最近的空位）。
+ * 種類不符回傳 false。一步復原。原軌道空了也不自動刪掉。
+ */
+export function moveItemTo(id: string, target: DropTarget, start: number): boolean {
+  const p = store().project;
+  if (!p) return false;
+  const next = moveItemToTrack(p.tracks, id, target, start, createTrack);
+  if (!next) return false;
+  store().apply((d) => {
+    d.tracks = next as never;
+  });
+  return true;
+}
+
+/** 物件放到新位置（自由放置，避開同軌其他物件） */
 export function placeItem(id: string, start: number, opts?: Opts) {
   const p = store().project;
   const f = p && findItem(p, id);
-  if (!p || !f || f.track.kind === 'main') return;
+  if (!p || !f) return;
   const s = findFreeStart(f.track.items, start, f.item.duration, id);
   editItem(id, (it) => void (it.start = s), opts);
 }
 
-export { isVideoItem, mainTrack, relayout };
+export { isVideoItem };
 
 /**
- * 改專案比例。choice='auto'＝照主軌第一個片段的形狀決定，並維持「自動」（沒有片段就維持現在的比例）。
+ * 改專案比例。choice='auto'＝照第一個影片／照片的形狀決定，並維持「自動」（沒有片段就維持現在的比例）。
  * 手動選比例後 aspectAuto 會關掉。可以復原。
  */
 export function setProjectAspect(choice: Aspect | 'auto'): Aspect | null {
@@ -303,7 +357,7 @@ export function setProjectAspect(choice: Aspect | 'auto'): Aspect | null {
   if (!p) return null;
   let aspect: Aspect;
   if (choice === 'auto') {
-    const first = mainItems(p)[0];
+    const first = mediaItems(p)[0];
     const asset = first && p.assets.find((a) => a.id === first.assetId);
     aspect = asset ? pickAspect(asset.width, asset.height) : p.aspect;
   } else aspect = choice;

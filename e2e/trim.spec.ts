@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { clips, createProjectWith, project, samplePreview, seekTo } from './helpers';
 
-type Clip = { id: string; start: number; duration: number; trimIn: number; gap?: number };
+type Clip = { id: string; start: number; duration: number; trimIn: number };
 const main = async (page: Page) => (await project(page)).tracks[0]!.items as unknown as Clip[];
 
 async function drag(page: Page, testId: string, dx: number) {
@@ -15,7 +15,7 @@ async function drag(page: Page, testId: string, dx: number) {
   await page.mouse.up();
 }
 
-test('主軌左把手往右拉：尾巴不動、前面留空白（黑畫面）；往左拉回來完全還原；右把手也能拉回', async ({
+test('影像軌左把手往右拉：尾巴不動、前面留空位（黑畫面）；往左拉回來完全還原；右把手也能拉回', async ({
   page,
 }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']); // 2 秒 + 1.6 秒
@@ -25,7 +25,7 @@ test('主軌左把手往右拉：尾巴不動、前面留空白（黑畫面）�
 
   await drag(page, 'trim-start', 60); // 60px = 1 秒
   let m = await main(page);
-  expect(m[0]!.gap).toBeCloseTo(1, 1);
+  expect(m[0]!.start).toBeCloseTo(1, 1); // 起點往後，前面空出 1 秒
   expect(m[0]!.trimIn).toBeCloseTo(1, 1);
   expect(m[0]!.duration).toBeCloseTo(1, 1);
   expect(m[0]!.start + m[0]!.duration).toBeCloseTo(2, 1); // 尾巴還在原本的位置
@@ -45,7 +45,7 @@ test('主軌左把手往右拉：尾巴不動、前面留空白（黑畫面）�
   await clips(page).first().tap();
   await drag(page, 'trim-start', -60);
   m = await main(page);
-  expect(m[0]!.gap ?? 0).toBeCloseTo(0, 1);
+  expect(m[0]!.start).toBeCloseTo(0, 1);
   expect(m[0]!.trimIn).toBeCloseTo(0, 1);
   expect(m[0]!.duration).toBeCloseTo(2, 1);
   expect(m[1]!.start).toBeCloseTo(2, 1);
@@ -58,18 +58,22 @@ test('主軌左把手往右拉：尾巴不動、前面留空白（黑畫面）�
   expect((await main(page))[0]!.duration).toBeCloseTo(2, 1);
 });
 
-test('刪除空白：選到有空白的片段，工具列出現「刪除空白」，後面往前接上；一步復原', async ({ page }) => {
+test('補齊空位：開場留白的虛線框點一下選取、再點一下補齊，後面往前接上；一步復原', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
   await clips(page).first().tap();
-  await expect(page.getByRole('button', { name: '刪除空白' })).toHaveCount(0);
+  await expect(page.getByTestId('gap')).toHaveCount(0);
   await drag(page, 'trim-start', 60);
-  await expect(page.getByRole('button', { name: '刪除空白' })).toBeVisible();
-  await page.getByRole('button', { name: '刪除空白' }).tap();
+  await expect(page.getByTestId('gap')).toHaveCount(1);
+  const gap = page.getByTestId('gap');
+  await gap.tap(); // 第一下：選取，出現「補齊」
+  await expect(gap).toHaveText('補齊');
+  expect((await main(page)).map((c) => c.start)).toEqual([1, 2]); // 還沒動
+  await gap.tap(); // 第二下：真的補齊
   const m = await main(page);
   expect(m.map((c) => c.start)).toEqual([0, 1]);
-  expect(m[0]!.gap).toBeUndefined();
+  await expect(page.getByTestId('gap')).toHaveCount(0);
   await page.getByRole('button', { name: '復原' }).tap();
-  expect((await main(page))[0]!.gap).toBeCloseTo(1, 1);
+  expect((await main(page))[0]!.start).toBeCloseTo(1, 1);
 });
 
 test('修剪面板：整段素材攤開、選取窗；拖把手／拖中間／按鈕都能改；文字寫清楚；片段位置不變；一次拖曳一步復原', async ({
@@ -91,7 +95,7 @@ test('修剪面板：整段素材攤開、選取窗；拖把手／拖中間／�
   await expect(info).toContainText('第 1.0 秒 → 第 2.0 秒');
   let m = await main(page);
   expect(m[0]).toMatchObject({ trimIn: 1, duration: 1, start: 0 }); // 位置不變
-  expect(m[1]!.start).toBeCloseTo(1, 5); // 後面順延
+  expect(m[1]!.start).toBeCloseTo(2, 5); // 後面的片段不動（自由擺放，不再順延）
   await page.getByRole('button', { name: '前面多 1 秒' }).tap();
   await expect(info).toContainText('第 0.0 秒 → 第 2.0 秒');
   await page.getByRole('button', { name: '後面少 1 秒' }).tap();

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createClip, createProject } from '../model/defaults';
 import type { Asset, Project } from '../model/types';
 import { audibleItems, chooseFormat, estimateBytes, outputSize, videoBitrate } from './exporter';
-import { relayout } from './timeline';
+import { placeSequential } from './timeline';
 
 describe('outputSize', () => {
   it('長邊縮到 1920／1280，偶數，不放大', () => {
@@ -39,7 +39,7 @@ describe('videoBitrate / estimateBytes', () => {
       thumbs: [],
     };
     p.assets = [a];
-    p.tracks[0]!.items = relayout([createClip(a)]);
+    p.tracks[0]!.items = placeSequential([createClip(a)]);
     const b = estimateBytes(p, { longSide: 1920, fps: 30, quality: 'standard' });
     expect(b).toBeCloseTo(((8_000_000 + 192_000) * 10) / 8, -3);
   });
@@ -93,7 +93,7 @@ describe('audibleItems：哪些影片要出聲', () => {
     const b = asset('b', false);
     const c = asset('c', true);
     p.assets = [a, b, c];
-    p.tracks[0]!.items = relayout([createClip(a), createClip(b), { ...createClip(c), volume: 0 }]);
+    p.tracks[0]!.items = placeSequential([createClip(a), createClip(b), { ...createClip(c), volume: 0 }]);
     expect(audibleItems(p).map((x) => x.asset.id)).toEqual(['a']);
     p.tracks[0]!.muted = true;
     expect(audibleItems(p)).toHaveLength(0);

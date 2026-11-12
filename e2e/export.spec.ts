@@ -200,7 +200,7 @@ test('沒有內容時匯出鈕按下去會說要先匯入；專案資料不會�
   await createProjectWith(page, ['solid-red.webm']);
   await page.getByTestId('clip').first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除' }).tap();
+  await page.getByRole('button', { name: '刪除', exact: true }).tap();
   await page.getByRole('button', { name: '匯出影片' }).tap();
   await expect(page.getByText('還沒有內容可以匯出')).toBeVisible();
   await expect(page.getByRole('button', { name: '開始匯出' })).toBeDisabled();

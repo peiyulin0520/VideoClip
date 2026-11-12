@@ -1,40 +1,72 @@
 import { MAX_SPEED, MIN_CLIP_DURATION, MIN_SPEED, newId } from '../model/defaults';
-import type { Asset, Item, Project, Track, VideoItem } from '../model/types';
+import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../model/types';
 
-/** 主軌片段依序排好：每個片段前面可以有空白（gap，預設 0＝首尾相接），重算 start。回傳新陣列（不改原物件）。 */
-export function relayout(items: VideoItem[]): VideoItem[] {
-  let t = 0;
-  return items.map((it) => {
-    t += Math.max(it.gap ?? 0, 0);
-    const out = it.start === t ? it : { ...it, start: t };
-    t += it.duration;
+/** 軌道種類的分區：影像 → 特效 → 字卡 → 音訊（陣列由前到後＝由下到上的圖層順序）。素材只能放進同種類的軌道。 */
+export const ZONE: Record<TrackKind, number> = { media: 0, effect: 1, text: 2, audio: 3 };
+
+/** 依分區排好（同一區維持原本的相對順序） */
+export function normalizeZones(tracks: Track[]): Track[] {
+  return tracks
+    .map((t, i) => ({ t, i }))
+    .sort((x, y) => ZONE[x.t.kind] - ZONE[y.t.kind] || x.i - y.i)
+    .map((x) => x.t);
+}
+
+/** 新軌道要插在陣列的哪個位置：放在同種類（同區）的最上面；那一區還沒有軌道就接在前面各區的後面 */
+export function insertIndexFor(tracks: Track[], kind: TrackKind): number {
+  let idx = 0;
+  tracks.forEach((t, i) => {
+    if (ZONE[t.kind] <= ZONE[kind]) idx = i + 1;
+  });
+  return idx;
+}
+
+/** 這個種類的軌道在陣列裡的範圍 [lo, hi]（含）；沒有這種軌道回傳 null */
+export function zoneRange(tracks: Track[], kind: TrackKind): [number, number] | null {
+  let lo = -1;
+  let hi = -1;
+  tracks.forEach((t, i) => {
+    if (t.kind !== kind) return;
+    if (lo < 0) lo = i;
+    hi = i;
+  });
+  return lo < 0 ? null : [lo, hi];
+}
+
+/** 最下面那條影像軌（匯入的影片放這裡）；沒有就是 undefined */
+export function baseMediaTrack(p: { tracks: Track[] }): Track | undefined {
+  return p.tracks.find((t) => t.kind === 'media');
+}
+
+/** 所有影像軌上的影片／照片，依開始時間排好（找第一個素材、決定比例、首頁縮圖用） */
+export function mediaItems(p: { tracks: Track[] }): VideoItem[] {
+  return p.tracks
+    .filter((t) => t.kind === 'media')
+    .flatMap((t) => t.items as VideoItem[])
+    .sort((a, b) => a.start - b.start);
+}
+
+/** 一串片段依序接在一起放（匯入多支影片時）：第一個從 from 開始 */
+export function placeSequential(clips: VideoItem[], from = 0): VideoItem[] {
+  let t = Math.max(from, 0);
+  return clips.map((c) => {
+    const out = c.start === t ? c : { ...c, start: t };
+    t += c.duration;
     return out;
   });
 }
 
-/** 主軌某一片段前面的空白（秒） */
-export const gapOf = (it: VideoItem): number => Math.max(it.gap ?? 0, 0);
+/** 軌道上最後一個物件結束的時間（沒有物件＝0） */
+export const trackEnd = (items: Item[]): number => items.reduce((m, it) => Math.max(m, it.start + it.duration), 0);
 
-/** 刪掉主軌片段前面的空白，後面的片段往前接上 */
-export function removeGap(items: VideoItem[], id: string): VideoItem[] {
-  return relayout(
-    items.map((it) => {
-      if (it.id !== id) return it;
-      const { gap: _gap, ...rest } = it;
-      void _gap;
-      return rest as VideoItem;
-    }),
-  );
-}
-
-export function mainTrack(p: Project): Track {
-  const t = p.tracks.find((x) => x.kind === 'main');
-  if (!t) throw new Error('專案沒有主軌');
-  return t;
-}
-
-export function mainItems(p: Project): VideoItem[] {
-  return mainTrack(p).items as VideoItem[];
+/** 刪除並補齊：拿掉這個物件，同一軌在它後面的物件整個往前移它的長度 */
+export function rippleDelete<T extends Item>(items: T[], id: string): T[] {
+  const it = items.find((x) => x.id === id);
+  if (!it) return items;
+  const end = it.start + it.duration;
+  return items
+    .filter((x) => x.id !== id)
+    .map((x) => (x.start >= end - EPS ? { ...x, start: Math.max(x.start - it.duration, 0) } : x));
 }
 
 export function isVideoItem(i: Item): i is VideoItem {
@@ -60,7 +92,7 @@ export type Layer = { item: Item; track: Track; trackIndex: number };
 
 /**
  * t 秒時要畫出來的圖層，由下到上（= 軌道順序）。隱藏的軌道跳過。
- * 主軌用 itemAt（t 超過結尾時仍顯示最後一個片段）；其他軌道只在 [start, end) 內顯示。
+ * 每一軌只在 [start, end) 內顯示；專案的最後一格（t ≥ 總長度）仍顯示最後結束的物件。
  */
 export function visibleLayers(p: Project, t: number): Layer[] {
   return layersAt(p, t, false);
@@ -68,17 +100,13 @@ export function visibleLayers(p: Project, t: number): Layer[] {
 
 /** 同上，但可以選擇連隱藏軌道的物件也列出來（圖層面板要能把隱藏的軌道再打開） */
 export function layersAt(p: Project, t: number, includeHidden: boolean): Layer[] {
+  const total = totalDuration(p);
+  const tt = total > 0 && t >= total ? total - 1e-6 : t;
   const out: Layer[] = [];
   p.tracks.forEach((track, trackIndex) => {
     if (track.kind === 'audio') return; // 音樂沒有畫面
     if (track.hidden && !includeHidden) return;
-    if (track.kind === 'main') {
-      const hit = itemAt(track.items as VideoItem[], t);
-      // 主軌的空白（片段前面的 gap）是黑畫面：這個片段還沒開始就不畫
-      if (hit && t >= hit.item.start - 1e-9) out.push({ item: hit.item, track, trackIndex });
-      return;
-    }
-    const item = track.items.find((x) => t >= x.start && t < x.start + x.duration);
+    const item = track.items.find((x) => tt >= x.start && tt < x.start + x.duration);
     if (item) out.push({ item, track, trackIndex });
   });
   return out;
@@ -115,113 +143,10 @@ export function maxDuration(item: VideoItem, asset: Asset | undefined): number {
   return Math.max((asset.duration - item.trimIn) / item.speed, MIN_CLIP_DURATION);
 }
 
-export function splitItem(items: VideoItem[], id: string, t: number): VideoItem[] | null {
-  const i = items.findIndex((x) => x.id === id);
-  if (i < 0) return null;
-  const it = items[i]!;
-  const local = t - it.start;
-  if (local < MIN_CLIP_DURATION || it.duration - local < MIN_CLIP_DURATION) return null;
-  const a: VideoItem = { ...it, duration: local };
-  const b: VideoItem = {
-    ...it,
-    id: newId('i_'),
-    duration: it.duration - local,
-    trimIn: it.trimIn + local * it.speed,
-  };
-  delete b.gap; // 空白只留在前半段
-  return relayout([...items.slice(0, i), a, b, ...items.slice(i + 1)]);
-}
-
-export function duplicateItem(items: VideoItem[], id: string): { items: VideoItem[]; newId: string } | null {
-  const i = items.findIndex((x) => x.id === id);
-  if (i < 0) return null;
-  const copy: VideoItem = { ...items[i]!, id: newId('i_') };
-  delete copy.gap; // 複製品緊接在原片段後面
-  return { items: relayout([...items.slice(0, i + 1), copy, ...items.slice(i + 1)]), newId: copy.id };
-}
-
-export function removeItem(items: VideoItem[], id: string): VideoItem[] {
-  return relayout(items.filter((x) => x.id !== id));
-}
-
-export function moveItem(items: VideoItem[], id: string, toIndex: number): VideoItem[] {
-  const from = items.findIndex((x) => x.id === id);
-  if (from < 0) return items;
-  const to = Math.min(Math.max(toIndex, 0), items.length - 1);
-  if (from === to) return items;
-  const next = items.slice();
-  const [it] = next.splice(from, 1);
-  next.splice(to, 0, it!);
-  return relayout(next);
-}
-
-/** 修剪尾端：把片段長度改成 newDuration（受素材長度與最短長度限制） */
-export function trimEnd(
-  items: VideoItem[],
-  id: string,
-  newDuration: number,
-  asset: Asset | undefined,
-): VideoItem[] {
-  return relayout(
-    items.map((it) => {
-      if (it.id !== id) return it;
-      const d = Math.min(Math.max(newDuration, MIN_CLIP_DURATION), maxDuration(it, asset));
-      return { ...it, duration: d };
-    }),
-  );
-}
-
 /**
- * 修剪頭端（主軌）：delta 為正代表把起點往後切掉 delta 秒（時間軸秒數）。出點（尾巴）不動：
- * 切掉的部分變成前面的空白（gap），後面的片段不動。delta 為負＝往前拉回來：先吃掉前面的空白，
- * 用完空白還想往前，就把片段往前延伸（後面的片段被推開），最多到素材起點。
+ * 修剪面板：直接指定素材要留的區段 [srcStart, srcEnd]（素材秒數）。片段的開始時間不變，
+ * 長度不能壓到後面的物件。照片沒有素材區段，不適用。
  */
-export function trimStart(items: VideoItem[], id: string, delta: number): VideoItem[] {
-  return relayout(
-    items.map((it) => {
-      if (it.id !== id) return it;
-      const isImage = it.type === 'image';
-      const maxCut = it.duration - MIN_CLIP_DURATION;
-      const maxBack = isImage ? 600 : it.trimIn / it.speed; // 往前最多拉回素材起點
-      const d = Math.min(Math.max(delta, -maxBack), maxCut);
-      const gap = gapOf(it);
-      const out: VideoItem = {
-        ...it,
-        duration: it.duration - d,
-        trimIn: isImage ? 0 : it.trimIn + d * it.speed,
-      };
-      if (d >= 0)
-        out.gap = gap + d; // 切掉的變空白
-      else out.gap = Math.max(gap + d, 0); // 先吃掉空白；超過的部分是往前延伸（後面被推開）
-      if (!out.gap) delete out.gap;
-      return out;
-    }),
-  );
-}
-
-/**
- * 修剪面板：直接指定素材要留的區段 [srcStart, srcEnd]（素材秒數）。片段的位置（含前面的空白）不變，
- * 長度跟著變，後面的片段順延（主軌）。照片沒有素材區段，不適用。
- */
-export function setTrimWindow(
-  items: VideoItem[],
-  id: string,
-  srcStart: number,
-  srcEnd: number,
-  asset: Asset | undefined,
-): VideoItem[] {
-  return relayout(
-    items.map((it) => {
-      if (it.id !== id || it.type === 'image' || !asset) return it;
-      const minSrc = MIN_CLIP_DURATION * it.speed;
-      const s0 = Math.min(Math.max(srcStart, 0), Math.max(asset.duration - minSrc, 0));
-      const e0 = Math.min(Math.max(srcEnd, s0 + minSrc), asset.duration);
-      return { ...it, trimIn: s0, duration: (e0 - s0) / it.speed };
-    }),
-  );
-}
-
-/** 同上，給疊加軌：片段的開始時間不變，長度不能壓到後面的物件 */
 export function setTrimWindowFree(
   items: Item[],
   id: string,
@@ -242,16 +167,15 @@ export function setTrimWindowFree(
   });
 }
 
-/** 改速度：保持素材區段不變，時間軸長度跟著變 */
-export function setSpeed(items: VideoItem[], id: string, speed: number): VideoItem[] {
+/** 改速度：保持素材區段不變，時間軸長度跟著變；後面有物件擋住（會重疊）就回傳 null */
+export function setSpeedFree(items: Item[], id: string, speed: number): Item[] | null {
   const s = Math.min(Math.max(speed, MIN_SPEED), MAX_SPEED);
-  return relayout(
-    items.map((it) => {
-      if (it.id !== id || it.type === 'image') return it;
-      const span = it.duration * it.speed;
-      return { ...it, speed: s, duration: Math.max(span / s, MIN_CLIP_DURATION) };
-    }),
-  );
+  const it = items.find((x) => x.id === id);
+  if (!it || !isVideoItem(it) || it.type === 'image') return items;
+  const span = it.duration * it.speed;
+  const want = Math.max(span / s, MIN_CLIP_DURATION);
+  if (!canPlace(items, it.start, want, id)) return null;
+  return items.map((x) => (x.id === id ? { ...x, speed: s, duration: want } : x));
 }
 
 export function formatTime(t: number): string {
@@ -261,7 +185,7 @@ export function formatTime(t: number): string {
   return `${m}:${sec.toFixed(1).padStart(4, '0')}`;
 }
 
-// ---------- 疊加 / 文字軌：自由放置（不 ripple），同一軌的物件不能重疊 ----------
+// ---------- 所有軌道：自由放置（不 ripple），同一軌的物件不能重疊 ----------
 
 const EPS = 1e-6;
 
@@ -371,21 +295,25 @@ export function trimEndFree(
   });
 }
 
-/** 交換圖層順序（dir = +1 往上層）。主軌固定在最底層。 */
+/** 交換圖層順序（dir = +1 往上層）。只能在同種類（同一區）的軌道之間換，不能跨區。 */
 export function moveTrack(tracks: Track[], id: string, dir: -1 | 1): Track[] {
   const i = tracks.findIndex((t) => t.id === id);
   const j = i + dir;
-  if (i < 1 || j < 1 || j >= tracks.length) return tracks;
+  if (i < 0 || j < 0 || j >= tracks.length || tracks[j]!.kind !== tracks[i]!.kind) return tracks;
   const next = tracks.slice();
   [next[i], next[j]] = [next[j]!, next[i]!];
   return next;
 }
 
-/** 把軌道搬到新的圖層位置 toIndex（tracks 的 index，0＝主軌固定不動，不能搬到主軌下面）。沒有變動回傳原陣列。 */
+/**
+ * 把軌道搬到新的圖層位置 toIndex（tracks 的 index）；會夾在同種類（同一區）的範圍內，不能跨區。
+ * 沒有變動回傳原陣列。
+ */
 export function reorderTrack(tracks: Track[], id: string, toIndex: number): Track[] {
   const from = tracks.findIndex((t) => t.id === id);
-  if (from < 1) return tracks;
-  const to = Math.min(Math.max(toIndex, 1), tracks.length - 1);
+  if (from < 0) return tracks;
+  const [lo, hi] = zoneRange(tracks, tracks[from]!.kind)!;
+  const to = Math.min(Math.max(toIndex, lo), hi);
   if (to === from) return tracks;
   const next = tracks.slice();
   const [t] = next.splice(from, 1);
@@ -397,3 +325,81 @@ export function reorderTrack(tracks: Track[], id: string, toIndex: number): Trac
 export function firstFreeTrack(p: Project, kind: Track['kind'], start: number, duration: number): number {
   return p.tracks.findIndex((t) => t.kind === kind && !t.locked && canPlace(t.items, start, duration));
 }
+
+// ---------- 長按拖移素材：拖到別的軌道、別的時間 ----------
+
+/** 物件屬於哪一種軌道（影片、照片、貼圖＝影像；字卡＝字卡；音樂＝音訊） */
+export function trackKindOf(item: Item): TrackKind {
+  return item.type === 'text' ? 'text' : item.type === 'audio' ? 'audio' : 'media';
+}
+
+/** 軌道種類的中文名（提示用） */
+export const KIND_LABEL: Record<TrackKind, string> = {
+  media: '影像（影片、照片、貼圖）',
+  effect: '特效',
+  text: '字卡',
+  audio: '音樂和音效',
+};
+
+/** 放到哪裡：既有的某條軌道，或是同一區最上面／最下面新增一條 */
+export type DropTarget =
+  | { type: 'track'; trackId: string }
+  | { type: 'new'; edge: 'top' | 'bottom' }
+  | { type: 'invalid'; kind: TrackKind };
+
+/**
+ * 算放開手指時要放到哪：targetId＝手指所在的軌道（null＝不在任何軌道上）、newEdge＝手指在「＋新增一軌」的放置區。
+ * 素材只能放進同種類的軌道，種類不同＝invalid（要彈回原位並提示）。
+ */
+export function dropTarget(
+  tracks: Track[],
+  item: Item,
+  hover: { trackId: string | null; newEdge: 'top' | 'bottom' | null },
+): DropTarget | null {
+  const kind = trackKindOf(item);
+  if (hover.newEdge) return { type: 'new', edge: hover.newEdge };
+  if (!hover.trackId) return null;
+  const tr = tracks.find((t) => t.id === hover.trackId);
+  if (!tr) return null;
+  if (tr.kind !== kind) return { type: 'invalid', kind };
+  if (tr.locked) return { type: 'invalid', kind };
+  return { type: 'track', trackId: tr.id };
+}
+
+/**
+ * 把物件搬到目標軌道（或新增的軌道）的 start 秒。回傳新的軌道陣列；不能搬（種類不符、找不到）回傳 null。
+ * 目標軌道在那個時間已經有東西：移到最近的空位。來源軌道空了也不會自動刪掉。
+ */
+export function moveItemToTrack(
+  tracks: Track[],
+  itemId: string,
+  target: DropTarget,
+  start: number,
+  makeTrack: (kind: TrackKind, existing: Track[]) => Track,
+): Track[] | null {
+  const srcIdx = tracks.findIndex((t) => t.items.some((x) => x.id === itemId));
+  if (srcIdx < 0 || target.type === 'invalid') return null;
+  const item = tracks[srcIdx]!.items.find((x) => x.id === itemId)!;
+  const kind = trackKindOf(item);
+  const at = Math.max(start, 0);
+  if (target.type === 'track') {
+    const dstIdx = tracks.findIndex((t) => t.id === target.trackId);
+    if (dstIdx < 0 || tracks[dstIdx]!.kind !== kind) return null;
+    const dst = tracks[dstIdx]!;
+    const s = findFreeStart(dst.items, at, item.duration, itemId); // 同一軌時 itemId 自己不算擋路
+    return tracks.map((t, i) => {
+      if (i === srcIdx && i === dstIdx) return { ...t, items: t.items.map((x) => (x.id === itemId ? { ...x, start: s } : x)) };
+      if (i === srcIdx) return { ...t, items: t.items.filter((x) => x.id !== itemId) };
+      if (i === dstIdx) return { ...t, items: [...t.items, { ...item, start: s }] };
+      return t;
+    });
+  }
+  // 新增一條軌道：最上面＝同一區的最上面，最下面＝同一區的最下面
+  const without = tracks.map((t, i) => (i === srcIdx ? { ...t, items: t.items.filter((x) => x.id !== itemId) } : t));
+  const fresh = makeTrack(kind, without);
+  fresh.items = [{ ...item, start: at }];
+  const range = zoneRange(without, kind);
+  const index = target.edge === 'top' ? insertIndexFor(without, kind) : range ? range[0] : insertIndexFor(without, kind);
+  return [...without.slice(0, index), fresh, ...without.slice(index)];
+}
+

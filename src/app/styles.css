@@ -15,6 +15,23 @@
   --clip: #333;
   --bar: #555;
   --timeline: #151515;
+  /* 時間軸片段：深底配淺字、淺底配深字（跟著主題換，不要寫死顏色） */
+  --clip-text: #3b3350;
+  --clip-text-ink: #f4efff;
+  --clip-audio: #1f3b3a;
+  --clip-audio-ink: #d9fffa;
+  --clip-wave: #7ee0d2;
+  --clip-effect: #4a3a1f;
+  --clip-effect-ink: #fff3d6;
+  --clip-media-ink: #ffffff; /* 縮圖上的標籤（有陰影），永遠白字 */
+  --danger: #ff6b6b;
+  --danger-bg: #3a1c1c;
+  --ok: #7cfc6a;
+  --warn: #ffb347;
+  --note-bg: #2a2230;
+  --info-bg: #22303a;
+  --font-body: -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+  --font-head: var(--font-body);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -35,13 +52,26 @@
   --clip: #cfcfcf;
   --bar: #9a9a9a;
   --timeline: #f0f0f0;
+  --clip-text: #333333;
+  --clip-text-ink: #ffffff;
+  --clip-audio: #444444;
+  --clip-audio-ink: #ffffff;
+  --clip-wave: #e0e0e0;
+  --clip-effect: #666666;
+  --clip-effect-ink: #ffffff;
+  --danger: #c62828;
+  --danger-bg: #fbe4e4;
+  --ok: #1b7a2b;
+  --warn: #9a5b00;
+  --note-bg: #ececec;
+  --info-bg: #e6eef3;
 }
 :root[data-theme='fresh'] {
   color-scheme: light;
   --bg: #f4fbf9;
   --fg: #1d3b38;
-  --muted: #6b8884;
-  --accent: #14b8a6;
+  --muted: #587975;
+  --accent: #0b7f72;
   --on-accent: #ffffff;
   --panel: #ffffff;
   --line: #d7ebe7;
@@ -49,29 +79,64 @@
   --btn2: #d3ebe6;
   --field: #ffffff;
   --border: #b3d3cd;
-  --clip: #c8e6e0;
+  --clip: #bfe0d9;
   --bar: #96bfb7;
   --timeline: #e9f6f3;
+  --clip-text: #4f6f8a;
+  --clip-text-ink: #ffffff;
+  --clip-audio: #2f7f76;
+  --clip-audio-ink: #ffffff;
+  --clip-wave: #d6fff9;
+  --clip-effect: #8a6a2c;
+  --clip-effect-ink: #ffffff;
+  --danger: #c0392b;
+  --danger-bg: #fde8e5;
+  --ok: #17803a;
+  --warn: #9a5b00;
+  --note-bg: #e3f3f0;
+  --info-bg: #dcecf5;
 }
+/* 溫暖：米色底、磚紅（赤陶）重點、深咖啡字；標題用襯線字（iPhone 內建宋體） */
 :root[data-theme='warm'] {
-  color-scheme: dark;
-  --bg: #2a1f18;
-  --fg: #f7ead8;
-  --muted: #bda58d;
-  --accent: #e3893f;
-  --on-accent: #2a1408;
-  --panel: #382a21;
-  --line: #4b392d;
-  --btn: #46352a;
-  --btn2: #523f32;
-  --field: #231912;
-  --border: #6e5646;
-  --clip: #5a4638;
-  --bar: #8a6f5b;
-  --timeline: #241a14;
+  color-scheme: light;
+  --bg: #f6f0e6;
+  --fg: #3b2a20;
+  --muted: #7d6858;
+  --accent: #b8553a;
+  --on-accent: #fff8f0;
+  --panel: #fffaf2;
+  --line: #e8dccb;
+  --btn: #efe5d6;
+  --btn2: #e6d8c4;
+  --field: #fffaf2;
+  --border: #d6c4ad;
+  --clip: #e2d3bd;
+  --bar: #b9a184;
+  --timeline: #f1e8da;
+  --clip-text: #8a5a44;
+  --clip-text-ink: #fff8f0;
+  --clip-audio: #5f6f4c;
+  --clip-audio-ink: #fffaf2;
+  --clip-wave: #f0f5e4;
+  --clip-effect: #8a6a2c;
+  --clip-effect-ink: #fffaf2;
+  --danger: #b3261e;
+  --danger-bg: #f9e0dc;
+  --ok: #3f7a2a;
+  --warn: #8a5a00;
+  --note-bg: #efe5d6;
+  --info-bg: #e8e4d8;
+  --font-head: 'Noto Serif TC', 'Songti TC', 'STSong', 'PMingLiU', serif;
 }
 * {
   box-sizing: border-box;
+}
+h1,
+h2,
+h3,
+.ed-top .name-btn,
+.tab {
+  font-family: var(--font-head);
 }
 html,
 body,
@@ -82,7 +147,7 @@ body,
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+  font-family: var(--font-body);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
 }
@@ -153,10 +218,10 @@ button {
 }
 .btn.danger,
 .menu-item.danger {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 .btn.danger {
-  background: #3a1c1c;
+  background: var(--danger-bg);
 }
 .chips {
   display: flex;
@@ -281,7 +346,7 @@ button {
   margin-bottom: 12px;
   font-size: 13px;
   line-height: 1.5;
-  background: #2a2230;
+  background: var(--note-bg);
   border-radius: 12px;
 }
 .tip .icon-btn {
@@ -637,7 +702,7 @@ button {
   align-items: flex-start;
   padding: 4px 8px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--muted);
   white-space: nowrap;
   text-overflow: ellipsis;
   background: var(--btn2);
@@ -657,6 +722,7 @@ button {
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--clip-media-ink);
   text-shadow: 0 1px 3px #000;
   pointer-events: none;
 }
@@ -770,7 +836,11 @@ button {
   border-radius: 10px;
 }
 .clip.is-text {
-  background: #3b3350;
+  background: var(--clip-text);
+}
+.clip.is-text .clip-label {
+  color: var(--clip-text-ink);
+  text-shadow: none;
 }
 .clip.is-text .clip-label {
   top: 50%;
@@ -797,12 +867,19 @@ button {
   z-index: 15;
   background: var(--panel);
   display: flex;
+  overflow-x: auto; /* 7 個分頁：窄螢幕放不下時可以左右滑 */
+  scrollbar-width: none;
   border-bottom: 1px solid var(--line);
 }
+.tabs::-webkit-scrollbar {
+  display: none;
+}
 .tab {
-  flex: 1;
+  flex: 1 0 52px;
   min-height: 44px;
-  font-size: 15px;
+  padding: 0 4px;
+  font-size: 14px;
+  white-space: nowrap;
   color: var(--muted);
   background: transparent;
   border-radius: 0;
@@ -988,10 +1065,10 @@ button {
   color: var(--muted);
 }
 .ok {
-  color: #7cfc6a;
+  color: var(--ok);
 }
 .warn {
-  color: #ffb347;
+  color: var(--warn);
 }
 .pack-list {
   display: flex;
@@ -1161,7 +1238,7 @@ button {
   font-style: normal;
 }
 .font-tags .ok {
-  color: #7cfc6a;
+  color: var(--ok);
 }
 .font-tags .cloud,
 .font-tags .note {
@@ -1175,7 +1252,7 @@ button {
   margin-bottom: 12px;
   font-size: 13px;
   line-height: 1.5;
-  background: #22303a;
+  background: var(--info-bg);
   border-radius: 12px;
 }
 .banner a {
@@ -1523,7 +1600,7 @@ button {
   min-width: 0;
 }
 .hint.warn {
-  color: #ffb36b;
+  color: var(--warn);
 }
 
 .sticker-wrap {
@@ -1581,7 +1658,8 @@ button {
   height: 24px;
 }
 .proxy-note {
-  color: #ffd23f;
+  color: inherit;
+  font-weight: 600;
 }
 
 /* 主軌片段前面的空白（虛線框） */
@@ -1595,7 +1673,7 @@ button {
   padding: 0;
   font-size: 11px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
   border: 1px dashed var(--border);
   border-radius: 8px;
 }
@@ -1705,7 +1783,7 @@ button {
 .box-part {
   margin: 8px 0;
   padding: 8px 10px 4px;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
   border-radius: 12px;
 }
 
@@ -1883,13 +1961,14 @@ button {
   background: var(--accent, #ff4d8d);
   transition: width 120ms;
 }
-.hint.warn {
-  color: #ffd23f;
-}
 
 /* 背景音樂：時間軸上的音樂列與波形 */
 .clip.is-audio {
-  background: #1f3b3a;
+  background: var(--clip-audio);
+}
+.clip.is-audio .clip-label {
+  color: var(--clip-audio-ink);
+  text-shadow: none;
 }
 .clip.is-audio .wave {
   position: absolute;
@@ -1900,7 +1979,7 @@ button {
 }
 .wave path {
   fill: none;
-  stroke: #7ee0d2;
+  stroke: var(--clip-wave);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
   opacity: 0.85;
@@ -1913,7 +1992,7 @@ button {
   pointer-events: none;
 }
 .trim-strip.is-audio {
-  background: #1f3b3a;
+  background: var(--clip-audio);
 }
 .music-note {
   margin-top: 6px;
@@ -1984,4 +2063,122 @@ button {
   margin-right: 6px;
   border: 1px solid rgba(128, 128, 128, 0.6);
   border-radius: 50%;
+}
+
+/* 預覽上的「查看圖層」 */
+.peek-toggle {
+  position: absolute;
+  top: 6px;
+  right: 56px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+}
+.peek-toggle[aria-pressed='true'] {
+  color: var(--accent);
+}
+.peek {
+  position: absolute;
+  top: 56px;
+  right: 6px;
+  left: 6px;
+  z-index: 6;
+  max-height: calc(100% - 64px);
+  padding: 8px 10px;
+  overflow-y: auto;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.peek-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.peek ul {
+  padding: 0;
+  margin: 6px 0 0;
+  list-style: none;
+}
+.peek-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 4px 8px;
+  color: var(--fg);
+  text-align: left;
+  background: var(--btn);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+.peek-row.on {
+  outline: 2px solid var(--accent);
+}
+.peek-row:disabled {
+  opacity: 0.55;
+}
+.peek-thumb {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-size: 13px;
+  background: var(--btn2) center / cover;
+  border-radius: 8px;
+}
+.peek-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.peek-track {
+  font-size: 12px;
+  color: var(--muted);
+}
+.hit.soft {
+  touch-action: pan-y;
+}
+
+/* 長按拖素材到別軌：放得進去的軌道亮起來、不同種類的變灰；同一區上下的「＋ 新增一軌」放置區 */
+.track.drop-ok {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+.track.drop-bad {
+  opacity: 0.35;
+}
+.new-slot {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--muted);
+  border: 1.5px dashed var(--border);
+  border-radius: 8px;
+}
+.new-slot.hot {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
 }

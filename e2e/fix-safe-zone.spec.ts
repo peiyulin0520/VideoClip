@@ -69,32 +69,30 @@ test('拖移疊加物件時參考線才出現，放開就消失；匯出的畫�
   expect(isRed(out.samples[1] as [number, number, number, number])).toBe(true);
 });
 
-test('主軌：匯入後不自動選取；預覽單點不選；從時間軸選才有細框（沒有圓點）；疊加照舊自動選取', async ({
+test('主軌：匯入後不自動選取；預覽上點一下就選到（細框、沒有圓點）；選了之後可以在預覽上拖；疊加照舊自動選取', async ({
   page,
 }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await expect(page.getByTestId('selbox')).toHaveCount(0);
   expect(await selectedItemId(page)).toBeNull();
 
-  // 點預覽畫面（只有主軌）→ 不選取
+  // 點預覽畫面（只有主軌）→ 選到主軌（2026-11-12 使用者要求：預覽上點影片就能選、縮放）
   const stage = await previewBox(page);
   await page.mouse.click(stage.x + stage.width * 0.5, stage.y + stage.height * 0.5);
-  expect(await selectedItemId(page)).toBeNull();
-  await expect(page.getByTestId('selbox')).toHaveCount(0);
+  expect(await selectedItemId(page)).toBe((await project(page)).tracks[0]!.items[0]!.id);
 
-  // 在預覽上拖移也不會動到主軌
+  // 選了之後在預覽上拖移＝移動它
   const before = (await project(page)).tracks[0]!.items[0]!.transform;
   await page.mouse.move(stage.x + stage.width * 0.5, stage.y + stage.height * 0.5);
   await page.mouse.down();
   await page.mouse.move(stage.x + stage.width * 0.6, stage.y + stage.height * 0.55, { steps: 6 });
   await page.mouse.up();
   const after = (await project(page)).tracks[0]!.items[0]!.transform;
-  expect(after).toEqual(before);
+  expect(after.x).toBeGreaterThan(before.x);
 
   // 從時間軸選主軌片段 → 細框、沒有 ✕、有縮放鈕
   await clips(page).first().tap();
   await expect(page.getByTestId('selbox')).toBeVisible();
-  await expect(page.getByTestId('selbox')).toHaveClass(/main/);
   await expect(page.getByRole('button', { name: '刪除圖層' })).toHaveCount(0);
   await expect(page.locator('.sel-dot, [data-handle]')).toHaveCount(0);
   await page.screenshot({ path: `${SHOT}/after-main-selected.png` });

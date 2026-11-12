@@ -5,7 +5,7 @@ import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
 import { captureThumb } from './probe';
 import { buildScene } from './scene';
-import { mainTrack, sourceTimeAt, totalDuration } from './timeline';
+import { baseMediaTrack, sourceTimeAt, totalDuration } from './timeline';
 
 type Deps = {
   getProject: () => Project | null;
@@ -357,7 +357,7 @@ export class Player {
       used.add(el);
       this.syncVideo(el, item, asset, track, t);
       this.maybeCaptureThumb(el, asset);
-      if (track.kind === 'main' && el.videoWidth)
+      if (track.kind === 'media' && el.videoWidth)
         this.videoInfo = `${el.videoWidth}×${el.videoHeight} ${asset.codec ?? ''}${asset.hdr ? ' HDR' : ''}｜預覽檔：${asset.proxy?.status ?? '無'}`;
       return {
         source: el,
@@ -407,17 +407,13 @@ export class Player {
     };
     for (const track of p.tracks) {
       if (track.hidden) continue;
-      const items = track.items;
-      if (track.kind === 'main') {
-        const cur = (items as VideoItem[]).findIndex((x) => t < x.start + x.duration);
-        const next = items[cur + 1] as VideoItem | undefined;
-        // 在片段前面的空白裡：這個片段還沒開始畫，先載入停在起點
-        const curItem = items[cur] as VideoItem | undefined;
-        if (curItem && t < curItem.start) push(curItem);
-        if (cur >= 0 && next) push(next);
-      } else if (track.kind === 'overlay') {
-        for (const it of items as VideoItem[]) if (it.start > t && it.start <= t + PREFETCH_S) push(it);
-      }
+      if (track.kind !== 'media') continue;
+      // 這條軌道接下來要開始的影片：目前這個片段正在播就預載下一個（無縫接下去）；
+      // 目前沒有片段（在空白裡）就只預載 1 秒內要開始的
+      const items = [...(track.items as VideoItem[])].sort((a, b) => a.start - b.start);
+      const cur = items.some((x) => t >= x.start && t < x.start + x.duration);
+      const next = items.find((x) => x.start > t);
+      if (next && (cur || next.start <= t + PREFETCH_S)) push(next);
     }
     return out;
   }
@@ -444,11 +440,12 @@ export class Player {
     };
   }
 
-  /** 預覽主軌目前的片段 id（測試用） */
+  /** 預覽最下面那條影像軌目前的片段 id（測試用） */
   currentMainItemId(): string | undefined {
     const p = this.deps.getProject();
     if (!p) return undefined;
-    return mainTrack(p).items.find((x) => this.t < x.start + x.duration)?.id;
+    const base = baseMediaTrack(p);
+    return base?.items.find((x) => this.t >= x.start && this.t < x.start + x.duration)?.id;
   }
 
   destroy() {

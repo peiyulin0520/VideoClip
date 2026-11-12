@@ -1,8 +1,8 @@
 import { useRef, type PointerEvent as RPointerEvent } from 'react';
 import { MIN_CLIP_DURATION } from '../../model/defaults';
 import type { Asset, Track, VideoItem } from '../../model/types';
-import { setTrimWindow, setTrimWindowFree } from '../../engine/timeline';
-import { setMainItems, setTrackItems } from '../../store/projectStore';
+import { setTrimWindowFree } from '../../engine/timeline';
+import { setTrackItems } from '../../store/projectStore';
 import { useUI } from '../../store/uiStore';
 import { Wave } from './Wave';
 
@@ -30,17 +30,10 @@ export function TrimPanel({
   const minSrc = MIN_CLIP_DURATION * item.speed;
 
   const commit = (s: number, e: number, peekAt: 'start' | 'end') => {
-    if (track.kind === 'main') {
-      const next = setTrimWindow(track.items as VideoItem[], item.id, s, e, asset);
-      setMainItems(next, { coalesce: `trim:${item.id}` });
-      const cur = next.find((x) => x.id === item.id)!;
-      player?.peek(peekAt === 'start' ? cur.start : cur.start + cur.duration - 0.05);
-    } else {
-      const next = setTrimWindowFree(track.items, item.id, s, e, asset);
-      setTrackItems(track.id, next, { coalesce: `trim:${item.id}` });
-      const cur = next.find((x) => x.id === item.id)!;
-      player?.peek(peekAt === 'start' ? cur.start : cur.start + cur.duration - 0.05);
-    }
+    const next = setTrimWindowFree(track.items, item.id, s, e, asset);
+    setTrackItems(track.id, next, { coalesce: `trim:${item.id}` });
+    const cur = next.find((x) => x.id === item.id)!;
+    player?.peek(peekAt === 'start' ? cur.start : cur.start + cur.duration - 0.05);
   };
 
   const startDrag = (e: RPointerEvent, mode: 'left' | 'right' | 'move') => {

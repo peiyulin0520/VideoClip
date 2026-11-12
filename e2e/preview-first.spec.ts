@@ -4,6 +4,7 @@ import {
   countColor,
   clips,
   createProjectWith,
+  deselect,
   openTab,
   pinch,
   previewBox,
@@ -33,7 +34,7 @@ test('預覽很大而且大小永遠不變：每個分頁、面板開合、選�
   await page.screenshot({ path: `${SHOT}/top.png` });
 
   const base = await stageSize(page);
-  for (const tab of ['疊加', '文字', '圖層', '剪輯'] as const) {
+  for (const tab of ['疊加', '文字', '圖層', '版型', '素材', '音訊', '剪輯'] as const) {
     await openTab(page, tab);
     expect(await stageSize(page)).toEqual(base);
   }
@@ -130,7 +131,7 @@ test('雙指：手指放在框外也能縮放；沒有選取時雙指會選到�
   expect(s1).toBeGreaterThan(0.4);
 
   // 取消選取後雙指 → 選到中點下的文字並放大
-  await page.getByTestId('stage').click({ position: { x: 8, y: 8 } });
+  await deselect(page); // 預覽上點空白處不再取消選取（使用者 2026-11-12）：改點時間軸空白
   await expect(page.getByTestId('selbox')).toHaveCount(0);
   await pinch(page, { cx, cy, from: 60, to: 120 });
   await expect(page.getByTestId('selbox')).toBeVisible();
@@ -170,7 +171,7 @@ test('很小的文字也點得到；文字面板的「刪除」；全螢幕預�
   const cy = st.y + st.height * 0.5;
   await pinch(page, { cx, cy, from: 200, to: 40 }); // 縮很小
   expect((await textTransform(page)).scale).toBeLessThan(0.3);
-  await page.getByTestId('stage').click({ position: { x: 8, y: 8 } });
+  await deselect(page); // 預覽上點空白處不再取消選取（使用者 2026-11-12）：改點時間軸空白
   await expect(page.getByTestId('selbox')).toHaveCount(0);
   await page.mouse.click(cx + 12, cy); // 點在字旁邊 12px 內
   await expect(page.getByTestId('selbox')).toBeVisible();

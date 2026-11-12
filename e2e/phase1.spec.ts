@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
 import {
-  clipIds,
   clips,
   createProjectWith,
   expectToast,
@@ -8,6 +7,7 @@ import {
   isGray,
   isRed,
   isWhite,
+  project,
   samplePreview,
   seekTo,
   selectedIndex,
@@ -38,7 +38,7 @@ test('兩個專案各匯入 2 個素材：重新整理後都還在，編輯一�
   await page.getByRole('link', { name: '開啟 新專案 1' }).tap();
   await expect(clips(page)).toHaveCount(2);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByRole('button', { name: '刪除並補齊', exact: true }).tap(); // 後面的往前接上，總長度才會變短
   await expect(clips(page)).toHaveCount(1);
   await page.getByRole('link', { name: '回首頁' }).tap();
   // 首頁是從資料庫讀的：封面角落的長度變成剩下那段（clip-b 1.6 秒）＝ 離開編輯器時已立即存檔
@@ -98,19 +98,11 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await clips(page).first().tap();
   expect(await selectedIndex(page)).toBe(0);
 
-  // 複製
+  // 複製：複製品放在原片段後面最近的空位（後面被占住就接在最後）；自由擺放，其他片段不動
   await page.getByRole('button', { name: '複製' }).tap();
   await expect(clips(page)).toHaveCount(4);
-  expect(await selectedIndex(page)).toBe(1);
-
-  // 後移 / 前移
-  const before = await clipIds(page);
-  await page.getByRole('button', { name: '後移' }).tap();
-  const after = await clipIds(page);
-  expect(after[2]).toBe(before[1]);
-  expect(await selectedIndex(page)).toBe(2);
-  await page.getByRole('button', { name: '前移' }).tap();
-  expect(await clipIds(page)).toEqual(before);
+  expect(await selectedIndex(page)).toBe(3);
+  expect((await project(page)).tracks[0]!.items.map((i) => i.start).slice(0, 3)).toEqual([0, 2, 3.6]);
 
   // 變速：2 倍速 → 這個 2 秒的片段變 1 秒
   const totalBefore = await timeText(page);
@@ -121,14 +113,14 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await page.screenshot({ path: `${SHOT}/editor-speed-panel.png` });
   await page.getByRole('button', { name: '完成' }).tap();
   expect(await timeText(page)).not.toBe(totalBefore);
-  await expect(clips(page).nth(1)).toContainText('2x');
+  await expect(clips(page).nth(3)).toContainText('2x');
 
   // 音量：靜音
   await page.getByRole('button', { name: '音量' }).tap();
   await page.getByRole('button', { name: '關閉聲音', exact: true }).tap();
   await expect(page.getByTestId('volume-value')).toHaveText('0%');
   await page.getByRole('button', { name: '完成' }).tap();
-  await expect(clips(page).nth(1)).toContainText('靜音');
+  await expect(clips(page).nth(3)).toContainText('靜音');
 
   // 完整 / 填滿
   await page.getByRole('button', { name: '完整' }).tap();
@@ -136,10 +128,10 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await expect(page.getByRole('button', { name: '填滿' })).toBeVisible();
   await page.getByRole('button', { name: '填滿' }).tap();
 
-  // 分割：把播放頭移到第 3 個片段（clip-b，1.6s）中間再分割
-  await clips(page).nth(2).tap();
+  // 分割：把播放頭移到 clip-b（1.6s）中間再分割
+  await clips(page).nth(1).tap();
   const n = await clips(page).count();
-  const start = (await clipsStartSeconds(page))[2]!;
+  const start = (await clipsStartSeconds(page))[1]!;
   await seekTo(page, start + 0.8);
   await page.getByRole('button', { name: '分割' }).tap();
   await expect(clips(page)).toHaveCount(n + 1);
@@ -222,9 +214,10 @@ test('修剪頭尾：拖把手會改片段長度，素材範圍受限', async ({
   await expect(clips(page).first()).toContainText('2.0s');
 });
 
-test('長按拖曳片段可以重新排序', async ({ page }) => {
+test('長按拖曳片段可以移動時間：目標位置被占住就移到最近的空位，其他片段不動', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm', 'clip-c.webm']);
-  const ids = await clipIds(page);
+  const before = (await project(page)).tracks[0]!.items;
+  const end = Math.max(...before.map((i) => i.start + i.duration));
   // 把第 1 個（2 秒）拖到最後面（編輯器整頁捲動：先捲到看得到時間軸）
   await showTimeline(page);
   const first = (await clips(page).nth(0).boundingBox())!;
@@ -238,7 +231,12 @@ test('長按拖曳片段可以重新排序', async ({ page }) => {
   await page.screenshot({ path: `${SHOT}/reorder-dragging.png` });
   await page.mouse.move(x + 330, y, { steps: 8 });
   await page.mouse.up();
-  await expect.poll(async () => clipIds(page)).toEqual([ids[1], ids[2], ids[0]]);
+  await expect
+    .poll(async () => (await project(page)).tracks[0]!.items[0]!.start, { timeout: 5000 })
+    .toBeGreaterThan(end - 0.1); // 中間都被占住，放到最後面
+  const after = (await project(page)).tracks[0]!.items;
+  expect(after[1]!.start).toBeCloseTo(before[1]!.start, 3);
+  expect(after[2]!.start).toBeCloseTo(before[2]!.start, 3);
 });
 
 test('播放：時間前進、影片真的在解碼、跨片段會無縫換到下一支', async ({ page }) => {

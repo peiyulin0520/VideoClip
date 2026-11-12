@@ -117,10 +117,10 @@ describe('圖層與軌道', () => {
     const main = createClip(asset('m', 5));
     p.assets.push(asset('m', 5), asset('o', 5));
     p.tracks[0]!.items = [main];
-    const o1 = createTrack('overlay', p.tracks);
+    const o1 = createTrack('media', p.tracks);
     p.tracks.push(o1);
     o1.items = [clip('o1', 1, 3)];
-    const o2 = createTrack('overlay', p.tracks);
+    const o2 = createTrack('media', p.tracks);
     p.tracks.push(o2);
     o2.items = [clip('o2', 2, 3)];
     const tx = createTrack('text', p.tracks);
@@ -155,35 +155,35 @@ describe('圖層與軌道', () => {
     ).toEqual(['o2']);
   });
 
-  it('moveTrack 換圖層順序，主軌不動', () => {
-    const p = proj();
+  it('moveTrack 換圖層順序：同一種類的軌道之間可以換（包含最下面那條影像軌），不能跨種類', () => {
+    const p = proj(); // [影像0, 影像1(o1), 影像2(o2), 文字]
     const ids = p.tracks.map((t) => t.id);
     const up = moveTrack(p.tracks, ids[1]!, 1);
     expect(up.map((t) => t.id)).toEqual([ids[0], ids[2], ids[1], ids[3]]);
-    expect(moveTrack(p.tracks, ids[1]!, -1)).toBe(p.tracks); // 不能換到主軌下面
-    expect(moveTrack(p.tracks, ids[0]!, 1)).toBe(p.tracks); // 主軌不能動
-    expect(moveTrack(p.tracks, ids[3]!, 1)).toBe(p.tracks); // 已經最上面
+    const down = moveTrack(p.tracks, ids[1]!, -1); // 最下面那條影像軌也能換（沒有固定的主軌了）
+    expect(down.map((t) => t.id)).toEqual([ids[1], ids[0], ids[2], ids[3]]);
+    expect(moveTrack(p.tracks, ids[2]!, 1)).toBe(p.tracks); // 影像不能換到字卡上面
+    expect(moveTrack(p.tracks, ids[3]!, -1)).toBe(p.tracks); // 字卡不能換到影像下面
+    expect(moveTrack(p.tracks, ids[0]!, -1)).toBe(p.tracks); // 已經最下面
     const layers = visibleLayers({ ...p, tracks: up }, 2.2).map((l) => l.item.id);
     expect(layers.slice(1)).toEqual(['o2', 'o1']);
   });
 
-  it('reorderTrack：直接搬到指定位置，主軌固定在最底下、不能被搬動或搬到它下面', () => {
+  it('reorderTrack：直接搬到指定位置，夾在同一種類的範圍內，不能跨種類', () => {
     const p = proj();
-    const ids = p.tracks.map((t) => t.id); // [main, a, b, c]
-    expect(reorderTrack(p.tracks, ids[1]!, 3).map((t) => t.id)).toEqual([ids[0], ids[2], ids[3], ids[1]]);
-    expect(reorderTrack(p.tracks, ids[3]!, 1).map((t) => t.id)).toEqual([ids[0], ids[3], ids[1], ids[2]]);
-    expect(reorderTrack(p.tracks, ids[2]!, 0)).not.toBe(p.tracks); // 想搬到主軌下面：夾在 1
-    expect(reorderTrack(p.tracks, ids[2]!, 0)[0]!.id).toBe(ids[0]);
-    expect(reorderTrack(p.tracks, ids[2]!, 99)[3]!.id).toBe(ids[2]); // 超過最上面：夾在最上面
-    expect(reorderTrack(p.tracks, ids[0]!, 2)).toBe(p.tracks); // 主軌不能動
+    const ids = p.tracks.map((t) => t.id); // [影像 a, 影像 b, 影像 c, 文字]
+    expect(reorderTrack(p.tracks, ids[0]!, 2).map((t) => t.id)).toEqual([ids[1], ids[2], ids[0], ids[3]]);
+    expect(reorderTrack(p.tracks, ids[2]!, 0).map((t) => t.id)).toEqual([ids[2], ids[0], ids[1], ids[3]]);
+    expect(reorderTrack(p.tracks, ids[0]!, 99).map((t) => t.id)).toEqual([ids[1], ids[2], ids[0], ids[3]]); // 夾在影像區最上面，不會跑到字卡上面
+    expect(reorderTrack(p.tracks, ids[3]!, 0)).toBe(p.tracks); // 字卡只有一條，沒地方動
     expect(reorderTrack(p.tracks, ids[1]!, 1)).toBe(p.tracks); // 位置沒變
     expect(reorderTrack(p.tracks, 'nope', 2)).toBe(p.tracks);
   });
 
   it('firstFreeTrack 找得到空軌，找不到回 -1', () => {
     const p = proj();
-    expect(firstFreeTrack(p, 'overlay', 0, 1)).toBe(1); // o1 的 0–1 是空的
-    expect(firstFreeTrack(p, 'overlay', 2.5, 1)).toBe(-1); // 兩條都被占
+    expect(firstFreeTrack(p, 'media', 0, 1)).toBe(1); // o1 的 0–1 是空的
+    expect(firstFreeTrack(p, 'media', 2.5, 1)).toBe(-1); // 兩條都被占
     expect(firstFreeTrack(p, 'text', 0, 1)).toBe(3);
   });
 });

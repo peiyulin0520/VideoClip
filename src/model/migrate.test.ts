@@ -1,0 +1,123 @@
+import { describe, expect, it } from 'vitest';
+import { migrateProject } from './migrate';
+import type { Project } from './types';
+
+const item = (id: string, start: number, extra: Record<string, unknown> = {}) => ({
+  id,
+  type: 'video',
+  assetId: 'a',
+  start,
+  duration: 2,
+  trimIn: 0,
+  speed: 1,
+  volume: 1,
+  fit: 'cover',
+  transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
+  ...extra,
+});
+const text = (id: string, start: number) => ({
+  id,
+  type: 'text',
+  start,
+  duration: 3,
+  transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
+  card: {},
+});
+const track = (id: string, kind: string, name: string, items: unknown[] = [], extra = {}) => ({
+  id,
+  kind,
+  name,
+  hidden: false,
+  locked: false,
+  items,
+  ...extra,
+});
+const v1 = (tracks: unknown[]) =>
+  ({ id: 'p', name: 'x', createdAt: 1, updatedAt: 1, aspect: '9:16', width: 1080, height: 1920, fps: 30, assets: [], tracks, version: 1 }) as unknown as Project;
+
+describe('migrateProject v1 → v2', () => {
+  it('只有主軌：變成「影像 1」，片段時間不變', () => {
+    const m = migrateProject(v1([track('m', 'main', '主軌', [item('a', 0), item('b', 2)])]));
+    expect(m.changed).toBe(true);
+    expect(m.reordered).toBe(false);
+    expect(m.project.version).toBe(2);
+    expect(m.project.tracks).toHaveLength(1);
+    expect(m.project.tracks[0]!.kind).toBe('media');
+    expect(m.project.tracks[0]!.name).toBe('影像 1');
+    expect(m.project.tracks[0]!.items.map((i) => [i.id, i.start])).toEqual([
+      ['a', 0],
+      ['b', 2],
+    ]);
+  });
+
+  it('主軌有 gap：gap 欄位刪掉，start 保留（空白已經在 start 裡）', () => {
+    const m = migrateProject(v1([track('m', 'main', '主軌', [item('a', 1.5, { gap: 1.5 }), item('b', 3.5)])]));
+    const items = m.project.tracks[0]!.items;
+    expect(items.map((i) => i.start)).toEqual([1.5, 3.5]);
+    expect(items.every((i) => !('gap' in i))).toBe(true);
+  });
+
+  it('主軌＋疊加＋字卡＋音樂：疊加變影像 2、3；順序依分區（影像 → 字卡 → 音訊）', () => {
+    const m = migrateProject(
+      v1([
+        track('m', 'main', '主軌', [item('a', 0)]),
+        track('o1', 'overlay', '疊加 1', [item('b', 0)]),
+        track('t', 'text', '文字 1', [text('c', 0)]),
+        track('o2', 'overlay', '疊加 2', [item('d', 1)]),
+        track('au', 'audio', '音樂 1', [item('e', 0, { type: 'audio' })]),
+      ]),
+    );
+    expect(m.project.tracks.map((t) => [t.id, t.kind, t.name])).toEqual([
+      ['m', 'media', '影像 1'],
+      ['o1', 'media', '影像 2'],
+      ['o2', 'media', '影像 3'],
+      ['t', 'text', '文字 1'],
+      ['au', 'audio', '音樂 1'],
+    ]);
+    expect(m.reordered).toBe(true); // 字卡本來在疊加 2 的下面
+  });
+
+  it('字卡軌本來就在所有影像上面：不算調整順序', () => {
+    const m = migrateProject(
+      v1([
+        track('m', 'main', '主軌', [item('a', 0)]),
+        track('o1', 'overlay', '疊加 1', [item('b', 0)]),
+        track('t', 'text', '文字 1', [text('c', 0)]),
+      ]),
+    );
+    expect(m.reordered).toBe(false);
+  });
+
+  it('使用者自己改過的軌道名字保留；鎖住、靜音等設定保留', () => {
+    const m = migrateProject(
+      v1([
+        track('m', 'main', '我的主畫面', [item('a', 0)], { muted: true }),
+        track('o', 'overlay', '貼紙層', [item('b', 0)], { locked: true }),
+      ]),
+    );
+    expect(m.project.tracks.map((t) => t.name)).toEqual(['我的主畫面', '貼紙層']);
+    expect(m.project.tracks[0]!.muted).toBe(true);
+    expect(m.project.tracks[1]!.locked).toBe(true);
+  });
+
+  it('版型專案：外框（鎖住的最上層疊加軌）仍在影像區最上面且鎖住', () => {
+    const m = migrateProject(
+      v1([
+        track('m', 'main', '主軌', [item('a', 0)]),
+        track('c1', 'overlay', '疊加 1', [item('b', 0, { cell: { x: 0, y: 0, w: 1, h: 1 }, group: 'g' })]),
+        track('f', 'overlay', '疊加 2', [item('f1', 0, { group: 'g' })], { locked: true }),
+      ]),
+    );
+    const t = m.project.tracks;
+    expect(t[t.length - 1]!.id).toBe('f');
+    expect(t[t.length - 1]!.locked).toBe(true);
+    expect(t.every((x) => x.kind === 'media')).toBe(true);
+  });
+
+  it('已經是 v2：原封不動（同一個物件）', () => {
+    const p = { ...v1([track('m', 'media', '影像 1', [item('a', 0)])]), version: 2 } as unknown as Project;
+    const m = migrateProject(p);
+    expect(m.changed).toBe(false);
+    expect(m.project).toBe(p);
+  });
+});

@@ -27,16 +27,16 @@ export const THEMES: {
   {
     id: 'fresh',
     name: '清新',
-    desc: '白底、薄荷綠重點',
-    colors: ['#f4fbf9', '#e3f3f0', '#1d3b38', '#14b8a6'],
+    desc: '淺色底、薄荷綠重點',
+    colors: ['#f4fbf9', '#e3f3f0', '#1d3b38', '#0b7f72'],
     bar: '#f4fbf9',
   },
   {
     id: 'warm',
     name: '溫暖',
-    desc: '棕色系、奶油字、焦糖重點',
-    colors: ['#2a1f18', '#46352a', '#f7ead8', '#e3893f'],
-    bar: '#2a1f18',
+    desc: '米色底、磚紅重點、深咖啡字',
+    colors: ['#f6f0e6', '#efe5d6', '#3b2a20', '#b8553a'],
+    bar: '#f6f0e6',
   },
 ];
 

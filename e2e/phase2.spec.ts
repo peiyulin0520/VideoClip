@@ -49,24 +49,24 @@ test('同一秒疊 3 支影片＋1 個字卡：換圖層順序後預覽正確，
   const rows = page.getByTestId('layer-row');
   await expect(rows).toHaveCount(4);
   await expect(rows.nth(0)).toContainText('文字');
-  await expect(rows.nth(1)).toContainText('疊加 2');
-  await expect(rows.nth(2)).toContainText('疊加 1');
-  await expect(rows.nth(3)).toContainText('主軌');
+  await expect(rows.nth(1)).toContainText('影像 3');
+  await expect(rows.nth(2)).toContainText('影像 2');
+  await expect(rows.nth(3)).toContainText('影像 1');
 
-  // 把藍色（疊加 2）往下一層 → 綠色變成最上面
-  await page.getByRole('button', { name: '疊加 2 往下一層' }).tap();
+  // 把藍色（影像 3）往下一層 → 綠色變成最上面
+  await page.getByRole('button', { name: '影像 3 往下一層' }).tap();
   await expect.poll(async () => isGreen(await samplePreview(page, ...IN))).toBe(true);
-  await expect(rows.nth(1)).toContainText('疊加 1');
+  await expect(rows.nth(1)).toContainText('影像 2');
   await page.screenshot({ path: `${SHOT}/layers-green-on-top.png` });
 
   // 再把綠色往下、藍色回到最上面
-  await page.getByRole('button', { name: '疊加 1 往下一層' }).tap();
+  await page.getByRole('button', { name: '影像 2 往下一層' }).tap();
   await expect.poll(async () => isBlue(await samplePreview(page, ...IN))).toBe(true);
 
   // 隱藏藍色那條軌道 → 看到綠色
-  await page.getByRole('button', { name: '疊加 2 隱藏' }).tap();
+  await page.getByRole('button', { name: '影像 3 隱藏' }).tap();
   await expect.poll(async () => isGreen(await samplePreview(page, ...IN))).toBe(true);
-  await page.getByRole('button', { name: '疊加 2 顯示' }).tap();
+  await page.getByRole('button', { name: '影像 3 顯示' }).tap();
   await expect.poll(async () => isBlue(await samplePreview(page, ...IN))).toBe(true);
 
   // 單格匯出（輸出解析度 1080×1920）和預覽在同樣幾個點的顏色一致
@@ -151,12 +151,13 @@ test('點預覽畫面會選到最上面那個物件；鎖定的軌道不會被�
 
   await click(0.5, 0.5); // 中間：藍在最上面
   expect(await selectedItemId(page)).toBe(track2Id);
-  await click(0.08, 0.08); // 角落：只有主軌 → 預覽上單點主軌不會選到它（要從時間軸選）
-  expect(await selectedItemId(page)).toBeNull();
+  const mainId = (await project(page)).tracks[0]!.items[0]!.id;
+  await click(0.08, 0.08); // 角落：只有主軌 → 點預覽的主軌影片也選得到（使用者 2026-11-12 要求）
+  expect(await selectedItemId(page)).toBe(mainId);
 
   // 鎖定藍色那條軌道 → 點中間會選到綠
   await openTab(page, '圖層');
-  await page.getByRole('button', { name: '疊加 2 鎖定' }).tap();
+  await page.getByRole('button', { name: '影像 3 鎖定' }).tap();
   await click(0.5, 0.5);
   expect(await selectedItemId(page)).toBe(track1Id);
 });
@@ -203,15 +204,15 @@ test('疊加素材：長按拖曳移動時間、修剪、軌道選單', async ({
   await page.screenshot({ path: `${SHOT}/overlay-moved.png` });
 
   // 軌道選單：隱藏 → 預覽回到紅；顯示 → 綠
-  await page.getByRole('button', { name: /疊加 1 軌道設定/ }).tap();
+  await page.getByRole('button', { name: /影像 2 軌道設定/ }).tap();
   await page.getByRole('button', { name: /隱藏這條軌道/ }).tap();
   expect((await project(page)).tracks[1]!.hidden).toBe(true);
-  await page.getByRole('button', { name: /疊加 1 軌道設定/ }).tap();
+  await page.getByRole('button', { name: /影像 2 軌道設定/ }).tap();
   await page.getByRole('button', { name: /顯示這條軌道/ }).tap();
   expect((await project(page)).tracks[1]!.hidden).toBe(false);
 
   // 刪除軌道（連同物件）
-  await page.getByRole('button', { name: /疊加 1 軌道設定/ }).tap();
+  await page.getByRole('button', { name: /影像 2 軌道設定/ }).tap();
   await page.getByRole('button', { name: /刪除這條軌道/ }).tap();
   await expect(page.getByTestId('track')).toHaveCount(1);
   await expect(clips(page)).toHaveCount(1);
