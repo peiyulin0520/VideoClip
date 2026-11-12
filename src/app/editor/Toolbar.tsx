@@ -47,7 +47,9 @@ export function BottomBar({
   }, [tab]);
   useEffect(() => {
     if (!selectedId) return;
+    const tabAtSelect = tabRef.current;
     const timer = setTimeout(() => {
+      if (tabRef.current !== tabAtSelect) return; // 這段時間使用者自己切了分頁：不要再把人帶走
       const st = useProjectStore.getState();
       const f = st.project && findItem(st.project, st.selectedId);
       if (!f || st.selectedId !== selectedId) return;
