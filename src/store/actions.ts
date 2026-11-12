@@ -9,7 +9,19 @@ import {
   newId,
   pickAspect,
 } from '../model/defaults';
-import type { Aspect, Asset, Item, Project, TextItem, Track, Transform, VideoItem } from '../model/types';
+import {
+  TEXT_STYLE_KEYS,
+  type Aspect,
+  type Asset,
+  type Item,
+  type Project,
+  type TextItem,
+  type TextRun,
+  type TextStyle,
+  type Track,
+  type Transform,
+  type VideoItem,
+} from '../model/types';
 import {
   baseMediaTrack,
   duplicateFree,
@@ -205,6 +217,9 @@ export function removeGroup(group: string) {
 export function addText(t: number, shape = false): string {
   const item = shape ? createShapeItem(t) : createTextItem(t);
   store().apply((d) => {
+    // 新文字沿用上一次的樣式（字體、大小、顏色、透明度、描邊、陰影…），內容與位置照預設
+    if (!shape && d.lastTextStyle)
+      Object.assign(item.card.runs[0]!, JSON.parse(JSON.stringify(d.lastTextStyle)) as TextStyle);
     const ti = trackIndexFor(d.tracks as Track[], 'text', item.start, item.duration);
     d.tracks[ti]!.items.push(item);
   });
@@ -212,14 +227,51 @@ export function addText(t: number, shape = false): string {
   return item.id;
 }
 
+/** 這個字的樣式欄位（複製一份，不含文字內容、位置、字塊、裝飾） */
+export function pickTextStyle(run: TextRun): TextStyle {
+  const out: Record<string, unknown> = {};
+  for (const k of TEXT_STYLE_KEYS) if (run[k] !== undefined) out[k] = JSON.parse(JSON.stringify(run[k]));
+  return out as TextStyle;
+}
+
 export function editText(id: string, recipe: (card: Draft<TextItem['card']>) => void, opts?: Opts) {
-  editItem(
-    id,
-    (it) => {
-      if (it.type === 'text') recipe(it.card);
-    },
-    opts,
-  );
+  store().apply((d) => {
+    for (const tr of d.tracks) {
+      const it = tr.items.find((x) => x.id === id);
+      if (!it) continue;
+      if (it.type === 'text') {
+        recipe(it.card);
+        const run = it.card.runs[0];
+        // 獨立圖形（沒有文字）的樣式不算
+        if (run && run.text !== '') d.lastTextStyle = pickTextStyle(run as TextRun);
+      }
+      return;
+    }
+  }, opts);
+}
+
+/** 把這個字卡的樣式複製到專案裡所有其他的文字（不動內容、位置、字塊、裝飾）；回傳套用了幾個。一步復原 */
+export function applyTextStyleToAll(id: string): number {
+  const p = store().project;
+  const f = p && findItem(p, id);
+  if (!p || !f || f.item.type !== 'text') return 0;
+  const style = pickTextStyle(f.item.card.runs[0]!);
+  let n = 0;
+  store().apply((d) => {
+    for (const tr of d.tracks)
+      for (const it of tr.items) {
+        if (it.type !== 'text' || it.id === id || it.card.runs[0]?.text === '') continue;
+        for (const run of it.card.runs) {
+          for (const k of TEXT_STYLE_KEYS) {
+            if (style[k] === undefined) delete (run as Record<string, unknown>)[k];
+            else (run as Record<string, unknown>)[k] = JSON.parse(JSON.stringify(style[k]));
+          }
+        }
+        n++;
+      }
+    d.lastTextStyle = style;
+  });
+  return n;
 }
 
 export function removeAnyItem(id: string): boolean {

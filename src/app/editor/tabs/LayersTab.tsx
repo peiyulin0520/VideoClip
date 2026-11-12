@@ -96,8 +96,9 @@ export function LayersTab() {
             <span>選取的圖層</span>
           </div>
           <TransformControls item={it} />
+          {it.type === 'text' && <p className="hint">文字本身的透明度在「文字」分頁。</p>}
           <Slider
-            label="透明度"
+            label="整個圖層透明度"
             value={Math.round(it.transform.opacity * 100)}
             min={0}
             max={100}

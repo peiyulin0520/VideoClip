@@ -18,13 +18,16 @@ import {
   listProjects,
   renameProject,
   saveProject,
+  setProjectCover,
 } from '../../storage/projects';
+import { coverFromBlob, coverFromDataUrl } from '../../engine/cover';
 import { useFonts } from '../../fonts/fontStore';
 import { useApp } from '../../store/appStore';
 import { toast, useUI } from '../../store/uiStore';
 import { ConfirmSheet, Sheet } from '../../ui/Sheet';
 
 function coverOf(p: Project): string | undefined {
+  if (p.cover) return p.cover;
   const first = mediaItems(p)[0];
   return first ? p.assets.find((a) => a.id === first.assetId)?.thumbs[0] : undefined;
 }
@@ -53,6 +56,8 @@ export function Home() {
   const [renameFor, setRenameFor] = useState<Project | null>(null);
   const [nameDraft, setNameDraft] = useState('');
   const [deleteFor, setDeleteFor] = useState<Project | null>(null);
+  const [coverFor, setCoverFor] = useState<Project | null>(null);
+  const coverFileRef = useRef<HTMLInputElement>(null);
   const [tipHidden, setTipHidden] = useState(() => safeGet('tip-ios-a2hs') === '1');
   const pickRef = useRef<HTMLInputElement>(null);
   const fontCount = useFonts((st) => st.installed.size + st.userFonts.length);
@@ -61,6 +66,11 @@ export function Home() {
   const appLoaded = useApp((st) => st.loaded);
 
   const refresh = useCallback(async () => setProjects(await listProjects()), []);
+  const setCover = async (p: Project, cover: string | undefined) => {
+    await setProjectCover(p, cover);
+    await refresh();
+    toast(cover ? '封面已更換' : '封面恢復預設');
+  };
   useEffect(() => {
     let alive = true;
     void listProjects().then((list) => alive && setProjects(list));
@@ -251,6 +261,15 @@ export function Home() {
         </button>
         <button
           className="menu-item"
+          onClick={() => {
+            setCoverFor(menuFor);
+            setMenuFor(null);
+          }}
+        >
+          更換封面
+        </button>
+        <button
+          className="menu-item"
           onClick={async () => {
             const p = menuFor;
             setMenuFor(null);
@@ -279,6 +298,61 @@ export function Home() {
           刪除
         </button>
       </Sheet>
+
+      <Sheet open={!!coverFor} title="更換封面" onClose={() => setCoverFor(null)}>
+        <p className="hint">從專案裡的影片或照片選一張，或從相簿選一張照片。</p>
+        {coverFor && (
+          <div className="cover-strip" data-testid="cover-strip">
+            {coverFor.assets
+              .filter((a) => a.kind !== 'audio' && a.thumbs[0])
+              .map((a) => (
+                <button
+                  key={a.id}
+                  className="cover-pick"
+                  aria-label={`用 ${a.name} 當封面`}
+                  style={{ backgroundImage: `url(${a.thumbs[0]})` }}
+                  onClick={async () => {
+                    const p = coverFor;
+                    setCoverFor(null);
+                    await setCover(p, await coverFromDataUrl(a.thumbs[0]!));
+                  }}
+                />
+              ))}
+          </div>
+        )}
+        <button className="menu-item" onClick={() => coverFileRef.current?.click()}>
+          從相簿選照片
+        </button>
+        <button
+          className="menu-item"
+          onClick={async () => {
+            const p = coverFor;
+            setCoverFor(null);
+            if (p) await setCover(p, undefined);
+          }}
+        >
+          恢復預設（第一個素材）
+        </button>
+      </Sheet>
+      <input
+        ref={coverFileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        data-testid="cover-file"
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          const p = coverFor;
+          if (!f || !p) return;
+          setCoverFor(null);
+          try {
+            await setCover(p, await coverFromBlob(f));
+          } catch {
+            toast('這張圖片讀不出來');
+          }
+        }}
+      />
 
       <Sheet open={!!renameFor} title="專案改名" onClose={() => setRenameFor(null)}>
         <input

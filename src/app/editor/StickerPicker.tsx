@@ -53,7 +53,7 @@ export function StickerPicker() {
             key={name}
             role="tab"
             aria-selected={cat === name}
-            className={`chip sm${cat === name ? ' active' : ''}`}
+            className={`chip3${cat === name ? ' on' : ''}`}
             onClick={() => setCat(name)}
           >
             {name}

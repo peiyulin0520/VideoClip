@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { drawOps, opsBounds } from '../../engine/decorations';
 import { shapeDef, shapePath } from '../../engine/shapes';
+import { SHAPE_LINE } from '../../model/defaults';
 import type { BoxShape } from '../../model/types';
 
 /** 圖形縮圖：用同一個路徑函式實際畫出來（不是靜態圖片），並依範圍縮放置中 */
-export function ShapeThumb({ shape, color = '#ff4d8d' }: { shape: BoxShape; color?: string }) {
+export function ShapeThumb({ shape, color = SHAPE_LINE }: { shape: BoxShape; color?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
@@ -13,7 +14,7 @@ export function ShapeThumb({ shape, color = '#ff4d8d' }: { shape: BoxShape; colo
     ctx.clearRect(0, 0, cv.width, cv.height);
     const def = shapeDef(shape);
     const cmds = shapePath(shape, 100, def.inset[0] > 1.8 ? 100 : 56, { radius: 12 });
-    const ops = [{ type: 'fill' as const, cmds }];
+    const ops = [{ type: 'stroke' as const, cmds, width: 3 }]; // 線框縮圖（字塊預設是透明底＋細框線）
     const b = opsBounds(ops)!;
     const pad = 6;
     const k = Math.min((cv.width - pad * 2) / (b.r - b.l), (cv.height - pad * 2) / (b.b - b.t));

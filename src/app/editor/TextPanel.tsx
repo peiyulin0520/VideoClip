@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import type { CardBox, Stroke, TextItem } from '../../model/types';
-import { editText, removeAnyItem } from '../../store/actions';
+import { applyTextStyleToAll, editText, removeAnyItem } from '../../store/actions';
+import { toast } from '../../store/uiStore';
 import { useProjectStore } from '../../store/projectStore';
+import { SHAPE_LINE } from '../../model/defaults';
 import { DECORATION_KINDS } from '../../engine/decorations';
 import { SHAPE_CATS, SHAPES, shapeDef } from '../../engine/shapes';
 import { ColorPicker } from '../../ui/ColorPicker';
+import { Segmented } from '../../ui/Segmented';
 import { Slider } from '../../ui/Slider';
 import { DecoThumb } from './DecoThumb';
 import { TransformControls } from './TransformControls';
@@ -21,9 +24,12 @@ const SIDES = [
 ] as const;
 const px = (v: number) => `${v}px`;
 
+// 字塊預設：透明底、棕色細框線（要填滿到「填滿」打開、選顏色；填滿的預設色是粉紅）
 export const DEFAULT_BOX: CardBox = {
   shape: 'roundRect',
   fill: '#ff4d8d',
+  fillOn: false,
+  stroke: { color: SHAPE_LINE, width: 6, opacity: 1 },
   opacity: 1,
   padding: { top: 24, right: 40, bottom: 24, left: 40 },
   nudgeY: 0,
@@ -62,20 +68,10 @@ export function TextPanel({
 
   return (
     <>
-      <div className="chips sticky-tabs" role="tablist" aria-label="字卡設定">
-        {SECTIONS.map((s) => (
-          <button
-            key={s}
-            role="tab"
-            aria-selected={section === s}
-            className={`chip${section === s ? ' active' : ''}`}
-            onClick={() => setSection(s)}
-          >
-            {s}
-          </button>
-        ))}
-        <button className="chip sm add" aria-label="新增文字" onClick={onAdd}>
-          ＋新增
+      <div className="seg-row sticky-tabs">
+        <Segmented options={SECTIONS} value={section} onChange={setSection} label="字卡設定" />
+        <button className="add-circle" aria-label="新增文字" onClick={onAdd}>
+          ＋
         </button>
       </div>
 
@@ -107,6 +103,24 @@ export function TextPanel({
             label="文字顏色"
             onPick={(col) => edit((c) => void (c.runs[0]!.color = col))}
           />
+          <Slider
+            label="文字透明度"
+            value={Math.round((run.opacity ?? 1) * 100)}
+            min={10}
+            max={100}
+            step={1}
+            format={(v) => `${v}%`}
+            onChange={(v) => edit((c) => void (c.runs[0]!.opacity = v / 100), 'txop')}
+          />
+          <button
+            className="btn done"
+            onClick={() => {
+              const n = applyTextStyleToAll(item.id);
+              toast(n > 0 ? `已套用到 ${n} 個文字` : '沒有其他文字可以套用');
+            }}
+          >
+            套用這個樣式到所有文字
+          </button>
           <div className="chips">
             <button
               className={`chip${run.weight === 'bold' ? ' active' : ''}`}
@@ -212,7 +226,7 @@ export function TextPanel({
             <button
               role="radio"
               aria-checked={!box}
-              className={`chip${!box ? ' active' : ''}`}
+              className={`chip3${!box ? ' on' : ''}`}
               onClick={() => edit((c) => void delete c.box)}
             >
               無字塊
@@ -220,7 +234,7 @@ export function TextPanel({
             {SHAPE_CATS.map((c) => (
               <button
                 key={c}
-                className={`chip${cat === c ? ' active' : ''}`}
+                className={`chip3${cat === c ? ' on' : ''}`}
                 aria-pressed={cat === c}
                 aria-label={`圖形分類 ${c}`}
                 onClick={() => setCat(c)}
@@ -245,7 +259,13 @@ export function TextPanel({
                       if (c.box) {
                         c.box.shape = s.id;
                         delete c.box.adj; // 調整值是各圖形自己的，換圖形就回到預設長相
-                      } else c.box = { ...DEFAULT_BOX, padding: { ...DEFAULT_BOX.padding }, shape: s.id };
+                      } else
+                        c.box = {
+                          ...DEFAULT_BOX,
+                          stroke: { ...DEFAULT_BOX.stroke! },
+                          padding: { ...DEFAULT_BOX.padding },
+                          shape: s.id,
+                        };
                     })
                   }
                 >

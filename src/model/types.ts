@@ -85,11 +85,40 @@ export type TextRun = {
   letterSpacing: number; // em，-0.2 ~ 1.0
   lineHeight: number; // 倍數，0.8 ~ 2.5
   weight: 'normal' | 'bold';
+  /** 文字本身（含描邊、陰影）的透明度 0.1–1，沒有＝1；字塊、裝飾各自有自己的透明度 */
+  opacity?: number;
   italic?: boolean; // 字型沒有斜體就斜切 -12°
   /** 多層描邊（由外到內，畫的時候依厚度由大到小）。例：白 12 + 粉 6 */
   strokes?: Stroke[];
   shadow?: TextShadow;
 };
+/** 文字樣式（一套）：新增文字時沿用上一次的樣式、「套用樣式到所有文字」都用這組欄位 */
+export type TextStyle = Pick<
+  TextRun,
+  | 'fontId'
+  | 'size'
+  | 'color'
+  | 'opacity'
+  | 'weight'
+  | 'italic'
+  | 'letterSpacing'
+  | 'lineHeight'
+  | 'strokes'
+  | 'shadow'
+>;
+export const TEXT_STYLE_KEYS = [
+  'fontId',
+  'size',
+  'color',
+  'opacity',
+  'weight',
+  'italic',
+  'letterSpacing',
+  'lineHeight',
+  'strokes',
+  'shadow',
+] as const;
+
 export type DecorationKind =
   | 'tail-loop'
   | 'wave-underline'
@@ -213,6 +242,10 @@ export type Project = {
   assets: Asset[];
   tracks: Track[];
   thumbnail?: string;
+  /** 自訂封面（JPEG data URL，長邊 480）；沒有＝用第一個素材的縮圖 */
+  cover?: string;
+  /** 最後一次新增或編輯的文字樣式；新增文字沿用它，才不會跟之前的不一樣 */
+  lastTextStyle?: TextStyle;
   /** 2＝2026-11-12 起：影像軌統一、沒有主軌；舊的 1 讀進來時由 migrateProject 轉換 */
   version: 2;
 };
