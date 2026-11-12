@@ -29,7 +29,7 @@ const dims = async (page: Page) => (await project(page)) as unknown as { width: 
 const tracks = async (page: Page) => (await project(page)).tracks as unknown as Tr[];
 
 async function addLayout(page: Page, name: string, color: string, files: string[]) {
-  await openTab(page, '疊加');
+  await openTab(page, '版型');
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
   await expect(page.getByTestId('layout-sheet')).toBeVisible();
   await page.getByRole('radio', { name: `外框 ${color}` }).tap();
@@ -44,7 +44,7 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
   page,
 }) => {
   await createProjectWith(page, ['solid-blue.webm']);
-  await openTab(page, '疊加');
+  await openTab(page, '版型');
   await expect(page.getByTestId('layout-grid').locator('.layout-card')).toHaveCount(8);
   await page.screenshot({ path: `${SHOT}/picker.png` });
   await addLayout(page, '拍貼機直條', '黑', ['solid-red.webm', 'solid-green.webm']);
@@ -87,7 +87,7 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
   await expect.poll(() => selectedItemId(page)).toBe(cellTracks[1]!.items[0]!.id);
 
   // 移除版型：外框與所有格子一起拿掉；一步復原
-  await openTab(page, '剪輯');
+  await openTab(page, '版型');
   await page.getByRole('button', { name: '移除版型' }).tap();
   expect((await tracks(page)).length).toBe(1);
   await page.getByRole('button', { name: '復原' }).tap();

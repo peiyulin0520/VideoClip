@@ -4,6 +4,7 @@ import {
   clips,
   createProjectWith,
   expectToast,
+  openTab,
   fixture,
   isGray,
   isRed,
@@ -103,7 +104,8 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await expect(clips(page)).toHaveCount(4);
   expect(await selectedIndex(page)).toBe(1);
 
-  // 後移 / 前移
+  // 後移 / 前移（在圖層分頁）
+  await openTab(page, '圖層');
   const before = await clipIds(page);
   await page.getByRole('button', { name: '後移' }).tap();
   const after = await clipIds(page);
@@ -111,6 +113,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   expect(await selectedIndex(page)).toBe(2);
   await page.getByRole('button', { name: '前移' }).tap();
   expect(await clipIds(page)).toEqual(before);
+  await openTab(page, '剪輯');
 
   // 變速：2 倍速 → 這個 2 秒的片段變 1 秒
   const totalBefore = await timeText(page);

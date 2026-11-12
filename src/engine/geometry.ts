@@ -110,17 +110,36 @@ export function aabb(box: Box): { l: number; t: number; r: number; b: number } {
   return { l: Math.min(...xs), r: Math.max(...xs), t: Math.min(...ys), b: Math.max(...ys) };
 }
 
-/** 點在哪個圖層上（最上面的優先）。鎖定的軌道、隱藏的軌道不會被選到。 */
-/** minSize：點選範圍至少這麼大（畫面座標），讓很小的物件手指也點得到 */
-export function topHit(layers: Layer[], ctx: GeoCtx, px: number, py: number, minSize = 0): Layer | null {
+/**
+ * 點在哪些圖層上，由上到下排好（最上面的在最前面）。
+ * 鎖定的軌道不會被選到（隱藏的軌道 visibleLayers 已經濾掉）。
+ * minSize：點選範圍至少這麼大（畫面座標），讓很小的物件手指也點得到
+ */
+export function hitTestAll(layers: Layer[], ctx: GeoCtx, px: number, py: number, minSize = 0): Layer[] {
+  const out: Layer[] = [];
   for (let i = layers.length - 1; i >= 0; i--) {
     const l = layers[i]!;
     if (l.track.locked) continue;
     const box = selectionBox(l.item, ctx);
     if (box && pointInBox({ ...box, w: Math.max(box.w, minSize), h: Math.max(box.h, minSize) }, px, py))
-      return l;
+      out.push(l);
   }
-  return null;
+  return out;
+}
+
+/** 點在哪個圖層上（最上面的優先）。鎖定的軌道、隱藏的軌道不會被選到。 */
+export function topHit(layers: Layer[], ctx: GeoCtx, px: number, py: number, minSize = 0): Layer | null {
+  return hitTestAll(layers, ctx, px, py, minSize)[0] ?? null;
+}
+
+/**
+ * 輕點時要選哪一個：點在已選物件上又點一次＝換下面那一層（到底再回最上面）；
+ * 沒有選取或點在別的地方＝最上面那個。hits 由上到下。
+ */
+export function nextHit<T extends { item: { id: string } }>(hits: T[], selectedId: string | null): T | null {
+  if (hits.length === 0) return null;
+  const i = hits.findIndex((h) => h.item.id === selectedId);
+  return i < 0 ? hits[0]! : hits[(i + 1) % hits.length]!;
 }
 
 export const BLEND_LABELS: Record<BlendMode, string> = {

@@ -9,7 +9,7 @@ test('貼圖：分類、縮圖有載入、點一下加到這一秒（變成照�
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await createProjectWith(page, ['solid-blue.webm']);
-  await openTab(page, '疊加');
+  await openTab(page, '素材');
   const grid = page.getByTestId('sticker-grid');
   // 我的貼圖、GIPHY ＋ 9 個 Fluent Emoji 分類；Fluent 每個分類至少 20 個貼圖，縮圖都載入得到
   const tabs = page.getByRole('tablist', { name: '貼圖分類' }).getByRole('tab');
@@ -84,7 +84,7 @@ test('貼圖授權：設定頁有連結，授權檔可以打開', async ({ page,
 
 test('我的貼圖：上傳自己的圖存在這支手機，換一個專案也能用；可以刪除', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
-  await openTab(page, '疊加');
+  await openTab(page, '素材');
   await page.getByRole('tablist', { name: '貼圖分類' }).getByRole('tab', { name: '我的貼圖' }).tap();
   await expect(page.getByText('所有專案都能用')).toBeVisible();
   await page.getByTestId('my-sticker-input').setInputFiles(fixture('photo.png'));
@@ -100,7 +100,7 @@ test('我的貼圖：上傳自己的圖存在這支手機，換一個專案也�
   await page.getByRole('button', { name: '新增專案' }).tap();
   await page.getByTestId('new-project-files').setInputFiles(fixture('solid-red.webm'));
   await expect(page).toHaveURL(/#\/p\//);
-  await openTab(page, '疊加');
+  await openTab(page, '素材');
   await page.getByRole('tablist', { name: '貼圖分類' }).getByRole('tab', { name: '我的貼圖' }).tap();
   await expect(page.getByTestId('my-sticker-grid').locator('.sticker-cell')).toHaveCount(1);
   await page.screenshot({ path: `${SHOT}/my-stickers.png` });

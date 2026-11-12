@@ -151,8 +151,9 @@ test('點預覽畫面會選到最上面那個物件；鎖定的軌道不會被�
 
   await click(0.5, 0.5); // 中間：藍在最上面
   expect(await selectedItemId(page)).toBe(track2Id);
-  await click(0.08, 0.08); // 角落：只有主軌 → 預覽上單點主軌不會選到它（要從時間軸選）
-  expect(await selectedItemId(page)).toBeNull();
+  const mainId = (await project(page)).tracks[0]!.items[0]!.id;
+  await click(0.08, 0.08); // 角落：只有主軌 → 點預覽的主軌影片也選得到（使用者 2026-11-12 要求）
+  expect(await selectedItemId(page)).toBe(mainId);
 
   // 鎖定藍色那條軌道 → 點中間會選到綠
   await openTab(page, '圖層');

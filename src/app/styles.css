@@ -867,12 +867,19 @@ button {
   z-index: 15;
   background: var(--panel);
   display: flex;
+  overflow-x: auto; /* 7 個分頁：窄螢幕放不下時可以左右滑 */
+  scrollbar-width: none;
   border-bottom: 1px solid var(--line);
 }
+.tabs::-webkit-scrollbar {
+  display: none;
+}
 .tab {
-  flex: 1;
+  flex: 1 0 52px;
   min-height: 44px;
-  font-size: 15px;
+  padding: 0 4px;
+  font-size: 14px;
+  white-space: nowrap;
   color: var(--muted);
   background: transparent;
   border-radius: 0;
@@ -2056,4 +2063,93 @@ button {
   margin-right: 6px;
   border: 1px solid rgba(128, 128, 128, 0.6);
   border-radius: 50%;
+}
+
+/* 預覽上的「查看圖層」 */
+.peek-toggle {
+  position: absolute;
+  top: 6px;
+  right: 56px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+}
+.peek-toggle[aria-pressed='true'] {
+  color: var(--accent);
+}
+.peek {
+  position: absolute;
+  top: 56px;
+  right: 6px;
+  left: 6px;
+  z-index: 6;
+  max-height: calc(100% - 64px);
+  padding: 8px 10px;
+  overflow-y: auto;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.peek-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.peek ul {
+  padding: 0;
+  margin: 6px 0 0;
+  list-style: none;
+}
+.peek-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 4px 8px;
+  color: var(--fg);
+  text-align: left;
+  background: var(--btn);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+.peek-row.on {
+  outline: 2px solid var(--accent);
+}
+.peek-row:disabled {
+  opacity: 0.55;
+}
+.peek-thumb {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-size: 13px;
+  background: var(--btn2) center / cover;
+  border-radius: 8px;
+}
+.peek-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.peek-track {
+  font-size: 12px;
+  color: var(--muted);
+}
+.hit.soft {
+  touch-action: pan-y;
 }

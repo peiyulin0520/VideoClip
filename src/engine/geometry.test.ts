@@ -10,6 +10,8 @@ import {
   snapRotation,
   SAFE_BOTTOM,
   topHit,
+  hitTestAll,
+  nextHit,
   type GeoCtx,
 } from './geometry';
 
@@ -118,6 +120,36 @@ describe('geometry', () => {
     layers[1]!.track = track(true);
     expect(topHit(layers, ctx, 540, 960)!.item.id).toBe('low');
     expect(topHit(layers, ctx, 5, 5)).toBeNull();
+  });
+
+  it('hitTestAll：疊三層由上到下，鎖定的不在裡面，點在外面是空的', () => {
+    const mk = (id: string) => ({ ...createOverlayClip(asset, 0), id });
+    const track = (locked: boolean) => ({
+      id: 't',
+      kind: 'overlay' as const,
+      name: '',
+      hidden: false,
+      locked,
+      items: [],
+    });
+    const layers = [
+      { item: mk('a'), track: track(false), trackIndex: 1 },
+      { item: mk('b'), track: track(true), trackIndex: 2 },
+      { item: mk('c'), track: track(false), trackIndex: 3 },
+    ];
+    expect(hitTestAll(layers, ctx, 540, 960).map((l) => l.item.id)).toEqual(['c', 'a']);
+    expect(hitTestAll(layers, ctx, 5, 5)).toEqual([]);
+  });
+
+  it('nextHit：沒選＝最上面；已選＝下一層，到底回最上面；選的不在裡面＝最上面', () => {
+    const hits = ['top', 'mid', 'low'].map((id) => ({ item: { id } }));
+    expect(nextHit(hits, null)!.item.id).toBe('top');
+    expect(nextHit(hits, 'top')!.item.id).toBe('mid');
+    expect(nextHit(hits, 'mid')!.item.id).toBe('low');
+    expect(nextHit(hits, 'low')!.item.id).toBe('top');
+    expect(nextHit(hits, 'other')!.item.id).toBe('top');
+    expect(nextHit([{ item: { id: 'x' } }], 'x')!.item.id).toBe('x'); // 只有一個：維持
+    expect(nextHit([], 'x')).toBeNull();
   });
 
   it('吸附：靠近中心線與安全區邊界時吸過去，太遠不吸', () => {

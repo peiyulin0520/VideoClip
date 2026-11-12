@@ -1,4 +1,4 @@
-import { Maximize, Minimize, ShieldCheck } from 'lucide-react';
+import { Layers, Maximize, Minimize, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { urlFor } from '../../engine/assetUrls';
 import { installDebugHook } from '../../engine/debug';
@@ -9,14 +9,15 @@ import {
   snapRotation,
   SAFE_BOTTOM,
   SAFE_RIGHT,
-  topHit,
+  hitTestAll,
+  nextHit,
   type Box,
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
+import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
 import { CropOverlay } from './CropOverlay';
 import { useCrop } from '../../store/cropStore';
-import type { Item } from '../../model/types';
 import { geoCtx } from '../../engine/scene';
 import { findItem, visibleLayers } from '../../engine/timeline';
 import { setTransform } from '../../store/actions';
@@ -34,6 +35,12 @@ const readSafe = () => {
 };
 
 type Pt = { x: number; y: number };
+/** 輕點的判定：手指移動不到 8px、按下到放開不到 350ms，而且中間沒被瀏覽器接手去捲頁面 */
+const TAP_MOVE = 8;
+const TAP_MS = 350;
+/** 大於舞台一半的物件（例如滿版的影片）：沒選取時只能「點」來選取，上下滑要能捲頁面 */
+const LARGE_AREA = 0.5;
+type Tap = { pointerId: number; cx: number; cy: number; t: number; pt: Pt; moved: boolean };
 type Gesture =
   | { type: 'move'; id: string; start: Pt; startX: number; startY: number; moved: boolean }
   | {
@@ -66,6 +73,7 @@ export function Preview({
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [selVisible, setSelVisible] = useState(true);
   const [hitIds, setHitIds] = useState(''); // 這一秒可以拖的物件（逗號分隔），給觸控區用
+  const [peek, setPeek] = useState(false); // 「查看圖層」清單
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
@@ -144,7 +152,7 @@ export function Preview({
       setHitIds(
         p
           ? visibleLayers(p, t)
-              .filter((l) => l.track.kind !== 'main' && !l.track.locked)
+              .filter((l) => !l.track.locked)
               .map((l) => l.item.id)
               .join(',')
           : '',
@@ -163,6 +171,7 @@ export function Preview({
 
   const pointers = useRef(new Map<number, Pt>());
   const gesture = useRef<Gesture | null>(null);
+  const tap = useRef<Tap | null>(null);
 
   const toProj = (e: { clientX: number; clientY: number }): Pt => {
     const r = stageRef.current!.getBoundingClientRect();
@@ -182,6 +191,13 @@ export function Preview({
     };
   };
 
+  /** 這個點下面所有的物件，由上到下 */
+  const hitsAt = (pt: Pt) => {
+    const st = useProjectStore.getState();
+    const t = useUI.getState().player?.time ?? 0;
+    return hitTestAll(visibleLayers(st.project!, t), geo, pt.x, pt.y, 40 / k);
+  };
+
   const onPointerDown = (e: RPointerEvent) => {
     if ((e.target as HTMLElement).closest('[data-handle]')) return;
     stageRef.current!.setPointerCapture(e.pointerId);
@@ -191,13 +207,14 @@ export function Preview({
     const cur = findItem(st.project!, st.selectedId);
 
     if (pointers.current.size === 2) {
+      tap.current = null; // 第二根手指：不是輕點
       const [a, b] = [...pointers.current.values()] as [Pt, Pt];
-      // 沒有選取時：選兩指中點下最上面的物件（主軌除外）
-      let target: { item: Item } | null = cur && !cur.track.locked ? cur : null;
+      // 已經有選取：雙指不管落在哪裡都作用在已選的物件；沒有選取：選兩指中點下最上面的物件
+      let target: { item: { id: string; transform: { scale: number; rotation: number } } } | null =
+        cur && !cur.track.locked ? cur : null;
       if (!target) {
-        const t = useUI.getState().player?.time ?? 0;
-        const hit = topHit(visibleLayers(st.project!, t), geo, (a.x + b.x) / 2, (a.y + b.y) / 2, 40 / k);
-        if (hit && hit.track.kind !== 'main') {
+        const hit = hitsAt({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })[0];
+        if (hit) {
           st.select(hit.item.id);
           target = hit;
         }
@@ -216,28 +233,40 @@ export function Preview({
     }
     if (pointers.current.size > 1) return;
 
+    tap.current = { pointerId: e.pointerId, cx: e.clientX, cy: e.clientY, t: performance.now(), pt, moved: false };
+    // 按在「看不見的觸控區」（touch-action:none）上：立刻選取＋準備拖移。
+    // 其他地方（含沒選取的大物件）只當成「可能是輕點」，放開時才判定，上下滑就是捲頁面、什麼都不改
+    const hitEl = (e.target as HTMLElement).closest<HTMLElement>('[data-hit]');
+    if (!hitEl || hitEl.dataset.eager !== '1') return;
+    const id = hitEl.dataset.hit!;
     useUI.getState().player?.pause();
-    const t = useUI.getState().player?.time ?? 0;
-    const hit = topHit(visibleLayers(st.project!, t), geo, pt.x, pt.y, 40 / k);
-    if (!hit) {
-      st.select(null);
-      gesture.current = null;
-      return;
+    if (id !== st.selectedId) {
+      st.select(id);
+      tap.current = null; // 這一下已經拿來選取了，不再算輕點（不會馬上換到下一層）
     }
-    // 主軌是滿版的：預覽上單點它不選取、也不拖移（要選主軌請點時間軸）；已經從時間軸選了主軌時才可以在預覽上調整
-    if (hit.track.kind === 'main' && hit.item.id !== st.selectedId) {
-      st.select(null);
-      gesture.current = null;
-      return;
-    }
-    if (hit.item.id !== st.selectedId) st.select(hit.item.id);
-    startMove(hit.item.id, pt);
+    startMove(id, pt);
+  };
+
+  /** 輕點判定結束：選取最上面的，或已選的再點一次換下一層；點到空白什麼都不做 */
+  const finishTap = (e: RPointerEvent) => {
+    const tp = tap.current;
+    tap.current = null;
+    if (!tp || tp.pointerId !== e.pointerId || tp.moved) return;
+    if (gesture.current?.type === 'move' && gesture.current.moved) return; // 拖移過了
+    if (performance.now() - tp.t > TAP_MS) return;
+    const hit = nextHit(hitsAt(tp.pt), useProjectStore.getState().selectedId);
+    if (!hit) return;
+    useUI.getState().player?.pause();
+    if (hit.item.id !== useProjectStore.getState().selectedId) useProjectStore.getState().select(hit.item.id);
   };
 
   const onPointerMove = (e: RPointerEvent) => {
     if (!pointers.current.has(e.pointerId)) return;
     const pt = toProj(e);
     pointers.current.set(e.pointerId, pt);
+    if (tap.current && tap.current.pointerId === e.pointerId) {
+      if (Math.hypot(e.clientX - tap.current.cx, e.clientY - tap.current.cy) > TAP_MOVE) tap.current.moved = true;
+    }
     const g = gesture.current;
     if (!g) return;
     const f = findItem(useProjectStore.getState().project!, g.id);
@@ -281,6 +310,7 @@ export function Preview({
   };
 
   const onPointerUp = (e: RPointerEvent) => {
+    finishTap(e);
     pointers.current.delete(e.pointerId);
     setGuides({ x: null, y: null });
     if (pointers.current.size === 0) setDragging(false);
@@ -290,6 +320,11 @@ export function Preview({
       const [pt] = [...pointers.current.values()] as [Pt];
       startMove(gesture.current.id, pt);
     }
+  };
+
+  const onPointerCancel = (e: RPointerEvent) => {
+    tap.current = null; // 瀏覽器接手去捲頁面了：不是輕點
+    onPointerUp(e);
   };
 
   const toggleSafe = () => {
@@ -312,7 +347,7 @@ export function Preview({
       if (b) hitBoxes.push({ id, b });
     }
   }
-  if (sel && box && sel.track.kind === 'main') hitBoxes.push({ id: sel.item.id, b: box }); // 從時間軸選了主軌
+  // 從時間軸選了一個現在不在畫面上的物件：沒有觸控區（選取框也不會顯示）
   const minHit = 44 / k;
 
   return (
@@ -325,7 +360,7 @@ export function Preview({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerCancel={onPointerCancel}
       >
         {/* key：比例改變就換一個新的 canvas（舊的 WebGL 環境被 Pixi 銷毀後不能在同一個 canvas 上重建） */}
         <canvas key={`${width}x${height}`} ref={canvasRef} data-testid="preview-canvas" />
@@ -360,14 +395,18 @@ export function Preview({
         )}
         {!cropping &&
           hitBoxes.map(({ id, b }) => {
-            const pad = id === selectedId ? 24 / k : 0; // 選取中的物件觸控區外擴一點，雙指比較好放
+            const pad = id === selectedId ? 40 / k : 0; // 選取中的物件觸控區外擴 40px，雙指比較好放（再大就擋住預覽上的捲頁面）
             const w = Math.max(b.w, minHit) + pad * 2;
             const h = Math.max(b.h, minHit) + pad * 2;
+            // 沒選取的大物件（滿版影片）：觸控區不擋捲動，只靠輕點選取；選取中的、小的物件：可以直接拖
+            const large = (b.w * b.h) / (width * height) >= LARGE_AREA;
+            const eager = id === selectedId || !large;
             return (
               <div
                 key={id}
-                className="hit"
+                className={`hit${eager ? '' : ' soft'}`}
                 data-hit={id}
+                data-eager={eager ? '1' : '0'}
                 aria-hidden="true"
                 style={{
                   left: b.cx * k,
@@ -386,6 +425,19 @@ export function Preview({
           ＋ 匯入影片或照片
         </button>
       )}
+      <button
+        className="peek-toggle"
+        aria-label="查看圖層"
+        aria-pressed={peek}
+        onClick={() => {
+          player?.pause();
+          setPeek((v) => !v);
+        }}
+      >
+        <Layers size={18} />
+        <span>圖層</span>
+      </button>
+      {peek && <LayerPeek project={project} time={player?.time ?? 0} onClose={() => setPeek(false)} />}
       <button
         className="full-toggle"
         aria-label={previewFull ? '結束全螢幕預覽' : '全螢幕預覽'}

@@ -51,7 +51,7 @@ async function mockGiphy(page: Page, opts: { badKeys?: string[] } = {}) {
 }
 
 async function openGiphy(page: Page) {
-  await openTab(page, '疊加');
+  await openTab(page, '素材');
   await page.getByRole('tablist', { name: '貼圖分類' }).getByRole('tab', { name: 'GIPHY' }).tap();
 }
 
@@ -296,7 +296,7 @@ test('GIPHY 沒有會動的版本或下載失敗：退回靜態圖，照常加�
 
 test('我的貼圖：上傳 GIF 會保留會動；一般圖片還是轉成 PNG', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
-  await openTab(page, '疊加');
+  await openTab(page, '素材');
   await page.getByRole('tablist', { name: '貼圖分類' }).getByRole('tab', { name: '我的貼圖' }).tap();
   await page
     .getByTestId('my-sticker-input')

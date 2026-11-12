@@ -16,7 +16,7 @@ const audioTrack = async (page: Page) =>
     { kind: string; muted?: boolean; items: Item[] } | undefined;
 
 async function addMusic(page: Page, file = 'music-4s.wav') {
-  await openTab(page, '疊加');
+  await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fixture(file));
   await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
 }
@@ -86,7 +86,7 @@ test('選到音樂：只有音樂用得到的工具；音量 0–200%、淡入�
   await createProjectWith(page, ['solid-red.webm']);
   await addMusic(page);
   await musicClip(page).tap();
-  await openTab(page, '剪輯');
+  await openTab(page, '音訊');
   const tools = page.getByRole('toolbar', { name: '音樂工具' });
   await expect(tools).toBeVisible();
   for (const n of ['分割', '刪除', '複製', '修剪', '音量'])
@@ -136,7 +136,7 @@ test('音樂可以分割、複製、刪除；修剪面板顯示波形；音樂�
   await createProjectWith(page, ['solid-red.webm']);
   await addMusic(page);
   await musicClip(page).tap();
-  await openTab(page, '剪輯');
+  await openTab(page, '音訊');
   await seekTo(page, 2);
   await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '分割' }).tap();
   let items = (await audioTrack(page))!.items;
@@ -225,7 +225,7 @@ test('匯出會混進背景音樂：放在對的時間；音量、淡入淡出�
 
   // 淡入 2 秒：第 0 秒（響的那半秒音量最多 25%）比第 2 秒小很多
   await musicClip(page).tap();
-  await openTab(page, '剪輯');
+  await openTab(page, '音訊');
   await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '音量' }).tap();
   await page.getByRole('slider', { name: '淡入', exact: true }).evaluate((el) => {
     const i = el as HTMLInputElement;
@@ -260,6 +260,7 @@ test('匯出會混進背景音樂：放在對的時間；音量、淡入淡出�
 test('全部影片靜音：一鍵關掉所有影片的聲音（音樂不受影響），再按恢復；一步復原', async ({ page }) => {
   test.setTimeout(150_000);
   await createProjectWith(page, ['clip-a.webm']); // 有聲音（440Hz）
+  await openTab(page, '音訊'); // 「全部影片靜音」在音訊分頁
   const mute = page.getByRole('button', { name: '全部影片靜音' });
   await expect(mute).toBeVisible();
   const before = await inspect(page, {});
@@ -274,7 +275,6 @@ test('全部影片靜音：一鍵關掉所有影片的聲音（音樂不受影�
   // 全部靜音時加音樂：音樂還是有聲音
   await mute.tap();
   await addMusic(page);
-  await openTab(page, '剪輯');
   const withMusic = await inspect(page, {});
   expect(withMusic.hasAudio).toBe(true);
   expect(Math.max(...withMusic.audioPeaks.slice(0, 2))).toBeGreaterThan(0.1);
@@ -284,7 +284,7 @@ test('沒有影片時不能加背景音樂；音樂檔壞掉會說明原因', as
   await createProjectWith(page, ['photo.png']);
   await page.getByTestId('clip').first().tap();
   await page.getByRole('button', { name: '刪除' }).tap();
-  await openTab(page, '疊加');
+  await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
   await expect(page.locator('.toast').filter({ hasText: '先匯入影片或照片' })).toBeVisible();
   expect(await audioTrack(page)).toBeUndefined();

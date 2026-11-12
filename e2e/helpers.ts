@@ -148,7 +148,7 @@ export const exportFrame = async (page: Page, t: number, pts: [number, number][]
   );
 
 /** 切到底部分頁 */
-export async function openTab(page: Page, name: '剪輯' | '疊加' | '文字' | '圖層') {
+export async function openTab(page: Page, name: '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '素材' | '音訊') {
   const tab = page.getByRole('tab', { name });
   // 點「目前的分頁」會收合面板，所以已經在這個分頁且展開時就不用再點
   if (
@@ -238,4 +238,9 @@ export async function showTimeline(page: Page) {
     const r = el.getBoundingClientRect();
     if (r.top < 60 || r.bottom > window.innerHeight) window.scrollBy(0, r.top - window.innerHeight / 3);
   });
+}
+
+/** 取消選取：點時間軸某一軌的空白處（預覽上點空白處不會取消選取了） */
+export async function deselect(page: Page) {
+  await page.locator('[data-testid="track"]').first().click({ position: { x: 100, y: 4 } });
 }
