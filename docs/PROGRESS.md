@@ -4,7 +4,7 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`。第 3 次實測修正＋GIPHY＋我的貼圖＋精靈說明已開 **PR #5** 等使用者合併（2026-11-12）；合併後分支對齊 main：`git fetch origin main && git merge --ff-only origin/main`
+- **分支**：PR #5（第 3 次實測修正＋GIPHY＋我的貼圖＋精靈說明）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已用 `git merge --ff-only origin/main` 對齊，之後的新工作繼續在這個分支
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
 - **測試**：566 個單元測試、70 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
