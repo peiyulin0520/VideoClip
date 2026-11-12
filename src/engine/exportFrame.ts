@@ -1,4 +1,5 @@
 import type { Asset, Project, VideoItem } from '../model/types';
+import { animBitmapAt, fetchBlob } from './animImage';
 import { Compositor } from './compositor';
 import { buildScene } from './scene';
 import { sourceTimeAt, visibleLayers } from './timeline';
@@ -17,7 +18,7 @@ function once(el: EventTarget, ok: string, ms = 8000): Promise<void> {
   });
 }
 
-type Prepared = { source: HTMLVideoElement | HTMLImageElement; w: number; h: number };
+type Prepared = { source: HTMLVideoElement | HTMLImageElement | ImageBitmap; w: number; h: number };
 
 /**
  * 把專案在 t 秒的那一格，用「輸出解析度」畫成 PNG（匯出整支影片時每一格也是走同一套 buildScene + Compositor）。
@@ -38,6 +39,14 @@ export async function renderFrame(
         const asset = project.assets.find((a) => a.id === item.assetId);
         const url = urlFor(item.assetId);
         if (!asset || !url) return;
+        if (item.type === 'image' && asset.anim) {
+          // 會動的圖片：取「物件開始後 t − start 秒」那一格，跟預覽一樣
+          const bmp = await animBitmapAt(asset.id, fetchBlob(url), t - item.start);
+          if (bmp) {
+            prepared.set(item.id, { source: bmp, w: bmp.width, h: bmp.height });
+            return;
+          }
+        }
         if (item.type === 'image') {
           const img = new Image();
           img.src = url;

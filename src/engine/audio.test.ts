@@ -51,6 +51,11 @@ describe('driftPlan：播放中對時，小差距慢慢追、大差距才硬跳'
     expect(driftPlan(0.8, 2)).toEqual({ seek: true, rate: 2 });
     expect(driftPlan(-0.8, 0.5)).toEqual({ seek: true, rate: 0.5 });
   });
+  it('iPhone（soft=false）：小差距不微調速度，大差距照樣硬跳', () => {
+    expect(driftPlan(0.2, 1, false)).toEqual({ seek: false, rate: 1 });
+    expect(driftPlan(-0.3, 2, false)).toEqual({ seek: false, rate: 2 });
+    expect(driftPlan(0.8, 1, false)).toEqual({ seek: true, rate: 1 });
+  });
   it('變速的片段以它的速度為基準', () => {
     expect(driftPlan(0.2, 2).rate).toBeGreaterThan(2);
   });

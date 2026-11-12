@@ -1,9 +1,11 @@
 import {
   ArrowDown,
   ArrowLeft,
+  ArrowLeftToLine,
   ArrowRight,
   ArrowUp,
   Copy,
+  Crop as CropIcon,
   Eye,
   EyeOff,
   Gauge,
@@ -11,44 +13,59 @@ import {
   Lock,
   Maximize,
   Minimize,
+  MoveHorizontal,
   Plus,
   Scissors,
   Trash2,
   Type,
   Volume2,
+  VolumeX,
   type LucideIcon,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { ensureUrls } from '../../engine/assetUrls';
 import { BLEND_LABELS } from '../../engine/geometry';
+import { importFiles } from '../../engine/importMedia';
 import {
   findItem,
+  gapOf,
   isVideoItem,
   itemAt,
   layersAt,
   mainItems,
   moveItem,
+  removeGap,
   setSpeed,
+  totalDuration,
 } from '../../engine/timeline';
 import { MAX_SPEED, MIN_SPEED } from '../../model/defaults';
 import type { BlendMode, Item, VideoItem } from '../../model/types';
 import {
+  addMusic,
   addText,
   duplicateAny,
   editItem,
   patchTrack,
   removeAnyItem,
+  removeGroup,
   shiftTrackLayer,
+  setAllVideoMuted,
   splitAny,
+  videoTracksMuted,
 } from '../../store/actions';
 import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Slider } from '../../ui/Slider';
+import { LayoutPicker } from './LayoutPicker';
 import { StickerPicker } from './StickerPicker';
 import { TextPanel } from './TextPanel';
+import { CropPanel } from './CropPanel';
+import { TrimPanel } from './TrimPanel';
+import { cancelCrop, startCrop, useCrop } from '../../store/cropStore';
 import { TransformControls } from './TransformControls';
 
 export type Tab = 'edit' | 'overlay' | 'text' | 'layers';
-type Panel = 'speed' | 'volume' | null;
+type Panel = 'speed' | 'volume' | 'trim' | null;
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'edit', label: '剪輯' },
@@ -100,6 +117,7 @@ export function BottomBar({
   // 點目前的分頁＝收合/展開下面的面板（讓出空間給預覽畫面）
   const switchTab = (t: Tab) => {
     setPanel(null);
+    cancelCrop(); // 離開剪輯分頁就結束裁切模式（不套用）
     if (t === tab) setCollapsed((c) => !c);
     else {
       setTab(t);
@@ -157,6 +175,7 @@ function EditTab({
 }) {
   const project = useProjectStore((s) => s.project)!;
   const player = useUI((s) => s.player);
+  const cropping = useCrop((s) => !!s.s);
   const selected = found?.item;
   const isMain = found?.track.kind === 'main';
 
@@ -208,14 +227,26 @@ function EditTab({
     toast(s.fit === 'cover' ? '完整顯示（上下或左右留黑邊）' : '填滿畫面（裁掉多餘部分）');
   };
 
+  const removeMainGap = (id: string) => setMainItems(removeGap(items, id));
+
   const openPanel = (p: Exclude<Panel, null>) => {
     const s = need();
     if (!s) return;
     if (!isVideoItem(s)) return toast('文字不能變速或調音量');
     if (p === 'speed' && s.type === 'image') return toast('照片不能變速');
+    if (p === 'speed' && s.type === 'audio') return toast('音樂不能變速');
     if (p === 'volume' && s.type === 'image') return toast('照片沒有聲音');
+    if (p === 'trim' && s.type === 'image') return toast('照片沒有素材區段，請拖時間軸上的把手調長度');
     setPanel(p);
   };
+
+  if (cropping) return <CropPanel />;
+
+  if (panel === 'trim' && selected && isVideoItem(selected) && found) {
+    const asset = project.assets.find((a) => a.id === selected.assetId);
+    if (asset)
+      return <TrimPanel item={selected} asset={asset} track={found.track} onClose={() => setPanel(null)} />;
+  }
 
   if (panel && selected && isVideoItem(selected)) {
     const asset = project.assets.find((a) => a.id === selected.assetId);
@@ -276,29 +307,54 @@ function EditTab({
         ) : (
           <>
             <div className="panel-head">
-              <span>音量{asset && !asset.hasAudio ? '（這支影片沒有聲音）' : ''}</span>
+              <span>
+                {selected.type === 'audio' ? '音樂音量' : '音量'}
+                {asset && !asset.hasAudio ? '（這支影片沒有聲音）' : ''}
+              </span>
               <b data-testid="volume-value">{Math.round(selected.volume * 100)}%</b>
             </div>
+            {found?.track.muted && (
+              <p className="hint warn">這條軌道目前是靜音的（點時間軸左邊的圖示可以取消靜音）。</p>
+            )}
             <input
               type="range"
               aria-label="音量"
               min={0}
-              max={1}
+              max={2}
               step={0.01}
               value={selected.volume}
               onChange={(e) => setVideo({ volume: Number(e.target.value) }, `vol:${selected.id}`)}
             />
             <div className="chips">
-              {[0, 0.5, 1].map((v) => (
+              {[0, 0.5, 1, 1.5, 2].map((v) => (
                 <button
                   key={v}
                   className={`chip${selected.volume === v ? ' active' : ''}`}
+                  aria-label={v === 0 ? '關閉聲音' : `音量 ${v * 100}%`}
                   onClick={() => setVideo({ volume: v })}
                 >
-                  {v === 0 ? '靜音' : `${v * 100}%`}
+                  {v === 0 ? '關閉聲音' : `${v * 100}%`}
                 </button>
               ))}
             </div>
+            <Slider
+              label="淡入"
+              value={selected.fadeIn ?? 0}
+              min={0}
+              max={Math.max(Math.min(5, Math.round((selected.duration / 2) * 10) / 10), 0.1)}
+              step={0.1}
+              format={(v) => `${v.toFixed(1)} 秒`}
+              onChange={(v) => setVideo({ fadeIn: v }, `fi:${selected.id}`)}
+            />
+            <Slider
+              label="淡出"
+              value={selected.fadeOut ?? 0}
+              min={0}
+              max={Math.max(Math.min(5, Math.round((selected.duration / 2) * 10) / 10), 0.1)}
+              step={0.1}
+              format={(v) => `${v.toFixed(1)} 秒`}
+              onChange={(v) => setVideo({ fadeOut: v }, `fo:${selected.id}`)}
+            />
           </>
         )}
         <button className="btn primary done" onClick={() => setPanel(null)}>
@@ -308,22 +364,113 @@ function EditTab({
     );
   }
 
+  // 選到背景音樂：只有音樂用得到的工具
+  if (selected && selected.type === 'audio') {
+    return (
+      <div className="toolbar" role="toolbar" aria-label="音樂工具">
+        <ToolButton icon={Scissors} label="分割" onClick={split} />
+        <ToolButton icon={Trash2} label="刪除" onClick={remove} />
+        <ToolButton icon={Copy} label="複製" onClick={() => duplicateAny(selected.id)} />
+        <ToolButton icon={MoveHorizontal} label="修剪" onClick={() => openPanel('trim')} />
+        <ToolButton icon={Volume2} label="音量" onClick={() => openPanel('volume')} />
+      </div>
+    );
+  }
+
+  const allMuted = videoTracksMuted(project);
   return (
     <div className="toolbar" role="toolbar" aria-label="剪輯工具">
       <ToolButton icon={Plus} label="匯入" onClick={onImport} />
       <ToolButton icon={Scissors} label="分割" onClick={split} />
       <ToolButton icon={Trash2} label="刪除" onClick={remove} />
+      {selected && isVideoItem(selected) && selected.group && (
+        <ToolButton icon={Trash2} label="移除版型" onClick={() => removeGroup(selected.group!)} />
+      )}
       <ToolButton icon={Copy} label="複製" onClick={() => need() && duplicateAny(selected!.id)} />
       <ToolButton icon={ArrowLeft} label="前移" onClick={() => move(-1)} />
       <ToolButton icon={ArrowRight} label="後移" onClick={() => move(1)} />
+      <ToolButton icon={MoveHorizontal} label="修剪" onClick={() => openPanel('trim')} />
+      <ToolButton
+        icon={CropIcon}
+        label="裁切"
+        onClick={() => {
+          const s = need();
+          if (!s) return;
+          if (!isVideoItem(s)) return toast('文字不能裁切');
+          startCrop(s.id);
+        }}
+      />
+      {isMain && selected && isVideoItem(selected) && gapOf(selected) > 0 && (
+        <ToolButton icon={ArrowLeftToLine} label="刪除空白" onClick={() => removeMainGap(selected.id)} />
+      )}
       <ToolButton icon={Gauge} label="變速" onClick={() => openPanel('speed')} />
       <ToolButton icon={Volume2} label="音量" onClick={() => openPanel('volume')} />
+      <ToolButton
+        icon={allMuted ? Volume2 : VolumeX}
+        label={allMuted ? '恢復影片聲音' : '全部影片靜音'}
+        active={allMuted}
+        onClick={() => {
+          setAllVideoMuted(!allMuted);
+          toast(allMuted ? '影片的聲音恢復了' : '所有影片都靜音了（背景音樂不受影響）');
+        }}
+      />
       <ToolButton
         icon={selected && isVideoItem(selected) && selected.fit === 'contain' ? Minimize : Maximize}
         label={selected && isVideoItem(selected) && selected.fit === 'contain' ? '填滿' : '完整'}
         onClick={toggleFit}
       />
     </div>
+  );
+}
+
+/** 背景音樂：從「檔案」選 mp3／m4a／wav…，放在播放頭這一秒的音樂軌 */
+function MusicImport() {
+  const input = useRef<HTMLInputElement>(null);
+  const onFiles = async (list: FileList | null) => {
+    const files = list ? Array.from(list) : [];
+    if (input.current) input.current.value = '';
+    if (!files.length) return;
+    const st = useProjectStore.getState();
+    const pid = st.project?.id;
+    if (!pid) return;
+    if (totalDuration(st.project!) <= 0) return toast('先匯入影片或照片，再加背景音樂');
+    const { setBusy, player } = useUI.getState();
+    setBusy('匯入音樂中…');
+    try {
+      const res = await importFiles(pid, files);
+      if (res.assets.length) {
+        await ensureUrls(pid, res.assets);
+        addMusic(res.assets, player?.time ?? 0);
+        toast(`已加入背景音樂：${res.assets.map((a) => a.name).join('、')}`);
+      }
+      if (res.failed.length)
+        toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`, 8000);
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <>
+      <div className="panel-head">
+        <span>背景音樂</span>
+      </div>
+      <button className="btn done" onClick={() => input.current?.click()}>
+        ＋ 加入背景音樂（從「檔案」選 mp3、m4a、wav…）
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac,.caf"
+        multiple
+        hidden
+        data-testid="music-input"
+        onChange={(e) => void onFiles(e.target.files)}
+      />
+      <p className="hint music-note">
+        音樂會放在目前這一秒，最長到影片結束。點時間軸上的音樂可以分割、修剪、調音量和淡入淡出。發 Reels
+        時，也可以先匯出，再在 Instagram 裡加熱門音樂（比較不會有版權問題）。
+      </p>
+    </>
   );
 }
 
@@ -340,6 +487,8 @@ function OverlayTab({ onImportOverlay }: { onImportOverlay: () => void }) {
         <span>貼圖</span>
       </div>
       <StickerPicker />
+      <LayoutPicker />
+      <MusicImport />
     </div>
   );
 }
@@ -375,7 +524,7 @@ function LayersTab() {
   // 目前這一秒有哪些圖層（最上層在最上面）
   const layers = layersAt(project, t, true).slice().reverse();
   const found = findItem(project, selectedId);
-  const it = found?.item;
+  const it = found && found.item.type !== 'audio' ? found.item : undefined;
 
   return (
     <div className="panel">
@@ -516,42 +665,6 @@ function LayersTab() {
               />
             ))}
           </div>
-          {isVideoItem(it) && (
-            <>
-              <div className="slider-label">裁切（切掉各邊的比例）</div>
-              {(
-                [
-                  ['l', '左'],
-                  ['r', '右'],
-                  ['t', '上'],
-                  ['b', '下'],
-                ] as const
-              ).map(([k, name]) => (
-                <Slider
-                  key={k}
-                  label={`裁切${name}`}
-                  value={Math.round((it.crop?.[k] ?? 0) * 100)}
-                  min={0}
-                  max={80}
-                  step={1}
-                  format={(v) => `${v}%`}
-                  onChange={(v) =>
-                    editItem(
-                      it.id,
-                      (x) => {
-                        const c = (x.crop ??= { l: 0, t: 0, r: 0, b: 0 });
-                        c[k] = v / 100;
-                        // 左右、上下加起來不能超過 90%
-                        const other = k === 'l' ? 'r' : k === 'r' ? 'l' : k === 't' ? 'b' : 't';
-                        if (c[k] + c[other] > 0.9) c[other] = Math.max(0.9 - c[k], 0);
-                      },
-                      { coalesce: `crop${k}:${it.id}` },
-                    )
-                  }
-                />
-              ))}
-            </>
-          )}
           <button
             className="btn"
             onClick={() =>
@@ -567,7 +680,9 @@ function LayersTab() {
           </button>
         </div>
       ) : (
-        <p className="hint">點一個圖層（或預覽畫面上的物件）後，可以調透明度、混合模式、圓角、外框和裁切。</p>
+        <p className="hint">
+          點一個圖層（或預覽畫面上的物件）後，可以調透明度、混合模式、圓角和外框。裁切在「剪輯」分頁。
+        </p>
       )}
     </div>
   );

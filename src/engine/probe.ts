@@ -1,20 +1,25 @@
 import { ALL_FORMATS, BlobSource, CanvasSink, Input } from 'mediabunny';
 import type { Asset } from '../model/types';
+import { decodeAnimBlob } from './animImage';
+import { computeWave } from './wave';
 
-export type MediaKind = 'video' | 'image';
+export type MediaKind = 'video' | 'image' | 'audio';
 
 const VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|3gp|avi)$/i;
+const AUDIO_EXT = /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|caf|aif|aiff)$/i;
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i;
 
 export function mediaKindOf(file: File): MediaKind | null {
+  if (file.type.startsWith('audio/')) return 'audio';
   if (file.type.startsWith('video/')) return 'video';
   if (file.type.startsWith('image/')) return 'image';
+  if (AUDIO_EXT.test(file.name)) return 'audio';
   if (VIDEO_EXT.test(file.name)) return 'video';
   if (IMAGE_EXT.test(file.name)) return 'image';
   return null;
 }
 
-type Probed = Pick<Asset, 'duration' | 'width' | 'height' | 'hasAudio'>;
+type Probed = Pick<Asset, 'duration' | 'width' | 'height' | 'hasAudio' | 'codec' | 'hdr'>;
 
 /** 讀影片長度、尺寸、有沒有音軌（Mediabunny 直接讀容器，不需要瀏覽器能解碼） */
 async function probeVideoContainer(file: File): Promise<Probed | null> {
@@ -26,7 +31,19 @@ async function probeVideoContainer(file: File): Promise<Probed | null> {
       input.getPrimaryAudioTrack(),
     ]);
     if (!v) return null;
-    return { duration, width: v.displayWidth, height: v.displayHeight, hasAudio: !!a };
+    // 編碼與 HDR：給「要不要做預覽用輕量影片」判斷；讀不到不影響匯入
+    const [codec, hdr] = await Promise.all([
+      v.getCodec().catch(() => null),
+      v.hasHighDynamicRange().catch(() => false),
+    ]);
+    return {
+      duration,
+      width: v.displayWidth,
+      height: v.displayHeight,
+      hasAudio: !!a,
+      ...(codec ? { codec } : {}),
+      ...(hdr ? { hdr: true } : {}),
+    };
   } catch {
     return null;
   } finally {
@@ -171,15 +188,68 @@ async function imageInfo(file: File, url: string): Promise<{ w: number; h: numbe
 export type ProbeResult =
   { ok: true; info: Omit<Asset, 'id' | 'name' | 'mime' | 'size'> } | { ok: false; reason: string };
 
+/** 音樂檔：長度、波形。Mediabunny 讀不了的格式再用 <audio> 讀長度（沒有波形）。 */
+async function probeAudio(file: File, url: string): Promise<ProbeResult> {
+  let duration = 0;
+  const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+  try {
+    if (await input.getPrimaryAudioTrack()) duration = await input.computeDuration();
+  } catch {
+    /* 換 <audio> 試試 */
+  } finally {
+    input.dispose();
+  }
+  if (!(duration > 0)) {
+    const a = document.createElement('audio');
+    a.preload = 'metadata';
+    a.src = url;
+    if (await waitFor(a, 'loadedmetadata', 8000)) duration = a.duration;
+    a.removeAttribute('src');
+    a.load();
+  }
+  if (!(duration > 0) || !isFinite(duration)) return { ok: false, reason: '這個瀏覽器讀不了這個聲音檔' };
+  const wave = await computeWave(file, duration);
+  return {
+    ok: true,
+    info: {
+      kind: 'audio',
+      duration,
+      width: 0,
+      height: 0,
+      hasAudio: true,
+      thumbs: [],
+      ...(wave ? { wave } : {}),
+    },
+  };
+}
+
 export async function probeMedia(file: File, kind: MediaKind): Promise<ProbeResult> {
   const url = URL.createObjectURL(file);
   try {
+    if (kind === 'audio') return await probeAudio(file, url);
     if (kind === 'image') {
       const info = await imageInfo(file, url);
       if (!info) return { ok: false, reason: '這個瀏覽器讀不了這張圖片' };
+      // GIF／動態 WebP：解一次看有幾格（超過上限或解不了就當一般照片）；解出來的格子立刻釋放，播放時才依需要再解
+      let anim: Asset['anim'];
+      if (file.size <= 12 * 1024 * 1024) {
+        const d = await decodeAnimBlob(file).catch(() => null);
+        if (d) {
+          anim = { frames: d.frames.length, duration: d.duration };
+          d.frames.forEach((f) => f.close());
+        }
+      }
       return {
         ok: true,
-        info: { kind, duration: 0, width: info.w, height: info.h, hasAudio: false, thumbs: [info.thumb] },
+        info: {
+          kind,
+          duration: 0,
+          width: info.w,
+          height: info.h,
+          hasAudio: false,
+          thumbs: [info.thumb],
+          ...(anim ? { anim } : {}),
+        },
       };
     }
     const meta = (await probeVideoContainer(file)) ?? (await probeVideoElement(url));

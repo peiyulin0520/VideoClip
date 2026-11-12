@@ -64,11 +64,13 @@ test('圖形庫：4 個分類、每個圖形都點得動、縮圖有畫、對話
   await page.screenshot({ path: `${SHOT}/speech-bubble.png` });
 
   // 字塊外框
-  await setRange(page, '字塊外框', 6);
+  await page.getByRole('switch', { name: '框線' }).tap();
+  expect((await boxOf(page))!.stroke).toMatchObject({ width: 4 });
+  await setRange(page, '框線粗細', 6);
   expect((await boxOf(page))!.stroke).toMatchObject({ width: 6 });
   await page.getByRole('button', { name: '字塊外框顏色 #111111' }).tap();
   expect((await boxOf(page))!.stroke).toMatchObject({ color: '#111111', width: 6 });
-  await setRange(page, '字塊外框', 0);
+  await page.getByRole('switch', { name: '框線' }).tap();
   expect((await boxOf(page))!.stroke).toBeUndefined();
 
   // 換成星形：字塊顏色出現在預覽，文字仍在（白色字在粉紅星星裡）

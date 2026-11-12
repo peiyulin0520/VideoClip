@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { decodeAnimBlob } from '../../engine/animImage';
 import { ensureUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import type { LibraryRecord } from '../../storage/db';
@@ -79,7 +80,10 @@ export function MyStickers() {
     try {
       for (const f of list) {
         try {
-          await addToLibrary(await normalizeSticker(f), f.name, 'sticker');
+          // 會動的 GIF／動態 WebP：保留原檔（轉成 PNG 就不會動了）；其他圖片統一轉成 PNG
+          const anim = f.size <= 8 * 1024 * 1024 && (await decodeAnimBlob(f).catch(() => null));
+          if (anim) anim.frames.forEach((fr) => fr.close());
+          await addToLibrary(anim ? f : await normalizeSticker(f), f.name, 'sticker');
           ok++;
         } catch {
           toast(`「${f.name}」打不開，換一張試試`, 5000);

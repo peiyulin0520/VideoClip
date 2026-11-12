@@ -75,23 +75,32 @@ export function renderText(card: TextCard, scale: number): TextRender {
       reach = Math.max(reach, r.shadow.blur + Math.max(Math.abs(r.shadow.x), Math.abs(r.shadow.y)));
   }
   // 裝飾（尾端圈圈等）會畫到字塊外面：以墨跡矩形算出每個裝飾的範圍，畫布四周留夠
-  const boxOps: Op[] = card.box
-    ? [
-        {
-          type: 'fill',
-          alpha: card.box.opacity,
-          cmds: shapePath(card.box.shape, lay.w, lay.h, {
-            radius: (card.box.radius ?? 28) * scale,
-            tail: card.box.tailDir,
-            adj: card.box.adj,
-          }),
-        },
-      ]
+  const boxPath = card.box
+    ? shapePath(card.box.shape, lay.w, lay.h, {
+        radius: (card.box.radius ?? 28) * scale,
+        tail: card.box.tailDir,
+        adj: card.box.adj,
+      })
     : [];
+  // 填滿與框線分開：各自的顏色、透明度（框線沒有自己的透明度＝跟填滿一樣，舊專案長相不變）
+  const boxStroke = (card.box?.stroke?.width ?? 0) * scale;
+  const fillOps: Op[] =
+    card.box && card.box.fillOn !== false ? [{ type: 'fill', alpha: card.box.opacity, cmds: boxPath }] : [];
+  const strokeOps: Op[] =
+    card.box?.stroke && boxStroke > 0
+      ? [
+          {
+            type: 'stroke',
+            alpha: card.box.stroke.opacity ?? card.box.opacity,
+            cmds: boxPath,
+            width: boxStroke,
+          },
+        ]
+      : [];
+  const boxOps: Op[] = [...fillOps, ...strokeOps];
   const decoOps = (card.decorations ?? []).map((d) => ({ d, ops: decorationOps(d, lay.ink) }));
   let decoReach = 0;
-  const boxStroke = (card.box?.stroke?.width ?? 0) * scale;
-  for (const { ops } of [...decoOps, { ops: boxOps.map((o) => ({ ...o, width: boxStroke })) }]) {
+  for (const { ops } of [...decoOps, { ops: boxOps }]) {
     const bb = opsExtent(ops);
     if (!bb) continue;
     decoReach = Math.max(decoReach, -bb.l, -bb.t, bb.r - lay.w, bb.b - lay.h);
@@ -109,11 +118,8 @@ export function renderText(card: TextCard, scale: number): TextRender {
   if (card.box) {
     ctx.save();
     ctx.translate(ox, oy);
-    // 填色與外框分開畫：外框不跟著字塊透明度以外的東西變
-    drawOps(ctx, boxOps, card.box.fill);
-    if (card.box.stroke && card.box.stroke.width > 0) {
-      drawOps(ctx, [{ ...boxOps[0]!, type: 'stroke', width: boxStroke }], card.box.stroke.color);
-    }
+    drawOps(ctx, fillOps, card.box.fill);
+    if (card.box.stroke) drawOps(ctx, strokeOps, card.box.stroke.color);
     ctx.restore();
   }
 

@@ -101,7 +101,7 @@ export function nextProjectName(existing: string[]): string {
 
 export const TEXT_DEFAULT_DURATION = 3;
 
-const TRACK_NAMES: Record<TrackKind, string> = { main: '主軌', overlay: '疊加', text: '文字' };
+const TRACK_NAMES: Record<TrackKind, string> = { main: '主軌', overlay: '疊加', text: '文字', audio: '音樂' };
 
 export function createTrack(kind: TrackKind, existing: Track[]): Track {
   const n = existing.filter((t) => t.kind === kind).length + 1;
@@ -113,6 +113,12 @@ export function createTrack(kind: TrackKind, existing: Track[]): Track {
     locked: false,
     items: [],
   };
+}
+
+/** 背景音樂：放在 audio 軌，沒有畫面（transform、fit 只是湊欄位，不會用到） */
+export function createAudioClip(asset: Asset, start: number, duration = asset.duration): VideoItem {
+  const c = createClip({ ...asset, kind: 'video' });
+  return { ...c, type: 'audio', start, duration: Math.max(duration, MIN_CLIP_DURATION), fit: 'contain' };
 }
 
 /** 疊加素材：預設縮小 50%、完整顯示，放在畫面中央（畫中畫） */

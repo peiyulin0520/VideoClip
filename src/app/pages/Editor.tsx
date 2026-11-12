@@ -1,9 +1,10 @@
-import { ChevronLeft, Pause, Play, Redo2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronLeft, Pause, Play, Redo2, Share, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { countEditorRender } from '../../engine/debug';
 import { ensureUrls, releaseProjectUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
+import { enqueueProxies } from '../../engine/proxyQueue';
 import { addOverlayClips } from '../../store/actions';
 import { relayout, totalDuration, formatTime } from '../../engine/timeline';
 import { getProject } from '../../storage/projects';
@@ -14,6 +15,7 @@ import { ASPECTS, assignAspect, pickAspect } from '../../model/defaults';
 import type { Aspect } from '../../model/types';
 import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
+import { ExportSheet } from '../editor/ExportSheet';
 import { Preview } from '../editor/Preview';
 import { Timeline, MAX_PPS, MIN_PPS } from '../editor/Timeline';
 import { BottomBar } from '../editor/Toolbar';
@@ -38,6 +40,7 @@ function EditorLoader({ projectId }: { projectId: string }) {
       if (cancelled) return;
       useProjectStore.getState().load(p);
       autosave = startAutosave();
+      enqueueProxies(p.id, p.assets); // 舊專案的大影片：背景補做預覽用輕量影片
       setStatus('ready');
       if (missing.length)
         toast(`找不到素材檔：${missing.join('、')}（可能是上次存不下、沒有留在手機裡，請重新匯入）`, 8000);
@@ -109,6 +112,7 @@ function EditorBody() {
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [ratioOpen, setRatioOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const total = totalDuration(project);
 
@@ -142,6 +146,7 @@ function EditorBody() {
       );
       if (res.assets.length) {
         await ensureUrls(pid, res.assets);
+        enqueueProxies(pid, res.assets);
         const player = useUI.getState().player;
         if (importMode.current === 'overlay') {
           // 疊加：放在播放頭這一秒，同一秒疊多個就各佔一條軌道
@@ -212,6 +217,16 @@ function EditorBody() {
         >
           <Redo2 size={22} />
         </button>
+        <button
+          className="icon-btn"
+          aria-label="匯出影片"
+          onClick={() => {
+            useUI.getState().player?.pause();
+            setExportOpen(true);
+          }}
+        >
+          <Share size={22} />
+        </button>
       </header>
 
       <Preview
@@ -262,6 +277,8 @@ function EditorBody() {
         data-testid="file-input"
         onChange={(e) => void onFiles(e.target.files)}
       />
+
+      <ExportSheet project={project} open={exportOpen} onClose={() => setExportOpen(false)} />
 
       <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
         <p className="hint">改了之後，影片和文字的位置、大小會跟著新的畫面。可以按「復原」改回來。</p>

@@ -141,3 +141,11 @@ type BrushStroke = {
 | `d218cc71`（讓 vlog 飛一會兒） | 地面上白色手寫「VLOG」**逐筆寫出**（V → VL → VLO → VLOG），接著**畫一個橢圓把字圈起來** | `handwrite` 進場、`scribble-circle` 裝飾＋`decor-draw` 描線動畫 |
 
 > 這些是第三方創作者的作品，**只參考效果做法**，不要複製其素材、文字或角色。原始錄影沒有放進 repo；若要再看，請使用者重新上傳。
+
+
+## 裁切與自由形狀遮罩（2026-11-12 已實作）
+
+- **資料**：`ItemBase.crop`（各邊切掉的比例）＋ `VideoItem.mask`（自由形狀多邊形，座標是**原始素材畫面**的比例 0–1，只留多邊形裡面）。
+- **畫面**：矩形裁切用 Pixi 貼圖的子矩形（影片）或暫存畫布 `drawImage` 的來源矩形（照片）；多邊形用 `Graphics` 遮罩（`compositor.ts`，座標由 crop 換算到方框內，優先於圓角遮罩）。預覽、單格輸出共用。**沒做**：遮罩邊緣柔化（feather）。
+- **切完畫面不跳**：`engine/crop.ts` `cropKeepingPlace` 換新的 crop 時同時重算 `transform.x / y / scale`，讓留下來的那塊在畫面上位置、大小都不變（含旋轉、填滿／完整）。
+- **裁切模式**（`store/cropStore.ts`、`app/editor/CropOverlay.tsx`／`CropPanel.tsx`）：剪輯分頁按「裁切」→ 播放器暫時把該物件換成**完整原始畫面**（`Player.setPreviewPatch`，不改專案資料；如果完整畫面會超出預覽，改縮進預覽中央）→ 預覽上拖四邊拉霸／四角／框內平移（`dragCrop`，可鎖定比例）或畫一圈（`smoothPolygon`，Chaikin 磨圓）→ 預覽上的「完成」才一次寫進專案（一步復原）、「取消」什麼都不改。換分頁或選別的片段會結束裁切模式（不套用）。

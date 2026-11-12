@@ -102,6 +102,22 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 
 ## 5. 踩過的坑（避免再踩）
 
+- **介面主題**（`src/ui/theme.ts`、`styles.css`）：顏色全部是 `:root` 的變數（`--bg --fg --muted --accent --on-accent --panel --line --btn --btn2 --field --border --clip --bar --timeline`），`:root[data-theme='mono'|'fresh'|'warm']` 只覆蓋變數；暗黑是預設（沒有 data-theme）。新的 CSS 不要寫死中性色（#222、#444…），用變數；預覽畫面（`.stage`）永遠黑底。`index.html` 有一小段 inline script 先套用，避免打開時閃暗色；`applyTheme` 也會換 `theme-color` meta。
+- **多格版型**見 `docs/LAYOUTS.md`（外框 PNG＋每格一個普通疊加物件＋鎖住的外框軌道）。
+
+- **背景音樂（audio 軌）**：`TrackKind` 多了 `'audio'`，音樂是 `VideoItem` 的 `type: 'audio'`（有 `trimIn`、`volume`、`fadeIn`／`fadeOut`，`transform`、`fit` 只是湊欄位）。所以所有「自由軌」的分割、複製、修剪、移動、軌道選單都直接沿用。要記得的幾個地方：`layersAt`／`scene`／`itemBox` 對音樂回傳沒有畫面；`totalDuration` **不算**音樂（音樂比影片長就在影片結束時切掉）；`Asset.kind='audio'`、`Asset.wave`（每 0.1 秒一個 0–100 的值，匯入時 `engine/wave.ts` 算）。預覽：`Player` 多一個 `<audio>` 池（`VideoPool(…, 'audio')`，3 個），`syncMusic` 跟著時間軸對時；聲音走跟影片同一個 `AudioOut`（音量可到 200%、淡入淡出用 `fadeGain` 每格算）。匯出：`mixAudio` 每個物件一個 `GainNode`，音量與淡入淡出用 `setValueAtTime`／`linearRampToValueAtTime`。**沒做循環**（音樂比影片短就用「複製」接起來）。
+- 驗證聲音用 `AudioOut.level()` 時，e2e 要先注入 `navigator.audioSession`，否則 iPhone 模擬的 UA 會走「直接用元素出聲」的路徑（量不到）。
+- `npx tsc --noEmit -p .` 不會真的檢查（專案是 solution-style tsconfig），要用 `npx tsc -b`（`npm run build` 內也有）。
+
+- **匯出整支影片**（`engine/exporter.ts`、`app/editor/ExportSheet.tsx`）：不播放，一格一格依時間走。影片格用 Mediabunny `CanvasSink.getCanvas(t)`（WebCodecs；解不了才退到 `<video>` seek），畫面走跟預覽同一套 `buildScene`＋`Compositor`（輸出解析度），`CanvasSource` 編碼；聲音用 `OfflineAudioContext` 依時間軸（開始時間、修剪、速度、音量、靜音／隱藏軌道）一次混好，`AudioBufferSource` 編碼；`chooseFormat` 決定封裝：H.264＋AAC→MP4；編不出 AAC→**無聲 MP4＋明講**；編不出 H.264→WebM（VP9＋Opus，測試用）。輸出寫到 OPFS 暫存檔（`StreamTarget`，沒有 OPFS 才用記憶體），關閉面板／取消／出錯都會刪，啟動時 `cleanupExportTemp()` 再清一次。沙盒 Chromium 能編 H.264 但**編不出 AAC**，所以測聲音要用 `preferWebm`（只給測試）。除錯掛鉤 `exportAndInspect` 匯出後用 Mediabunny 讀回來檢查。
+- 無頭 Chromium 下載中文檔名時 `suggestedFilename()` 會變成 `download`（真的瀏覽器不會），e2e 不要斷言檔名。
+
+- **會動的圖片（GIF／動態 WebP）**：`engine/animImage.ts` 解成 `ImageBitmap[]`＋每格長度（有 `ImageDecoder` 用它；沒有就 GIF 用 `gifuct-js`（MIT，npm 套件）自己處理 disposal；動態 WebP 在沒有 `ImageDecoder` 的瀏覽器解不了，所以 `giphyToFile` 那種情況改抓 GIF 版本）。`Asset.anim = { frames, duration }` 在匯入時決定（超過 150 格或解開後 > 96MB 就當一般照片）。預覽（`Player.render`）與單格輸出（`exportFrame`）都用 `frameIndexAt(delays, t − item.start)` 取格，循環播放。快取只存在記憶體，每個素材解一次。
+
+- **預覽用輕量影片（proxy）**：`engine/proxy.ts`（Mediabunny `Conversion`，先試 H.264/mp4，沒有再用 VP9/webm；HDR 在 `process` 裡畫到 OffscreenCanvas 轉 SDR）、`engine/proxyQueue.ts`（一次一支，狀態寫進 `Asset.proxy`，不進復原紀錄）、`assetUrls.urlFor(…, 'preview'|'export')`（預覽用 proxy、匯出一律原檔）。proxy 存在跟素材同一處，檔名 `<assetId>~p`。池子裡的 `<video>` 只有停著時才換網址。沙盒 Chromium 沒有 H.264，所以測試走 VP9；iPhone 實際走 H.264，沒驗證。
+- **主軌空白（gap）**：`VideoItem.gap` 是「這個片段前面的空白秒數」，`relayout` 先加 gap 再排；`trimStart` 的語意是「尾巴不動、切掉的變空白」，往左拉先吃空白；`layersAt` 在空白時主軌沒有圖層（黑畫面）；分割時空白只留前半段、複製品沒有空白。修剪面板（`setTrimWindow`）不動片段位置，只改長度。
+- **CDP 觸控／滑鼠事件有延遲**：讀 React 狀態前要等一下（e2e 裡 `waitForTimeout(250)`）；圓角元素的最邊角點不到。
+
 - **影片直接當 Pixi 貼圖**：用 `ImageSource({ resource: <video> })`，**不要**用 `VideoSource`（它會對元素 `load()`、自己接管播放）。改裁切（`texture.frame`）後要 `texture.update()`，而且貼圖建構時要給 `frame`（否則 `noFrame` 會把 frame 重設）、要 `dynamic: true`（精靈才聽得到 `update`）。
 - **iPhone 聲音**：`<video>` 元素直接出聲在靜音模式下也有聲音但設不了音量；Web Audio 在靜音模式下預設沒聲音，要先 `navigator.audioSession.type = 'playback'`。解鎖要在使用者點擊當下**同步**對元素 `play()`（不靜音）再馬上 `pause()`，不能用靜音 play、也不能等 promise（會停掉剛開始播的影片）。見 `src/engine/audio.ts`、`mediaPool.ts`。
 - **iPhone Safari 沒辦法在沙盒測**：OPFS 寫入、Cache Storage、同時多個 `<video>` 解碼/自動播放解鎖、混合模式、手勢，全部在 `PLAN.md §7` 待真機驗證。

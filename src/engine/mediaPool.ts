@@ -6,9 +6,10 @@ export class VideoPool {
   readonly els: HTMLVideoElement[] = [];
   private tick = 0;
 
-  constructor(host: HTMLElement, size: number, onChange: () => void) {
+  /** tag：影片用 'video'；背景音樂用 'audio'（元素型別都當 HTMLVideoElement 用，音樂用不到 videoWidth） */
+  constructor(host: HTMLElement, size: number, onChange: () => void, tag: 'video' | 'audio' = 'video') {
     for (let i = 0; i < size; i++) {
-      const v = document.createElement('video');
+      const v = document.createElement(tag) as HTMLVideoElement;
       v.playsInline = true;
       v.muted = true;
       v.preload = 'auto';
@@ -49,7 +50,14 @@ export class VideoPool {
     if (el.dataset.assetId !== assetId) {
       el.src = url;
       el.dataset.assetId = assetId;
+      el.dataset.url = url;
       delete el.dataset.primed;
+    } else if (el.dataset.url !== url && el.paused) {
+      // 同一個素材換了網址（預覽用輕量影片做好了）：停著的時候才換，播放中的等下次
+      const t = el.currentTime;
+      el.src = url;
+      el.dataset.url = url;
+      el.currentTime = t;
     }
     el.dataset.used = String(++this.tick);
     return el;

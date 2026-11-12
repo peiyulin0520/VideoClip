@@ -17,11 +17,34 @@ export function chooseAudioMode(env: { hasAudioSession: boolean; isIOS: boolean 
 
 type AudioSessionNav = Navigator & { audioSession?: { type: string } };
 
+export function isIOSDevice(): boolean {
+  const nav = navigator as AudioSessionNav;
+  const ua = nav.userAgent ?? '';
+  return /iP(hone|ad|od)/.test(ua) || (nav.platform === 'MacIntel' && (nav.maxTouchPoints ?? 0) > 1);
+}
+
 function detectEnv() {
   const nav = navigator as AudioSessionNav;
   const ua = nav.userAgent ?? '';
   const isIOS = /iP(hone|ad|od)/.test(ua) || (nav.platform === 'MacIntel' && (nav.maxTouchPoints ?? 0) > 1);
   return { hasAudioSession: !!nav.audioSession, isIOS };
+}
+
+/**
+ * 淡入淡出：物件開始後 local 秒時的音量倍數（0–1，線性）。淡入淡出各自最長是物件長度的一半，
+ * 兩段不會重疊；沒有設定（0／undefined）就是 1。
+ */
+export function fadeSpans(duration: number, fadeIn = 0, fadeOut = 0): { fi: number; fo: number } {
+  const half = Math.max(duration, 0) / 2;
+  return { fi: Math.min(Math.max(fadeIn, 0), half), fo: Math.min(Math.max(fadeOut, 0), half) };
+}
+
+export function fadeGain(local: number, duration: number, fadeIn = 0, fadeOut = 0): number {
+  const { fi, fo } = fadeSpans(duration, fadeIn, fadeOut);
+  let g = 1;
+  if (fi > 0 && local < fi) g = Math.min(g, Math.max(local, 0) / fi);
+  if (fo > 0 && local > duration - fo) g = Math.min(g, Math.max(duration - local, 0) / fo);
+  return Math.min(Math.max(g, 0), 1);
 }
 
 /** 一個元素現在該有的聲音狀態（純函式，方便測試） */
@@ -80,7 +103,7 @@ export class AudioOut {
   }
 
   /** 套用這個元素現在該有的聲音（音量、關聲音） */
-  apply(el: HTMLVideoElement, volume: number, silent: boolean) {
+  apply(el: HTMLMediaElement, volume: number, silent: boolean) {
     const st = elementAudioState({ mode: this.mode, volume, silent });
     let node = this.nodes.get(el);
     if (this.mode === 'webaudio' && this.ctx && this.master && !node) {

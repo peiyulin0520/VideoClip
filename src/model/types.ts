@@ -5,7 +5,7 @@ export type Aspect = '9:16' | '16:9' | '1:1' | '3:4' | '4:3';
 
 export type Asset = {
   id: string;
-  kind: 'video' | 'image';
+  kind: 'video' | 'image' | 'audio';
   name: string;
   mime: string;
   size: number; // bytes
@@ -15,6 +15,18 @@ export type Asset = {
   hasAudio: boolean;
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
+  /** 音樂素材：音量波形，每 0.1 秒一個值（0–100），給時間軸畫波形用 */
+  wave?: number[];
+  /** 會動的圖片（GIF／動態 WebP，例如 GIPHY 貼圖）：格數與一圈的長度（秒）；沒有＝一般照片 */
+  anim?: { frames: number; duration: number };
+  /** 影片的編碼（'avc'、'hevc'、'vp9'…）與是不是 HDR；匯入時讀容器得到，舊專案沒有 */
+  codec?: string;
+  hdr?: boolean;
+  /**
+   * 預覽用的輕量影片（H.264、長邊 960、SDR）：播放用它，匯出用原檔。
+   * none＝原檔夠輕不需要；pending＝製作中；ready＝可用；failed＝做不出來（照用原檔）
+   */
+  proxy?: { status: 'none' | 'pending' | 'ready' | 'failed'; mime?: string; width?: number; height?: number };
   /** 只放在記憶體（手機存不下）：關掉網頁後素材會遺失，要重新匯入 */
   unsaved?: boolean;
 };
@@ -39,16 +51,33 @@ export type ItemBase = {
 };
 
 export type VideoItem = ItemBase & {
-  type: 'video' | 'image';
+  /** audio＝背景音樂（只放在 audio 軌，沒有畫面） */
+  type: 'video' | 'image' | 'audio';
   assetId: string;
   trimIn: number; // 素材內的起點（秒）
   speed: number; // 0.25–4；照片固定 1
-  volume: number; // 0–1
+  volume: number; // 0–2（200%）
+  /** 聲音淡入／淡出的秒數（影片與音樂都能用）；沒有＝0 */
+  fadeIn?: number;
+  fadeOut?: number;
   fit: 'cover' | 'contain';
+  /** 自由形狀裁切：多邊形的點，座標是「原始素材畫面」的比例 0–1（只留多邊形裡面，外面透明） */
+  mask?: [number, number][];
+  /** 多格版型：這個物件所在的格子（佔畫面寬、高的比例）。裁切模式完成時，畫面會填滿這個格子 */
+  cell?: { x: number; y: number; w: number; h: number };
+  /** 同一個版型的物件（外框與各格）共用的 id，用來「刪除整個版型」 */
+  group?: string;
+  /** 主軌專用：這個片段「前面」的空白秒數（黑畫面，疊加與文字照常）。沒有＝0＝首尾相接 */
+  gap?: number;
 };
 
 // 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
-export type Stroke = { color: string; width: number }; // width：從字緣往外的厚度，px（1080 基準）
+export type Stroke = {
+  color: string;
+  width: number; // 從字緣往外的厚度，px（1080 基準）
+  /** 只有字塊框線用：框線自己的透明度 0–1；沒有＝跟字塊填滿的透明度一樣（舊專案的長相） */
+  opacity?: number;
+};
 export type TextShadow = { color: string; blur: number; x: number; y: number };
 export type TextRun = {
   text: string;
@@ -131,7 +160,9 @@ export type BoxShape =
 export type CardBox = {
   shape: BoxShape;
   fill: string;
-  opacity: number; // 0–1
+  /** false＝不要底色，只畫框線（沒有＝要填滿） */
+  fillOn?: boolean;
+  opacity: number; // 填滿的透明度 0–1
   padding: { top: number; right: number; bottom: number; left: number }; // px（1080 基準）
   nudgeY: number; // 文字在字塊內的垂直微調 px
   radius?: number; // roundRect / speech-round 的圓角 px；pill 固定半圓
@@ -153,7 +184,7 @@ export type TextItem = ItemBase & { type: 'text'; card: TextCard };
 export type Item = VideoItem | TextItem;
 
 /** 軌道由下往上排列 = 圖層順序；index 0 一定是主軌 */
-export type TrackKind = 'main' | 'overlay' | 'text';
+export type TrackKind = 'main' | 'overlay' | 'text' | 'audio';
 
 export type Track = {
   id: string;

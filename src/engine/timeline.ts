@@ -1,14 +1,30 @@
 import { MAX_SPEED, MIN_CLIP_DURATION, MIN_SPEED, newId } from '../model/defaults';
 import type { Asset, Item, Project, Track, VideoItem } from '../model/types';
 
-/** 主軌片段首尾相接：依序重算 start。回傳新陣列（不改原物件）。 */
+/** 主軌片段依序排好：每個片段前面可以有空白（gap，預設 0＝首尾相接），重算 start。回傳新陣列（不改原物件）。 */
 export function relayout(items: VideoItem[]): VideoItem[] {
   let t = 0;
   return items.map((it) => {
+    t += Math.max(it.gap ?? 0, 0);
     const out = it.start === t ? it : { ...it, start: t };
     t += it.duration;
     return out;
   });
+}
+
+/** 主軌某一片段前面的空白（秒） */
+export const gapOf = (it: VideoItem): number => Math.max(it.gap ?? 0, 0);
+
+/** 刪掉主軌片段前面的空白，後面的片段往前接上 */
+export function removeGap(items: VideoItem[], id: string): VideoItem[] {
+  return relayout(
+    items.map((it) => {
+      if (it.id !== id) return it;
+      const { gap: _gap, ...rest } = it;
+      void _gap;
+      return rest as VideoItem;
+    }),
+  );
 }
 
 export function mainTrack(p: Project): Track {
@@ -54,10 +70,12 @@ export function visibleLayers(p: Project, t: number): Layer[] {
 export function layersAt(p: Project, t: number, includeHidden: boolean): Layer[] {
   const out: Layer[] = [];
   p.tracks.forEach((track, trackIndex) => {
+    if (track.kind === 'audio') return; // 音樂沒有畫面
     if (track.hidden && !includeHidden) return;
     if (track.kind === 'main') {
       const hit = itemAt(track.items as VideoItem[], t);
-      if (hit) out.push({ item: hit.item, track, trackIndex });
+      // 主軌的空白（片段前面的 gap）是黑畫面：這個片段還沒開始就不畫
+      if (hit && t >= hit.item.start - 1e-9) out.push({ item: hit.item, track, trackIndex });
       return;
     }
     const item = track.items.find((x) => t >= x.start && t < x.start + x.duration);
@@ -66,9 +84,11 @@ export function layersAt(p: Project, t: number, includeHidden: boolean): Layer[]
   return out;
 }
 
+/** 專案長度＝影片、照片、文字、貼圖最後結束的時間；背景音樂不算（音樂比影片長就在影片結束時切掉） */
 export function totalDuration(p: Project): number {
   return p.tracks.reduce(
-    (max, tr) => tr.items.reduce((m, it) => Math.max(m, it.start + it.duration), max),
+    (max, tr) =>
+      tr.kind === 'audio' ? max : tr.items.reduce((m, it) => Math.max(m, it.start + it.duration), max),
     0,
   );
 }
@@ -108,6 +128,7 @@ export function splitItem(items: VideoItem[], id: string, t: number): VideoItem[
     duration: it.duration - local,
     trimIn: it.trimIn + local * it.speed,
   };
+  delete b.gap; // 空白只留在前半段
   return relayout([...items.slice(0, i), a, b, ...items.slice(i + 1)]);
 }
 
@@ -115,6 +136,7 @@ export function duplicateItem(items: VideoItem[], id: string): { items: VideoIte
   const i = items.findIndex((x) => x.id === id);
   if (i < 0) return null;
   const copy: VideoItem = { ...items[i]!, id: newId('i_') };
+  delete copy.gap; // 複製品緊接在原片段後面
   return { items: relayout([...items.slice(0, i + 1), copy, ...items.slice(i + 1)]), newId: copy.id };
 }
 
@@ -149,22 +171,75 @@ export function trimEnd(
   );
 }
 
-/** 修剪頭端：delta 為正代表把起點往後切掉 delta 秒（時間軸秒數）。出點不變。 */
+/**
+ * 修剪頭端（主軌）：delta 為正代表把起點往後切掉 delta 秒（時間軸秒數）。出點（尾巴）不動：
+ * 切掉的部分變成前面的空白（gap），後面的片段不動。delta 為負＝往前拉回來：先吃掉前面的空白，
+ * 用完空白還想往前，就把片段往前延伸（後面的片段被推開），最多到素材起點。
+ */
 export function trimStart(items: VideoItem[], id: string, delta: number): VideoItem[] {
   return relayout(
     items.map((it) => {
       if (it.id !== id) return it;
-      // 往前延伸最多到素材起點；往後最多切到剩 MIN_CLIP_DURATION
-      const minDelta = it.type === 'image' ? -600 : -it.trimIn / it.speed;
-      const maxDelta = it.duration - MIN_CLIP_DURATION;
-      const d = Math.min(Math.max(delta, minDelta), maxDelta);
-      return {
+      const isImage = it.type === 'image';
+      const maxCut = it.duration - MIN_CLIP_DURATION;
+      const maxBack = isImage ? 600 : it.trimIn / it.speed; // 往前最多拉回素材起點
+      const d = Math.min(Math.max(delta, -maxBack), maxCut);
+      const gap = gapOf(it);
+      const out: VideoItem = {
         ...it,
         duration: it.duration - d,
-        trimIn: it.type === 'image' ? 0 : it.trimIn + d * it.speed,
+        trimIn: isImage ? 0 : it.trimIn + d * it.speed,
       };
+      if (d >= 0)
+        out.gap = gap + d; // 切掉的變空白
+      else out.gap = Math.max(gap + d, 0); // 先吃掉空白；超過的部分是往前延伸（後面被推開）
+      if (!out.gap) delete out.gap;
+      return out;
     }),
   );
+}
+
+/**
+ * 修剪面板：直接指定素材要留的區段 [srcStart, srcEnd]（素材秒數）。片段的位置（含前面的空白）不變，
+ * 長度跟著變，後面的片段順延（主軌）。照片沒有素材區段，不適用。
+ */
+export function setTrimWindow(
+  items: VideoItem[],
+  id: string,
+  srcStart: number,
+  srcEnd: number,
+  asset: Asset | undefined,
+): VideoItem[] {
+  return relayout(
+    items.map((it) => {
+      if (it.id !== id || it.type === 'image' || !asset) return it;
+      const minSrc = MIN_CLIP_DURATION * it.speed;
+      const s0 = Math.min(Math.max(srcStart, 0), Math.max(asset.duration - minSrc, 0));
+      const e0 = Math.min(Math.max(srcEnd, s0 + minSrc), asset.duration);
+      return { ...it, trimIn: s0, duration: (e0 - s0) / it.speed };
+    }),
+  );
+}
+
+/** 同上，給疊加軌：片段的開始時間不變，長度不能壓到後面的物件 */
+export function setTrimWindowFree(
+  items: Item[],
+  id: string,
+  srcStart: number,
+  srcEnd: number,
+  asset: Asset | undefined,
+): Item[] {
+  return items.map((it) => {
+    if (it.id !== id || !isVideoItem(it) || it.type === 'image' || !asset) return it;
+    const { nextStart } = neighbors(items, it);
+    const minSrc = MIN_CLIP_DURATION * it.speed;
+    const s0 = Math.min(Math.max(srcStart, 0), Math.max(asset.duration - minSrc, 0));
+    let e0 = Math.min(Math.max(srcEnd, s0 + minSrc), asset.duration);
+    const room = nextStart - it.start; // 後面有物件就不能再長
+    if (Number.isFinite(room) && (e0 - s0) / it.speed > room)
+      e0 = s0 + Math.max(room, MIN_CLIP_DURATION) * it.speed;
+    return { ...it, trimIn: s0, duration: (e0 - s0) / it.speed };
+  });
 }
 
 /** 改速度：保持素材區段不變，時間軸長度跟著變 */
@@ -271,11 +346,11 @@ export function trimStartFree(items: Item[], id: string, delta: number): Item[] 
     if (it.id !== id) return it;
     const { prevEnd } = neighbors(items, it);
     let lo = prevEnd - it.start; // 最多往前延伸到這裡（負值）
-    if (isVideoItem(it) && it.type === 'video') lo = Math.max(lo, -it.trimIn / it.speed);
+    if (isVideoItem(it) && it.type !== 'image') lo = Math.max(lo, -it.trimIn / it.speed);
     const hi = it.duration - MIN_CLIP_DURATION;
     const d = Math.min(Math.max(delta, lo), hi);
     const next = { ...it, start: it.start + d, duration: it.duration - d };
-    if (isVideoItem(it) && it.type === 'video') (next as VideoItem).trimIn = it.trimIn + d * it.speed;
+    if (isVideoItem(it) && it.type !== 'image') (next as VideoItem).trimIn = it.trimIn + d * it.speed;
     return next;
   });
 }
@@ -303,6 +378,18 @@ export function moveTrack(tracks: Track[], id: string, dir: -1 | 1): Track[] {
   if (i < 1 || j < 1 || j >= tracks.length) return tracks;
   const next = tracks.slice();
   [next[i], next[j]] = [next[j]!, next[i]!];
+  return next;
+}
+
+/** 把軌道搬到新的圖層位置 toIndex（tracks 的 index，0＝主軌固定不動，不能搬到主軌下面）。沒有變動回傳原陣列。 */
+export function reorderTrack(tracks: Track[], id: string, toIndex: number): Track[] {
+  const from = tracks.findIndex((t) => t.id === id);
+  if (from < 1) return tracks;
+  const to = Math.min(Math.max(toIndex, 1), tracks.length - 1);
+  if (to === from) return tracks;
+  const next = tracks.slice();
+  const [t] = next.splice(from, 1);
+  next.splice(to, 0, t!);
   return next;
 }
 

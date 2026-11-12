@@ -13,6 +13,21 @@ import type { BlendMode, Crop, Outline } from '../model/types';
 import type { Box } from './geometry';
 import { uiScale } from './textRender';
 
+/** 每個 <video> 已經呈現過幾個新畫面（requestVideoFrameCallback）；沒有這個 API 就回傳 null */
+const frameCounts = new WeakMap<HTMLVideoElement, number>();
+function videoFrameCount(v: HTMLVideoElement): number | null {
+  if (typeof v.requestVideoFrameCallback !== 'function') return null;
+  if (!frameCounts.has(v)) {
+    frameCounts.set(v, 0);
+    const loop = () => {
+      frameCounts.set(v, (frameCounts.get(v) ?? 0) + 1);
+      v.requestVideoFrameCallback(loop);
+    };
+    v.requestVideoFrameCallback(loop);
+  }
+  return frameCounts.get(v)!;
+}
+
 export type LayerSource = HTMLVideoElement | HTMLImageElement | HTMLCanvasElement | ImageBitmap;
 
 /** 一個要畫的圖層（由 scene.ts 依專案與時間算出）。座標都是合成器畫布的像素。 */
@@ -32,6 +47,8 @@ export type SceneLayer = {
   frameW?: number;
   frameH?: number;
   crop?: Crop;
+  /** 自由形狀遮罩：多邊形，座標是原始素材畫面的比例（搭配 crop 換算到方框內） */
+  mask?: [number, number][];
   opacity: number;
   blend: BlendMode;
   cornerRadius: number; // 0–0.5
@@ -55,10 +72,14 @@ type Obj = {
   outline: Graphics | null;
   maskKey: string;
   outlineKey: string;
+  shape: Graphics | null;
+  shapeKey: string;
 };
 
 export class Compositor {
   private objs = new Map<string, Obj>();
+  /** 這一輪合成裡，影片貼圖上傳（update）花的毫秒；Player 讀走後歸零 */
+  private uploadMs = 0;
   private constructor(
     private app: Application,
     readonly width: number,
@@ -85,6 +106,12 @@ export class Compositor {
     });
     app.ticker.stop();
     return new Compositor(app, opts.width, opts.height);
+  }
+
+  takeUploadMs(): number {
+    const v = this.uploadMs;
+    this.uploadMs = 0;
+    return v;
   }
 
   get canvas(): HTMLCanvasElement {
@@ -141,6 +168,8 @@ export class Compositor {
       outline: null,
       maskKey: '',
       outlineKey: '',
+      shape: null,
+      shapeKey: '',
     };
     this.objs.set(layer.id, o);
     return o;
@@ -192,11 +221,15 @@ export class Compositor {
       f.height = h;
       o.texture.update(); // 通知精靈：貼圖的範圍改了
     }
-    // 影片沒有新畫面（暫停、或螢幕更新比影片快）就不重新上傳
-    const uploadKey = `${v.currentTime}`;
+    // 影片沒有新畫面（暫停、或螢幕更新比影片快）就不重新上傳：播放中看「呈現過幾個新畫面」，
+    // 暫停（拖時間軸 seek）時看 currentTime（iPhone 播放中 currentTime 每次都不一樣，用它會每次都上傳）
+    const fc = v.paused ? null : videoFrameCount(v);
+    const uploadKey = fc === null ? `t${v.currentTime}` : `f${fc}`;
     if (!o.hasFrame || o.uploadKey !== uploadKey) {
       try {
+        const t0 = performance.now();
         o.textureSource?.update();
+        this.uploadMs += performance.now() - t0;
         o.hasFrame = true;
         o.uploadKey = uploadKey;
       } catch {
@@ -253,28 +286,62 @@ export class Compositor {
     o.sprite.height = box.h;
     o.sprite.blendMode = layer.blend;
 
-    // ---- 圓角遮罩 ----
+    // ---- 遮罩：自由形狀（多邊形）優先，沒有才用圓角 ----
     const radius = Math.min(layer.cornerRadius * Math.min(box.w, box.h), Math.min(box.w, box.h) / 2);
-    if (radius > 0.5) {
-      const key = `${box.w.toFixed(1)}|${box.h.toFixed(1)}|${radius.toFixed(1)}`;
-      if (!o.mask) {
-        o.mask = new Graphics();
-        o.container.addChild(o.mask);
+    const poly = layer.mask && layer.mask.length >= 3 ? layer.mask : null;
+    if (poly) {
+      const c = layer.crop ?? { l: 0, t: 0, r: 0, b: 0 };
+      const kw = Math.max(1 - c.l - c.r, 0.001);
+      const kh = Math.max(1 - c.t - c.b, 0.001);
+      const key = `${box.w.toFixed(1)}|${box.h.toFixed(1)}|${c.l}|${c.t}|${c.r}|${c.b}|${poly.length}|${poly[0]![0]}|${poly[poly.length >> 1]![1]}`;
+      if (!o.shape) {
+        o.shape = new Graphics();
+        o.container.addChild(o.shape);
       }
-      if (o.maskKey !== key) {
-        o.mask
-          .clear()
-          .roundRect(-box.w / 2, -box.h / 2, box.w, box.h, radius)
-          .fill(0xffffff);
-        o.maskKey = key;
+      if (o.shapeKey !== key) {
+        const pts = poly.flatMap(([u, v]) => [
+          ((u - c.l) / kw - 0.5) * box.w,
+          ((v - c.t) / kh - 0.5) * box.h,
+        ]);
+        o.shape.clear().poly(pts).fill(0xffffff);
+        o.shapeKey = key;
       }
-      o.sprite.mask = o.mask;
-    } else if (o.mask) {
-      o.sprite.mask = null;
-      o.container.removeChild(o.mask);
-      o.mask.destroy();
-      o.mask = null;
-      o.maskKey = '';
+      o.sprite.mask = o.shape;
+      if (o.mask) {
+        o.container.removeChild(o.mask);
+        o.mask.destroy();
+        o.mask = null;
+        o.maskKey = '';
+      }
+    } else {
+      if (o.shape) {
+        o.sprite.mask = null;
+        o.container.removeChild(o.shape);
+        o.shape.destroy();
+        o.shape = null;
+        o.shapeKey = '';
+      }
+      if (radius > 0.5) {
+        const key = `${box.w.toFixed(1)}|${box.h.toFixed(1)}|${radius.toFixed(1)}`;
+        if (!o.mask) {
+          o.mask = new Graphics();
+          o.container.addChild(o.mask);
+        }
+        if (o.maskKey !== key) {
+          o.mask
+            .clear()
+            .roundRect(-box.w / 2, -box.h / 2, box.w, box.h, radius)
+            .fill(0xffffff);
+          o.maskKey = key;
+        }
+        o.sprite.mask = o.mask;
+      } else if (o.mask) {
+        o.sprite.mask = null;
+        o.container.removeChild(o.mask);
+        o.mask.destroy();
+        o.mask = null;
+        o.maskKey = '';
+      }
     }
 
     // ---- 外框（畫在框內側，方框大小不變，選取框才對得準）----

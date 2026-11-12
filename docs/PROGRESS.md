@@ -4,11 +4,11 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：PR #5（第 3 次實測修正＋GIPHY＋我的貼圖＋精靈說明）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已用 `git merge --ff-only origin/main` 對齊，之後的新工作繼續在這個分支
+- **分支**：PR #6（播放順暢＋聲音、裝飾長度／透明度、選色彈窗）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
-- **測試**：594 個單元測試、74 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：708 個單元測試、118 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：照 `docs/plans/2026-11-12-feedback-4.md` 繼續實作（Sonnet）：**A 播放順暢＋影片聲音 ✅、E 裝飾長度／透明度／範圍＋選色彈窗 ✅（都只在 Chromium 驗證，iPhone 待真機）**，接著 **B 匯出影片 → C 音軌管理＋背景音樂 → D 裁切（四邊角＋自由形狀）→ E 裝飾長度／透明度／範圍＋取色彈窗**（使用者也可以指定先做 E）。之前規劃但還沒做的：缺字體提示、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
+- **下一步**：使用者 2026-11-12 傳了剪映的膠卷特效教學 → 規劃 `docs/plans/2026-11-12-keyframes-film.md`：**K1 關鍵影格核心 → K5 定格 → K6 調節（調色）可以打關鍵影格 → K2 自己模擬移動（路線預覽、試播、拖點調整；手指錄製選用）→ K3 底片框（日期＋假型號、多種顏色）→ K4 一鍵膠卷捲動**（Sonnet 實作）。另外：這一整批（feedback-5 ①～⑥、匯出、音樂、主題、版型）都還在分支上沒有開 PR，網站與手機還是舊版
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -51,6 +51,10 @@
 - 備份資料夾保持私人；只貼網址不登入無法寫入（Google 限制），已向使用者說明
 
 ## 使用者的修正紀錄（時間順序）
+- 2026-11-12 18:44 傳第二個剪映關鍵影格教學（8 張）：定格圖片 → 開頭打關鍵影格 → 往後移時間、雙指縮小放到左邊 → 在第二個關鍵影格打開「調節」飽和度 −50 → 圖片從大縮到小、顏色慢慢變黑白；「請參考，並確認目前的形式可以做出類似效果」→ 位置大小 K1 做得到；規劃補上 K5 定格、K6 調節（調色）＋關鍵影格
+- 2026-11-12 回覆關鍵影格規劃：①底片框寫「日期＋假的底片型號」②底片框「可以多種顏色，不受限於黑色」③「K2 應該是我打好影格後，可以自己模擬這個素材之後移動的方式」→ K2 改成移動路線預覽＋試播＋在路線上拖點調整（手指錄製選用），固定預設動畫降為之後的捷徑
+- 2026-11-12 16:43 傳剪映膠卷特效教學 7 張截圖：「他有關鍵幀可以讓影片按照自己調整的方向移動按照圖片順序看，最後一張是膠卷樣式」（教學：縮 50% → 開頭打關鍵影格 → 拖到右下 → 結尾往上拖出畫面 → 影片從下往上捲過；最後套底片框）→ 規劃 docs/plans/2026-11-12-keyframes-film.md（截圖是第三方 App 畫面，不放進 repo，步驟用文字記在規劃裡）
+- 2026-11-12 第 5 次回報（PR #6 合併後實測）：①主軌左把手往右拉＝右邊縮回來、右把手拉不回原長度；要像參考錄影那樣攤開整段素材用選取窗修剪，而且主軌前面可以留空白 ②「giphy 貼圖加上影片，他不會動！然後影片還是很卡」③軌道上下順序要能直接拖時間軸左邊的軌道圖示 ④裁切不要在圖層分頁、不要比例滑桿，要在剪輯分頁按了之後直接在預覽上拖四邊拉霸（像 PPT）或描邊自由裁切 ⑤字塊分成「填滿」與「框線」，各自顏色、透明度，可以不要底色只留框線，框線可調粗細 → 規劃 docs/plans/2026-11-12-feedback-5.md
 - 2026-11-12 回覆確認：①錄影預覽下方黑色區塊是自己測試影片縮放造成，不是問題 ②測試時有開影片聲音仍沒聲音；「我不是要開啟手機通知鈴聲，我是要開啟影片聲音，這兩個不太一樣」→ 規定：手機靜音模式下影片也要有聲音；不要叫使用者關靜音開關（規劃 A-4 已改）
 - 2026-11-12 第 4 次回報：①裝飾要能調長度（底線太長要能縮短）、透明度，百分比範圍太小；自訂顏色不要輸入色碼，要跳出彈窗直接拖拉選色，再用 RGB 細調 ②「影片播放很卡，不夠順暢」③「需要有最終剪輯好的影片匯出功能」④「目前影片沒有音軌聲音，需要加入，並保留選項可自由刪除選擇各項影片之音軌，以及導入背景音樂之功能」⑤「要可以增加影片 crop 功能（彈性描邊或是自由剪切四邊角）」→ 規劃 docs/plans/2026-11-12-feedback-4.md
 - 2026-11-12 ①「已客製化自己上傳的貼圖或畫好的素材可以直接存在 VideoClip 瀏覽器裡供其他剪輯專案使用，但如果是從 GIPHY 取得的，不需要存，每次各自搜尋即可」②同一支手機該選精靈哪個選項？（精靈選項講不清楚）③「api key 如果先前也已填過，可以存在網頁裡面？就不用每次都貼；如果先前沒貼過 Key，可以出一個簡短的申請說明（GIPHY 超連結 → 建帳號 → Dashboard Create API Key → 說明一律 VideoClip、使用 Web → 複製 key 貼上）」→ 已照做
@@ -67,6 +71,57 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 規劃補充：第二個關鍵影格教學（只有文件，Opus）
+  - 做了什麼：確認目前規劃能不能做到「定格圖片縮小移到左邊＋顏色慢慢變黑白」：K1 能做位置大小（補上主軌片段也支援）；新增 K5 定格（播放頭取一格成 PNG、切開主軌插入 3 秒圖片）、K6 調節（亮度、對比、飽和度、色溫、色調、褪色、暗角，Pixi ColorMatrixFilter，關鍵影格也記調節值、各項內插）；順序改成 K1 → K5 → K6 → K2 → K3 → K4
+  - 驗證：🔴 程式未改
+- 2026-11-12 寫規劃：關鍵影格＋膠卷外框＋膠卷捲動（只有文件，Opus）
+  - 做了什麼：看使用者的剪映教學截圖，整理成步驟；規劃 K1 關鍵影格核心（`keyframes` 資料、`transformAt` 內插、scene／選取框／拖移都改用「這個時間的 transform」、播放列 ◇ 按鈕、時間軸菱形、有關鍵影格時拖移自動新增）、K2 一鍵動畫預設（捲過畫面、滑入滑出、淡入淡出）、K3 底片框外框樣式（不用真實品牌字樣）、K4 一鍵膠卷捲動（多段影片同速往上捲）
+  - 驗證：🔴 程式未改
+  - 下一步：Sonnet 照 K1→K4；做 K3 前問底片框的字與顏色
+- 2026-11-12 介面主題＋多格版型（L1）
+  - 做了什麼：①**介面主題**：設定頁「介面主題」四選一——暗黑（預設）／黑白（白底黑字）／清新（白底薄荷綠）／溫暖（棕色系、奶油字、焦糖重點），存在這台手機、重新整理不會變、打開 App 不閃暗色、手機狀態列顏色跟著換；做法是把 `styles.css` 寫死的中性色（按鈕、輸入框、邊線、片段、時間軸…）換成 CSS 變數，主題只覆蓋變數；預覽畫面永遠黑底 ②**多格版型**：疊加分頁「版型」8 種（拍貼機直條、拍貼機 2×2、膠卷橫向／直向、拍立得、上下雙格、三格、九宮格）→ 選外框顏色（白／黑／粉／奶茶）→ 從相簿選照片或影片（比格子少就輪流重複、比格子多只用前面的）→ 一次做好：外框（有洞的 PNG，放在最上層、**鎖住**，點預覽點得到下面的格子）＋每一格一個普通的疊加物件（素材置中裁成格子比例、剛好填滿洞）；格子可以個別選、裁切（預設鎖「格子比例」，完成後畫面仍填滿格子）、調音量；工具列「移除版型」一次拿掉整組（一步復原）；同時超過 5 支影片會提醒；畫面很寬或接近正方形時版型自動縮小放得下
+  - 動了哪些檔：新 `src/ui/theme.ts`、`src/engine/layouts.ts`、`src/app/editor/LayoutPicker.tsx`；`src/app/styles.css`（變數化）、`index.html`、`src/main.tsx`、`src/app/pages/Settings.tsx`、`src/store/{actions,cropStore}.ts`（`addLayout`、`removeGroup`、格子裁切）、`src/app/editor/{Toolbar,CropPanel}.tsx`、`src/model/types.ts`（`VideoItem.cell`／`group`）；測試 `src/engine/layouts.test.ts`、`e2e/{theme,layout}.spec.ts`；文件 `docs/LAYOUTS.md`
+  - 驗證：✅ 單元（8 個版型 × 4 種畫面比例：格子數、都在外框裡、不重疊、齒孔不進格子；每一格方框剛好等於格子（多種素材比例）、置中裁切）；✅ e2e（主題：預設暗黑、切換四個、記住、重新整理仍在、狀態列顏色、每個主題文字對比與預覽仍黑底；版型：拍貼機直條 4 格輪流放紅綠、外框黑色、外框外面是主軌、外框軌道鎖住且在最上層、點預覽選到格子、移除版型與復原；8 個版型都做得出來；素材比格子多；超過 5 支影片提醒；拍立得 4:3 照片裁成正方形；格子的裁切）；全部 118 個 e2e、708 個單元、lint、build 過；截圖 `docs/screenshots/feedback-5/{theme,layout}/`  🔴 iPhone 沒測；🔴 版型長相是我自己設計的，要請使用者看  🔴 沒做：版型動畫、整個版型一起移動、改畫面比例後外框不會重畫
+  - 使用者的決定/回饋：「先做多格模板、介面主題」（沒有給參考圖，所以版型長相自己設計）
+  - 踩到的坑：按鈕底色那條規則在「共用」註解之前，批次取代只處理了後半段 → 要對整個檔案取代；格子在畫面比例不同時會超出畫面 → `fitInCanvas` 整體縮小；膠卷直向的外框高度被夾住導致格子跑出外框 → 改成由畫面高度算格子大小
+  - 下一步：開 PR 讓使用者合併，用 iPhone 測全部，並確認版型長相
+- 2026-11-12 feedback-4 C：音軌管理＋背景音樂
+  - 做了什麼：①**背景音樂**：疊加分頁「加入背景音樂」（從「檔案」選 mp3／m4a／wav…），放在播放頭這一秒、最長到影片結束，放進新的**音樂軌**（時間軸有 ♪ 與音量波形）；音樂可以分割、複製、刪除、拖移、用時間軸把手或「修剪」面板（也有波形）修剪；音樂比影片長會在影片結束時切掉，專案長度不被音樂拉長 ②**聲音面板**（原本的「音量」）：音量 0–200%（原本 0–100%）、「關閉聲音」「50%／100%／150%／200%」、**淡入／淡出**（0–5 秒，最長是長度的一半），影片與音樂都能用 ③「**全部影片靜音**」一鍵（影片的軌道靜音，音樂不受影響）與「恢復影片聲音」，一步復原 ④預覽：音樂用 `<audio>` 跟著時間軸播放、對時，走跟影片同一個 `AudioOut`（手機靜音模式下也有聲音、音量與淡入淡出每格算）⑤匯出：音樂與影片一起混音，每個物件的音量與淡入淡出用 `GainNode` 自動化；音量 0、靜音軌道不混 ⑥音樂軌道選單：靜音、刪除（沒有往上／往下一層）
+  - 動了哪些檔：新 `src/engine/wave.ts`、`src/app/editor/Wave.tsx`；`src/model/{types,defaults}.ts`（`Asset.kind='audio'`、`wave`、`type:'audio'`、`fadeIn/fadeOut`、`TrackKind='audio'`）、`src/engine/{timeline,geometry,scene,probe,importMedia,audio,mediaPool,player,exporter}.ts`、`src/store/actions.ts`（`addMusic`、`setAllVideoMuted`）、`src/app/editor/{Toolbar,Timeline,TrimPanel}.tsx`、`styles.css`；測試 `src/engine/music.test.ts`、`e2e/music.spec.ts`、`e2e/phase1.spec.ts`（「靜音」鈕改名「關閉聲音」）；新素材 `tests/fixtures/music-4s.wav`
+  - 驗證：✅ 單元（淡入淡出、音樂的資料與軌道規則：專案長度不算音樂／沒有畫面／修剪限制／哪些要出聲、音檔判斷、波形正規化）；✅ e2e（匯入音樂：波形、音樂軌、長度、專案長度不變；比影片長會被切；音樂工具列只有分割／刪除／複製／修剪／音量；音量 200%、關閉聲音、淡入淡出；分割／複製／刪除／修剪面板有波形；軌道選單靜音與刪除；預覽播放有聲音、軌道靜音就沒聲音；匯出：聲音在對的時間、淡入生效、音量一半約一半、關閉聲音沒有音軌；全部影片靜音；沒有影片不能加音樂）；全部 110 個 e2e、658 個單元、lint、build 過；截圖 `docs/screenshots/feedback-5/music-*.png`  🔴 iPhone 沒測：從「檔案」App 選音樂、音樂與影片同時播放（iOS 同時多個媒體元素）、靜音模式、匯出的 AAC 音樂  🔴 沒做：音樂循環（短音樂用「複製」接）、影片的聲音波形、每支影片單獨的「刪除音軌」（用「關閉聲音」＝音量 0 達成）
+  - 使用者的決定/回饋：「目前影片沒有音軌聲音，需要加入，並保留選項可自由刪除選擇各項影片之音軌，以及導入背景音樂之功能」
+  - 踩到的坑：`tsc --noEmit -p .` 沒真的檢查，要 `tsc -b`；e2e 量輸出音量要注入 `audioSession`，不然 iPhone 模擬走「元素出聲」量不到；音樂軌的 `trimStartFree` 會被前一段音樂擋住（只能往前拉到它結束）
+  - 下一步：開 PR 讓使用者合併，用 iPhone 測全部
+- 2026-11-12 feedback-4 B：匯出整支影片
+  - 做了什麼：頂列新增「匯出影片」→ 面板選解析度（1080p／720p）、更新率（30／60）、畫質（標準／高），顯示輸出尺寸與預估檔案大小 → 開始匯出：進度條＋階段（準備／聲音／畫面／收尾）＋剩餘時間，可取消 → 完成後顯示尺寸、更新率、檔案大小、有沒有聲音，「儲存到相簿／分享」（`navigator.share({files})`，不支援就下載）、「下載檔案」。**引擎**：不播放，一格一格依時間走；影片格用 Mediabunny `CanvasSink` 取精準那一格，畫面走預覽同一套 `buildScene`＋`Compositor`，WebCodecs 編碼；聲音用 `OfflineAudioContext` 依時間軸混好（開始時間、修剪、速度、音量；靜音／隱藏軌道、音量 0、沒音軌的素材都不混）；MP4（H.264＋AAC），這個瀏覽器編不出 AAC 就輸出無聲 MP4 並明講，編不出 H.264 才用 WebM；輸出寫到 OPFS 暫存檔（不整支放記憶體），取消／出錯／關閉面板都清掉，啟動時再清一次殘留
+  - 動了哪些檔：新 `src/engine/exporter.ts`、`src/app/editor/ExportSheet.tsx`；`src/app/pages/Editor.tsx`（頂列按鈕）、`src/engine/debug.ts`（`exportAndInspect`）、`src/main.tsx`（清暫存）、`styles.css`；測試 `src/engine/exporter.test.ts`、`e2e/export.spec.ts`
+  - 驗證：✅ 單元（輸出尺寸、位元率與預估大小、`chooseFormat` 各種組合含「編不出 AAC 一定有警告」、哪些影片要出聲）；✅ e2e（用 Mediabunny 讀回：長度 ±0.15 秒、尺寸 720×1280、不同時間點的畫面顏色對（主軌紅、疊加綠、後面換成 clip-a）；聲音放在對的時間（前 4 秒無聲、第 4 秒起有 440Hz）；音量 0 就沒有音軌、音量一半量到約一半；照片＋影片；預設走 MP4／H.264，沒有 AAC 時一定有警告；面板選項、預估大小、進度、完成、下載、關閉後暫存檔清掉；取消後回到選項且暫存檔清掉；空專案不能匯出）；全部 102 個 e2e、647 個單元、lint、build 過；截圖 `docs/screenshots/feedback-5/export-*.png`  🔴 iPhone 沒測：H.264／AAC 能不能編、4K HEVC 影片匯出多久與會不會被系統中斷、分享面板能不能「儲存影片」到相簿、相簿與 Instagram 能不能播  🔴 沒做：背景音樂（C 項）、轉場／特效（還沒有這些功能）、匯出時顯示預覽畫面
+  - 使用者的決定/回饋：「需要有最終剪輯好的影片匯出功能」
+  - 踩到的坑：沙盒 Chromium 編得出 H.264 但編不出 AAC → 測聲音要走 WebM（`preferWebm`，只給測試）；無頭 Chromium 下載中文檔名建議檔名會變 `download`；React lint 不准在 render 裡呼叫 `performance.now()`（剩餘時間改在進度回呼裡算）
+  - 下一步：開 PR 讓使用者合併，用 iPhone 測；再做 C 音軌管理＋背景音樂
+- 2026-11-12 feedback-5 ⑥：GIPHY 貼圖會動
+  - 做了什麼：加 GIPHY 貼圖時改下載**會動的版本**（`fixed_height`：瀏覽器有 `ImageDecoder` 就抓動態 WebP，有半透明邊緣；沒有就抓 GIF），下載不到或沒有會動版本才退回靜態 PNG；新 `engine/animImage.ts` 把動圖解成一格一格（`ImageDecoder`，沒有時 GIF 用 `gifuct-js`），`Asset.anim` 記格數與一圈長度；預覽與單格輸出都用「物件開始後經過的時間」取格、循環播放（暫停、拖時間軸都定在準確的格）；「我的貼圖」上傳 GIF／動態 WebP 保留原檔（不再轉 PNG）；格子裡的縮圖原本就是會動的
+  - 動了哪些檔：新 `src/engine/animImage.ts`；`src/engine/{player,exportFrame,probe}.ts`、`src/stickers/giphy.ts`、`src/app/editor/{GiphyPanel,MyStickers}.tsx`、`src/model/types.ts`（`Asset.anim`）、`package.json`（`gifuct-js`，MIT）；測試 `src/engine/animImage.test.ts`、`src/stickers/giphy.test.ts`、`e2e/giphy.spec.ts`；新素材 `tests/fixtures/anim-3frames.{gif,webp}`
+  - 驗證：✅ 單元（取格與循環、檔頭判斷、壞檔回 null、解析 anim 網址）；✅ e2e（模擬 GIPHY：下載的是動態 WebP 不是靜態圖；0.1／0.4／0.7 秒取到黃／綠／洋紅、1.05 秒循環回黃；單格輸出取同一格；重新整理後還會動；沒有 `ImageDecoder` 時改抓 GIF、用備用解碼器一樣會動；下載失敗退回靜態圖；我的貼圖上傳 GIF 會動）；全部 95 個 e2e、637 個單元、lint、build 過；截圖 `docs/screenshots/giphy/anim-sticker.png`  🔴 iPhone 沒測：有沒有動、多個貼圖同時動順不順；真的 GIPHY API 沒測（沙盒連不到，用模擬）  🔴 沒做：動態 WebP 在沒有 `ImageDecoder` 的瀏覽器解不了（會改抓 GIF）；GIF 的邊緣只有 1 bit 透明（不是 GIPHY 的錯）
+  - 使用者的決定/回饋：「目前將 giphy 貼圖加上影片，他不會動！」
+  - 下一步：開 PR 讓使用者合併，用 iPhone 測 ①～⑥
+- 2026-11-12 feedback-5 ⑤：裁切（剪輯分頁、預覽上直接拖、自由形狀）
+  - 做了什麼：「裁切」從圖層分頁（比例滑桿）搬到剪輯分頁。按了之後預覽顯示**完整原始畫面**（留下的那塊位置不變），四邊中間細拉霸、四個角、框內平移直接在預覽上拖；顯示「保留 72% × 100%」；比例 自由／原比例／1:1／9:16／4:5／16:9（鎖定後拖角仍保持比例）；「自由形狀」用手指沿著要留的範圍畫一圈（磨圓、自動閉合）→ 保留區域自動框住多邊形；預覽上有「自由形狀／重設／取消／完成」（不用捲到下面的面板）；完成才寫進專案、一步復原；切完留下的畫面**位置大小不跳**（`cropKeepingPlace`）；多邊形遮罩在合成器用 Graphics 遮罩，預覽與單格輸出共用；換分頁或選別的片段結束裁切（不套用）；完整畫面會超出預覽時（例如填滿的橫式影片）改縮進預覽中央，把手才按得到
+  - 動了哪些檔：新 `src/engine/crop.ts`（`cropKeepingPlace`、`dragCrop`、`applyRatio`、`polygonCrop`、`smoothPolygon`）、`src/store/cropStore.ts`、`src/app/editor/{CropOverlay,CropPanel}.tsx`；`src/engine/{compositor,scene,player}.ts`（多邊形遮罩、`setPreviewPatch`）、`Toolbar.tsx`（裁切鈕、拿掉圖層分頁的裁切滑桿）、`Preview.tsx`、`src/model/types.ts`（`VideoItem.mask`）、`styles.css`；測試 `src/engine/crop.test.ts`、`e2e/crop.spec.ts`、`e2e/phase2.spec.ts`（裁切改到剪輯分頁）；文件 `docs/EFFECTS.md`
+  - 驗證：✅ 單元（切完畫面不跳：多種填滿／旋轉／已切過再切／來回切、四角座標不變；dragCrop 自由與鎖比例、不出界；套比例；多邊形外框與磨圓）；✅ e2e（拖右邊與下邊拉霸→保留 60%×70%→完成後留下的位置不跳、被切掉的露出底下、一步復原還原位置大小；取消／重設／框內平移／拖角／再進來；比例鎖定；自由形狀畫圓→圈外透明圈內保留、復原／重做、重新進入看得到輪廓、清除形狀；沒選東西提示、換分頁結束）；全部 91 個 e2e、630 個單元、lint、build 過；截圖 `docs/screenshots/feedback-5/crop-*.png`  🔴 iPhone 沒測：手指拖把手好不好抓、有沒有誤捲頁面  🔴 沒做：自由形狀的邊緣柔化；雙指在框內縮放裡面的畫面；會動的人要跟著動（人物去背）
+  - 踩到的坑：Playwright 點下面面板會把頁面往下捲，預覽被推到 sticky 頂列後面 → 進裁切模式要 `scrollTo(0,0)`，測試用到面板後也要捲回來；控制按鈕（完成／取消）要放在預覽上，不然使用者得來回捲；圓角元素最邊角點不到
+  - 下一步：⑥ GIPHY 貼圖會動
+- 2026-11-12 feedback-5 ①～④：播放卡、主軌修剪、軌道拖拉、字塊填滿／框線
+  - 做了什麼：①**播放卡**：設定頁「顯示播放效能」→ 預覽左上角顯示 fps、每格毫秒（場景／影片上傳／合成）、掉格、影片尺寸與編碼；匯入影片時讀 `codec`／`hdr`；背景做「預覽用輕量影片」（長邊 > 1280、HDR、非 H.264/VP 就做；H.264 長邊 960、SDR、30fps），預覽播放用它、匯出與單格輸出用原檔；做不出來就標 failed 照用原檔；時間軸片段顯示製作進度；影片貼圖只在「呈現了新畫面」時才上傳（`requestVideoFrameCallback`）；iPhone 上不微調 `playbackRate` ②**主軌修剪**：`VideoItem.gap`（片段前面的空白），左把手往右拉＝尾巴不動、切掉的變空白，往左拉先吃空白再往前延伸；空白在時間軸是虛線框，選到片段後工具列有「刪除空白」；剪輯分頁新「修剪」面板（整段素材縮圖條＋選取窗，拖左右把手／拖中間／前面多少 1 秒的按鈕，顯示「第 a 秒 → 第 b 秒，留 n 秒 / 素材共 m 秒」，片段位置不變只改長度）③**軌道圖示**按住上下拖換圖層順序（`reorderTrack`，主軌固定，拖動時其他列讓位，一步復原；點一下仍開選單）④**字塊**分成「填滿」（開關、顏色、透明度 0–100%）與「框線」（開關、顏色、透明度、粗細 1–40）；`CardBox.fillOn`、`Stroke.opacity`（沒有＝跟填滿一樣，舊專案不變）
+  - 動了哪些檔：`src/engine/{proxy,proxyQueue,assetUrls,probe,player,compositor,audio,mediaPool,timeline,textRender,debug}.ts`、`src/app/editor/{PerfOverlay,TrimPanel,Timeline,Toolbar,TextPanel,Preview}.tsx`、`src/app/pages/{Editor,Settings}.tsx`、`src/store/{projectStore,actions}.ts`、`src/storage/media.ts`、`src/model/types.ts`、`styles.css`；新測試 `src/engine/{proxy,timeline.gap}.test.ts`、`e2e/{proxy,trim,track-drag,box-fill-border}.spec.ts`；新素材 `tests/fixtures/big-1080p.webm`
+  - 驗證：✅ 單元（proxy 判斷與尺寸、gap／trimStart／setTrimWindow／分割／複製／換順序／刪空白、reorderTrack、driftPlan）；✅ e2e（1080p 影片匯入後真的做出 960 寬 proxy 且預覽改用它、小影片 none、proxy 失敗仍可播、效能框；左把手留空白與還原、空白時預覽是黑的、刪除空白、修剪面板各種操作與一步復原；觸控拖軌道換順序與夾在範圍內；字塊只留框線、半透明填滿＋實心框線、框線透明度）；全部 86 e2e、615 單元、lint、build 過；截圖 `docs/screenshots/feedback-5/`  🔴 iPhone 沒測：proxy 在 iPhone 上實際走 H.264、做多久、播放是否變順（先看設定頁效能框的數字）；把手與軌道拖拉好不好用  🔴 沒做：時間軸自動捲動的節流（要先看效能框數字再決定）；修剪面板的聲音波形
+  - 使用者的決定/回饋：見上方 2026-11-12 第 5 次回報
+  - 踩到的坑：CDP 事件延遲、反鋸齒的混色會誤判（測試用中央區域＋寬鬆門檻）；連續拖曳同一個 coalesce key 會併成一步復原（測試要等 1.5 秒）
+  - 下一步：⑤ 裁切、⑥ GIPHY 會動
+- 2026-11-12 寫修改規劃：第 5 次回報 5 項（只有文件，Opus；交給 Sonnet 實作）
+  - 做了什麼：看 3 段錄影＋1 張截圖。量錄影三（60fps）：預覽、時間軸、時間數字都約每秒只更新 3 次 → 每格主執行緒 ~300ms，iPhone 特有（Chromium 1.3ms）；最可能是 iPhone HDR／HEVC／4K 影片交給 WebGL/canvas 時 CPU 色彩轉換＋搬運 → 規劃效能框（讓手機自己報數字）＋匯入時背景做「預覽用輕量影片」（H.264、長邊 960、SDR，Mediabunny Conversion），預覽用 proxy、匯出用原檔。查證修剪：主軌是磁吸排法（`relayout`），左把手切開頭看起來像右邊縮；規劃 `gap`（主軌允許空白、左把手尾巴不動）＋照參考錄影的「修剪面板」（整段縮圖條＋選取窗＋前面／後面多少 1 秒）。軌道圖示按住上下拖換順序。字塊 `fillOn`＋框線自己的 `opacity`。裁切搬到剪輯分頁、預覽上四邊拉霸＋角把手、`cropKeepingPlace`（切完畫面不跳）、自由形狀遮罩（取代 feedback-4 D）。GIPHY 改存會動的 webp/gif、`ImageDecoder`／gifuct-js 解格、依時間取格
+  - 驗證：🔴 程式未改
+  - 下一步：Sonnet 照 feedback-5 ①→⑥
 - 2026-11-12 feedback-4 E：裝飾長度／透明度／範圍放大＋自訂顏色彈窗
   - 做了什麼：①`Decoration` 新增 `length`（20–150%）、`align`（靠左／置中／靠右）、`opacity`（10–100%）；`lineSpan()` 縮放底線類（波浪、虛線、點點、雙底線）與螢光筆的線段；尾端圈圈的長度只伸縮直線段，圈圈大小與位置不變（`length=1` 與舊結果完全相同）；透明度乘進每一筆的 alpha ②範圍放大：粗細 2–60%（原 3–25）、距離 −100～300%（原 −30～100）、大小 20–400%（原 50–200）③面板新增「長度」「靠哪一邊」「透明度」（沒有長度的裝飾不顯示；長度 100% 時收起靠哪一邊）④新 `ColorPopup`：點「自訂顏色」跳出彈窗——大方塊（橫＝飽和度、直＝亮度）手指拖拉／點選、色相條、R／G／B 滑桿＋−／＋（44px）＋數字、「原本」「新的」並排預覽、色碼只當小字顯示、取消／確定（按確定才套用並進「最近用過」）；拿掉色碼輸入框與系統取色器；所有 `ColorPicker` 用到的地方（文字、字塊、外框、描邊、裝飾）自動套用；「自訂顏色」按鈕移到常駐那一列（跟「更多顏色」並排，按鈕上有目前顏色的小圓點）⑤`colorMath.ts`：色碼／RGB／HSV 換算，拉到灰／黑時沿用原本的色相
   - 動了哪些檔：`src/model/types.ts`、`src/engine/decorations.ts`、`src/app/editor/TextPanel.tsx`、`src/ui/{ColorPicker,ColorPopup,colorMath}.ts(x)`、`src/app/styles.css`；測試 `src/engine/decorations.test.ts`、`src/ui/colorMath.test.ts`、`e2e/fix-colors.spec.ts`（舊的色碼／系統取色器測試改成彈窗）、`e2e/phase3a-deco.spec.ts`（新增長度／透明度／範圍測試）；文件 `docs/TEXT_CARDS.md §3`、`docs/PLAN.md §7`

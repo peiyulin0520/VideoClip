@@ -13,6 +13,9 @@ import {
   type Box,
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
+import { PerfOverlay } from './PerfOverlay';
+import { CropOverlay } from './CropOverlay';
+import { useCrop } from '../../store/cropStore';
 import type { Item } from '../../model/types';
 import { geoCtx } from '../../engine/scene';
 import { findItem, visibleLayers } from '../../engine/timeline';
@@ -66,6 +69,7 @@ export function Preview({
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
+  const cropping = useCrop((s) => !!s.s);
   const previewFull = useUI((s) => s.previewFull);
   const fontEpoch = useFonts((s) => s.epoch); // 字體載入完成：字卡大小可能變，選取框要重算
 
@@ -326,6 +330,7 @@ export function Preview({
         {/* key：比例改變就換一個新的 canvas（舊的 WebGL 環境被 Pixi 銷毀後不能在同一個 canvas 上重建） */}
         <canvas key={`${width}x${height}`} ref={canvasRef} data-testid="preview-canvas" />
         <div ref={poolRef} className="pool" aria-hidden="true" />
+        <PerfOverlay player={player} />
 
         {(safe || dragging) && (
           <div className="safe" aria-hidden="true" data-testid="safe-zone">
@@ -340,7 +345,7 @@ export function Preview({
         {guides.x !== null && <div className="guide v" style={{ left: guides.x * k }} />}
         {guides.y !== null && <div className="guide h" style={{ top: guides.y * k }} />}
 
-        {box && sel && (
+        {box && sel && !cropping && (
           <div
             className={`selbox${selLocked ? ' locked' : ''}${sel.track.kind === 'main' ? ' main' : ''}`}
             data-testid="selbox"
@@ -353,26 +358,28 @@ export function Preview({
             }}
           />
         )}
-        {hitBoxes.map(({ id, b }) => {
-          const pad = id === selectedId ? 24 / k : 0; // 選取中的物件觸控區外擴一點，雙指比較好放
-          const w = Math.max(b.w, minHit) + pad * 2;
-          const h = Math.max(b.h, minHit) + pad * 2;
-          return (
-            <div
-              key={id}
-              className="hit"
-              data-hit={id}
-              aria-hidden="true"
-              style={{
-                left: b.cx * k,
-                top: b.cy * k,
-                width: w * k,
-                height: h * k,
-                transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
-              }}
-            />
-          );
-        })}
+        {!cropping &&
+          hitBoxes.map(({ id, b }) => {
+            const pad = id === selectedId ? 24 / k : 0; // 選取中的物件觸控區外擴一點，雙指比較好放
+            const w = Math.max(b.w, minHit) + pad * 2;
+            const h = Math.max(b.h, minHit) + pad * 2;
+            return (
+              <div
+                key={id}
+                className="hit"
+                data-hit={id}
+                aria-hidden="true"
+                style={{
+                  left: b.cx * k,
+                  top: b.cy * k,
+                  width: w * k,
+                  height: h * k,
+                  transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
+                }}
+              />
+            );
+          })}
+        {cropping && <CropOverlay project={project} k={k} width={width} height={height} />}
       </div>
       {emptyAction && (
         <button className="empty-import" onClick={emptyAction}>

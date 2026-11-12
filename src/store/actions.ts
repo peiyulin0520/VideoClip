@@ -1,13 +1,15 @@
 import type { Draft } from 'immer';
 import {
   assignAspect,
+  createAudioClip,
   createOverlayClip,
   createShapeItem,
   createTextItem,
   createTrack,
+  newId,
   pickAspect,
 } from '../model/defaults';
-import type { Aspect, Asset, Item, TextItem, Track, Transform, VideoItem } from '../model/types';
+import type { Aspect, Asset, Item, Project, TextItem, Track, Transform, VideoItem } from '../model/types';
 import {
   duplicateFree,
   duplicateItem,
@@ -20,9 +22,12 @@ import {
   moveTrack,
   relayout,
   removeItem,
+  reorderTrack,
   splitFree,
   splitItem,
+  totalDuration,
 } from '../engine/timeline';
+import { cellItem, type Rect } from '../engine/layouts';
 import { useProjectStore } from './projectStore';
 
 const store = () => useProjectStore.getState();
@@ -74,6 +79,96 @@ export function addOverlayClips(assets: Asset[], t: number, opts: { scale?: numb
   });
   if (firstId) store().select(firstId);
   return firstId;
+}
+
+/** 背景音樂：放在播放頭這一秒（最長到專案結束），放在音樂軌；同一時間有別的音樂就開新的音樂軌 */
+export function addMusic(assets: Asset[], t: number): string | null {
+  if (assets.length === 0) return null;
+  const total = totalDuration(store().project!);
+  let firstId: string | null = null;
+  store().apply((d) => {
+    for (const asset of assets) if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    for (const asset of assets) {
+      const start = Math.min(Math.max(t, 0), Math.max(total - 0.5, 0));
+      const dur = Math.max(Math.min(asset.duration, total - start), 0.5);
+      const clip = createAudioClip(asset, start, dur);
+      let ti = firstFreeTrack(d as never, 'audio', clip.start, clip.duration);
+      if (ti < 0) {
+        d.tracks.push(createTrack('audio', d.tracks as Track[]));
+        ti = d.tracks.length - 1;
+      }
+      d.tracks[ti]!.items.push(clip);
+      firstId ??= clip.id;
+    }
+  });
+  if (firstId) store().select(firstId);
+  return firstId;
+}
+
+/** 影片的軌道（主軌、疊加）是不是全部靜音了 */
+export function videoTracksMuted(p: Project): boolean {
+  const tracks = p.tracks.filter((t) => (t.kind === 'main' || t.kind === 'overlay') && t.items.length > 0);
+  return tracks.length > 0 && tracks.every((t) => !!t.muted);
+}
+
+/** 一鍵把所有影片（主軌、疊加）的聲音關掉／恢復；背景音樂不受影響。一步復原。 */
+export function setAllVideoMuted(muted: boolean) {
+  store().apply((d) => {
+    for (const t of d.tracks) if (t.kind === 'main' || t.kind === 'overlay') t.muted = muted;
+  });
+}
+
+/**
+ * 加一個多格版型：每一格一個疊加物件（各自一條軌道，放在下面）＋最上面一條鎖住的外框軌道（外框是有洞的 PNG）。
+ * 外框鎖住是為了點預覽時點得到下面的格子（要動外框，到軌道選單解鎖）。一步復原整個拿掉。
+ */
+export function addLayout(o: {
+  cells: { asset: Asset; win: Rect }[];
+  frame: Asset;
+  start: number;
+  duration: number;
+  frameName: string;
+}): string | null {
+  const proj = store().project;
+  if (!proj || o.cells.length === 0) return null;
+  const { width: W, height: H } = proj;
+  const group = newId('g_');
+  let firstId: string | null = null;
+  store().apply((d) => {
+    for (const a of [...o.cells.map((c) => c.asset), o.frame])
+      if (!d.assets.some((x) => x.id === a.id)) d.assets.push(a);
+    for (const c of o.cells) {
+      const dur = c.asset.kind === 'image' ? o.duration : Math.min(c.asset.duration, o.duration);
+      const item = cellItem(c.asset, c.win, W, H, o.start, dur, group);
+      const tr = createTrack('overlay', d.tracks as Track[]);
+      tr.items.push(item);
+      d.tracks.push(tr);
+      firstId ??= item.id;
+    }
+    const frame = createOverlayClip(o.frame, o.start);
+    frame.duration = o.duration;
+    frame.fit = 'contain';
+    frame.transform = { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 };
+    frame.group = group;
+    const ft = createTrack('overlay', d.tracks as Track[]);
+    ft.name = o.frameName;
+    ft.locked = true;
+    ft.items.push(frame);
+    d.tracks.push(ft);
+  });
+  if (firstId) store().select(firstId);
+  return firstId;
+}
+
+/** 刪掉整個版型（同一個 group 的外框與所有格子），空掉的軌道一起拿掉；一步復原 */
+export function removeGroup(group: string) {
+  store().apply(
+    (d) => {
+      for (const t of d.tracks) t.items = t.items.filter((x) => (x as VideoItem).group !== group) as never;
+      d.tracks = d.tracks.filter((t, i) => i === 0 || t.items.length > 0) as never;
+    },
+    { select: null },
+  );
 }
 
 export function addText(t: number, shape = false): string {
@@ -168,6 +263,13 @@ export function patchTrack(
 export function shiftTrackLayer(trackId: string, dir: -1 | 1) {
   store().apply((d) => {
     d.tracks = moveTrack(d.tracks as Track[], trackId, dir) as never;
+  });
+}
+
+/** 直接把軌道搬到新的圖層位置（拖時間軸左邊的軌道圖示）；一步復原 */
+export function moveTrackTo(trackId: string, toIndex: number) {
+  store().apply((d) => {
+    d.tracks = reorderTrack(d.tracks as Track[], trackId, toIndex) as never;
   });
 }
 

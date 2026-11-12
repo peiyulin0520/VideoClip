@@ -1,4 +1,6 @@
 import { APP_VERSION } from '../pwa';
+import { isPerfOn, setPerfOn } from '../editor/PerfOverlay';
+import { getTheme, setTheme, THEMES, type ThemeId } from '../../ui/theme';
 import { GiphyKeySetup } from '../editor/GiphyPanel';
 import { ChevronLeft, Download, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -28,6 +30,8 @@ export function Settings() {
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [driveUrl, setDriveUrl] = useState(backup.driveFolderUrl ?? '');
   const [openLicenses, setOpenLicenses] = useState(false);
+  const [perf, setPerf] = useState(isPerfOn);
+  const [theme, setThemeState] = useState<ThemeId>(getTheme);
 
   useEffect(() => {
     let alive = true;
@@ -56,6 +60,35 @@ export function Settings() {
         </Link>
         <h1>設定</h1>
       </header>
+
+      <section aria-label="介面主題">
+        <h2>介面主題</h2>
+        <div className="theme-grid" role="radiogroup" aria-label="介面主題">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              role="radio"
+              aria-checked={theme === t.id}
+              aria-label={`主題 ${t.name}`}
+              data-theme-id={t.id}
+              className="theme-card"
+              onClick={() => {
+                setTheme(t.id);
+                setThemeState(t.id);
+              }}
+            >
+              <span className="theme-swatches" aria-hidden="true">
+                {t.colors.map((c) => (
+                  <i key={c} style={{ background: c }} />
+                ))}
+              </span>
+              <b>{t.name}</b>
+              <small className="hint">{t.desc}</small>
+            </button>
+          ))}
+        </div>
+        <p className="hint">只改操作介面的顏色，影片預覽和匯出的畫面不受影響。存在這台手機。</p>
+      </section>
 
       <section aria-label="字體">
         <h2>字體</h2>
@@ -238,6 +271,26 @@ export function Settings() {
           <br />
           {persisted === true && '瀏覽器已承諾不會自動清掉這些資料。'}
           {persisted === false && '瀏覽器可能在空間不足時清掉資料。iPhone 請「加入主畫面」，並定期備份。'}
+        </p>
+      </section>
+
+      <section aria-label="播放效能">
+        <h2>播放效能</h2>
+        <label className="check-row">
+          <input
+            type="checkbox"
+            data-testid="perf-toggle"
+            checked={perf}
+            onChange={(e) => {
+              setPerfOn(e.target.checked);
+              setPerf(e.target.checked);
+            }}
+          />
+          顯示播放效能（在預覽左上角）
+        </label>
+        <p className="hint">
+          播放卡的時候打開，錄一段播放給我們看：會顯示每秒幾格、每格花多少毫秒、慢在哪一段，還有影片的大小與編碼。
+          大的影片（4K、HDR）匯入後，會在背景自動做一份預覽用的輕量影片，播放比較順；匯出時仍用原檔。
         </p>
       </section>
 
