@@ -67,8 +67,12 @@ export type VideoItem = ItemBase & {
   mask?: [number, number][];
   /** 多格版型：這個物件所在的格子（佔畫面寬、高的比例）。裁切模式完成時，畫面會填滿這個格子 */
   cell?: { x: number; y: number; w: number; h: number };
-  /** 同一個版型的物件（外框與各格）共用的 id，用來「刪除整個版型」 */
+  /** 同一個版型的物件（外框與各格）共用的 id：一起縮放、移動、同一段時間，也用來「刪除整個版型」 */
   group?: string;
+  /** 版型外框專用：看得到的範圍（佔整張外框圖的比例）；選取框、點選範圍用它，不用整張透明的圖 */
+  visible?: { x: number; y: number; w: number; h: number };
+  /** 版型外框專用：整個版型的動畫（捲動＝由下往上捲過畫面；滑入滑出＝開頭從右邊滑進來、結尾往左滑出去） */
+  motion?: 'drift' | 'slide';
 };
 
 // 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
@@ -227,6 +231,14 @@ export type Track = {
   hidden: boolean;
   locked: boolean;
   muted?: boolean;
+  /**
+   * 版型：外框軌（frame）與各格的軌道（cell）共用同一個 group。時間軸上只畫外框那一條（代表整個版型），
+   * 各格的軌道藏起來；在預覽上點格子可以個別選片段。
+   */
+  group?: string;
+  groupRole?: 'frame' | 'cell';
+  /** 格子軌道：素材放完（或這段時間沒有素材）時，格子顯示的色塊顏色 */
+  fill?: 'black' | 'white';
   items: Item[];
 };
 
