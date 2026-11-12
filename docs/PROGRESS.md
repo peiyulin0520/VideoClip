@@ -6,9 +6,9 @@
 - **日期**：2026-11-11
 - **分支**：PR #5（第 3 次實測修正＋GIPHY＋我的貼圖＋精靈說明）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已用 `git merge --ff-only origin/main` 對齊，之後的新工作繼續在這個分支
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
-- **測試**：566 個單元測試、70 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：575 個單元測試、72 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：照 `docs/plans/2026-11-12-feedback-4.md` 實作（Sonnet），建議順序 **A 播放順暢＋影片聲音 → B 匯出影片 → C 音軌管理＋背景音樂 → D 裁切（四邊角＋自由形狀）→ E 裝飾長度／透明度／範圍＋取色彈窗**（使用者也可以指定先做 E）。之前規劃但還沒做的：缺字體提示、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
+- **下一步**：照 `docs/plans/2026-11-12-feedback-4.md` 繼續實作（Sonnet）：**A 播放順暢＋影片聲音 ✅ 已做（Chromium 驗證，iPhone 待真機）**，接著 **B 匯出影片 → C 音軌管理＋背景音樂 → D 裁切（四邊角＋自由形狀）→ E 裝飾長度／透明度／範圍＋取色彈窗**（使用者也可以指定先做 E）。之前規劃但還沒做的：缺字體提示、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -67,6 +67,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 feedback-4 A：播放順暢＋影片聲音（靜音模式也有聲音）
+  - 做了什麼：①播放時間改成獨立的 `TimeText`（最多每 100ms 更新），`EditorBody` 不再每格重畫（e2e 量到播放 2.5 秒內重畫 0 次，之前每秒 60 次）②影片圖層直接當 GPU 貼圖（`ImageSource` 包 `<video>`，裁切用貼圖子矩形 `frame`，`dynamic:true` 才會通知精靈；沒有新畫面不重新上傳），不再每格 `drawImage` 到暫存畫布 ③對時改柔性：差 >0.04 秒用 `playbackRate` ±15% 慢慢追，>0.5 秒才硬跳（`driftPlan`）④新 `engine/audio.ts`：有 `navigator.audioSession`（或不是 iOS）→ 先設 `type='playback'` 再走 Web Audio（每個 `<video>` → `GainNode`，音量可到 200%）；沒有 Audio Session 的 iOS → 直接用 `<video>` 出聲（只能開／關）；⑤`mediaPool.unlock()` 改成使用者點擊當下**同步**對停著的元素 `play()` 後立刻 `pause()`（原本靜音 play、等 promise 才 pause，會停掉剛開始播的影片，而且靜音 play 不算解鎖出聲）；`play()` 先 `audio.unlock()`、渲染（目前的影片在點擊內 play）、再 `pool.unlock()` ⑥出聲播放被擋（`NotAllowedError`）不再吞掉：暫停並提示「iPhone 擋住了聲音，請再按一次播放」⑦除錯掛鉤新增 `stats()`（fps、每格合成毫秒）、`audio()`（模式、是否在跑、輸出音量）、`editorRenders()`
+  - 動了哪些檔：`src/engine/{audio,player,mediaPool,compositor,debug}.ts`、`src/app/pages/Editor.tsx`、`src/app/editor/Preview.tsx`；新 `src/engine/audio.test.ts`、`e2e/playback-audio.spec.ts`
+  - 驗證：✅ 單元測試（模式選擇、聲音狀態、對時）；✅ e2e（播放中編輯器重畫 <10 次、headless Chromium 軟體繪圖 ≈48fps、每格合成 ≈1.3ms；有 Audio Session 時設成 playback、Web Audio 在跑、聲音輸出音量 >0.02；音量 0 時 <0.01）；✅ 全部 72 個 e2e、lint、build 過；🔴 iPhone 沒測：靜音模式有沒有聲音、跨片段聲音、播放順不順、`createMediaElementSource` 在 iOS 上的行為（已列 PLAN §7）
+  - 使用者的決定/回饋：影片要有聲音，手機鈴聲靜音時也要有（見上方 2026-11-12 回覆確認）
+  - 踩到的坑：Pixi 的 `Sprite` 只有 `texture.dynamic=true` 才會聽貼圖 `update` 事件，改 `frame` 後要呼叫 `texture.update()`（且建構時要給 `frame`，否則 `noFrame` 會把 frame 重設回整張）；不要用 Pixi 的 `VideoSource`（它會對元素 `load()`／自己管播放，會干擾影片池），用 `ImageSource` 包 `<video>` 即可
+  - 下一步：B 匯出影片（見 `docs/plans/2026-11-12-feedback-4.md`）；請使用者用 iPhone 測 A
 - 2026-11-12 修正規劃 feedback-4 的 A-4（聲音）：靜音模式下也要有聲音 → Web Audio 前先設 `navigator.audioSession.type='playback'`，沒有這個 API 的舊 iOS 改用 `<video>` 元素出聲（只能開／關）；拿掉「請關靜音開關」提示；黑色區塊確認不是問題
   - 驗證：🔴 程式未改；iOS 靜音模式行為要真機確認
 - 2026-11-12 寫修改規劃：第 4 次回報 5 項（只有文件，Opus；依使用者分工交給 Sonnet 實作）

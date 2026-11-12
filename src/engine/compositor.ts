@@ -1,4 +1,13 @@
-import { Application, CanvasSource, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import {
+  Application,
+  CanvasSource,
+  Container,
+  Graphics,
+  ImageSource,
+  Rectangle,
+  Sprite,
+  Texture,
+} from 'pixi.js';
 import 'pixi.js/advanced-blend-modes';
 import type { BlendMode, Crop, Outline } from '../model/types';
 import type { Box } from './geometry';
@@ -33,7 +42,11 @@ type Obj = {
   container: Container;
   sprite: Sprite;
   texture: Texture | null;
-  textureSource: CanvasSource | null;
+  textureSource: CanvasSource | ImageSource | null;
+  /** 影片「直接當貼圖」模式：不經過暫存畫布，每格只通知 GPU 重新上傳 */
+  videoEl: HTMLVideoElement | null;
+  videoKey: string;
+  uploadKey: string;
   frameCanvas: HTMLCanvasElement | null;
   frameCtx: CanvasRenderingContext2D | null;
   textKey: string | undefined;
@@ -117,6 +130,9 @@ export class Compositor {
       sprite,
       texture: null,
       textureSource: null,
+      videoEl: null,
+      videoKey: '',
+      uploadKey: '',
       frameCanvas: null,
       frameCtx: null,
       textKey: undefined,
@@ -131,11 +147,62 @@ export class Compositor {
   }
 
   private setSource(o: Obj, canvas: HTMLCanvasElement) {
-    o.texture?.destroy(false);
-    o.textureSource?.destroy();
+    this.dropTexture(o);
     o.textureSource = new CanvasSource({ resource: canvas, scaleMode: 'linear' });
     o.texture = new Texture({ source: o.textureSource });
     o.sprite.texture = o.texture;
+  }
+
+  private dropTexture(o: Obj) {
+    o.texture?.destroy(false);
+    o.textureSource?.destroy();
+    o.texture = null;
+    o.textureSource = null;
+    o.videoEl = null;
+    o.videoKey = '';
+    o.uploadKey = '';
+  }
+
+  /** 影片直接當貼圖：裁切改用貼圖的子矩形，不再每格 drawImage 到暫存畫布 */
+  private updateVideo(o: Obj, layer: SceneLayer, v: HTMLVideoElement) {
+    const vw = v.videoWidth;
+    const vh = v.videoHeight;
+    if (!layer.ready || vw <= 0 || vh <= 0) return; // 保留上一格
+    const key = `${v.currentSrc}|${vw}x${vh}`;
+    if (o.videoEl !== v || o.videoKey !== key || !o.texture) {
+      this.dropTexture(o);
+      const src = new ImageSource({ resource: v, scaleMode: 'linear', autoGarbageCollect: false });
+      o.textureSource = src;
+      o.texture = new Texture({ source: src, frame: new Rectangle(0, 0, vw, vh), dynamic: true });
+      o.sprite.texture = o.texture;
+      o.videoEl = v;
+      o.videoKey = key;
+      o.hasFrame = false;
+    }
+    const c = layer.crop ?? { l: 0, t: 0, r: 0, b: 0 };
+    const f = o.texture.frame;
+    const x = vw * c.l;
+    const y = vh * c.t;
+    const w = Math.max(vw * (1 - c.l - c.r), 1);
+    const h = Math.max(vh * (1 - c.t - c.b), 1);
+    if (f.x !== x || f.y !== y || f.width !== w || f.height !== h) {
+      f.x = x;
+      f.y = y;
+      f.width = w;
+      f.height = h;
+      o.texture.update(); // 通知精靈：貼圖的範圍改了
+    }
+    // 影片沒有新畫面（暫停、或螢幕更新比影片快）就不重新上傳
+    const uploadKey = `${v.currentTime}`;
+    if (!o.hasFrame || o.uploadKey !== uploadKey) {
+      try {
+        o.textureSource?.update();
+        o.hasFrame = true;
+        o.uploadKey = uploadKey;
+      } catch {
+        /* 解碼中，保留上一格 */
+      }
+    }
   }
 
   private update(o: Obj, layer: SceneLayer) {
@@ -146,6 +213,8 @@ export class Compositor {
         o.textKey = layer.textKey;
         o.hasFrame = true;
       }
+    } else if (layer.kind === 'video' && layer.source instanceof HTMLVideoElement) {
+      this.updateVideo(o, layer, layer.source);
     } else {
       const fw = Math.max(Math.round(layer.frameW ?? layer.box.w), 2);
       const fh = Math.max(Math.round(layer.frameH ?? layer.box.h), 2);
@@ -234,8 +303,7 @@ export class Compositor {
   private destroyObj(o: Obj) {
     o.container.parent?.removeChild(o.container);
     o.container.destroy({ children: true });
-    o.texture?.destroy(false);
-    o.textureSource?.destroy();
+    this.dropTexture(o);
   }
 
   /** 讀畫面上某一點的 RGBA（x、y 是合成器畫布像素） */

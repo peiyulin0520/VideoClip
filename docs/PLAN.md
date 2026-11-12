@@ -333,6 +333,8 @@ docs/
 - [ ] （Phase 1）iPhone 匯入照片圖庫的 .mov（HEVC）與 .heic：能不能讀長度、縮圖、播放
 - [ ] （Phase 1）OPFS 寫入大檔（>500MB）；沒有 createWritable 時退回 IndexedDB 是否可用
 - [ ] （Phase 1）預覽跨片段播放時聲音不中斷（第二個 <video> 的解鎖）
+- [ ] （feedback-4 A）**手機開著靜音模式**，播放有聲音的影片也要有聲音（像 YouTube／IG）；音量滑桿在 iPhone 有作用（新版 iOS 走 Web Audio＋`audioSession.type='playback'`；舊版 iOS 只能開／關）；第一次按播放有聲音、跨片段／疊加影片聲音不中斷；若出現「iPhone 擋住了聲音，請再按一次播放」，回報是哪一種情況
+- [ ] （feedback-4 A）播放比以前順暢（影片直接當 GPU 貼圖、編輯器不再每格重畫）：1080p／4K HEVC 影片、主軌＋疊加同時播放時有沒有卡、時間軸跟著捲動順不順
 - [ ] （Phase 1）時間軸：捲動＝移動播放頭、雙指縮放、長按拖曳排序、修剪把手是否好點、不會誤觸頁面捲動
 - [ ] （Phase 3B）字體包下載（基本包約 22 MB）在 iPhone 的速度；Cache Storage 的配額與是否被清掉；載入 3–6 MB 的字體後預覽會不會卡
 - [ ] （Phase 3B）首次使用精靈在 iPhone Safari 與「加入主畫面」後的流程；字體選單捲動是否順
