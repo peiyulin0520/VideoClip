@@ -20,6 +20,7 @@ import {
   type TextStyle,
   type Track,
   type Transform,
+  type TransitionKind,
   type VideoItem,
 } from '../model/types';
 import {
@@ -44,6 +45,7 @@ import {
   trackEnd,
 } from '../engine/timeline';
 import { cellItem, type Rect } from '../engine/layouts';
+import { DEFAULT_TRANSITION_DURATION } from '../engine/transitions';
 import { groupPatch, transformAbout } from '../engine/groupTransform';
 import { useProjectStore } from './projectStore';
 
@@ -361,6 +363,56 @@ export function removeGroup(group: string) {
     },
     { select: null },
   );
+}
+
+/** 設定（或取消）一個片段的進場轉場；duration 沒給就沿用原本的 */
+export function setTransition(id: string, kind: TransitionKind | null, duration?: number, opts?: Opts): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type === 'text' || it.type === 'audio') return;
+      if (!kind) delete it.transitionIn;
+      else
+        it.transitionIn = {
+          kind,
+          duration: duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+        };
+    },
+    opts,
+  );
+}
+
+/** 同一軌上所有「前面緊接著另一個片段」的片段都套用同一種轉場；回傳套用了幾個 */
+export function setTransitionAll(trackId: string, kind: TransitionKind | null, duration?: number): number {
+  const p = store().project;
+  const tr = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !tr) return 0;
+  const ids = tr.items
+    .filter((it) => it.type !== 'text' && it.type !== 'audio')
+    .filter((it) =>
+      tr.items.some(
+        (x) =>
+          x !== it &&
+          x.type !== 'text' &&
+          x.type !== 'audio' &&
+          Math.abs(x.start + x.duration - it.start) < 0.03,
+      ),
+    )
+    .map((it) => it.id);
+  if (ids.length === 0) return 0;
+  store().apply((d) => {
+    const t = d.tracks.find((x) => x.id === trackId);
+    for (const it of t?.items ?? []) {
+      if (!ids.includes(it.id) || it.type === 'text' || it.type === 'audio') continue;
+      if (!kind) delete it.transitionIn;
+      else
+        it.transitionIn = {
+          kind,
+          duration: duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+        };
+    }
+  });
+  return ids.length;
 }
 
 /** 版型整組動畫：不動／捲動／滑入滑出 */

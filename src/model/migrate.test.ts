@@ -124,7 +124,7 @@ describe('migrateProject v1 → v2', () => {
     );
     const t = m.project.tracks;
     expect(t[t.length - 1]!.id).toBe('f');
-    expect(t[t.length - 1]!.locked).toBe(true);
+    expect(t[t.length - 1]!.groupRole).toBe('frame'); // G4：外框改成版型的代表列，不再鎖住
     expect(t.every((x) => x.kind === 'media')).toBe(true);
   });
 
@@ -133,5 +133,35 @@ describe('migrateProject v1 → v2', () => {
     const m = migrateProject(p);
     expect(m.changed).toBe(false);
     expect(m.project).toBe(p);
+  });
+});
+
+describe('markLegacyGroups', () => {
+  it('舊的版型：外框軌解鎖並標記、各格軌道標記為 cell', async () => {
+    const { markLegacyGroups } = await import('./migrate');
+    const mk = (id: string, locked: boolean, cell: boolean) =>
+      ({
+        id,
+        kind: 'media',
+        name: id,
+        locked,
+        items: [
+          {
+            id: `${id}-i`,
+            type: 'image',
+            group: 'g1',
+            ...(cell ? { cell: { x: 0, y: 0, w: 1, h: 1 } } : {}),
+          },
+        ],
+      }) as never;
+    const p = { tracks: [mk('c1', false, true), mk('f', true, false)] } as never;
+    const r = markLegacyGroups(p);
+    expect(r.changed).toBe(true);
+    const [c, f] = r.project.tracks;
+    expect(c!.groupRole).toBe('cell');
+    expect(c!.fill).toBe('black');
+    expect(f!.groupRole).toBe('frame');
+    expect(f!.locked).toBe(false);
+    expect(markLegacyGroups(r.project).changed).toBe(false);
   });
 });

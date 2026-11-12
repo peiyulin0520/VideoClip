@@ -9,7 +9,6 @@ import {
   project,
   samplePreview,
   selectedItemId,
-  showTimeline,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-5/layout';
@@ -24,7 +23,7 @@ type It = {
   duration: number;
   transform: { x: number; y: number; scale: number };
 };
-type Tr = { kind: string; name: string; locked: boolean; items: It[] };
+type Tr = { kind: string; name: string; locked: boolean; groupRole?: string; items: It[] };
 const dims = async (page: Page) => (await project(page)) as unknown as { width: number; height: number };
 const tracks = async (page: Page) => (await project(page)).tracks as unknown as Tr[];
 
@@ -40,7 +39,7 @@ const center = (c: Cell): [number, number] => [c.x + c.w / 2, c.y + c.h / 2];
 const near = (c: number[] | null, want: number[], tol = 40) =>
   !!c && want.every((v, i) => Math.abs(c[i]! - v) <= tol);
 
-test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外框鎖住，點預覽選到下面的格子；移除版型一步復原', async ({
+test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外框是代表整個版型的一條，點預覽先選到整個版型、再點一下才選到格子；移除版型一步復原', async ({
   page,
 }) => {
   await createProjectWith(page, ['solid-blue.webm']);
@@ -51,9 +50,9 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
 
   const tr = await tracks(page);
   const cellTracks = tr.filter((t) => t.items[0]?.cell);
-  const frameTrack = tr.find((t) => t.name.startsWith('版型外框'))!;
+  const frameTrack = tr.find((t) => t.groupRole === 'frame')!;
   expect(cellTracks).toHaveLength(4);
-  expect(frameTrack.locked).toBe(true); // 外框鎖住
+  expect(frameTrack.locked).toBeFalsy(); // 外框不鎖：它代表整個版型，可以整體縮放移動
   expect(tr.indexOf(frameTrack)).toBe(tr.length - 1); // 在最上層
   const group = cellTracks[0]!.items[0]!.group!;
   expect([...cellTracks, frameTrack].every((t) => t.items[0]!.group === group)).toBe(true);
@@ -80,10 +79,17 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: `${SHOT}/booth-strip.png` });
 
-  // 點預覽上的格子：選到那一格（不是被鎖住的外框）
+  // 點預覽上的格子：第一下選到整個版型（外框），再點一下才選到那一格
   const box = await previewBox(page);
   const [cx1, cy1] = center(cellTracks[1]!.items[0]!.cell!);
-  await page.touchscreen.tap(box.x + cx1 * box.width, box.y + cy1 * box.height);
+  const tapCell = async () => {
+    await page.touchscreen.tap(box.x + cx1 * box.width, box.y + cy1 * box.height);
+  };
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await tapCell();
+  await expect.poll(() => selectedItemId(page)).toBe(frameTrack.items[0]!.id);
+  await page.waitForTimeout(450);
+  await tapCell();
   await expect.poll(() => selectedItemId(page)).toBe(cellTracks[1]!.items[0]!.id);
 
   // 移除版型：外框與所有格子一起拿掉；一步復原
@@ -164,8 +170,8 @@ test('版型的格子可以用裁切調整露出的範圍：預設鎖定格子�
   await addLayout(page, '拍貼機直條', '白', ['clip-a.webm', 'clip-b.webm']);
   const cellTr = (await tracks(page)).filter((t) => t.items[0]?.cell);
   const it = cellTr[0]!.items[0]!;
-  await showTimeline(page);
-  await page.locator(`[data-testid="clip"][data-item-id="${it.id}"]`).tap();
+  // 剛加好版型時，第 1 格已經被選取（時間軸上各格藏起來，由「版型」分頁選格子）
+  await expect.poll(() => selectedItemId(page)).toBe(it.id);
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();

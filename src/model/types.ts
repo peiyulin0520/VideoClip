@@ -73,7 +73,12 @@ export type VideoItem = ItemBase & {
   visible?: { x: number; y: number; w: number; h: number };
   /** 版型外框專用：整個版型的動畫（捲動＝由下往上捲過畫面；滑入滑出＝開頭從右邊滑進來、結尾往左滑出去） */
   motion?: 'drift' | 'slide';
+  /** 進場轉場：跟前面緊接的片段之間的效果（以兩個片段的接縫為中心，前半在前一個片段、後半在這個片段） */
+  transitionIn?: { kind: TransitionKind; duration: number };
 };
+
+/** 轉場種類：淡入淡出、黑場、白閃、暖色閃光、左推、上推、縮放 */
+export type TransitionKind = 'fade' | 'black' | 'white' | 'flash' | 'push' | 'rise' | 'zoom';
 
 // 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
 export type Stroke = {

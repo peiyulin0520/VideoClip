@@ -353,6 +353,9 @@ export function Preview({
       if (b) hitBoxes.push({ id, b });
     }
   }
+  // 已選的觸控區放在最上面（版型的外框很大，不然會蓋住下面已選的格子，拖不動）
+  if (sel && sel.item.type !== 'text' && sel.item.type !== 'audio' && sel.item.group)
+    hitBoxes.sort((a, b) => Number(a.id === selectedId) - Number(b.id === selectedId));
   // 從時間軸選了一個現在不在畫面上的物件：沒有觸控區（選取框也不會顯示）
   const minHit = 44 / k;
 

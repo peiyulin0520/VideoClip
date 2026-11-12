@@ -243,6 +243,7 @@ export function splitFree(items: Item[], id: string, t: number): Item[] | null {
         trimIn: it.trimIn + local * it.speed,
       }
     : { ...it, id: newId('i_'), start: t, duration: it.duration - local };
+  if (b.type !== 'text' && b.type !== 'audio') delete b.transitionIn; // 轉場在片段的開頭，後半段沒有
   return [...items.slice(0, i), a, b, ...items.slice(i + 1)];
 }
 
@@ -451,6 +452,7 @@ export function splitByRanges(item: VideoItem, ranges: Range[], assetDuration: n
     if (i > 0) {
       piece.id = newId('i_');
       delete piece.label; // 命名只留在第一段
+      delete piece.transitionIn; // 轉場只留在第一段
     }
     return piece;
   });
