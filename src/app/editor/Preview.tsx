@@ -231,7 +231,14 @@ export function Preview({
     }
     if (pointers.current.size > 1) return;
 
-    tap.current = { pointerId: e.pointerId, cx: e.clientX, cy: e.clientY, t: performance.now(), pt, moved: false };
+    tap.current = {
+      pointerId: e.pointerId,
+      cx: e.clientX,
+      cy: e.clientY,
+      t: performance.now(),
+      pt,
+      moved: false,
+    };
     // 按在「看不見的觸控區」（touch-action:none）上：立刻選取＋準備拖移。
     // 其他地方（含沒選取的大物件）只當成「可能是輕點」，放開時才判定，上下滑就是捲頁面、什麼都不改
     const hitEl = (e.target as HTMLElement).closest<HTMLElement>('[data-hit]');
@@ -263,7 +270,8 @@ export function Preview({
     const pt = toProj(e);
     pointers.current.set(e.pointerId, pt);
     if (tap.current && tap.current.pointerId === e.pointerId) {
-      if (Math.hypot(e.clientX - tap.current.cx, e.clientY - tap.current.cy) > TAP_MOVE) tap.current.moved = true;
+      if (Math.hypot(e.clientX - tap.current.cx, e.clientY - tap.current.cy) > TAP_MOVE)
+        tap.current.moved = true;
     }
     const g = gesture.current;
     if (!g) return;

@@ -67,7 +67,6 @@ function MusicImport() {
   );
 }
 
-
 /** 音訊分頁：背景音樂、全部影片靜音；選到音樂時多出分割、刪除、複製、修剪、聲音 */
 export function AudioTab({
   found,
@@ -81,7 +80,8 @@ export function AudioTab({
   const project = useProjectStore((s) => s.project)!;
   const player = useUI((s) => s.player);
   const selected = found?.item.type === 'audio' && isVideoItem(found.item) ? found.item : null;
-  if (selected && panelActive(panel, found)) return <ClipPanel panel={panel} setPanel={setPanel} found={found} />;
+  if (selected && panelActive(panel, found))
+    return <ClipPanel panel={panel} setPanel={setPanel} found={found} />;
   const allMuted = videoTracksMuted(project);
   return (
     <>
@@ -121,7 +121,8 @@ export function AudioTab({
             toast(allMuted ? '影片的聲音恢復了' : '所有影片都靜音了（背景音樂不受影響）');
           }}
         >
-          {allMuted ? <Volume2 size={18} /> : <VolumeX size={18} />} {allMuted ? '恢復影片聲音' : '全部影片靜音'}
+          {allMuted ? <Volume2 size={18} /> : <VolumeX size={18} />}{' '}
+          {allMuted ? '恢復影片聲音' : '全部影片靜音'}
         </button>
       </div>
     </>

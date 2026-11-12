@@ -44,7 +44,10 @@ export function BottomBar({
   if (prevSel !== selectedId) {
     setPrevSel(selectedId);
     if (found) {
-      const next = tabForSelection(tab, found.item.type === 'text' ? 'text' : found.item.type === 'audio' ? 'audio' : 'media');
+      const next = tabForSelection(
+        tab,
+        found.item.type === 'text' ? 'text' : found.item.type === 'audio' ? 'audio' : 'media',
+      );
       if (next !== tab) {
         setTab(next);
         setPanel(null);
@@ -73,7 +76,9 @@ export function BottomBar({
 
   // 分頁列放不下（窄螢幕）可以左右滑；選中的分頁自動捲進畫面
   useEffect(() => {
-    barRef.current?.querySelector<HTMLElement>('.tab.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    barRef.current
+      ?.querySelector<HTMLElement>('.tab.active')
+      ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   }, [tab]);
 
   return (
@@ -92,9 +97,7 @@ export function BottomBar({
           </button>
         ))}
       </div>
-      {tab === 'edit' && (
-        <EditTab panel={panel} setPanel={setPanel} onImport={onImportMain} found={found} />
-      )}
+      {tab === 'edit' && <EditTab panel={panel} setPanel={setPanel} onImport={onImportMain} found={found} />}
       {!collapsed && tab === 'overlay' && <OverlayTab onImportOverlay={onImportOverlay} />}
       {!collapsed && tab === 'text' && <TextTab found={found} />}
       {!collapsed && tab === 'layers' && <LayersTab />}

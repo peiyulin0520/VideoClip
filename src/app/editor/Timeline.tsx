@@ -148,7 +148,10 @@ export function Timeline({
   const slotZone = draggedItem ? ZONE[trackKindOf(draggedItem)] : null;
   const layout = useMemo(() => {
     const all = project.tracks.map((track, index) => ({ track, index })).reverse();
-    const list = [...all.filter((r) => r.track.kind !== 'audio'), ...all.filter((r) => r.track.kind === 'audio')];
+    const list = [
+      ...all.filter((r) => r.track.kind !== 'audio'),
+      ...all.filter((r) => r.track.kind === 'audio'),
+    ];
     const slots: { edge: 'top' | 'bottom'; top: number }[] = [];
     let y = RULER_H + ROW_GAP;
     const rows = list.map((r, i) => {
@@ -339,8 +342,11 @@ export function Timeline({
       if (!el) return { trackId: null, newEdge: null };
       const y = clientY - el.getBoundingClientRect().top + el.scrollTop;
       const lay = layoutRef.current;
-      for (const sl of lay.slots) if (y >= sl.top && y < sl.top + SLOT_H) return { trackId: null, newEdge: sl.edge };
-      for (const r of lay.rows) if (y >= r.top - ROW_GAP / 2 && y < r.top + r.h + ROW_GAP / 2) return { trackId: r.track.id, newEdge: null };
+      for (const sl of lay.slots)
+        if (y >= sl.top && y < sl.top + SLOT_H) return { trackId: null, newEdge: sl.edge };
+      for (const r of lay.rows)
+        if (y >= r.top - ROW_GAP / 2 && y < r.top + r.h + ROW_GAP / 2)
+          return { trackId: r.track.id, newEdge: null };
       return { trackId: null, newEdge: null };
     };
     const targetFor = (hover: Hover): DropTarget | null =>
@@ -355,7 +361,16 @@ export function Timeline({
       mode = 'drag';
       window.addEventListener('touchmove', blockScroll, { passive: false });
       const hover = { trackId: track.id, newEdge: null };
-      setDrag({ kind: 'move', id: item.id, dx: 0, dy: 0, snapX: null, hover, target: targetFor(hover), startTop });
+      setDrag({
+        kind: 'move',
+        id: item.id,
+        dx: 0,
+        dy: 0,
+        snapX: null,
+        hover,
+        target: targetFor(hover),
+        startTop,
+      });
       navigator.vibrate?.(15);
     }, LONG_PRESS_MS);
 
@@ -368,7 +383,16 @@ export function Timeline({
       if (mode !== 'drag') return;
       const s = snapStart(dx);
       const hover = resolveHover(ev.clientY);
-      setDrag({ kind: 'move', id: item.id, dx: s.dx, dy: ev.clientY - startY, snapX: s.snapX, hover, target: targetFor(hover), startTop });
+      setDrag({
+        kind: 'move',
+        id: item.id,
+        dx: s.dx,
+        dy: ev.clientY - startY,
+        snapX: s.snapX,
+        hover,
+        target: targetFor(hover),
+        startTop,
+      });
     };
     const finish = (ev: PointerEvent, cancelled: boolean) => {
       clearTimeout(timer);
@@ -670,7 +694,7 @@ export function Timeline({
                 {menuTrack.muted ? '取消靜音' : '這條軌道靜音'}
               </button>
             )}
-            {(
+            {
               <>
                 {menuTrack.kind !== 'audio' && (
                   <>
@@ -698,7 +722,9 @@ export function Timeline({
                     </button>
                   </>
                 )}
-                {!(menuTrack.kind === 'media' && project.tracks.filter((t) => t.kind === 'media').length <= 1) && (
+                {!(
+                  menuTrack.kind === 'media' && project.tracks.filter((t) => t.kind === 'media').length <= 1
+                ) && (
                   <button
                     className="menu-item danger"
                     onClick={() => {
@@ -710,7 +736,7 @@ export function Timeline({
                   </button>
                 )}
               </>
-            )}
+            }
           </>
         )}
       </Sheet>

@@ -52,7 +52,9 @@ test('軌道圖示按住上下拖＝換圖層順序（觸控）；點一下仍�
   await page.touchscreen.tap(5, 5);
 });
 
-test('軌道圖示：往下拖超過最底、往上拖超過字卡，都夾在同一種類的範圍內（影像、字卡不互相穿插）', async ({ page }) => {
+test('軌道圖示：往下拖超過最底、往上拖超過字卡，都夾在同一種類的範圍內（影像、字卡不互相穿插）', async ({
+  page,
+}) => {
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
   await addOverlays(page, ['solid-blue.webm']);

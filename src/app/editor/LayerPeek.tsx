@@ -39,7 +39,10 @@ export function LayerPeek({
       {layers.length === 0 && <p className="hint">這一秒畫面上沒有東西</p>}
       <ul>
         {layers.map(({ item, track }) => {
-          const asset = item.type === 'text' ? null : project.assets.find((a) => a.id === (item as { assetId: string }).assetId);
+          const asset =
+            item.type === 'text'
+              ? null
+              : project.assets.find((a) => a.id === (item as { assetId: string }).assetId);
           const thumb = asset?.thumbs?.[0];
           return (
             <li key={item.id}>

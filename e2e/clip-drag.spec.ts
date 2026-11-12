@@ -16,7 +16,12 @@ async function clipCenter(page: Page, itemId: string) {
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 /** 長按 → 移到 (x, y) → （可先檢查）→ 放開 */
-async function longPressDrag(page: Page, itemId: string, to: { dx?: number; y?: () => Promise<number> }, release = true) {
+async function longPressDrag(
+  page: Page,
+  itemId: string,
+  to: { dx?: number; y?: () => Promise<number> },
+  release = true,
+) {
   const from = await clipCenter(page, itemId);
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();

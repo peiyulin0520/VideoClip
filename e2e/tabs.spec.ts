@@ -3,8 +3,7 @@ import { addOverlays, clips, createProjectWith, fixture, openTab } from './helpe
 
 const SHOT = 'docs/screenshots/feedback-6/tabs';
 const NAMES = ['剪輯', '疊加', '文字', '圖層', '版型', '素材', '音訊'] as const;
-const activeTab = async (page: Page) =>
-  page.getByRole('tab', { selected: true }).first().textContent();
+const activeTab = async (page: Page) => page.getByRole('tab', { selected: true }).first().textContent();
 
 test('七個分頁都在、390 寬點得到每一個（放不下時分頁列可以左右滑）；每一頁有該有的內容', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
@@ -24,7 +23,8 @@ test('七個分頁都在、390 寬點得到每一個（放不下時分頁列可�
   for (const name of NAMES) {
     await page.getByRole('tab', { name }).tap();
     await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true');
-    if (name === '版型') await expect(page.getByRole('button', { name: `版型 ${want[name] as string}` })).toBeVisible();
+    if (name === '版型')
+      await expect(page.getByRole('button', { name: `版型 ${want[name] as string}` })).toBeVisible();
     else if (name === '剪輯') await expect(page.getByRole('button', { name: '分割' })).toBeVisible();
     else await expect(page.getByText(want[name]).first()).toBeVisible();
     await page.screenshot({ path: `${SHOT}/tab-${name}.png` });
@@ -34,7 +34,9 @@ test('七個分頁都在、390 寬點得到每一個（放不下時分頁列可�
   expect(bar.sw).toBeGreaterThanOrEqual(bar.cw);
 });
 
-test('剪輯分頁只留跟剪輯影片有關的（含刪除並補齊）；沒有前後移；移除版型在版型、全部靜音在音訊', async ({ page }) => {
+test('剪輯分頁只留跟剪輯影片有關的（含刪除並補齊）；沒有前後移；移除版型在版型、全部靜音在音訊', async ({
+  page,
+}) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
   await clips(page).first().tap();
   await openTab(page, '剪輯');

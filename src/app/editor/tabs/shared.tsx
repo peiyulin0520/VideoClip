@@ -36,8 +36,15 @@ export function ToolButton({
   );
 }
 
-
 export const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
-export const COLORS = ['#ffffff', '#111111', '#ff4d8d', '#ffd23f', '#4dd0ff', '#7CFC6A', '#b388ff', '#ff7a45'];
+export const COLORS = [
+  '#ffffff',
+  '#111111',
+  '#ff4d8d',
+  '#ffd23f',
+  '#4dd0ff',
+  '#7CFC6A',
+  '#b388ff',
+  '#ff7a45',
+];
 export const BLENDS = Object.keys(BLEND_LABELS) as BlendMode[];
-
