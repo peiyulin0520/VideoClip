@@ -7,6 +7,12 @@ import { lastImportErrors } from './importMedia';
 import { renderText } from './textRender';
 import type { Player } from './player';
 
+let editorRenders = 0;
+/** 編輯器本體每重畫一次就加 1（測試用：播放時不該每一格都重畫） */
+export function countEditorRender() {
+  editorRenders++;
+}
+
 /** 測試/除錯用：localStorage 的 vc-debug 設成 1 才會掛出 window.__videoclip。正常使用者看不到。 */
 export function installDebugHook(player: Player) {
   const on = (() => {
@@ -20,6 +26,11 @@ export function installDebugHook(player: Player) {
   const hook = {
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,
+    editorRenders: () => editorRenders,
+    /** 播放畫格數與每格合成耗時 */
+    stats: () => player.stats(),
+    /** 聲音輸出：模式、有沒有在跑、目前輸出音量（0–1） */
+    audio: () => ({ mode: player.audio.mode, running: player.audio.running, level: player.audio.level() }),
     lastImportErrors: () => JSON.parse(JSON.stringify(lastImportErrors)),
     selected: () => useProjectStore.getState().selectedId,
     /** 預覽畫面某區塊（0–1 比例）裡，和 rgb 差不多（每個色版差 tol 以內）的像素有幾個 */

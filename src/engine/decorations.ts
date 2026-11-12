@@ -26,12 +26,18 @@ export type DecoKindDef = {
   hasWidth: boolean;
   /** 有「大小」可以調 */
   hasScale: boolean;
+  /** 有「長度」可以調 */
+  hasLength: boolean;
+  /** 長度不是 1 時可以選靠哪一邊（尾端圈圈的圈圈固定在右邊，不用選） */
+  hasAlign: boolean;
   /** 距離滑桿的名稱（螢光筆是上下位置） */
   gapLabel: string;
 };
 const BASE: Omit<DecoKindDef, 'kind' | 'label' | 'width' | 'color'> = {
   hasWidth: true,
   hasScale: false,
+  hasLength: false,
+  hasAlign: false,
   gapLabel: '與文字距離',
 };
 export const DECORATION_KINDS: DecoKindDef[] = (
@@ -53,7 +59,14 @@ export const DECORATION_KINDS: DecoKindDef[] = (
 ).map((k) => ({
   ...BASE,
   ...k,
-  ...(k.kind === 'marker' ? { hasWidth: false, gapLabel: '上下位置' } : {}),
+  ...(k.kind === 'marker' ? { hasWidth: false, gapLabel: '上下位置', hasLength: true, hasAlign: true } : {}),
+  ...(k.kind === 'wave-underline' ||
+  k.kind === 'dashed-underline' ||
+  k.kind === 'dotted-underline' ||
+  k.kind === 'double-line'
+    ? { hasLength: true, hasAlign: true }
+    : {}),
+  ...(k.kind === 'tail-loop' ? { hasLength: true } : {}),
   ...(k.kind === 'sparkles' || k.kind === 'hearts' ? { hasWidth: false, hasScale: true } : {}),
   ...(k.kind === 'check' || k.kind === 'arrow-curve' ? { hasScale: true } : {}),
 }));
@@ -110,18 +123,44 @@ const TAIL: [number, number][][] = [
   ],
 ];
 
-function tailLoop(ink: Rect, lw: number): Op[] {
+export const LENGTH_MIN = 0.2;
+export const LENGTH_MAX = 1.5;
+
+/** 把 [x0, x1] 這段線依長度倍數縮放；align 決定縮放後靠哪一邊 */
+export function lineSpan(
+  x0: number,
+  x1: number,
+  length: number | undefined,
+  align: Decoration['align'],
+): [number, number] {
+  const L = Math.min(Math.max(length ?? 1, LENGTH_MIN), LENGTH_MAX);
+  const full = x1 - x0;
+  const w = full * L;
+  if (align === 'start') return [x0, x0 + w];
+  if (align === 'end') return [x1 - w, x1];
+  const a = x0 + (full - w) / 2;
+  return [a, a + w];
+}
+
+function tailLoop(ink: Rect, lw: number, length = 1): Op[] {
   const bottom = ink.y + ink.h;
   // 字很長（w/h > 5.3）時圈圈不要被拉扁：圈圈（u > 0.75）改成以字高為基準的固定大小、貼著字右緣，
   // 前面的直線段把剩下的寬度拉長補上。w/h = 5.3 時和等比縮放完全一樣，所以接起來是連續的。
   const long = ink.w / ink.h > 5.3;
   const loopW = 5.3 * ink.h;
-  const mx = (u: number) =>
+  const m0 = (u: number) =>
     long
       ? u > 0.75
         ? ink.x + ink.w + (u - 1) * loopW
         : ink.x + (u * (ink.w - 0.25 * loopW)) / 0.75
       : ink.x + u * ink.w;
+  // 長度：圈圈（u > 0.75）大小不變，前面的直線段（u 從 −0.02 到 0.75）依長度倍數伸縮，圈圈那端固定
+  const L = Math.min(Math.max(length, LENGTH_MIN), LENGTH_MAX);
+  const u0 = TAIL[0]![0]![0];
+  const a = m0(u0);
+  const bnd = m0(0.75);
+  const xs = bnd - (bnd - a) * L;
+  const mx = (u: number) => (u > 0.75 ? m0(u) : xs + ((u - u0) / (0.75 - u0)) * (bnd - xs));
   const my = (v: number) => bottom + v * ink.h;
   const cmds: PathCmd[] = [M(mx(TAIL[0]![0]![0]), my(TAIL[0]![0]![1]))];
   for (const seg of TAIL.slice(1)) {
@@ -159,7 +198,14 @@ function heart(cx: number, cy: number, s: number): PathCmd[] {
   ];
 }
 
+/** 一個裝飾的繪圖指令；透明度乘進每一筆（同一筆路徑不會自己疊深） */
 export function decorationOps(d: Decoration, ink: Rect): Op[] {
+  const ops = baseOps(d, ink);
+  const o = Math.min(Math.max(d.opacity ?? 1, 0), 1);
+  return o >= 1 ? ops : ops.map((op) => ({ ...op, alpha: (op.alpha ?? 1) * o }));
+}
+
+function baseOps(d: Decoration, ink: Rect): Op[] {
   const { x, y, w, h } = ink;
   const r = x + w;
   const b = y + h;
@@ -171,13 +217,12 @@ export function decorationOps(d: Decoration, ink: Rect): Op[] {
   const under = (extra = 0) => b + h * 0.32 + gap + lw / 2 + extra;
   switch (d.kind) {
     case 'tail-loop':
-      return tailLoop({ ...ink, y: ink.y + gap }, lw); // 整條往下移 gap
+      return tailLoop({ ...ink, y: ink.y + gap }, lw, d.length); // 整條往下移 gap
     case 'wave-underline': {
       const amp = h * 0.08;
       const y0 = under(amp);
       const wl = h * 0.55;
-      const x0 = x - h * 0.05;
-      const x1 = r + h * 0.05;
+      const [x0, x1] = lineSpan(x - h * 0.05, r + h * 0.05, d.length, d.align);
       const n = Math.max(Math.ceil(((x1 - x0) / wl) * 8), 8);
       const cmds: PathCmd[] = [];
       for (let i = 0; i <= n; i++) {
@@ -187,28 +232,35 @@ export function decorationOps(d: Decoration, ink: Rect): Op[] {
       }
       return [{ type: 'stroke', cmds, width: lw }];
     }
-    case 'dashed-underline':
-      return [{ type: 'stroke', cmds: line(x, under(), r, under()), width: lw, dash: [lw * 2.4, lw * 1.6] }];
-    case 'dotted-underline':
-      return [{ type: 'stroke', cmds: line(x, under(), r, under()), width: lw, dash: [0, lw * 2] }];
-    case 'double-line':
+    case 'dashed-underline': {
+      const [a, e] = lineSpan(x, r, d.length, d.align);
+      return [{ type: 'stroke', cmds: line(a, under(), e, under()), width: lw, dash: [lw * 2.4, lw * 1.6] }];
+    }
+    case 'dotted-underline': {
+      const [a, e] = lineSpan(x, r, d.length, d.align);
+      return [{ type: 'stroke', cmds: line(a, under(), e, under()), width: lw, dash: [0, lw * 2] }];
+    }
+    case 'double-line': {
+      const [a, e] = lineSpan(x, r, d.length, d.align);
       return [
-        { type: 'stroke', cmds: line(x, under(), r, under()), width: lw },
-        { type: 'stroke', cmds: line(x, under(lw * 2.4), r, under(lw * 2.4)), width: lw },
+        { type: 'stroke', cmds: line(a, under(), e, under()), width: lw },
+        { type: 'stroke', cmds: line(a, under(lw * 2.4), e, under(lw * 2.4)), width: lw },
       ];
+    }
     case 'marker': {
       // 斜、不規則邊的半透明色塊，畫在字後面；gap＝上下位置（正＝往下、負＝往上）
       const t = y + h * 0.4 + gap;
       const bt = b + h * 0.06 + gap;
+      const [mxl, mxr] = lineSpan(x - h * 0.12, r + h * 0.1, d.length, d.align);
       return [
         {
           type: 'fill',
           alpha: 0.65,
           cmds: [
-            M(x - h * 0.12, t + h * 0.04),
-            L(r + h * 0.1, t - h * 0.03),
-            L(r + h * 0.14, bt - h * 0.05),
-            L(x - h * 0.08, bt + h * 0.03),
+            M(mxl, t + h * 0.04),
+            L(mxr, t - h * 0.03),
+            L(mxr + h * 0.04, bt - h * 0.05),
+            L(mxl + h * 0.04, bt + h * 0.03),
             ['Z'],
           ],
         },

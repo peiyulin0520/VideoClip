@@ -1,4 +1,5 @@
 import type { Asset, Project, Track, VideoItem } from '../model/types';
+import { AudioOut } from './audio';
 import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
 import { captureThumb } from './probe';
@@ -10,12 +11,24 @@ type Deps = {
   urlFor: (assetId: string) => string | undefined;
   /** 素材沒有縮圖時，播放器拿到畫面後順手擷取一張（iPhone 匯入時可能產生不出來） */
   onThumb?: (assetId: string, thumbs: string[]) => void;
+  /** iPhone 擋住了出聲播放（要使用者再按一次播放） */
+  onAudioBlocked?: () => void;
 };
 type Listener = (t: number, playing: boolean) => void;
 
-const DRIFT = 0.3;
+/** 影片和時鐘差超過這個秒數才硬跳（會頓一下）；小的差距用 playbackRate 慢慢追 */
+const HARD_DRIFT = 0.5;
+const SOFT_DRIFT = 0.04;
 const PREFETCH_S = 1.0;
 const POOL_SIZE = 6;
+
+/** 播放中對時：diff = 該在的位置 − 影片目前位置（正的＝影片落後） */
+export function driftPlan(diff: number, speed: number): { seek: boolean; rate: number } {
+  const a = Math.abs(diff);
+  if (a > HARD_DRIFT) return { seek: true, rate: speed };
+  if (a > SOFT_DRIFT) return { seek: false, rate: speed * (1 + Math.max(-0.15, Math.min(0.15, diff * 0.5))) };
+  return { seek: false, rate: speed };
+}
 
 /** 預覽畫面的內部解析度：長邊 960（1:1 也是 960） */
 export function previewSize(p: Pick<Project, 'width' | 'height'>): { width: number; height: number } {
@@ -38,11 +51,18 @@ export class Player {
   private listeners = new Set<Listener>();
   private images = new Map<string, HTMLImageElement>();
   private thumbTried = new Set<string>();
+  /** 除錯／測試用：播放時每秒畫了幾格、每格畫面合成花多久 */
+  private statFrames = 0;
+  private statSince = 0;
+  private statMs = 0;
+  private statFps = 0;
+  private statAvgMs = 0;
 
   private constructor(
     readonly compositor: Compositor,
     private pool: VideoPool,
     private deps: Deps,
+    readonly audio: AudioOut = new AudioOut(),
   ) {}
 
   static async create(opts: { host: HTMLElement; canvas: HTMLCanvasElement } & Deps): Promise<Player> {
@@ -95,11 +115,15 @@ export class Player {
     const total = this.total();
     if (total <= 0 || this.playing) return;
     if (this.t >= total - 0.01) this.t = 0;
-    this.pool.unlock();
+    this.audio.unlock(); // 要在使用者點擊當下：解鎖聲音、設成「播放」類別（靜音模式也有聲音）
     this.playing = true;
+    this.statSince = 0;
+    this.statFrames = 0;
+    this.statMs = 0;
     this.wallStart = performance.now();
     this.tStart = this.t;
-    this.render(this.t);
+    this.render(this.t); // 目前要播的影片在這裡同步 play()（還在點擊裡）
+    this.pool.unlock(); // 其他停著等著的影片也趁現在解鎖
     this.emit();
     this.raf = requestAnimationFrame(this.tick);
   }
@@ -145,10 +169,31 @@ export class Player {
       return;
     }
     this.t = t;
+    const r0 = performance.now();
     this.render(t);
+    this.recordStats(r0);
     this.emit();
     this.raf = requestAnimationFrame(this.tick);
   };
+
+  private recordStats(renderStart: number) {
+    const now = performance.now();
+    this.statMs += now - renderStart;
+    this.statFrames++;
+    if (this.statSince === 0) this.statSince = now;
+    if (now - this.statSince >= 1000) {
+      this.statFps = (this.statFrames * 1000) / (now - this.statSince);
+      this.statAvgMs = this.statMs / this.statFrames;
+      this.statFrames = 0;
+      this.statMs = 0;
+      this.statSince = now;
+    }
+  }
+
+  /** 最近一秒的播放畫格數與每格平均合成時間（毫秒） */
+  stats(): { fps: number; renderMs: number } {
+    return { fps: this.statFps, renderMs: this.statAvgMs };
+  }
 
   private imageFor(assetId: string): HTMLImageElement | null {
     let img = this.images.get(assetId);
@@ -165,16 +210,27 @@ export class Player {
 
   private syncVideo(el: HTMLVideoElement, item: VideoItem, asset: Asset, track: Track, t: number) {
     const s = sourceTimeAt(item, t);
-    el.volume = item.volume;
-    el.muted = !!track.muted || !asset.hasAudio || item.volume === 0;
-    el.playbackRate = item.speed;
+    this.audio.apply(el, item.volume, !!track.muted || !asset.hasAudio);
     if (this.playing) {
-      if (Math.abs(el.currentTime - s) > DRIFT) el.currentTime = s;
-      if (el.paused) void el.play().catch(() => {});
+      const plan = driftPlan(s - el.currentTime, item.speed);
+      if (plan.seek) el.currentTime = s;
+      if (el.playbackRate !== plan.rate) el.playbackRate = plan.rate;
+      if (el.paused)
+        el.play().catch((e: unknown) => {
+          // 沒有出聲播放的許可（iPhone）：停下來請使用者再按一次播放（那一下點擊就能解鎖）
+          if (e instanceof DOMException && e.name === 'NotAllowedError' && !el.muted) this.blocked();
+        });
     } else {
+      if (el.playbackRate !== item.speed) el.playbackRate = item.speed;
       if (!el.paused) el.pause();
       if (Math.abs(el.currentTime - s) > 0.02) el.currentTime = s;
     }
+  }
+
+  private blocked() {
+    if (!this.playing) return;
+    this.pause();
+    this.deps.onAudioBlocked?.();
   }
 
   private render(t: number) {
@@ -273,6 +329,7 @@ export class Player {
     this.playing = false;
     this.listeners.clear();
     this.pool.destroy();
+    this.audio.destroy();
     this.compositor.destroy();
   }
 }

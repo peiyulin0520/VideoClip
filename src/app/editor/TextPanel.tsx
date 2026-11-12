@@ -544,18 +544,50 @@ export function TextPanel({
                   <Slider
                     label={`${def.label}粗細`}
                     value={Math.round(d.width * 100)}
-                    min={3}
-                    max={25}
+                    min={2}
+                    max={60}
                     step={1}
                     format={(v) => `${v}%`}
                     onChange={(v) => edit((c) => void (c.decorations![i]!.width = v / 100), `deco${i}`)}
                   />
                 )}
+                {def.hasLength && (
+                  <Slider
+                    label={`${def.label}長度`}
+                    value={Math.round((d.length ?? 1) * 100)}
+                    min={20}
+                    max={150}
+                    step={5}
+                    format={(v) => `${v}%`}
+                    onChange={(v) => edit((c) => void (c.decorations![i]!.length = v / 100), `decolen${i}`)}
+                  />
+                )}
+                {def.hasAlign && (d.length ?? 1) !== 1 && (
+                  <div className="chips" role="radiogroup" aria-label={`${def.label}靠哪一邊`}>
+                    {(
+                      [
+                        ['start', '靠左'],
+                        ['center', '置中'],
+                        ['end', '靠右'],
+                      ] as const
+                    ).map(([a, name]) => (
+                      <button
+                        key={a}
+                        role="radio"
+                        aria-checked={(d.align ?? 'center') === a}
+                        className={`chip sm${(d.align ?? 'center') === a ? ' active' : ''}`}
+                        onClick={() => edit((c) => void (c.decorations![i]!.align = a))}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <Slider
                   label={`${def.label}${def.gapLabel}`}
                   value={Math.round((d.gap ?? 0) * 100)}
-                  min={-30}
-                  max={100}
+                  min={-100}
+                  max={300}
                   step={5}
                   format={(v) => `${v}%`}
                   onChange={(v) => edit((c) => void (c.decorations![i]!.gap = v / 100), `decogap${i}`)}
@@ -564,13 +596,22 @@ export function TextPanel({
                   <Slider
                     label={`${def.label}大小`}
                     value={Math.round((d.scale ?? 1) * 100)}
-                    min={50}
-                    max={200}
+                    min={20}
+                    max={400}
                     step={5}
                     format={(v) => `${v}%`}
                     onChange={(v) => edit((c) => void (c.decorations![i]!.scale = v / 100), `decosc${i}`)}
                   />
                 )}
+                <Slider
+                  label={`${def.label}透明度`}
+                  value={Math.round((d.opacity ?? 1) * 100)}
+                  min={10}
+                  max={100}
+                  step={5}
+                  format={(v) => `${v}%`}
+                  onChange={(v) => edit((c) => void (c.decorations![i]!.opacity = v / 100), `decoop${i}`)}
+                />
               </div>
             );
           })}

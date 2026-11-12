@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from 'react';
+import { ColorPopup } from './ColorPopup';
 
-// 共用顏色選擇器：最近用過 → 基本 8 色 →（展開）粉嫩／莫蘭迪／螢光各 8 色 → 自訂（系統取色器＋色碼）。
+// 共用顏色選擇器：最近用過 → 基本 8 色 →（展開）粉嫩／莫蘭迪／螢光各 8 色；「自訂顏色」跳出彈窗（拖拉選色＋RGB 細調）。
 // 資料格式還是一般的色碼字串，舊專案不用轉換。
 
 export const PALETTE: { name: string; colors: string[] }[] = [
@@ -73,7 +74,7 @@ export function ColorPicker({
   extra?: string;
 }) {
   const [more, setMore] = useState(false);
-  const [hex, setHex] = useState<string | null>(null); // 正在輸入的色碼（null = 跟著目前顏色）
+  const [popup, setPopup] = useState(false);
   const recents = useRecent();
   const basic = PALETTE[0]!.colors;
   const first = extra && !basic.some((c) => same(c, extra)) ? [extra, ...basic.slice(0, 7)] : basic;
@@ -109,45 +110,37 @@ export function ColorPicker({
               {g.colors.map((c) => swatch(c, label))}
             </div>
           ))}
-          <div className="color-custom">
-            <label className="chip sm custom-btn">
-              自訂顏色
-              <input
-                type="color"
-                aria-label={`${label} 自訂`}
-                value={normalizeHex(value) ?? '#ffffff'}
-                onChange={(e) => pick(e.target.value)}
-              />
-            </label>
-            <input
-              className="hex-input"
-              aria-label={`${label} 色碼`}
-              inputMode="text"
-              spellCheck={false}
-              maxLength={7}
-              value={hex ?? value}
-              onChange={(e) => {
-                setHex(e.target.value);
-                const n = normalizeHex(e.target.value);
-                if (n) onPick(n);
-              }}
-              onBlur={() => {
-                const n = hex ? normalizeHex(hex) : null;
-                if (n) pushRecent(n);
-                setHex(null);
-              }}
-            />
-          </div>
         </>
       )}
-      <button
-        className="chip sm more-colors"
-        aria-expanded={more}
-        aria-label={`${label} 更多顏色`}
-        onClick={() => setMore(!more)}
-      >
-        {more ? '收起 ▴' : '更多顏色 ▾'}
-      </button>
+      <div className="color-actions">
+        <button
+          className="chip sm more-colors"
+          aria-expanded={more}
+          aria-label={`${label} 更多顏色`}
+          onClick={() => setMore(!more)}
+        >
+          {more ? '收起 ▴' : '更多顏色 ▾'}
+        </button>
+        <button
+          className="chip sm custom-btn"
+          aria-label={`${label} 自訂顏色`}
+          onClick={() => setPopup(true)}
+        >
+          <span className="custom-dot" style={{ background: value }} aria-hidden="true" />
+          自訂顏色
+        </button>
+      </div>
+      {popup && (
+        <ColorPopup
+          initial={normalizeHex(value) ?? '#ffffff'}
+          label={label}
+          onCancel={() => setPopup(false)}
+          onConfirm={(c) => {
+            pick(c);
+            setPopup(false);
+          }}
+        />
+      )}
     </div>
   );
 }

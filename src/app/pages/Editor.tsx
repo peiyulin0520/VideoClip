@@ -1,6 +1,7 @@
 import { ChevronLeft, Pause, Play, Redo2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { countEditorRender } from '../../engine/debug';
 import { ensureUrls, releaseProjectUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { addOverlayClips } from '../../store/actions';
@@ -70,6 +71,33 @@ function EditorLoader({ projectId }: { projectId: string }) {
   return <EditorBody />;
 }
 
+/** 播放時間：自己訂閱播放器，播放中最多每 100 毫秒更新一次（不讓整個編輯器每一格都重畫） */
+function TimeText({ total }: { total: number }) {
+  const player = useUI((s) => s.player);
+  const [time, setTime] = useState(0);
+  useEffect(() => {
+    if (!player) return;
+    let last = 0;
+    let alive = true;
+    queueMicrotask(() => alive && setTime(player.time));
+    const unsub = player.subscribe((t, playing) => {
+      const now = performance.now();
+      if (playing && now - last < 100) return;
+      last = now;
+      setTime(t);
+    });
+    return () => {
+      alive = false;
+      unsub();
+    };
+  }, [player]);
+  return (
+    <span className="time" data-testid="time">
+      {formatTime(time)} / {formatTime(total)}
+    </span>
+  );
+}
+
 function EditorBody() {
   const project = useProjectStore((s) => s.project)!;
   const canUndo = useProjectStore((s) => s.past.length > 0);
@@ -78,7 +106,6 @@ function EditorBody() {
   const previewFull = useUI((s) => s.previewFull);
   const fileInput = useRef<HTMLInputElement>(null);
   const [pps, setPps] = useState(60);
-  const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [ratioOpen, setRatioOpen] = useState(false);
@@ -86,9 +113,12 @@ function EditorBody() {
   const total = totalDuration(project);
 
   useEffect(() => {
+    countEditorRender();
+  });
+
+  useEffect(() => {
     if (!player) return;
-    return player.subscribe((t, p) => {
-      setTime(t);
+    return player.subscribe((_t, p) => {
       setPlaying(p);
     });
   }, [player]);
@@ -202,9 +232,7 @@ function EditorBody() {
         >
           {playing ? <Pause size={22} /> : <Play size={22} />}
         </button>
-        <span className="time" data-testid="time">
-          {formatTime(time)} / {formatTime(total)}
-        </span>
+        <TimeText total={total} />
         <span className="spacer" />
         <button
           className="icon-btn"

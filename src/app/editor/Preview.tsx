@@ -82,6 +82,7 @@ export function Preview({
       getProject: () => useProjectStore.getState().project,
       urlFor: (id) => urlFor(projectId, id),
       onThumb: setAssetThumbs,
+      onAudioBlocked: () => toast('iPhone 擋住了聲音，請再按一次播放', 6000),
     }).then((player) => {
       if (cancelled) return player.destroy();
       created = player;

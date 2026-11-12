@@ -59,18 +59,17 @@ export class VideoPool {
     for (const v of this.els) if (!keep.has(v) && !v.paused) v.pause();
   }
 
-  /** iOS Safari：要在使用者點擊當下對每個元素 play() 一下，之後才能由程式啟動播放 */
+  /**
+   * iOS Safari：沒有出聲播放過的元素，之後由程式啟動播放（不是使用者點擊）會被擋下。
+   * 要在使用者點擊當下、同步地對每個「有影片、目前停著」的元素 play() 再馬上 pause()。
+   * （不能用靜音的 play：靜音播放不算數。也不能等 promise 回來才 pause，會把剛開始播的影片停掉。）
+   */
   unlock() {
     for (const v of this.els) {
-      if (!v.paused || v.dataset.unlocked) continue;
-      v.muted = true;
-      void v.play().then(
-        () => {
-          v.dataset.unlocked = '1';
-          v.pause();
-        },
-        () => {},
-      );
+      if (!v.paused || v.dataset.unlocked || !v.getAttribute('src')) continue;
+      v.dataset.unlocked = '1';
+      v.play().catch(() => {});
+      v.pause();
     }
   }
 

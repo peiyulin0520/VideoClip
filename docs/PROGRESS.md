@@ -4,11 +4,11 @@
 
 ## 交接快照（最新狀態，每次覆寫）
 - **日期**：2026-11-11
-- **分支**：`claude/zen-tesla-v3brj5`。第 3 次實測修正＋GIPHY＋我的貼圖＋精靈說明已開 **PR #5** 等使用者合併（2026-11-12）；合併後分支對齊 main：`git fetch origin main && git merge --ff-only origin/main`
+- **分支**：PR #5（第 3 次實測修正＋GIPHY＋我的貼圖＋精靈說明）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已用 `git merge --ff-only origin/main` 對齊，之後的新工作繼續在這個分支
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
-- **測試**：566 個單元測試、70 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：594 個單元測試、74 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：合併上線後請使用者在 iPhone 上：看設定頁版本號 → 重測匯入大影片 → 在設定頁或「疊加 → 貼圖 → GIPHY」貼上自己的 GIPHY key 試搜尋（沙盒連不到 GIPHY，只用模擬資料測過）→ 試「我的貼圖」。之後可做：缺字體提示＋重新匯入自動接回、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
+- **下一步**：照 `docs/plans/2026-11-12-feedback-4.md` 繼續實作（Sonnet）：**A 播放順暢＋影片聲音 ✅、E 裝飾長度／透明度／範圍＋選色彈窗 ✅（都只在 Chromium 驗證，iPhone 待真機）**，接著 **B 匯出影片 → C 音軌管理＋背景音樂 → D 裁切（四邊角＋自由形狀）→ E 裝飾長度／透明度／範圍＋取色彈窗**（使用者也可以指定先做 E）。之前規劃但還沒做的：缺字體提示、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -27,6 +27,7 @@
 ```
 
 ## 使用者已確認的偏好
+- **分工**：之後沒有特別說明時，**Opus 只做規劃**（寫進 `docs/plans/`），**Sonnet 負責實作與修改**；使用者會自己切換模型（2026-11-12）。規劃要寫到 Sonnet 能直接照做：檔案、做法、驗收、要改的既有測試
 - 自己上傳的貼圖／畫好的素材存在「我的素材庫」（這台手機、所有專案共用）；**GIPHY 搜尋結果不存**，每次各自搜尋（2026-11-12）
 - **API key 不能放進程式碼或 GitHub**（公開 repo）：使用者 2026-11-12 已申請 GIPHY API key，要求注意不要讓別人用到 → 做法：key 只在使用者手機的設定頁輸入、存在那台裝置（localStorage），**絕不寫進 repo、文件、commit、日誌**（本檔也不記 key 的值）
 - **預覽畫面優先**：預覽大小永遠不變、不能被設定面板擠小；整頁往下滑看其他功能，往上滑回來看預覽（預覽不必固定在螢幕上）（2026-11-11）
@@ -50,6 +51,8 @@
 - 備份資料夾保持私人；只貼網址不登入無法寫入（Google 限制），已向使用者說明
 
 ## 使用者的修正紀錄（時間順序）
+- 2026-11-12 回覆確認：①錄影預覽下方黑色區塊是自己測試影片縮放造成，不是問題 ②測試時有開影片聲音仍沒聲音；「我不是要開啟手機通知鈴聲，我是要開啟影片聲音，這兩個不太一樣」→ 規定：手機靜音模式下影片也要有聲音；不要叫使用者關靜音開關（規劃 A-4 已改）
+- 2026-11-12 第 4 次回報：①裝飾要能調長度（底線太長要能縮短）、透明度，百分比範圍太小；自訂顏色不要輸入色碼，要跳出彈窗直接拖拉選色，再用 RGB 細調 ②「影片播放很卡，不夠順暢」③「需要有最終剪輯好的影片匯出功能」④「目前影片沒有音軌聲音，需要加入，並保留選項可自由刪除選擇各項影片之音軌，以及導入背景音樂之功能」⑤「要可以增加影片 crop 功能（彈性描邊或是自由剪切四邊角）」→ 規劃 docs/plans/2026-11-12-feedback-4.md
 - 2026-11-12 ①「已客製化自己上傳的貼圖或畫好的素材可以直接存在 VideoClip 瀏覽器裡供其他剪輯專案使用，但如果是從 GIPHY 取得的，不需要存，每次各自搜尋即可」②同一支手機該選精靈哪個選項？（精靈選項講不清楚）③「api key 如果先前也已填過，可以存在網頁裡面？就不用每次都貼；如果先前沒貼過 Key，可以出一個簡短的申請說明（GIPHY 超連結 → 建帳號 → Dashboard Create API Key → 說明一律 VideoClip、使用 Web → 複製 key 貼上）」→ 已照做
 - 2026-11-12 問：選「不是第一次使用」時，之前匯入的字體、貼圖、畫畫素材會不會記住？還是每次都要重新匯入？未完成專案的字體會不會跑掉？→ 回答：同一台手機都會記住（字體在 IndexedDB、素材在專案的 OPFS／IndexedDB），不用重匯；風險是 Safari 清除網站資料（建議加入主畫面）或換手機（要等備份 Phase 6）。已知缺口：字體不見時現在會默默換成預設字體 → 規劃「缺字體提示＋重新匯入同一個字體自動接回」
 - 2026-11-12 提供 GIPHY API key（值不記錄），要求不要放進公開的程式碼
@@ -64,6 +67,25 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 feedback-4 E：裝飾長度／透明度／範圍放大＋自訂顏色彈窗
+  - 做了什麼：①`Decoration` 新增 `length`（20–150%）、`align`（靠左／置中／靠右）、`opacity`（10–100%）；`lineSpan()` 縮放底線類（波浪、虛線、點點、雙底線）與螢光筆的線段；尾端圈圈的長度只伸縮直線段，圈圈大小與位置不變（`length=1` 與舊結果完全相同）；透明度乘進每一筆的 alpha ②範圍放大：粗細 2–60%（原 3–25）、距離 −100～300%（原 −30～100）、大小 20–400%（原 50–200）③面板新增「長度」「靠哪一邊」「透明度」（沒有長度的裝飾不顯示；長度 100% 時收起靠哪一邊）④新 `ColorPopup`：點「自訂顏色」跳出彈窗——大方塊（橫＝飽和度、直＝亮度）手指拖拉／點選、色相條、R／G／B 滑桿＋−／＋（44px）＋數字、「原本」「新的」並排預覽、色碼只當小字顯示、取消／確定（按確定才套用並進「最近用過」）；拿掉色碼輸入框與系統取色器；所有 `ColorPicker` 用到的地方（文字、字塊、外框、描邊、裝飾）自動套用；「自訂顏色」按鈕移到常駐那一列（跟「更多顏色」並排，按鈕上有目前顏色的小圓點）⑤`colorMath.ts`：色碼／RGB／HSV 換算，拉到灰／黑時沿用原本的色相
+  - 動了哪些檔：`src/model/types.ts`、`src/engine/decorations.ts`、`src/app/editor/TextPanel.tsx`、`src/ui/{ColorPicker,ColorPopup,colorMath}.ts(x)`、`src/app/styles.css`；測試 `src/engine/decorations.test.ts`、`src/ui/colorMath.test.ts`、`e2e/fix-colors.spec.ts`（舊的色碼／系統取色器測試改成彈窗）、`e2e/phase3a-deco.spec.ts`（新增長度／透明度／範圍測試）；文件 `docs/TEXT_CARDS.md §3`、`docs/PLAN.md §7`
+  - 驗證：✅ 單元（長度三種對齊、各種裝飾有沒有長度、透明度、極端範圍仍有限、色碼／RGB／HSV 來回換算全部抽樣一致）；✅ e2e（彈窗：點色相條、點／拖方塊、＋−與滑桿細調、原本／新的色塊、取消不套用、確定套用且進最近用過、點背景＝取消、拉到灰色色相不跳、拖出方塊外夾在邊緣；裝飾：滑桿範圍、長度 40% 預覽上線變少、靠左／靠右、透明度 30% 顏色變淡、極端值）；截圖 `docs/screenshots/fix-feedback-2/color-popup-*.png`、`docs/screenshots/phase3a/deco-length-*.png`、`deco-opacity-30.png`；全部 74 個 e2e、594 個單元、lint、build 過  🔴 iPhone 沒測：彈窗內手指拖拉好不好用、頁面有沒有跟著捲、彈窗有沒有被工具列切到（已列 PLAN §7）  🔴 沒做：透明度滑桿（alpha）放進顏色彈窗（透明度在裝飾面板另外調）
+  - 踩到的坑：方塊圓角 12px，e2e 點在最右上角會點到圓角外（不算在元素上）→ 測試點離邊 2–3%；CDP 觸控事件到畫面更新有一點延遲，讀數字前要等一下
+  - 下一步：B 匯出影片（見 `docs/plans/2026-11-12-feedback-4.md`）；請使用者用 iPhone 測 A、E
+- 2026-11-12 feedback-4 A：播放順暢＋影片聲音（靜音模式也有聲音）
+  - 做了什麼：①播放時間改成獨立的 `TimeText`（最多每 100ms 更新），`EditorBody` 不再每格重畫（e2e 量到播放 2.5 秒內重畫 0 次，之前每秒 60 次）②影片圖層直接當 GPU 貼圖（`ImageSource` 包 `<video>`，裁切用貼圖子矩形 `frame`，`dynamic:true` 才會通知精靈；沒有新畫面不重新上傳），不再每格 `drawImage` 到暫存畫布 ③對時改柔性：差 >0.04 秒用 `playbackRate` ±15% 慢慢追，>0.5 秒才硬跳（`driftPlan`）④新 `engine/audio.ts`：有 `navigator.audioSession`（或不是 iOS）→ 先設 `type='playback'` 再走 Web Audio（每個 `<video>` → `GainNode`，音量可到 200%）；沒有 Audio Session 的 iOS → 直接用 `<video>` 出聲（只能開／關）；⑤`mediaPool.unlock()` 改成使用者點擊當下**同步**對停著的元素 `play()` 後立刻 `pause()`（原本靜音 play、等 promise 才 pause，會停掉剛開始播的影片，而且靜音 play 不算解鎖出聲）；`play()` 先 `audio.unlock()`、渲染（目前的影片在點擊內 play）、再 `pool.unlock()` ⑥出聲播放被擋（`NotAllowedError`）不再吞掉：暫停並提示「iPhone 擋住了聲音，請再按一次播放」⑦除錯掛鉤新增 `stats()`（fps、每格合成毫秒）、`audio()`（模式、是否在跑、輸出音量）、`editorRenders()`
+  - 動了哪些檔：`src/engine/{audio,player,mediaPool,compositor,debug}.ts`、`src/app/pages/Editor.tsx`、`src/app/editor/Preview.tsx`；新 `src/engine/audio.test.ts`、`e2e/playback-audio.spec.ts`
+  - 驗證：✅ 單元測試（模式選擇、聲音狀態、對時）；✅ e2e（播放中編輯器重畫 <10 次、headless Chromium 軟體繪圖 ≈48fps、每格合成 ≈1.3ms；有 Audio Session 時設成 playback、Web Audio 在跑、聲音輸出音量 >0.02；音量 0 時 <0.01）；✅ 全部 72 個 e2e、lint、build 過；🔴 iPhone 沒測：靜音模式有沒有聲音、跨片段聲音、播放順不順、`createMediaElementSource` 在 iOS 上的行為（已列 PLAN §7）
+  - 使用者的決定/回饋：影片要有聲音，手機鈴聲靜音時也要有（見上方 2026-11-12 回覆確認）
+  - 踩到的坑：Pixi 的 `Sprite` 只有 `texture.dynamic=true` 才會聽貼圖 `update` 事件，改 `frame` 後要呼叫 `texture.update()`（且建構時要給 `frame`，否則 `noFrame` 會把 frame 重設回整張）；不要用 Pixi 的 `VideoSource`（它會對元素 `load()`／自己管播放，會干擾影片池），用 `ImageSource` 包 `<video>` 即可
+  - 下一步：B 匯出影片（見 `docs/plans/2026-11-12-feedback-4.md`）；請使用者用 iPhone 測 A
+- 2026-11-12 修正規劃 feedback-4 的 A-4（聲音）：靜音模式下也要有聲音 → Web Audio 前先設 `navigator.audioSession.type='playback'`，沒有這個 API 的舊 iOS 改用 `<video>` 元素出聲（只能開／關）；拿掉「請關靜音開關」提示；黑色區塊確認不是問題
+  - 驗證：🔴 程式未改；iOS 靜音模式行為要真機確認
+- 2026-11-12 寫修改規劃：第 4 次回報 5 項（只有文件，Opus；依使用者分工交給 Sonnet 實作）
+  - 做了什麼：看錄影（影片已能匯入與播放，播放有跳格）、查程式找原因：卡頓＝每格 `setTime` 讓整個編輯器重畫＋影片每格經暫存畫布再上傳 GPU＋時間軸每格捲動＋0.3 秒硬對時；沒聲音很可能＝`mediaPool.unlock()` 用靜音 play 解鎖、promise 回來又 pause 掉剛開始出聲的影片，之後在 rAF 裡 play 不算使用者點擊被 iOS 擋（錯誤被吞）。寫 `docs/plans/2026-11-12-feedback-4.md`：A 播放順暢＋聲音（時間顯示獨立、影片直接當 GPU 貼圖、requestVideoFrameCallback、Web Audio 出聲）、B 匯出（Mediabunny 逐格解碼＋OfflineAudioContext 混音＋H.264/AAC MP4，存相簿用 share）、C 音軌管理＋背景音樂（audio 軌、波形）、D 裁切（預覽上拖四角四邊、比例快捷、自由形狀遮罩）、E 裝飾長度／透明度／範圍放大＋取色彈窗（SV 方塊、色相條、RGB 細調）
+  - 驗證：🔴 程式未改
+  - 下一步：Sonnet 照規劃 A→E
 - 2026-11-12 GIPHY 貼圖＋我的貼圖素材庫＋精靈說明（分支 claude/zen-tesla-v3brj5，Opus）
   - 做了什麼：(1) **GIPHY**（`src/stickers/giphy.ts`、`src/app/editor/GiphyPanel.tsx`）：key 只存在這台手機的 localStorage（`vc-giphy-key`），**不進 repo**；沒填過顯示申請說明（GIPHY Developers 超連結 → 建帳號 → Dashboard「Create an API Key」→ 選 API、名稱與說明填 VideoClip、平台 Web → 複製貼上），儲存前先試打一次確認 key 能用（連不到時先存）；填過就記住，設定頁顯示「已設定（…末四碼）」可更換／刪除；key 不對時顯示提示並回到填 key。貼圖分頁多「GIPHY」：熱門＋搜尋（中文自動用 zh-TW、rating g）、「Powered by GIPHY」、點了把**第一格**畫成 PNG 當照片素材加進專案（會動的版本還沒做）；搜尋結果不存。(2) **我的貼圖**（`src/storage/library.ts`、IndexedDB 升到 v3 新增 `library`、`MyStickers.tsx`）：上傳自己的圖（轉成最長邊 1024 的 PNG，HEIC 也能用）存在這支手機，**所有專案共用**；點了加進專案；「管理」可刪除。(3) **精靈**：第一頁改成「這個瀏覽器裡還沒有 VideoClip 的資料」＋「開始使用」／「我之前用過，怎麼又看到這一頁？」，後者說明 Safari 與主畫面資料分開、被清除、換手機三種情況。(4) 找到偶發失敗的根因：e2e helper `selectedItemId` 等在除錯掛鉤出現前就讀取 → 所有讀掛鉤的 helper 統一先 `waitHook`
   - 動了哪些檔：src/stickers/{giphy,giphy.test}.ts、src/storage/{db,library,library.test}.ts、src/app/editor/{GiphyPanel,MyStickers,StickerPicker}.tsx、src/app/pages/Settings.tsx、src/app/Welcome.tsx、styles.css、e2e/{giphy,phase3a-stickers,phase3b,helpers}.ts
