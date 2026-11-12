@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
 - **測試**：566 個單元測試、70 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：合併上線後請使用者在 iPhone 上：看設定頁版本號 → 重測匯入大影片 → 在設定頁或「疊加 → 貼圖 → GIPHY」貼上自己的 GIPHY key 試搜尋（沙盒連不到 GIPHY，只用模擬資料測過）→ 試「我的貼圖」。之後可做：缺字體提示＋重新匯入自動接回、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
+- **下一步**：照 `docs/plans/2026-11-12-feedback-4.md` 實作（Sonnet），建議順序 **A 播放順暢＋影片聲音 → B 匯出影片 → C 音軌管理＋背景音樂 → D 裁切（四邊角＋自由形狀）→ E 裝飾長度／透明度／範圍＋取色彈窗**（使用者也可以指定先做 E）。之前規劃但還沒做的：缺字體提示、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -51,6 +51,7 @@
 - 備份資料夾保持私人；只貼網址不登入無法寫入（Google 限制），已向使用者說明
 
 ## 使用者的修正紀錄（時間順序）
+- 2026-11-12 第 4 次回報：①裝飾要能調長度（底線太長要能縮短）、透明度，百分比範圍太小；自訂顏色不要輸入色碼，要跳出彈窗直接拖拉選色，再用 RGB 細調 ②「影片播放很卡，不夠順暢」③「需要有最終剪輯好的影片匯出功能」④「目前影片沒有音軌聲音，需要加入，並保留選項可自由刪除選擇各項影片之音軌，以及導入背景音樂之功能」⑤「要可以增加影片 crop 功能（彈性描邊或是自由剪切四邊角）」→ 規劃 docs/plans/2026-11-12-feedback-4.md
 - 2026-11-12 ①「已客製化自己上傳的貼圖或畫好的素材可以直接存在 VideoClip 瀏覽器裡供其他剪輯專案使用，但如果是從 GIPHY 取得的，不需要存，每次各自搜尋即可」②同一支手機該選精靈哪個選項？（精靈選項講不清楚）③「api key 如果先前也已填過，可以存在網頁裡面？就不用每次都貼；如果先前沒貼過 Key，可以出一個簡短的申請說明（GIPHY 超連結 → 建帳號 → Dashboard Create API Key → 說明一律 VideoClip、使用 Web → 複製 key 貼上）」→ 已照做
 - 2026-11-12 問：選「不是第一次使用」時，之前匯入的字體、貼圖、畫畫素材會不會記住？還是每次都要重新匯入？未完成專案的字體會不會跑掉？→ 回答：同一台手機都會記住（字體在 IndexedDB、素材在專案的 OPFS／IndexedDB），不用重匯；風險是 Safari 清除網站資料（建議加入主畫面）或換手機（要等備份 Phase 6）。已知缺口：字體不見時現在會默默換成預設字體 → 規劃「缺字體提示＋重新匯入同一個字體自動接回」
 - 2026-11-12 提供 GIPHY API key（值不記錄），要求不要放進公開的程式碼
@@ -65,6 +66,10 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 寫修改規劃：第 4 次回報 5 項（只有文件，Opus；依使用者分工交給 Sonnet 實作）
+  - 做了什麼：看錄影（影片已能匯入與播放，播放有跳格）、查程式找原因：卡頓＝每格 `setTime` 讓整個編輯器重畫＋影片每格經暫存畫布再上傳 GPU＋時間軸每格捲動＋0.3 秒硬對時；沒聲音很可能＝`mediaPool.unlock()` 用靜音 play 解鎖、promise 回來又 pause 掉剛開始出聲的影片，之後在 rAF 裡 play 不算使用者點擊被 iOS 擋（錯誤被吞）。寫 `docs/plans/2026-11-12-feedback-4.md`：A 播放順暢＋聲音（時間顯示獨立、影片直接當 GPU 貼圖、requestVideoFrameCallback、Web Audio 出聲）、B 匯出（Mediabunny 逐格解碼＋OfflineAudioContext 混音＋H.264/AAC MP4，存相簿用 share）、C 音軌管理＋背景音樂（audio 軌、波形）、D 裁切（預覽上拖四角四邊、比例快捷、自由形狀遮罩）、E 裝飾長度／透明度／範圍放大＋取色彈窗（SV 方塊、色相條、RGB 細調）
+  - 驗證：🔴 程式未改
+  - 下一步：Sonnet 照規劃 A→E
 - 2026-11-12 GIPHY 貼圖＋我的貼圖素材庫＋精靈說明（分支 claude/zen-tesla-v3brj5，Opus）
   - 做了什麼：(1) **GIPHY**（`src/stickers/giphy.ts`、`src/app/editor/GiphyPanel.tsx`）：key 只存在這台手機的 localStorage（`vc-giphy-key`），**不進 repo**；沒填過顯示申請說明（GIPHY Developers 超連結 → 建帳號 → Dashboard「Create an API Key」→ 選 API、名稱與說明填 VideoClip、平台 Web → 複製貼上），儲存前先試打一次確認 key 能用（連不到時先存）；填過就記住，設定頁顯示「已設定（…末四碼）」可更換／刪除；key 不對時顯示提示並回到填 key。貼圖分頁多「GIPHY」：熱門＋搜尋（中文自動用 zh-TW、rating g）、「Powered by GIPHY」、點了把**第一格**畫成 PNG 當照片素材加進專案（會動的版本還沒做）；搜尋結果不存。(2) **我的貼圖**（`src/storage/library.ts`、IndexedDB 升到 v3 新增 `library`、`MyStickers.tsx`）：上傳自己的圖（轉成最長邊 1024 的 PNG，HEIC 也能用）存在這支手機，**所有專案共用**；點了加進專案；「管理」可刪除。(3) **精靈**：第一頁改成「這個瀏覽器裡還沒有 VideoClip 的資料」＋「開始使用」／「我之前用過，怎麼又看到這一頁？」，後者說明 Safari 與主畫面資料分開、被清除、換手機三種情況。(4) 找到偶發失敗的根因：e2e helper `selectedItemId` 等在除錯掛鉤出現前就讀取 → 所有讀掛鉤的 helper 統一先 `waitHook`
   - 動了哪些檔：src/stickers/{giphy,giphy.test}.ts、src/storage/{db,library,library.test}.ts、src/app/editor/{GiphyPanel,MyStickers,StickerPicker}.tsx、src/app/pages/Settings.tsx、src/app/Welcome.tsx、styles.css、e2e/{giphy,phase3a-stickers,phase3b,helpers}.ts
