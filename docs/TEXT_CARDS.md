@@ -85,6 +85,8 @@ type Decoration = {
 
 **目前實作的欄位（`src/model/types.ts` 的 `Decoration`）**：`kind`、`color`、`width`（線寬，佔字高比例，2%–60%）、`gap`（與文字距離，−100%～300%；螢光筆是上下位置）、`scale`（大小 20%–400%：星星、愛心、打勾、彎箭頭）、`length`（長度 20%–150%：底線類、螢光筆、尾端圈圈的直線段）、`align`（長度不是 100% 時靠左／置中／靠右；尾端圈圈固定從圈圈往左延伸）、`opacity`（透明度 10%–100%，乘進每一筆路徑的 alpha）。全部選填；沒有的欄位＝舊行為，舊專案不用轉換。每種裝飾有沒有 `length`／`align`／`scale`／`width` 由 `DECORATION_KINDS` 的 `hasLength`／`hasAlign`／`hasScale`／`hasWidth` 決定，面板只顯示有的滑桿。
 
+**字塊（`CardBox`）的填滿與框線是分開的（2026-11-12）**：`fillOn`（false＝不要底色，沒有＝要）、`fill`、`opacity`（只管填滿）；框線是 `stroke: { color, width, opacity? }`，`stroke.opacity` 沒有時＝跟 `box.opacity` 一樣（舊專案長相不變）；面板改填滿透明度時會先把框線的透明度固定住，不會連框線一起變。
+
 每種裝飾是一個函式：`(inkBox: Rect, opts) => Path2D[]`，以**字的墨跡邊界**為基準計算。風格選單裡每格都用「範例字」實際渲染縮圖（用 OffscreenCanvas 產生並快取），**不要只列名稱**。
 
 | kind | 長相 |

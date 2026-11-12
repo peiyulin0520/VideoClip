@@ -58,7 +58,12 @@ export type VideoItem = ItemBase & {
 };
 
 // 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
-export type Stroke = { color: string; width: number }; // width：從字緣往外的厚度，px（1080 基準）
+export type Stroke = {
+  color: string;
+  width: number; // 從字緣往外的厚度，px（1080 基準）
+  /** 只有字塊框線用：框線自己的透明度 0–1；沒有＝跟字塊填滿的透明度一樣（舊專案的長相） */
+  opacity?: number;
+};
 export type TextShadow = { color: string; blur: number; x: number; y: number };
 export type TextRun = {
   text: string;
@@ -141,7 +146,9 @@ export type BoxShape =
 export type CardBox = {
   shape: BoxShape;
   fill: string;
-  opacity: number; // 0–1
+  /** false＝不要底色，只畫框線（沒有＝要填滿） */
+  fillOn?: boolean;
+  opacity: number; // 填滿的透明度 0–1
   padding: { top: number; right: number; bottom: number; left: number }; // px（1080 基準）
   nudgeY: number; // 文字在字塊內的垂直微調 px
   radius?: number; // roundRect / speech-round 的圓角 px；pill 固定半圓

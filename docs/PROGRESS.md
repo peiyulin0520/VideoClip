@@ -6,9 +6,9 @@
 - **日期**：2026-11-11
 - **分支**：PR #6（播放順暢＋聲音、裝飾長度／透明度、選色彈窗）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
-- **測試**：594 個單元測試、74 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：615 個單元測試、86 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：照 `docs/plans/2026-11-12-feedback-5.md` 實作（Sonnet），建議順序 **① 播放卡（效能框＋預覽用輕量影片 proxy）→ ② 主軌修剪（允許空白＋修剪面板）→ ③ 軌道圖示直接拖拉換順序 → ④ 字塊填滿／框線分開 → ⑤ 裁切（剪輯分頁、預覽上拖四邊拉霸、自由形狀）→ ⑥ GIPHY 會動**；之後才是 feedback-4 的 B 匯出、C 音軌＋背景音樂（feedback-4 的 D 裁切已被 feedback-5 C 取代）
+- **下一步**：`docs/plans/2026-11-12-feedback-5.md` 已做 **① 播放卡（效能框＋預覽用輕量影片）② 主軌修剪（空白＋修剪面板）③ 軌道圖示拖拉 ④ 字塊填滿／框線**（Chromium 驗證，iPhone 待真機）；還沒做 **⑤ 裁切（剪輯分頁、預覽上拖四邊拉霸、自由形狀；`cropKeepingPlace` 切完畫面不跳）⑥ GIPHY 會動**；再之後 feedback-4 的 B 匯出、C 音軌＋背景音樂。請使用者用 iPhone 測 ①～④（尤其設定頁打開「顯示播放效能」錄一段播放）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -68,6 +68,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 feedback-5 ①～④：播放卡、主軌修剪、軌道拖拉、字塊填滿／框線
+  - 做了什麼：①**播放卡**：設定頁「顯示播放效能」→ 預覽左上角顯示 fps、每格毫秒（場景／影片上傳／合成）、掉格、影片尺寸與編碼；匯入影片時讀 `codec`／`hdr`；背景做「預覽用輕量影片」（長邊 > 1280、HDR、非 H.264/VP 就做；H.264 長邊 960、SDR、30fps），預覽播放用它、匯出與單格輸出用原檔；做不出來就標 failed 照用原檔；時間軸片段顯示製作進度；影片貼圖只在「呈現了新畫面」時才上傳（`requestVideoFrameCallback`）；iPhone 上不微調 `playbackRate` ②**主軌修剪**：`VideoItem.gap`（片段前面的空白），左把手往右拉＝尾巴不動、切掉的變空白，往左拉先吃空白再往前延伸；空白在時間軸是虛線框，選到片段後工具列有「刪除空白」；剪輯分頁新「修剪」面板（整段素材縮圖條＋選取窗，拖左右把手／拖中間／前面多少 1 秒的按鈕，顯示「第 a 秒 → 第 b 秒，留 n 秒 / 素材共 m 秒」，片段位置不變只改長度）③**軌道圖示**按住上下拖換圖層順序（`reorderTrack`，主軌固定，拖動時其他列讓位，一步復原；點一下仍開選單）④**字塊**分成「填滿」（開關、顏色、透明度 0–100%）與「框線」（開關、顏色、透明度、粗細 1–40）；`CardBox.fillOn`、`Stroke.opacity`（沒有＝跟填滿一樣，舊專案不變）
+  - 動了哪些檔：`src/engine/{proxy,proxyQueue,assetUrls,probe,player,compositor,audio,mediaPool,timeline,textRender,debug}.ts`、`src/app/editor/{PerfOverlay,TrimPanel,Timeline,Toolbar,TextPanel,Preview}.tsx`、`src/app/pages/{Editor,Settings}.tsx`、`src/store/{projectStore,actions}.ts`、`src/storage/media.ts`、`src/model/types.ts`、`styles.css`；新測試 `src/engine/{proxy,timeline.gap}.test.ts`、`e2e/{proxy,trim,track-drag,box-fill-border}.spec.ts`；新素材 `tests/fixtures/big-1080p.webm`
+  - 驗證：✅ 單元（proxy 判斷與尺寸、gap／trimStart／setTrimWindow／分割／複製／換順序／刪空白、reorderTrack、driftPlan）；✅ e2e（1080p 影片匯入後真的做出 960 寬 proxy 且預覽改用它、小影片 none、proxy 失敗仍可播、效能框；左把手留空白與還原、空白時預覽是黑的、刪除空白、修剪面板各種操作與一步復原；觸控拖軌道換順序與夾在範圍內；字塊只留框線、半透明填滿＋實心框線、框線透明度）；全部 86 e2e、615 單元、lint、build 過；截圖 `docs/screenshots/feedback-5/`  🔴 iPhone 沒測：proxy 在 iPhone 上實際走 H.264、做多久、播放是否變順（先看設定頁效能框的數字）；把手與軌道拖拉好不好用  🔴 沒做：時間軸自動捲動的節流（要先看效能框數字再決定）；修剪面板的聲音波形
+  - 使用者的決定/回饋：見上方 2026-11-12 第 5 次回報
+  - 踩到的坑：CDP 事件延遲、反鋸齒的混色會誤判（測試用中央區域＋寬鬆門檻）；連續拖曳同一個 coalesce key 會併成一步復原（測試要等 1.5 秒）
+  - 下一步：⑤ 裁切、⑥ GIPHY 會動
 - 2026-11-12 寫修改規劃：第 5 次回報 5 項（只有文件，Opus；交給 Sonnet 實作）
   - 做了什麼：看 3 段錄影＋1 張截圖。量錄影三（60fps）：預覽、時間軸、時間數字都約每秒只更新 3 次 → 每格主執行緒 ~300ms，iPhone 特有（Chromium 1.3ms）；最可能是 iPhone HDR／HEVC／4K 影片交給 WebGL/canvas 時 CPU 色彩轉換＋搬運 → 規劃效能框（讓手機自己報數字）＋匯入時背景做「預覽用輕量影片」（H.264、長邊 960、SDR，Mediabunny Conversion），預覽用 proxy、匯出用原檔。查證修剪：主軌是磁吸排法（`relayout`），左把手切開頭看起來像右邊縮；規劃 `gap`（主軌允許空白、左把手尾巴不動）＋照參考錄影的「修剪面板」（整段縮圖條＋選取窗＋前面／後面多少 1 秒）。軌道圖示按住上下拖換順序。字塊 `fillOn`＋框線自己的 `opacity`。裁切搬到剪輯分頁、預覽上四邊拉霸＋角把手、`cropKeepingPlace`（切完畫面不跳）、自由形狀遮罩（取代 feedback-4 D）。GIPHY 改存會動的 webp/gif、`ImageDecoder`／gifuct-js 解格、依時間取格
   - 驗證：🔴 程式未改

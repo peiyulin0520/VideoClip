@@ -102,6 +102,10 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 
 ## 5. 踩過的坑（避免再踩）
 
+- **預覽用輕量影片（proxy）**：`engine/proxy.ts`（Mediabunny `Conversion`，先試 H.264/mp4，沒有再用 VP9/webm；HDR 在 `process` 裡畫到 OffscreenCanvas 轉 SDR）、`engine/proxyQueue.ts`（一次一支，狀態寫進 `Asset.proxy`，不進復原紀錄）、`assetUrls.urlFor(…, 'preview'|'export')`（預覽用 proxy、匯出一律原檔）。proxy 存在跟素材同一處，檔名 `<assetId>~p`。池子裡的 `<video>` 只有停著時才換網址。沙盒 Chromium 沒有 H.264，所以測試走 VP9；iPhone 實際走 H.264，沒驗證。
+- **主軌空白（gap）**：`VideoItem.gap` 是「這個片段前面的空白秒數」，`relayout` 先加 gap 再排；`trimStart` 的語意是「尾巴不動、切掉的變空白」，往左拉先吃空白；`layersAt` 在空白時主軌沒有圖層（黑畫面）；分割時空白只留前半段、複製品沒有空白。修剪面板（`setTrimWindow`）不動片段位置，只改長度。
+- **CDP 觸控／滑鼠事件有延遲**：讀 React 狀態前要等一下（e2e 裡 `waitForTimeout(250)`）；圓角元素的最邊角點不到。
+
 - **影片直接當 Pixi 貼圖**：用 `ImageSource({ resource: <video> })`，**不要**用 `VideoSource`（它會對元素 `load()`、自己接管播放）。改裁切（`texture.frame`）後要 `texture.update()`，而且貼圖建構時要給 `frame`（否則 `noFrame` 會把 frame 重設）、要 `dynamic: true`（精靈才聽得到 `update`）。
 - **iPhone 聲音**：`<video>` 元素直接出聲在靜音模式下也有聲音但設不了音量；Web Audio 在靜音模式下預設沒聲音，要先 `navigator.audioSession.type = 'playback'`。解鎖要在使用者點擊當下**同步**對元素 `play()`（不靜音）再馬上 `pause()`，不能用靜音 play、也不能等 promise（會停掉剛開始播的影片）。見 `src/engine/audio.ts`、`mediaPool.ts`。
 - **iPhone Safari 沒辦法在沙盒測**：OPFS 寫入、Cache Storage、同時多個 `<video>` 解碼/自動播放解鎖、混合模式、手勢，全部在 `PLAN.md §7` 待真機驗證。

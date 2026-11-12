@@ -262,20 +262,50 @@ export function TextPanel({
           </div>
           {box ? (
             <>
-              <ColorPicker
-                value={box.fill}
-                label="字塊顏色"
-                onPick={(col) => edit((c) => void (c.box!.fill = col))}
-              />
-              <Slider
-                label="透明度"
-                value={Math.round(box.opacity * 100)}
-                min={10}
-                max={100}
-                step={5}
-                format={(v) => `${v}%`}
-                onChange={(v) => edit((c) => void (c.box!.opacity = v / 100), 'bop')}
-              />
+              <div className="box-part" role="group" aria-label="填滿">
+                <div className="panel-head">
+                  <span>填滿（字塊裡面的顏色）</span>
+                  <button
+                    role="switch"
+                    aria-checked={box.fillOn !== false}
+                    aria-label="填滿"
+                    className={`chip sm${box.fillOn !== false ? ' active' : ''}`}
+                    onClick={() =>
+                      edit((c) => {
+                        if (c.box!.fillOn === false) delete c.box!.fillOn;
+                        else c.box!.fillOn = false;
+                      })
+                    }
+                  >
+                    {box.fillOn !== false ? '開' : '關'}
+                  </button>
+                </div>
+                {box.fillOn !== false && (
+                  <>
+                    <ColorPicker
+                      value={box.fill}
+                      label="字塊顏色"
+                      onPick={(col) => edit((c) => void (c.box!.fill = col))}
+                    />
+                    <Slider
+                      label="填滿透明度"
+                      value={Math.round(box.opacity * 100)}
+                      min={0}
+                      max={100}
+                      step={5}
+                      format={(v) => `${v}%`}
+                      onChange={(v) =>
+                        edit((c) => {
+                          const b2 = c.box!;
+                          // 框線沒有自己的透明度時原本是跟著填滿的：先固定住，改填滿不會連框線一起變
+                          if (b2.stroke && b2.stroke.opacity === undefined) b2.stroke.opacity = b2.opacity;
+                          b2.opacity = v / 100;
+                        }, 'bop')
+                      }
+                    />
+                  </>
+                )}
+              </div>
               {shapeDef(box.shape).tail && (
                 <div className="chips" role="radiogroup" aria-label="尾巴方向">
                   {(
@@ -312,29 +342,55 @@ export function TextPanel({
                   onChange={(v) => edit((c) => void (c.box!.radius = v), 'brad')}
                 />
               )}
-              <Slider
-                label="字塊外框"
-                value={box.stroke?.width ?? 0}
-                min={0}
-                max={24}
-                step={1}
-                format={px}
-                onChange={(v) =>
-                  edit((c) => {
-                    const b2 = c.box!;
-                    b2.stroke = { color: b2.stroke?.color ?? '#ffffff', width: v };
-                    if (v <= 0) delete b2.stroke;
-                  }, 'bst')
-                }
-              />
-              {box.stroke && (
-                <ColorPicker
-                  value={box.stroke.color}
-                  label="字塊外框顏色"
-                  onPick={(col) =>
-                    edit((c) => void (c.box!.stroke = { color: col, width: c.box!.stroke?.width ?? 4 }))
-                  }
-                />
+              <div className="box-part" role="group" aria-label="框線">
+                <div className="panel-head">
+                  <span>框線（字塊的外框）</span>
+                  <button
+                    role="switch"
+                    aria-checked={!!box.stroke}
+                    aria-label="框線"
+                    className={`chip sm${box.stroke ? ' active' : ''}`}
+                    onClick={() =>
+                      edit((c) => {
+                        const b2 = c.box!;
+                        if (b2.stroke) delete b2.stroke;
+                        else b2.stroke = { color: '#ffffff', width: 4, opacity: 1 };
+                      })
+                    }
+                  >
+                    {box.stroke ? '開' : '關'}
+                  </button>
+                </div>
+                {box.stroke && (
+                  <>
+                    <ColorPicker
+                      value={box.stroke.color}
+                      label="字塊外框顏色"
+                      onPick={(col) => edit((c) => void (c.box!.stroke!.color = col))}
+                    />
+                    <Slider
+                      label="框線透明度"
+                      value={Math.round((box.stroke.opacity ?? box.opacity) * 100)}
+                      min={0}
+                      max={100}
+                      step={5}
+                      format={(v) => `${v}%`}
+                      onChange={(v) => edit((c) => void (c.box!.stroke!.opacity = v / 100), 'bsop')}
+                    />
+                    <Slider
+                      label="框線粗細"
+                      value={box.stroke.width}
+                      min={1}
+                      max={40}
+                      step={1}
+                      format={px}
+                      onChange={(v) => edit((c) => void (c.box!.stroke!.width = v), 'bst')}
+                    />
+                  </>
+                )}
+              </div>
+              {box.fillOn === false && !box.stroke && (
+                <p className="hint">填滿和框線都關了，字塊看不到。要不要打開其中一個，或把字塊設成「無」？</p>
               )}
               {shapeDef(box.shape).adjust.length > 0 && (
                 <>

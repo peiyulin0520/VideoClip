@@ -85,9 +85,9 @@ test('字卡面板：文字／版面／字塊／描邊陰影，每個按鈕都�
   await page.getByRole('button', { name: '字塊顏色 #ffd23f' }).tap();
   expect((await card(page)).box!.fill).toBe('#ffd23f');
   await expect.poll(() => countColor(page, [255, 210, 63], 30, [0.2, 0.4, 0.8, 0.6])).toBeGreaterThan(200);
-  await setRange(page, '透明度', 50);
+  await setRange(page, '填滿透明度', 50);
   expect((await card(page)).box!.opacity).toBeCloseTo(0.5);
-  await setRange(page, '透明度', 100);
+  await setRange(page, '填滿透明度', 100);
 
   // 內距上下左右各自調
   await setRange(page, '內距 上', 10);

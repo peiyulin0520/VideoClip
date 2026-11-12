@@ -1641,3 +1641,11 @@ button {
 .track.track-dragging .track-chip {
   background: #ff4d8d;
 }
+
+/* 字塊：填滿／框線兩區 */
+.box-part {
+  margin: 8px 0;
+  padding: 8px 10px 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+}
