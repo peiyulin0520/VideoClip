@@ -22,7 +22,7 @@ import {
 } from '../../engine/timeline';
 import type { Asset, Item, Track, VideoItem } from '../../model/types';
 import { useProxyProgress } from '../../engine/proxyQueue';
-import { patchTrack, placeItem, removeTrack, shiftTrackLayer } from '../../store/actions';
+import { moveTrackTo, patchTrack, placeItem, removeTrack, shiftTrackLayer } from '../../store/actions';
 import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
@@ -100,6 +100,9 @@ export function Timeline({
   const [drag, setDrag] = useState<Drag | null>(null);
   const [menuTrackId, setMenuTrackId] = useState<string | null>(null);
   const proxyProgress = useProxyProgress((s) => s.progress);
+  // 拖軌道圖示換圖層順序：rowIndex＝顯示的第幾列（0＝最上面）、dy＝手指移動的距離
+  const [trackDrag, setTrackDrag] = useState<{ id: string; from: number; dy: number } | null>(null);
+  const suppressChipClick = useRef(false);
 
   const total = totalDuration(project);
   const main = mainItems(project);
@@ -114,6 +117,53 @@ export function Timeline({
       top: RULER_H + ROW_GAP + heights.slice(0, i).reduce((sum, h) => sum + h + ROW_GAP, 0),
     }));
   }, [project.tracks]);
+  // 拖到的位置（顯示列）：跟其他列的中心比較；主軌（最底下那列）固定不能被擠開
+  const dropRow = (from: number, dy: number): number => {
+    const me = rows[from];
+    if (!me) return from;
+    const center = me.top + me.h / 2 + dy;
+    let to = 0;
+    rows.forEach((r, i) => {
+      if (i !== from && i < rows.length - 1 && r.top + r.h / 2 < center) to++;
+    });
+    return Math.min(to, rows.length - 2);
+  };
+
+  const startTrackDrag = (e: RPointerEvent, trackId: string, from: number) => {
+    e.stopPropagation();
+    if (rows[from]?.track.kind === 'main') return; // 主軌不能拖，點一下還是開選單
+    const startY = e.clientY;
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    let dragging = false;
+    const move = (ev: PointerEvent) => {
+      const dy = ev.clientY - startY;
+      if (!dragging && Math.abs(dy) > 8) {
+        dragging = true;
+        player?.pause();
+        navigator.vibrate?.(10);
+      }
+      if (dragging) setTrackDrag({ id: trackId, from, dy });
+    };
+    const end = (ev: PointerEvent, cancelled: boolean) => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', cancel);
+      if (!dragging) return;
+      suppressChipClick.current = true; // 拖完不要又開選單
+      setTimeout(() => (suppressChipClick.current = false), 0);
+      setTrackDrag(null);
+      if (cancelled) return;
+      const to = dropRow(from, ev.clientY - startY);
+      if (to !== from) moveTrackTo(trackId, project.tracks.length - 1 - to); // 顯示列 → 圖層順序（反過來）
+    };
+    const up = (ev: PointerEvent) => end(ev, false);
+    const cancel = (ev: PointerEvent) => end(ev, true);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', cancel);
+  };
+
   const contentH = (rows.length ? rows[rows.length - 1]!.top + rows[rows.length - 1]!.h : RULER_H) + 12;
 
   useLayoutEffect(() => {
@@ -377,129 +427,149 @@ export function Timeline({
             ))}
           </div>
 
-          {rows.map(({ track, top, h }) => (
-            <div
-              key={track.id}
-              className={`track${track.hidden ? ' off' : ''}`}
-              data-testid="track"
-              data-kind={track.kind}
-              data-bg="1"
-              style={{ top, height: h }}
-            >
-              <button
-                className="track-chip"
-                aria-label={`${track.name} 軌道設定`}
-                data-testid="track-chip"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => setMenuTrackId(track.id)}
+          {rows.map(({ track, top, h }, rowIdx) => {
+            // 拖軌道時：被拖的那列跟著手指，中間經過的列讓位
+            let shift = 0;
+            const isDragged = trackDrag?.id === track.id;
+            if (trackDrag) {
+              const to = dropRow(trackDrag.from, trackDrag.dy);
+              const dh = rows[trackDrag.from]!.h + ROW_GAP;
+              if (isDragged) shift = trackDrag.dy;
+              else if (trackDrag.from < to && rowIdx > trackDrag.from && rowIdx <= to) shift = -dh;
+              else if (trackDrag.from > to && rowIdx >= to && rowIdx < trackDrag.from) shift = dh;
+            }
+            return (
+              <div
+                key={track.id}
+                className={`track${track.hidden ? ' off' : ''}${isDragged ? ' track-dragging' : ''}`}
+                data-testid="track"
+                data-kind={track.kind}
+                data-track-id={track.id}
+                data-bg="1"
+                style={{
+                  top,
+                  height: h,
+                  transform: shift ? `translateY(${shift}px)` : undefined,
+                  transition: trackDrag && !isDragged ? 'transform 120ms' : undefined,
+                }}
               >
-                {track.kind === 'main' ? (
-                  <Film size={16} />
-                ) : track.kind === 'text' ? (
-                  <Type size={16} />
-                ) : (
-                  <Layers size={16} />
-                )}
-                {track.locked ? (
-                  <Lock size={11} />
-                ) : track.hidden ? (
-                  <EyeOff size={11} />
-                ) : track.muted ? (
-                  <VolumeX size={11} />
-                ) : null}
-              </button>
+                <button
+                  className={`track-chip${track.kind === 'main' ? '' : ' draggable'}`}
+                  aria-label={`${track.name} 軌道設定`}
+                  data-testid="track-chip"
+                  onPointerDown={(e) => startTrackDrag(e, track.id, rowIdx)}
+                  onClick={() => {
+                    if (!suppressChipClick.current) setMenuTrackId(track.id);
+                  }}
+                >
+                  {track.kind === 'main' ? (
+                    <Film size={16} />
+                  ) : track.kind === 'text' ? (
+                    <Type size={16} />
+                  ) : (
+                    <Layers size={16} />
+                  )}
+                  {track.locked ? (
+                    <Lock size={11} />
+                  ) : track.hidden ? (
+                    <EyeOff size={11} />
+                  ) : track.muted ? (
+                    <VolumeX size={11} />
+                  ) : null}
+                </button>
 
-              {track.kind === 'main' &&
-                (track.items as VideoItem[]).map(
-                  (it) =>
-                    gapOf(it) > 0 && (
-                      <button
-                        key={`gap-${it.id}`}
-                        className="gap-block"
-                        data-testid="gap"
-                        data-item-id={it.id}
-                        aria-label={`空白 ${gapOf(it).toFixed(1)} 秒`}
-                        style={{
-                          left: half + (it.start - gapOf(it)) * pps,
-                          width: Math.max(gapOf(it) * pps, 4),
-                        }}
-                        onClick={() => useProjectStore.getState().select(it.id)}
-                      >
-                        {gapOf(it) * pps > 56 && `空白 ${gapOf(it).toFixed(1)}s`}
-                      </button>
-                    ),
-                )}
+                {track.kind === 'main' &&
+                  (track.items as VideoItem[]).map(
+                    (it) =>
+                      gapOf(it) > 0 && (
+                        <button
+                          key={`gap-${it.id}`}
+                          className="gap-block"
+                          data-testid="gap"
+                          data-item-id={it.id}
+                          aria-label={`空白 ${gapOf(it).toFixed(1)} 秒`}
+                          style={{
+                            left: half + (it.start - gapOf(it)) * pps,
+                            width: Math.max(gapOf(it) * pps, 4),
+                          }}
+                          onClick={() => useProjectStore.getState().select(it.id)}
+                        >
+                          {gapOf(it) * pps > 56 && `空白 ${gapOf(it).toFixed(1)}s`}
+                        </button>
+                      ),
+                  )}
 
-              {track.items.map((it) => {
-                const asset = isVideoItem(it) ? project.assets.find((a) => a.id === it.assetId) : undefined;
-                const selected = it.id === selectedId;
-                const dragging = drag?.id === it.id;
-                const dx = dragging ? drag!.dx : 0;
-                return (
-                  <div
-                    key={it.id}
-                    className={`clip${selected ? ' selected' : ''}${dragging ? ' dragging' : ''}${it.type === 'text' ? ' is-text' : ''}${it.duration * pps < 80 ? ' short' : ''}`}
-                    data-testid="clip"
-                    data-selected={selected}
-                    data-item-id={it.id}
-                    data-kind={it.type}
-                    style={{
-                      left: half + it.start * pps,
-                      width: Math.max(it.duration * pps, 4),
-                      transform: dragging ? `translateX(${dx}px)` : undefined,
-                    }}
-                    onPointerDown={(e) => startItemGesture(e, it, track)}
-                  >
-                    {isVideoItem(it) ? <Tiles item={it} asset={asset} pps={pps} h={h} /> : null}
-                    <div className="clip-label">
-                      {it.type === 'text'
-                        ? it.card.runs[0]?.text === ''
-                          ? '圖形'
-                          : `Aa ${it.card.runs[0]?.text.replace(/\n/g, ' ') ?? ''}`
-                        : `${it.type === 'image' ? '照片' : '影片'} ${it.duration.toFixed(1)}s`}
-                      {isVideoItem(it) && it.speed !== 1 && ` · ${it.speed}x`}
-                      {isVideoItem(it) && it.type === 'video' && it.volume === 0 && ' · 靜音'}
-                      {asset && proxyProgress[asset.id] !== undefined && (
-                        <span className="proxy-note" data-testid="proxy-note">
-                          {' '}
-                          · 預覽檔製作中 {Math.round(proxyProgress[asset.id]! * 100)}%
-                        </span>
+                {track.items.map((it) => {
+                  const asset = isVideoItem(it) ? project.assets.find((a) => a.id === it.assetId) : undefined;
+                  const selected = it.id === selectedId;
+                  const dragging = drag?.id === it.id;
+                  const dx = dragging ? drag!.dx : 0;
+                  return (
+                    <div
+                      key={it.id}
+                      className={`clip${selected ? ' selected' : ''}${dragging ? ' dragging' : ''}${it.type === 'text' ? ' is-text' : ''}${it.duration * pps < 80 ? ' short' : ''}`}
+                      data-testid="clip"
+                      data-selected={selected}
+                      data-item-id={it.id}
+                      data-kind={it.type}
+                      style={{
+                        left: half + it.start * pps,
+                        width: Math.max(it.duration * pps, 4),
+                        transform: dragging ? `translateX(${dx}px)` : undefined,
+                      }}
+                      onPointerDown={(e) => startItemGesture(e, it, track)}
+                    >
+                      {isVideoItem(it) ? <Tiles item={it} asset={asset} pps={pps} h={h} /> : null}
+                      <div className="clip-label">
+                        {it.type === 'text'
+                          ? it.card.runs[0]?.text === ''
+                            ? '圖形'
+                            : `Aa ${it.card.runs[0]?.text.replace(/\n/g, ' ') ?? ''}`
+                          : `${it.type === 'image' ? '照片' : '影片'} ${it.duration.toFixed(1)}s`}
+                        {isVideoItem(it) && it.speed !== 1 && ` · ${it.speed}x`}
+                        {isVideoItem(it) && it.type === 'video' && it.volume === 0 && ' · 靜音'}
+                        {asset && proxyProgress[asset.id] !== undefined && (
+                          <span className="proxy-note" data-testid="proxy-note">
+                            {' '}
+                            · 預覽檔製作中 {Math.round(proxyProgress[asset.id]! * 100)}%
+                          </span>
+                        )}
+                      </div>
+                      {selected && !dragging && !track.locked && (
+                        <>
+                          <div
+                            className="handle left"
+                            data-testid="trim-start"
+                            onPointerDown={(e) => startTrim(e, it, track, 'start')}
+                          />
+                          <div
+                            className="handle right"
+                            data-testid="trim-end"
+                            onPointerDown={(e) => startTrim(e, it, track, 'end')}
+                          />
+                        </>
                       )}
                     </div>
-                    {selected && !dragging && !track.locked && (
-                      <>
-                        <div
-                          className="handle left"
-                          data-testid="trim-start"
-                          onPointerDown={(e) => startTrim(e, it, track, 'start')}
-                        />
-                        <div
-                          className="handle right"
-                          data-testid="trim-end"
-                          onPointerDown={(e) => startTrim(e, it, track, 'end')}
-                        />
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
 
-              {track.kind === 'main' && (
-                <>
-                  {insertX !== null && <div className="insert-line" style={{ left: insertX }} />}
-                  <button
-                    className="add-clip"
-                    aria-label="加入素材"
-                    style={{ left: half + total * pps + 8 }}
-                    onClick={onAdd}
-                    onPointerDown={(e) => e.stopPropagation()}
-                  >
-                    <Plus size={22} />
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
+                {track.kind === 'main' && (
+                  <>
+                    {insertX !== null && <div className="insert-line" style={{ left: insertX }} />}
+                    <button
+                      className="add-clip"
+                      aria-label="加入素材"
+                      style={{ left: half + total * pps + 8 }}
+                      onClick={onAdd}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <Plus size={22} />
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })}
           {drag?.kind === 'move' && drag.snapX !== null && (
             <div className="snap-line" style={{ left: half + drag.snapX * pps }} />
           )}

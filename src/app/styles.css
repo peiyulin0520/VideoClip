@@ -1629,3 +1629,15 @@ button {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+
+/* 軌道圖示：按住上下拖＝換圖層順序（只有這一小欄禁止捲動，不影響整頁捲動） */
+.track-chip.draggable {
+  touch-action: none;
+}
+.track.track-dragging {
+  z-index: 20;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
+}
+.track.track-dragging .track-chip {
+  background: #ff4d8d;
+}

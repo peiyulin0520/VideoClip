@@ -7,6 +7,7 @@ import {
   firstFreeTrack,
   moveFree,
   moveTrack,
+  reorderTrack,
   splitFree,
   trimEndFree,
   trimStartFree,
@@ -164,6 +165,19 @@ describe('圖層與軌道', () => {
     expect(moveTrack(p.tracks, ids[3]!, 1)).toBe(p.tracks); // 已經最上面
     const layers = visibleLayers({ ...p, tracks: up }, 2.2).map((l) => l.item.id);
     expect(layers.slice(1)).toEqual(['o2', 'o1']);
+  });
+
+  it('reorderTrack：直接搬到指定位置，主軌固定在最底下、不能被搬動或搬到它下面', () => {
+    const p = proj();
+    const ids = p.tracks.map((t) => t.id); // [main, a, b, c]
+    expect(reorderTrack(p.tracks, ids[1]!, 3).map((t) => t.id)).toEqual([ids[0], ids[2], ids[3], ids[1]]);
+    expect(reorderTrack(p.tracks, ids[3]!, 1).map((t) => t.id)).toEqual([ids[0], ids[3], ids[1], ids[2]]);
+    expect(reorderTrack(p.tracks, ids[2]!, 0)).not.toBe(p.tracks); // 想搬到主軌下面：夾在 1
+    expect(reorderTrack(p.tracks, ids[2]!, 0)[0]!.id).toBe(ids[0]);
+    expect(reorderTrack(p.tracks, ids[2]!, 99)[3]!.id).toBe(ids[2]); // 超過最上面：夾在最上面
+    expect(reorderTrack(p.tracks, ids[0]!, 2)).toBe(p.tracks); // 主軌不能動
+    expect(reorderTrack(p.tracks, ids[1]!, 1)).toBe(p.tracks); // 位置沒變
+    expect(reorderTrack(p.tracks, 'nope', 2)).toBe(p.tracks);
   });
 
   it('firstFreeTrack 找得到空軌，找不到回 -1', () => {

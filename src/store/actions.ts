@@ -20,6 +20,7 @@ import {
   moveTrack,
   relayout,
   removeItem,
+  reorderTrack,
   splitFree,
   splitItem,
 } from '../engine/timeline';
@@ -168,6 +169,13 @@ export function patchTrack(
 export function shiftTrackLayer(trackId: string, dir: -1 | 1) {
   store().apply((d) => {
     d.tracks = moveTrack(d.tracks as Track[], trackId, dir) as never;
+  });
+}
+
+/** 直接把軌道搬到新的圖層位置（拖時間軸左邊的軌道圖示）；一步復原 */
+export function moveTrackTo(trackId: string, toIndex: number) {
+  store().apply((d) => {
+    d.tracks = reorderTrack(d.tracks as Track[], trackId, toIndex) as never;
   });
 }
 

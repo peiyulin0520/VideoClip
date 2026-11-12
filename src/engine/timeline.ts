@@ -378,6 +378,18 @@ export function moveTrack(tracks: Track[], id: string, dir: -1 | 1): Track[] {
   return next;
 }
 
+/** 把軌道搬到新的圖層位置 toIndex（tracks 的 index，0＝主軌固定不動，不能搬到主軌下面）。沒有變動回傳原陣列。 */
+export function reorderTrack(tracks: Track[], id: string, toIndex: number): Track[] {
+  const from = tracks.findIndex((t) => t.id === id);
+  if (from < 1) return tracks;
+  const to = Math.min(Math.max(toIndex, 1), tracks.length - 1);
+  if (to === from) return tracks;
+  const next = tracks.slice();
+  const [t] = next.splice(from, 1);
+  next.splice(to, 0, t!);
+  return next;
+}
+
 /** 在哪一條同類型軌道的 [start, start+duration) 是空的；找不到回傳 -1（呼叫端要新增軌道） */
 export function firstFreeTrack(p: Project, kind: Track['kind'], start: number, duration: number): number {
   return p.tracks.findIndex((t) => t.kind === kind && !t.locked && canPlace(t.items, start, duration));
