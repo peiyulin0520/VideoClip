@@ -353,6 +353,9 @@ export class Player {
       if (track.kind === 'main') {
         const cur = (items as VideoItem[]).findIndex((x) => t < x.start + x.duration);
         const next = items[cur + 1] as VideoItem | undefined;
+        // 在片段前面的空白裡：這個片段還沒開始畫，先載入停在起點
+        const curItem = items[cur] as VideoItem | undefined;
+        if (curItem && t < curItem.start) push(curItem);
         if (cur >= 0 && next) push(next);
       } else if (track.kind === 'overlay') {
         for (const it of items as VideoItem[]) if (it.start > t && it.start <= t + PREFETCH_S) push(it);

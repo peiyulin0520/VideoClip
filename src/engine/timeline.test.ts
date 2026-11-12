@@ -100,7 +100,10 @@ describe('timeline', () => {
     const t1 = trimStart(items, items[0]!.id, 1);
     expect(t1[0]!.trimIn).toBe(1);
     expect(t1[0]!.duration).toBe(3);
-    expect(t1[1]!.start).toBe(3);
+    // 左把手往右拉：尾巴不動，切掉的 1 秒變成前面的空白，後面的片段位置不變
+    expect(t1[0]!.gap).toBe(1);
+    expect(t1[0]!.start).toBe(1);
+    expect(t1[1]!.start).toBe(4);
     expect(trimStart(t1, t1[0]!.id, -5)[0]!.trimIn).toBe(0); // 最多還原到素材起點
     expect(trimStart(items, items[0]!.id, 99)[0]!.duration).toBeCloseTo(0.2);
   });

@@ -1,6 +1,7 @@
 import {
   ArrowDown,
   ArrowLeft,
+  ArrowLeftToLine,
   ArrowRight,
   ArrowUp,
   Copy,
@@ -11,6 +12,7 @@ import {
   Lock,
   Maximize,
   Minimize,
+  MoveHorizontal,
   Plus,
   Scissors,
   Trash2,
@@ -22,11 +24,13 @@ import { useRef, useState } from 'react';
 import { BLEND_LABELS } from '../../engine/geometry';
 import {
   findItem,
+  gapOf,
   isVideoItem,
   itemAt,
   layersAt,
   mainItems,
   moveItem,
+  removeGap,
   setSpeed,
 } from '../../engine/timeline';
 import { MAX_SPEED, MIN_SPEED } from '../../model/defaults';
@@ -45,10 +49,11 @@ import { toast, useUI } from '../../store/uiStore';
 import { Slider } from '../../ui/Slider';
 import { StickerPicker } from './StickerPicker';
 import { TextPanel } from './TextPanel';
+import { TrimPanel } from './TrimPanel';
 import { TransformControls } from './TransformControls';
 
 export type Tab = 'edit' | 'overlay' | 'text' | 'layers';
-type Panel = 'speed' | 'volume' | null;
+type Panel = 'speed' | 'volume' | 'trim' | null;
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'edit', label: '剪輯' },
@@ -208,14 +213,23 @@ function EditTab({
     toast(s.fit === 'cover' ? '完整顯示（上下或左右留黑邊）' : '填滿畫面（裁掉多餘部分）');
   };
 
+  const removeMainGap = (id: string) => setMainItems(removeGap(items, id));
+
   const openPanel = (p: Exclude<Panel, null>) => {
     const s = need();
     if (!s) return;
     if (!isVideoItem(s)) return toast('文字不能變速或調音量');
     if (p === 'speed' && s.type === 'image') return toast('照片不能變速');
     if (p === 'volume' && s.type === 'image') return toast('照片沒有聲音');
+    if (p === 'trim' && s.type === 'image') return toast('照片沒有素材區段，請拖時間軸上的把手調長度');
     setPanel(p);
   };
+
+  if (panel === 'trim' && selected && isVideoItem(selected) && found) {
+    const asset = project.assets.find((a) => a.id === selected.assetId);
+    if (asset)
+      return <TrimPanel item={selected} asset={asset} track={found.track} onClose={() => setPanel(null)} />;
+  }
 
   if (panel && selected && isVideoItem(selected)) {
     const asset = project.assets.find((a) => a.id === selected.assetId);
@@ -316,6 +330,10 @@ function EditTab({
       <ToolButton icon={Copy} label="複製" onClick={() => need() && duplicateAny(selected!.id)} />
       <ToolButton icon={ArrowLeft} label="前移" onClick={() => move(-1)} />
       <ToolButton icon={ArrowRight} label="後移" onClick={() => move(1)} />
+      <ToolButton icon={MoveHorizontal} label="修剪" onClick={() => openPanel('trim')} />
+      {isMain && selected && isVideoItem(selected) && gapOf(selected) > 0 && (
+        <ToolButton icon={ArrowLeftToLine} label="刪除空白" onClick={() => removeMainGap(selected.id)} />
+      )}
       <ToolButton icon={Gauge} label="變速" onClick={() => openPanel('speed')} />
       <ToolButton icon={Volume2} label="音量" onClick={() => openPanel('volume')} />
       <ToolButton

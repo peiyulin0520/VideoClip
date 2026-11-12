@@ -9,6 +9,7 @@ import {
   type PointerEvent as RPointerEvent,
 } from 'react';
 import {
+  gapOf,
   isVideoItem,
   itemEnd,
   mainItems,
@@ -345,7 +346,7 @@ export function Timeline({
       half +
       (drag.target >= others.length
         ? total - dur
-        : others.slice(0, drag.target).reduce((s, x) => s + x.duration, 0)) *
+        : others.slice(0, drag.target).reduce((s, x) => s + gapOf(x) + x.duration, 0)) *
         pps;
   }
 
@@ -407,6 +408,27 @@ export function Timeline({
                   <VolumeX size={11} />
                 ) : null}
               </button>
+
+              {track.kind === 'main' &&
+                (track.items as VideoItem[]).map(
+                  (it) =>
+                    gapOf(it) > 0 && (
+                      <button
+                        key={`gap-${it.id}`}
+                        className="gap-block"
+                        data-testid="gap"
+                        data-item-id={it.id}
+                        aria-label={`空白 ${gapOf(it).toFixed(1)} 秒`}
+                        style={{
+                          left: half + (it.start - gapOf(it)) * pps,
+                          width: Math.max(gapOf(it) * pps, 4),
+                        }}
+                        onClick={() => useProjectStore.getState().select(it.id)}
+                      >
+                        {gapOf(it) * pps > 56 && `空白 ${gapOf(it).toFixed(1)}s`}
+                      </button>
+                    ),
+                )}
 
               {track.items.map((it) => {
                 const asset = isVideoItem(it) ? project.assets.find((a) => a.id === it.assetId) : undefined;

@@ -53,6 +53,8 @@ export type VideoItem = ItemBase & {
   speed: number; // 0.25–4；照片固定 1
   volume: number; // 0–1
   fit: 'cover' | 'contain';
+  /** 主軌專用：這個片段「前面」的空白秒數（黑畫面，疊加與文字照常）。沒有＝0＝首尾相接 */
+  gap?: number;
 };
 
 // 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
