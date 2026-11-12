@@ -82,10 +82,16 @@ export type Decoration = {
   kind: DecorationKind;
   color: string;
   width: number;
-  /** 與文字的距離，佔字高的比例（−0.3 ~ 1.0，預設 0）；螢光筆是上下位置 */
+  /** 與文字的距離，佔字高的比例（−1 ~ 3，預設 0）；螢光筆是上下位置 */
   gap?: number;
-  /** 大小倍數（0.5 ~ 2，預設 1）：星星、愛心、打勾、彎箭頭 */
+  /** 大小倍數（0.2 ~ 4，預設 1）：星星、愛心、打勾、彎箭頭 */
   scale?: number;
+  /** 長度，佔預設長度（文字墨跡寬）的比例（0.2 ~ 1.5，預設 1）：底線類、螢光筆、尾端圈圈的直線段 */
+  length?: number;
+  /** 長度不是 1 時，線靠哪一邊（預設置中）；尾端圈圈固定從圈圈往左延伸，不用這個 */
+  align?: 'start' | 'center' | 'end';
+  /** 透明度 0.1 ~ 1（預設 1） */
+  opacity?: number;
 };
 export type BoxShape =
   | 'rect'

@@ -6,9 +6,9 @@
 - **日期**：2026-11-11
 - **分支**：PR #5（第 3 次實測修正＋GIPHY＋我的貼圖＋精靈說明）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已用 `git merge --ff-only origin/main` 對齊，之後的新工作繼續在這個分支
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
-- **測試**：575 個單元測試、72 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：594 個單元測試、74 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：照 `docs/plans/2026-11-12-feedback-4.md` 繼續實作（Sonnet）：**A 播放順暢＋影片聲音 ✅ 已做（Chromium 驗證，iPhone 待真機）**，接著 **B 匯出影片 → C 音軌管理＋背景音樂 → D 裁切（四邊角＋自由形狀）→ E 裝飾長度／透明度／範圍＋取色彈窗**（使用者也可以指定先做 E）。之前規劃但還沒做的：缺字體提示、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
+- **下一步**：照 `docs/plans/2026-11-12-feedback-4.md` 繼續實作（Sonnet）：**A 播放順暢＋影片聲音 ✅、E 裝飾長度／透明度／範圍＋選色彈窗 ✅（都只在 Chromium 驗證，iPhone 待真機）**，接著 **B 匯出影片 → C 音軌管理＋背景音樂 → D 裁切（四邊角＋自由形狀）→ E 裝飾長度／透明度／範圍＋取色彈窗**（使用者也可以指定先做 E）。之前規劃但還沒做的：缺字體提示、GIPHY 會動的貼圖、介面主題、人物去背、多格模板（R22）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -67,6 +67,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 feedback-4 E：裝飾長度／透明度／範圍放大＋自訂顏色彈窗
+  - 做了什麼：①`Decoration` 新增 `length`（20–150%）、`align`（靠左／置中／靠右）、`opacity`（10–100%）；`lineSpan()` 縮放底線類（波浪、虛線、點點、雙底線）與螢光筆的線段；尾端圈圈的長度只伸縮直線段，圈圈大小與位置不變（`length=1` 與舊結果完全相同）；透明度乘進每一筆的 alpha ②範圍放大：粗細 2–60%（原 3–25）、距離 −100～300%（原 −30～100）、大小 20–400%（原 50–200）③面板新增「長度」「靠哪一邊」「透明度」（沒有長度的裝飾不顯示；長度 100% 時收起靠哪一邊）④新 `ColorPopup`：點「自訂顏色」跳出彈窗——大方塊（橫＝飽和度、直＝亮度）手指拖拉／點選、色相條、R／G／B 滑桿＋−／＋（44px）＋數字、「原本」「新的」並排預覽、色碼只當小字顯示、取消／確定（按確定才套用並進「最近用過」）；拿掉色碼輸入框與系統取色器；所有 `ColorPicker` 用到的地方（文字、字塊、外框、描邊、裝飾）自動套用；「自訂顏色」按鈕移到常駐那一列（跟「更多顏色」並排，按鈕上有目前顏色的小圓點）⑤`colorMath.ts`：色碼／RGB／HSV 換算，拉到灰／黑時沿用原本的色相
+  - 動了哪些檔：`src/model/types.ts`、`src/engine/decorations.ts`、`src/app/editor/TextPanel.tsx`、`src/ui/{ColorPicker,ColorPopup,colorMath}.ts(x)`、`src/app/styles.css`；測試 `src/engine/decorations.test.ts`、`src/ui/colorMath.test.ts`、`e2e/fix-colors.spec.ts`（舊的色碼／系統取色器測試改成彈窗）、`e2e/phase3a-deco.spec.ts`（新增長度／透明度／範圍測試）；文件 `docs/TEXT_CARDS.md §3`、`docs/PLAN.md §7`
+  - 驗證：✅ 單元（長度三種對齊、各種裝飾有沒有長度、透明度、極端範圍仍有限、色碼／RGB／HSV 來回換算全部抽樣一致）；✅ e2e（彈窗：點色相條、點／拖方塊、＋−與滑桿細調、原本／新的色塊、取消不套用、確定套用且進最近用過、點背景＝取消、拉到灰色色相不跳、拖出方塊外夾在邊緣；裝飾：滑桿範圍、長度 40% 預覽上線變少、靠左／靠右、透明度 30% 顏色變淡、極端值）；截圖 `docs/screenshots/fix-feedback-2/color-popup-*.png`、`docs/screenshots/phase3a/deco-length-*.png`、`deco-opacity-30.png`；全部 74 個 e2e、594 個單元、lint、build 過  🔴 iPhone 沒測：彈窗內手指拖拉好不好用、頁面有沒有跟著捲、彈窗有沒有被工具列切到（已列 PLAN §7）  🔴 沒做：透明度滑桿（alpha）放進顏色彈窗（透明度在裝飾面板另外調）
+  - 踩到的坑：方塊圓角 12px，e2e 點在最右上角會點到圓角外（不算在元素上）→ 測試點離邊 2–3%；CDP 觸控事件到畫面更新有一點延遲，讀數字前要等一下
+  - 下一步：B 匯出影片（見 `docs/plans/2026-11-12-feedback-4.md`）；請使用者用 iPhone 測 A、E
 - 2026-11-12 feedback-4 A：播放順暢＋影片聲音（靜音模式也有聲音）
   - 做了什麼：①播放時間改成獨立的 `TimeText`（最多每 100ms 更新），`EditorBody` 不再每格重畫（e2e 量到播放 2.5 秒內重畫 0 次，之前每秒 60 次）②影片圖層直接當 GPU 貼圖（`ImageSource` 包 `<video>`，裁切用貼圖子矩形 `frame`，`dynamic:true` 才會通知精靈；沒有新畫面不重新上傳），不再每格 `drawImage` 到暫存畫布 ③對時改柔性：差 >0.04 秒用 `playbackRate` ±15% 慢慢追，>0.5 秒才硬跳（`driftPlan`）④新 `engine/audio.ts`：有 `navigator.audioSession`（或不是 iOS）→ 先設 `type='playback'` 再走 Web Audio（每個 `<video>` → `GainNode`，音量可到 200%）；沒有 Audio Session 的 iOS → 直接用 `<video>` 出聲（只能開／關）；⑤`mediaPool.unlock()` 改成使用者點擊當下**同步**對停著的元素 `play()` 後立刻 `pause()`（原本靜音 play、等 promise 才 pause，會停掉剛開始播的影片，而且靜音 play 不算解鎖出聲）；`play()` 先 `audio.unlock()`、渲染（目前的影片在點擊內 play）、再 `pool.unlock()` ⑥出聲播放被擋（`NotAllowedError`）不再吞掉：暫停並提示「iPhone 擋住了聲音，請再按一次播放」⑦除錯掛鉤新增 `stats()`（fps、每格合成毫秒）、`audio()`（模式、是否在跑、輸出音量）、`editorRenders()`
   - 動了哪些檔：`src/engine/{audio,player,mediaPool,compositor,debug}.ts`、`src/app/pages/Editor.tsx`、`src/app/editor/Preview.tsx`；新 `src/engine/audio.test.ts`、`e2e/playback-audio.spec.ts`

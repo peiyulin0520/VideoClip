@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DECORATION_KINDS, decorationOps, opsBounds, type Rect } from './decorations';
+import { DECORATION_KINDS, decorationOps, lineSpan, opsBounds, type Rect } from './decorations';
 
 const ink: Rect = { x: 100, y: 50, w: 400, h: 100 };
 const deco = (kind: (typeof DECORATION_KINDS)[number]['kind'], width = 0.1) => ({
@@ -155,5 +155,118 @@ describe('與文字的距離（gap）與大小（scale）', () => {
     expect(by['sparkles']).toMatchObject({ hasWidth: false, hasScale: true });
     expect(by['check']).toMatchObject({ hasWidth: true, hasScale: true });
     expect(by['tail-loop']).toMatchObject({ hasWidth: true, hasScale: false, gapLabel: '與文字距離' });
+  });
+});
+
+describe('裝飾：長度、透明度、放大後的範圍', () => {
+  const ink: Rect = { x: 100, y: 50, w: 400, h: 80 };
+  const spanOf = (d: Parameters<typeof decorationOps>[0]) => {
+    const b = opsBounds(decorationOps(d, ink))!;
+    return { l: b.l, r: b.r, w: b.r - b.l };
+  };
+
+  it('lineSpan：置中／靠左／靠右，長度限制在 20%–150%', () => {
+    expect(lineSpan(0, 100, 1, 'center')).toEqual([0, 100]);
+    expect(lineSpan(0, 100, 0.5, 'center')).toEqual([25, 75]);
+    expect(lineSpan(0, 100, 0.5, 'start')).toEqual([0, 50]);
+    expect(lineSpan(0, 100, 0.5, 'end')).toEqual([50, 100]);
+    expect(lineSpan(0, 100, 0.01, 'start')).toEqual([0, 20]);
+    expect(lineSpan(0, 100, 9, 'start')).toEqual([0, 150]);
+    expect(lineSpan(0, 100, undefined, undefined)).toEqual([0, 100]);
+  });
+
+  it('底線類：長度 50% → 線約一半長；預設（沒有 length）和 length=1 完全一樣', () => {
+    for (const kind of ['dashed-underline', 'dotted-underline', 'double-line', 'wave-underline'] as const) {
+      const base = { kind, color: '#f00', width: 0.06 };
+      const full = spanOf(base);
+      expect(spanOf({ ...base, length: 1 })).toEqual(full);
+      const half = spanOf({ ...base, length: 0.5 });
+      expect(half.w).toBeLessThan(full.w * 0.62);
+      expect(half.w).toBeGreaterThan(full.w * 0.4);
+      // 置中：中心不變；靠左：左端不變；靠右：右端不變
+      expect((half.l + half.r) / 2).toBeCloseTo((full.l + full.r) / 2, 0);
+      expect(spanOf({ ...base, length: 0.5, align: 'start' }).l).toBeCloseTo(full.l, 0);
+      expect(spanOf({ ...base, length: 0.5, align: 'end' }).r).toBeCloseTo(full.r, 0);
+      // 拉長
+      expect(spanOf({ ...base, length: 1.5 }).w).toBeGreaterThan(full.w * 1.3);
+    }
+  });
+
+  it('螢光筆也能縮短', () => {
+    const base = { kind: 'marker' as const, color: '#ff0', width: 1 };
+    expect(spanOf({ ...base, length: 0.5 }).w).toBeLessThan(spanOf(base).w * 0.62);
+    expect(spanOf({ ...base, length: 1 })).toEqual(spanOf(base));
+  });
+
+  it('尾端圈圈：縮短只縮直線段，圈圈（右端）位置與大小不變；length=1 跟以前一樣', () => {
+    const base = { kind: 'tail-loop' as const, color: '#f00', width: 0.15 };
+    const full = opsBounds(decorationOps(base, ink))!;
+    expect(opsBounds(decorationOps({ ...base, length: 1 }, ink))).toEqual(full);
+    const short = opsBounds(decorationOps({ ...base, length: 0.3 }, ink))!;
+    expect(short.r).toBeCloseTo(full.r, 3);
+    expect(short.b).toBeCloseTo(full.b, 3);
+    expect(short.l).toBeGreaterThan(full.l + 100);
+    expect(short.r - short.l).toBeGreaterThan(ink.h); // 圈圈還在
+  });
+
+  it('沒有長度的裝飾（星星、愛心…）不受 length 影響', () => {
+    for (const kind of ['sparkles', 'hearts', 'check', 'arrow-curve'] as const) {
+      const base = { kind, color: '#f00', width: 0.1 };
+      expect(decorationOps({ ...base, length: 0.3 }, ink)).toEqual(decorationOps(base, ink));
+    }
+  });
+
+  it('透明度乘進每一筆；螢光筆本來的 0.65 也會再乘', () => {
+    const o = decorationOps({ kind: 'double-line', color: '#f00', width: 0.05, opacity: 0.4 }, ink);
+    expect(o.length).toBe(2);
+    for (const op of o) expect(op.alpha).toBeCloseTo(0.4);
+    expect(
+      decorationOps({ kind: 'marker', color: '#ff0', width: 1, opacity: 0.5 }, ink)[0]!.alpha,
+    ).toBeCloseTo(0.325);
+    expect(decorationOps({ kind: 'double-line', color: '#f00', width: 0.05 }, ink)[0]!.alpha).toBeUndefined();
+    expect(
+      decorationOps({ kind: 'double-line', color: '#f00', width: 0.05, opacity: 1 }, ink)[0]!.alpha,
+    ).toBe(undefined);
+  });
+
+  it('範圍放大後仍然有限：粗細 60%、距離 −100%～300%、大小 20%～400%', () => {
+    for (const k of DECORATION_KINDS) {
+      for (const over of [
+        { width: 0.6 },
+        { gap: -1 },
+        { gap: 3 },
+        { scale: 0.2 },
+        { scale: 4 },
+        { length: 0.2 },
+        { length: 1.5 },
+      ]) {
+        const ops = decorationOps({ kind: k.kind, color: '#f00', width: k.width, ...over }, ink);
+        const b = opsBounds(ops)!;
+        expect(ops.length).toBeGreaterThan(0);
+        expect([b.l, b.t, b.r, b.b].every(Number.isFinite)).toBe(true);
+      }
+    }
+    // 距離 300% 的底線離字更遠；−100% 比 0 更靠上
+    const y = (gap: number) =>
+      opsBounds(decorationOps({ kind: 'dashed-underline', color: '#f00', width: 0.05, gap }, ink))!.t;
+    expect(y(3)).toBeGreaterThan(y(0) + ink.h * 2.5);
+    expect(y(-1)).toBeLessThan(y(0) - ink.h * 0.9);
+  });
+
+  it('每種裝飾標示有沒有「長度」「靠哪一邊」', () => {
+    const by = Object.fromEntries(DECORATION_KINDS.map((k) => [k.kind, k]));
+    for (const k of ['wave-underline', 'dashed-underline', 'dotted-underline', 'double-line', 'marker'])
+      expect(by[k]).toMatchObject({ hasLength: true, hasAlign: true });
+    expect(by['tail-loop']).toMatchObject({ hasLength: true, hasAlign: false });
+    for (const k of [
+      'sparkles',
+      'hearts',
+      'check',
+      'arrow-curve',
+      'slashes',
+      'corner-brackets',
+      'scribble-circle',
+    ])
+      expect(by[k]).toMatchObject({ hasLength: false, hasAlign: false });
   });
 });

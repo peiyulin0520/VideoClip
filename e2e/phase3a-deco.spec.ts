@@ -205,3 +205,99 @@ test('裝飾的「與文字距離」「大小」滑桿：資料與預覽都會�
   const mk = (await decos(page)).find((x) => x.kind === 'marker') as { gap?: number };
   expect(mk.gap).toBeCloseTo(0.2);
 });
+
+test('裝飾的長度、透明度、放大後的範圍：底線可以縮短、半透明、範圍夠大（使用者：底線太長、幅度太小）', async ({
+  page,
+}) => {
+  await createProjectWith(page, ['solid-blue.webm']);
+  await openTab(page, '文字');
+  await page
+    .getByRole('button', { name: /新增文字/ })
+    .first()
+    .tap();
+  await page.getByLabel('文字內容').fill('今天吃很多飯');
+  await page.getByRole('tab', { name: '裝飾', exact: true }).tap();
+  await page.getByRole('button', { name: '裝飾 虛線' }).tap();
+  const d = async () =>
+    (await decos(page))[0] as {
+      width: number;
+      gap?: number;
+      length?: number;
+      align?: string;
+      opacity?: number;
+    };
+  const cyan = () => countColor(page, [77, 208, 255], 60, [0.02, 0.3, 0.98, 0.8]);
+
+  // 範圍：粗細到 60%、距離 −100%～300%
+  const range = async (label: string) =>
+    page.getByRole('slider', { name: label, exact: true }).evaluate((el) => {
+      const i = el as HTMLInputElement;
+      return { min: Number(i.min), max: Number(i.max) };
+    });
+  expect(await range('虛線粗細')).toEqual({ min: 2, max: 60 });
+  expect(await range('虛線與文字距離')).toEqual({ min: -100, max: 300 });
+  expect(await range('虛線長度')).toEqual({ min: 20, max: 150 });
+  expect(await range('虛線透明度')).toEqual({ min: 10, max: 100 });
+  await page.screenshot({ path: `${SHOT}/deco-length-opacity-panel.png` });
+
+  // 預設：長度 100%（沒有 length 欄位），沒有「靠哪一邊」
+  await expect.poll(cyan).toBeGreaterThan(80);
+  const full = await cyan();
+  expect((await d()).length).toBeUndefined();
+  await expect(page.getByRole('radiogroup', { name: '虛線靠哪一邊' })).toHaveCount(0);
+
+  // 縮短到 40%：資料更新、預覽上的線變少、出現靠左／置中／靠右
+  await setRange(page, '虛線長度', 40);
+  expect((await d()).length).toBeCloseTo(0.4);
+  await expect.poll(cyan).toBeLessThan(full * 0.6);
+  await expect(page.getByRole('radiogroup', { name: '虛線靠哪一邊' })).toBeVisible();
+  await page.screenshot({ path: `${SHOT}/deco-length-40-center.png` });
+  // 靠左：線左端對齊字左緣，所以左半邊有線、右半邊沒有
+  await page.getByRole('radio', { name: '靠左' }).tap();
+  expect((await d()).align).toBe('start');
+  const left = () => countColor(page, [77, 208, 255], 60, [0.02, 0.3, 0.5, 0.8]);
+  const right = () => countColor(page, [77, 208, 255], 60, [0.5, 0.3, 0.98, 0.8]);
+  await expect.poll(async () => (await left()) > (await right()) * 3).toBe(true);
+  await page.screenshot({ path: `${SHOT}/deco-length-40-start.png` });
+  await page.getByRole('radio', { name: '靠右' }).tap();
+  expect((await d()).align).toBe('end');
+  await expect.poll(async () => (await right()) > (await left()) * 3).toBe(true);
+  // 拉長到 150%
+  await setRange(page, '虛線長度', 150);
+  expect((await d()).length).toBeCloseTo(1.5);
+
+  // 透明度 30%：資料更新、線的顏色變淡（和藍色背景混合，原本的青色像素變少）
+  await setRange(page, '虛線長度', 100);
+  // 長度回到 100% 時「靠哪一邊」選項收起來（沒有差別）
+  await expect(page.getByRole('radiogroup', { name: '虛線靠哪一邊' })).toHaveCount(0);
+  const before = await cyan();
+  await setRange(page, '虛線透明度', 30);
+  expect((await d()).opacity).toBeCloseTo(0.3);
+  await expect.poll(cyan).toBeLessThan(before * 0.3);
+  await page.screenshot({ path: `${SHOT}/deco-opacity-30.png` });
+
+  // 大範圍：粗細 60%、距離 300%、距離 −100% 都收得下，字卡不會壞
+  await setRange(page, '虛線粗細', 60);
+  expect((await d()).width).toBeCloseTo(0.6);
+  await setRange(page, '虛線與文字距離', 300);
+  expect((await d()).gap).toBeCloseTo(3);
+  await setRange(page, '虛線與文字距離', -100);
+  expect((await d()).gap).toBeCloseTo(-1);
+
+  // 愛心大小 20%～400%；星星也一樣
+  await page.getByRole('button', { name: '裝飾 愛心' }).tap();
+  expect(await range('愛心大小')).toEqual({ min: 20, max: 400 });
+  await expect(page.getByRole('slider', { name: '愛心長度', exact: true })).toHaveCount(0); // 沒有長度的裝飾不顯示
+  await setRange(page, '愛心大小', 400);
+  const heart = (await decos(page)).find((x) => x.kind === 'hearts') as { scale?: number };
+  expect(heart.scale).toBeCloseTo(4);
+  await page.getByRole('slider', { name: '愛心透明度', exact: true }).waitFor();
+
+  // 尾端圈圈：長度只縮直線段
+  await page.getByRole('button', { name: '裝飾 尾端圈圈' }).tap();
+  await setRange(page, '尾端圈圈長度', 30);
+  expect(((await decos(page)).find((x) => x.kind === 'tail-loop') as { length?: number }).length).toBeCloseTo(
+    0.3,
+  );
+  await expect(page.getByRole('radiogroup', { name: '尾端圈圈靠哪一邊' })).toHaveCount(0);
+});

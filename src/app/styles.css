@@ -1272,41 +1272,132 @@ button {
   min-width: 0;
   min-height: 0;
 }
-.color-custom {
+.color-actions {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  margin: 6px 0 2px;
+  margin-top: 4px;
 }
 .custom-btn {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  overflow: hidden;
-  background: #2a2a2e;
+  gap: 6px;
 }
-.custom-btn input[type='color'] {
-  position: absolute;
+.custom-dot {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+}
+
+/* 自訂顏色彈窗 */
+.color-popup-backdrop {
+  position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  opacity: 0;
-  cursor: pointer;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  touch-action: none;
 }
-.hex-input {
+.color-popup {
+  width: min(100%, 420px);
+  max-height: 100%;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--panel);
+  border-radius: 20px;
+  touch-action: pan-y;
+}
+.cp-sv,
+.cp-hue {
+  position: relative;
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 12px;
+}
+.cp-sv {
+  height: 220px;
+  background-image:
+    linear-gradient(to top, #000, rgba(0, 0, 0, 0)), linear-gradient(to right, #fff, rgba(255, 255, 255, 0));
+}
+.cp-hue {
+  height: 32px;
+  margin-top: 12px;
+  background: linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00);
+}
+.cp-cursor {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  pointer-events: none;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.cp-cursor.hue {
+  top: 50%;
+}
+.cp-compare {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+.cp-swatch {
   flex: 1;
-  min-height: 44px;
-  padding: 0 12px;
-  font-size: 16px;
-  font-family: ui-monospace, monospace;
-  color: #fff;
-  background: #111;
-  border: 1px solid #444;
+  height: 48px;
+  display: flex;
+  align-items: flex-end;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid #555;
   border-radius: 10px;
 }
-.more-colors {
-  margin-top: 4px;
+.cp-swatch span {
+  padding: 0 6px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 6px;
+}
+.cp-hex {
+  align-self: center;
+  min-width: 76px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.cp-channel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.cp-channel input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}
+.cp-ch-label {
+  width: 14px;
+  font-weight: 700;
+}
+.cp-step {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  color: var(--fg);
+  background: #2a2a2e;
+  border-radius: 10px;
+}
+.cp-val {
+  width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 物件的觸控區：看不見，位置／大小／旋轉跟選取框一樣（最小 44px）；按在上面才是拖物件，其他地方上下滑是捲頁面 */
