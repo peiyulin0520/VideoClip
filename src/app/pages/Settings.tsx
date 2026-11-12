@@ -1,4 +1,5 @@
 import { APP_VERSION } from '../pwa';
+import { GiphyKeySetup } from '../editor/GiphyPanel';
 import { ChevronLeft, Download, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -238,6 +239,11 @@ export function Settings() {
           {persisted === true && '瀏覽器已承諾不會自動清掉這些資料。'}
           {persisted === false && '瀏覽器可能在空間不足時清掉資料。iPhone 請「加入主畫面」，並定期備份。'}
         </p>
+      </section>
+
+      <section aria-label="GIPHY 貼圖">
+        <h2>GIPHY 貼圖</h2>
+        <GiphyKeySetup />
       </section>
 
       <section aria-label="素材授權">

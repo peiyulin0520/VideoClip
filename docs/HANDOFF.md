@@ -87,6 +87,8 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 | TypeScript 5.9 | typescript-eslint 不支援 ≥ 6.1 |
 | 新專案比例預設「自動：跟主軌第一個素材」，編輯器頂列可隨時改（可復原）；比例多加 3:4、4:3 | 使用者 2026-11-11 選 A；位置/大小本來就是「佔畫面比例」，改比例不用搬資料 |
 | （2026-11-11 使用者更正）整頁往下捲：預覽在最上面、大小永遠不變，往下滑是時間軸／分頁／設定，往上滑回來看預覽；選取框只留框線、雙指縮放旋轉（取代四角點／旋轉點／時間軸精簡） | 使用者：「頁面可以整體往下滑新增功能，但往上滑可以看到不會縮小的預覽畫面」「選取框一率不需要小圓點」 |
+| GIPHY key 只存在使用者手機的 localStorage，絕不進 repo；搜尋結果不存 | repo 公開；使用者要求 |
+| 我的素材庫（IndexedDB `library`）：自己上傳的貼圖跨專案共用 | 使用者要求；之後畫好的圖也放這裡 |
 | 貼圖＝Fluent Emoji（npm iconify 套件，MIT），點了畫成 512px PNG 當照片素材 | GitHub 被擋拿不到原始 repo；當照片素材就能沿用拖移／縮放／圖層／匯出 |
 | 選取框用「看得到的內容」（`selectionBox`：字塊∪文字含描邊∪裝飾），渲染仍用整張畫布 | 畫布為了裝飾/陰影對稱多留透明邊，選取框會比看得到的大很多 |
 | 預覽選取操作：四角小點縮放＋上方旋轉點，沒有 ✕ 與大圓鈕；文字面板／疊加／圖層展開時時間軸精簡；全螢幕預覽 | 使用者：預覽太小、icon 太大；iPhone 13 實測預覽只佔 40% |
@@ -127,6 +129,8 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 > 坑：e2e 的雙指／觸控用 CDP `Input.dispatchTouchEvent`（helpers 的 `pinch`、`touchDrag`）；觸控滑動後有慣性捲動，要等停下再量 `scrollY`。整頁捲動後，用滑鼠座標的測試要先 `previewBox`（捲回頂端）或 `showTimeline`。
 
 > 坑（2026-11-12）：PWA 預快取讓 iPhone 一直開到舊版，使用者回報的錯誤可能是舊版的。現在 `src/app/pwa.ts` 會在開網頁／回前景時檢查新版並自動重新整理；請使用者回報時先看「設定 → 版本」。
+
+> 坑（2026-11-12）：e2e 讀 `window.__videoclip` 的 helper 一定要先 `waitHook`（預覽引擎晚建好時會讀到 undefined，造成偶發失敗）。iPhone 上 Safari 和「加入主畫面」的 App 資料是分開的。
 
 ## 6. 現況與下一步
 **已完成**（細節與驗證看 PROGRESS.md 日誌）：Phase 0（骨架/PWA/部署）、Phase 1（專案管理＋多影片拼接）、Phase 2（多圖層＋選取框手勢＋圖層屬性）、Phase 3B（字體管線＋首次使用精靈＋設定頁＋字體選單＋匯入字體）。

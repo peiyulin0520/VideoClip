@@ -5,6 +5,8 @@ import { STICKER_CATS, STICKER_SOURCE, stickerLabel, stickerToPng, stickerUrl } 
 import { addOverlayClips } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
+import { GiphyPanel } from './GiphyPanel';
+import { MyStickers } from './MyStickers';
 
 /** 貼圖大小：佔畫面寬度的比例（疊加素材預設 50%，貼圖小一點） */
 const STICKER_SCALE = 0.3;
@@ -36,40 +38,52 @@ export async function addSticker(name: string): Promise<string | null> {
   }
 }
 
+const GIPHY_TAB = 'GIPHY';
+const MINE_TAB = '我的貼圖';
+
 export function StickerPicker() {
   const [cat, setCat] = useState(STICKER_CATS[0]!.name);
   const items = STICKER_CATS.find((c) => c.name === cat)?.items ?? [];
+  const tabs = [MINE_TAB, GIPHY_TAB, ...STICKER_CATS.map((c) => c.name)];
   return (
     <div className="sticker-picker">
       <div className="chips cat-chips" role="tablist" aria-label="貼圖分類">
-        {STICKER_CATS.map((c) => (
+        {tabs.map((name) => (
           <button
-            key={c.name}
+            key={name}
             role="tab"
-            aria-selected={cat === c.name}
-            className={`chip sm${cat === c.name ? ' active' : ''}`}
-            onClick={() => setCat(c.name)}
+            aria-selected={cat === name}
+            className={`chip sm${cat === name ? ' active' : ''}`}
+            onClick={() => setCat(name)}
           >
-            {c.name}
+            {name}
           </button>
         ))}
       </div>
-      <div className="sticker-grid" data-testid="sticker-grid">
-        {items.map((n) => (
-          <button
-            key={n}
-            className="sticker-cell"
-            aria-label={`貼圖 ${stickerLabel(n)}`}
-            data-sticker={n}
-            onClick={() => void addSticker(n)}
-          >
-            <img src={stickerUrl(n)} alt="" loading="lazy" draggable={false} />
-          </button>
-        ))}
-      </div>
-      <p className="hint small">
-        貼圖：Microsoft Fluent Emoji（{STICKER_SOURCE.license} 授權）。點一下加到目前這一秒。
-      </p>
+      {cat === MINE_TAB ? (
+        <MyStickers />
+      ) : cat === GIPHY_TAB ? (
+        <GiphyPanel />
+      ) : (
+        <>
+          <div className="sticker-grid" data-testid="sticker-grid">
+            {items.map((n) => (
+              <button
+                key={n}
+                className="sticker-cell"
+                aria-label={`貼圖 ${stickerLabel(n)}`}
+                data-sticker={n}
+                onClick={() => void addSticker(n)}
+              >
+                <img src={stickerUrl(n)} alt="" loading="lazy" draggable={false} />
+              </button>
+            ))}
+          </div>
+          <p className="hint small">
+            貼圖：Microsoft Fluent Emoji（{STICKER_SOURCE.license} 授權）。點一下加到目前這一秒。
+          </p>
+        </>
+      )}
     </div>
   );
 }
