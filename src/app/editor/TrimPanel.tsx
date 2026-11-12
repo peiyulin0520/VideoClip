@@ -4,6 +4,7 @@ import type { Asset, Track, VideoItem } from '../../model/types';
 import { setTrimWindow, setTrimWindowFree } from '../../engine/timeline';
 import { setMainItems, setTrackItems } from '../../store/projectStore';
 import { useUI } from '../../store/uiStore';
+import { Wave } from './Wave';
 
 // 修剪面板：整段素材攤開（縮圖條），中間的「選取窗」是要留下來的區段。拖兩側把手改頭尾、拖中間整段平移，
 // 下面的按鈕一次調 1 秒。片段在時間軸上的位置（含前面的空白）不變，只有長度改變。
@@ -83,9 +84,15 @@ export function TrimPanel({
   const right = (srcEnd / dur) * 100;
   return (
     <div className="panel trim-panel" role="group" aria-label="修剪" data-testid="trim-panel">
-      <div className="trim-strip" ref={stripRef} data-testid="trim-strip">
+      <div
+        className={`trim-strip${asset.kind === 'audio' ? ' is-audio' : ''}`}
+        ref={stripRef}
+        data-testid="trim-strip"
+      >
         <div className="trim-tiles" aria-hidden="true">
-          {asset.thumbs.length > 0 ? (
+          {asset.kind === 'audio' ? (
+            <Wave wave={asset.wave} from={0} to={asset.duration} />
+          ) : asset.thumbs.length > 0 ? (
             asset.thumbs.map((t, i) => <img key={i} src={t} alt="" draggable={false} />)
           ) : (
             <span className="trim-nothumb">{asset.name}</span>

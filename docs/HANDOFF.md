@@ -102,6 +102,10 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 
 ## 5. 踩過的坑（避免再踩）
 
+- **背景音樂（audio 軌）**：`TrackKind` 多了 `'audio'`，音樂是 `VideoItem` 的 `type: 'audio'`（有 `trimIn`、`volume`、`fadeIn`／`fadeOut`，`transform`、`fit` 只是湊欄位）。所以所有「自由軌」的分割、複製、修剪、移動、軌道選單都直接沿用。要記得的幾個地方：`layersAt`／`scene`／`itemBox` 對音樂回傳沒有畫面；`totalDuration` **不算**音樂（音樂比影片長就在影片結束時切掉）；`Asset.kind='audio'`、`Asset.wave`（每 0.1 秒一個 0–100 的值，匯入時 `engine/wave.ts` 算）。預覽：`Player` 多一個 `<audio>` 池（`VideoPool(…, 'audio')`，3 個），`syncMusic` 跟著時間軸對時；聲音走跟影片同一個 `AudioOut`（音量可到 200%、淡入淡出用 `fadeGain` 每格算）。匯出：`mixAudio` 每個物件一個 `GainNode`，音量與淡入淡出用 `setValueAtTime`／`linearRampToValueAtTime`。**沒做循環**（音樂比影片短就用「複製」接起來）。
+- 驗證聲音用 `AudioOut.level()` 時，e2e 要先注入 `navigator.audioSession`，否則 iPhone 模擬的 UA 會走「直接用元素出聲」的路徑（量不到）。
+- `npx tsc --noEmit -p .` 不會真的檢查（專案是 solution-style tsconfig），要用 `npx tsc -b`（`npm run build` 內也有）。
+
 - **匯出整支影片**（`engine/exporter.ts`、`app/editor/ExportSheet.tsx`）：不播放，一格一格依時間走。影片格用 Mediabunny `CanvasSink.getCanvas(t)`（WebCodecs；解不了才退到 `<video>` seek），畫面走跟預覽同一套 `buildScene`＋`Compositor`（輸出解析度），`CanvasSource` 編碼；聲音用 `OfflineAudioContext` 依時間軸（開始時間、修剪、速度、音量、靜音／隱藏軌道）一次混好，`AudioBufferSource` 編碼；`chooseFormat` 決定封裝：H.264＋AAC→MP4；編不出 AAC→**無聲 MP4＋明講**；編不出 H.264→WebM（VP9＋Opus，測試用）。輸出寫到 OPFS 暫存檔（`StreamTarget`，沒有 OPFS 才用記憶體），關閉面板／取消／出錯都會刪，啟動時 `cleanupExportTemp()` 再清一次。沙盒 Chromium 能編 H.264 但**編不出 AAC**，所以測聲音要用 `preferWebm`（只給測試）。除錯掛鉤 `exportAndInspect` 匯出後用 Mediabunny 讀回來檢查。
 - 無頭 Chromium 下載中文檔名時 `suggestedFilename()` 會變成 `download`（真的瀏覽器不會），e2e 不要斷言檔名。
 

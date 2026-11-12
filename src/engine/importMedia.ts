@@ -88,13 +88,14 @@ export async function importFiles(
         const asset: Asset = {
           id,
           name: file.name,
-          mime: file.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg'),
+          mime:
+            file.type || (kind === 'video' ? 'video/mp4' : kind === 'audio' ? 'audio/mpeg' : 'image/jpeg'),
           size: file.size,
           ...probed.info,
           ...(stored === 'memory' ? { unsaved: true } : {}),
         };
         result.assets.push(asset);
-        result.clips.push(createClip(asset));
+        if (kind !== 'audio') result.clips.push(createClip(asset)); // 音樂不是主軌片段，呼叫端自己放到音樂軌
         if (stored === 'memory')
           result.warnings.push(
             `${file.name}（${mb(file.size)}）沒辦法存在手機裡，可以先剪輯，但關掉網頁後要重新匯入`,

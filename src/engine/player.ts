@@ -1,6 +1,6 @@
 import type { Asset, Project, Track, VideoItem } from '../model/types';
 import { frameIndexAt, loadAnim, peekAnim } from './animImage';
-import { AudioOut, isIOSDevice } from './audio';
+import { AudioOut, fadeGain, isIOSDevice } from './audio';
 import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
 import { captureThumb } from './probe';
@@ -23,6 +23,7 @@ const HARD_DRIFT = 0.5;
 const SOFT_DRIFT = 0.04;
 const PREFETCH_S = 1.0;
 const POOL_SIZE = 6;
+const MUSIC_POOL_SIZE = 3;
 
 /** 播放中對時：diff = 該在的位置 − 影片目前位置（正的＝影片落後） */
 export function driftPlan(diff: number, speed: number, soft = true): { seek: boolean; rate: number } {
@@ -75,6 +76,7 @@ export class Player {
   private constructor(
     readonly compositor: Compositor,
     private pool: VideoPool,
+    private music: VideoPool,
     private deps: Deps,
     readonly audio: AudioOut = new AudioOut(),
   ) {}
@@ -85,7 +87,8 @@ export class Player {
     const compositor = await Compositor.create({ ...size, canvas: opts.canvas });
     let player: Player | null = null;
     const pool = new VideoPool(opts.host, POOL_SIZE, () => player?.scheduleRender());
-    player = new Player(compositor, pool, opts);
+    const music = new VideoPool(opts.host, MUSIC_POOL_SIZE, () => {}, 'audio');
+    player = new Player(compositor, pool, music, opts);
     return player;
   }
 
@@ -138,6 +141,7 @@ export class Player {
     this.tStart = this.t;
     this.render(this.t); // 目前要播的影片在這裡同步 play()（還在點擊裡）
     this.pool.unlock(); // 其他停著等著的影片也趁現在解鎖
+    this.music.unlock(); // 背景音樂的 <audio> 也一樣要在點擊裡解鎖
     this.emit();
     this.raf = requestAnimationFrame(this.tick);
   }
@@ -252,7 +256,8 @@ export class Player {
 
   private syncVideo(el: HTMLVideoElement, item: VideoItem, asset: Asset, track: Track, t: number) {
     const s = sourceTimeAt(item, t);
-    this.audio.apply(el, item.volume, !!track.muted || !asset.hasAudio);
+    const vol = item.volume * fadeGain(t - item.start, item.duration, item.fadeIn, item.fadeOut);
+    this.audio.apply(el, vol, !!track.muted || !asset.hasAudio);
     if (this.playing) {
       const plan = driftPlan(s - el.currentTime, item.speed, !IOS);
       if (plan.seek) el.currentTime = s;
@@ -267,6 +272,39 @@ export class Player {
       if (!el.paused) el.pause();
       if (Math.abs(el.currentTime - s) > 0.02) el.currentTime = s;
     }
+  }
+
+  /** 背景音樂：現在這一秒有的音樂各用一個 <audio>，跟著時間軸播放／暫停／對時 */
+  private syncMusic(p: Project, t: number) {
+    const used = new Set<HTMLVideoElement>();
+    for (const track of p.tracks) {
+      if (track.kind !== 'audio' || track.hidden) continue;
+      for (const it of track.items as VideoItem[]) {
+        if (t < it.start || t >= it.start + it.duration) continue;
+        const asset = p.assets.find((a) => a.id === it.assetId);
+        const url = asset && this.deps.urlFor(asset.id);
+        if (!asset || !url) continue;
+        const el = this.music.acquire(it.id, asset.id, url, used);
+        if (!el) continue;
+        used.add(el);
+        const s = it.trimIn + (t - it.start);
+        const vol = it.volume * fadeGain(t - it.start, it.duration, it.fadeIn, it.fadeOut);
+        this.audio.apply(el, vol, !!track.muted);
+        if (this.playing) {
+          const plan = driftPlan(s - el.currentTime, 1, !IOS);
+          if (plan.seek) el.currentTime = s;
+          if (el.playbackRate !== plan.rate) el.playbackRate = plan.rate;
+          if (el.paused)
+            el.play().catch((e: unknown) => {
+              if (e instanceof DOMException && e.name === 'NotAllowedError' && !el.muted) this.blocked();
+            });
+        } else {
+          if (!el.paused) el.pause();
+          if (Math.abs(el.currentTime - s) > 0.05) el.currentTime = s;
+        }
+      }
+    }
+    this.music.pauseAllExcept(used);
   }
 
   private blocked() {
@@ -343,6 +381,7 @@ export class Player {
       if (!el.paused) el.pause();
     }
     this.pool.pauseAllExcept(used);
+    this.syncMusic(p, t);
     const t1 = performance.now();
     comp.render(scene);
     const t2 = performance.now();
@@ -418,6 +457,7 @@ export class Player {
     this.playing = false;
     this.listeners.clear();
     this.pool.destroy();
+    this.music.destroy();
     this.audio.destroy();
     this.compositor.destroy();
   }

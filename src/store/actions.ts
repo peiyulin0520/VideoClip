@@ -1,13 +1,14 @@
 import type { Draft } from 'immer';
 import {
   assignAspect,
+  createAudioClip,
   createOverlayClip,
   createShapeItem,
   createTextItem,
   createTrack,
   pickAspect,
 } from '../model/defaults';
-import type { Aspect, Asset, Item, TextItem, Track, Transform, VideoItem } from '../model/types';
+import type { Aspect, Asset, Item, Project, TextItem, Track, Transform, VideoItem } from '../model/types';
 import {
   duplicateFree,
   duplicateItem,
@@ -23,6 +24,7 @@ import {
   reorderTrack,
   splitFree,
   splitItem,
+  totalDuration,
 } from '../engine/timeline';
 import { useProjectStore } from './projectStore';
 
@@ -75,6 +77,43 @@ export function addOverlayClips(assets: Asset[], t: number, opts: { scale?: numb
   });
   if (firstId) store().select(firstId);
   return firstId;
+}
+
+/** 背景音樂：放在播放頭這一秒（最長到專案結束），放在音樂軌；同一時間有別的音樂就開新的音樂軌 */
+export function addMusic(assets: Asset[], t: number): string | null {
+  if (assets.length === 0) return null;
+  const total = totalDuration(store().project!);
+  let firstId: string | null = null;
+  store().apply((d) => {
+    for (const asset of assets) if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    for (const asset of assets) {
+      const start = Math.min(Math.max(t, 0), Math.max(total - 0.5, 0));
+      const dur = Math.max(Math.min(asset.duration, total - start), 0.5);
+      const clip = createAudioClip(asset, start, dur);
+      let ti = firstFreeTrack(d as never, 'audio', clip.start, clip.duration);
+      if (ti < 0) {
+        d.tracks.push(createTrack('audio', d.tracks as Track[]));
+        ti = d.tracks.length - 1;
+      }
+      d.tracks[ti]!.items.push(clip);
+      firstId ??= clip.id;
+    }
+  });
+  if (firstId) store().select(firstId);
+  return firstId;
+}
+
+/** 影片的軌道（主軌、疊加）是不是全部靜音了 */
+export function videoTracksMuted(p: Project): boolean {
+  const tracks = p.tracks.filter((t) => (t.kind === 'main' || t.kind === 'overlay') && t.items.length > 0);
+  return tracks.length > 0 && tracks.every((t) => !!t.muted);
+}
+
+/** 一鍵把所有影片（主軌、疊加）的聲音關掉／恢復；背景音樂不受影響。一步復原。 */
+export function setAllVideoMuted(muted: boolean) {
+  store().apply((d) => {
+    for (const t of d.tracks) if (t.kind === 'main' || t.kind === 'overlay') t.muted = muted;
+  });
 }
 
 export function addText(t: number, shape = false): string {

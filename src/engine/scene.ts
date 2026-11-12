@@ -44,6 +44,7 @@ function toLayer(
   ctx: GeoCtx,
   provide: SourceProvider,
 ): SceneLayer | null {
+  if (item.type === 'audio') return null;
   const box = itemBox(item, ctx);
   if (!box) return null;
   const common = {

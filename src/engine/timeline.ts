@@ -70,6 +70,7 @@ export function visibleLayers(p: Project, t: number): Layer[] {
 export function layersAt(p: Project, t: number, includeHidden: boolean): Layer[] {
   const out: Layer[] = [];
   p.tracks.forEach((track, trackIndex) => {
+    if (track.kind === 'audio') return; // 音樂沒有畫面
     if (track.hidden && !includeHidden) return;
     if (track.kind === 'main') {
       const hit = itemAt(track.items as VideoItem[], t);
@@ -83,9 +84,11 @@ export function layersAt(p: Project, t: number, includeHidden: boolean): Layer[]
   return out;
 }
 
+/** 專案長度＝影片、照片、文字、貼圖最後結束的時間；背景音樂不算（音樂比影片長就在影片結束時切掉） */
 export function totalDuration(p: Project): number {
   return p.tracks.reduce(
-    (max, tr) => tr.items.reduce((m, it) => Math.max(m, it.start + it.duration), max),
+    (max, tr) =>
+      tr.kind === 'audio' ? max : tr.items.reduce((m, it) => Math.max(m, it.start + it.duration), max),
     0,
   );
 }
@@ -343,11 +346,11 @@ export function trimStartFree(items: Item[], id: string, delta: number): Item[] 
     if (it.id !== id) return it;
     const { prevEnd } = neighbors(items, it);
     let lo = prevEnd - it.start; // 最多往前延伸到這裡（負值）
-    if (isVideoItem(it) && it.type === 'video') lo = Math.max(lo, -it.trimIn / it.speed);
+    if (isVideoItem(it) && it.type !== 'image') lo = Math.max(lo, -it.trimIn / it.speed);
     const hi = it.duration - MIN_CLIP_DURATION;
     const d = Math.min(Math.max(delta, lo), hi);
     const next = { ...it, start: it.start + d, duration: it.duration - d };
-    if (isVideoItem(it) && it.type === 'video') (next as VideoItem).trimIn = it.trimIn + d * it.speed;
+    if (isVideoItem(it) && it.type !== 'image') (next as VideoItem).trimIn = it.trimIn + d * it.speed;
     return next;
   });
 }

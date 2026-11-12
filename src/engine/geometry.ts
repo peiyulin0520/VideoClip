@@ -58,6 +58,7 @@ export function selectionBox(item: Item, ctx: GeoCtx): Box | null {
 }
 
 export function itemBox(item: Item, ctx: GeoCtx): Box | null {
+  if (item.type === 'audio') return null; // 背景音樂沒有畫面
   const { canvasW: cw, canvasH: ch } = ctx;
   const { x, y, scale, rotation } = item.transform;
   let w: number;

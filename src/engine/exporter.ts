@@ -19,6 +19,7 @@ import {
 import type { Asset, Project, VideoItem } from '../model/types';
 import { getMedia } from '../storage/media';
 import { animBitmapAt } from './animImage';
+import { fadeSpans } from './audio';
 import { Compositor } from './compositor';
 import { buildScene } from './scene';
 import { sourceTimeAt, totalDuration, visibleLayers } from './timeline';
@@ -205,7 +206,7 @@ export function audibleItems(project: Project): { item: VideoItem; asset: Asset 
   for (const track of project.tracks) {
     if (track.kind === 'text' || track.muted || track.hidden) continue;
     for (const it of track.items) {
-      if (it.type !== 'video' || it.volume <= 0) continue;
+      if ((it.type !== 'video' && it.type !== 'audio') || it.volume <= 0) continue; // 影片與背景音樂
       const asset = project.assets.find((a) => a.id === it.assetId);
       if (asset?.hasAudio) out.push({ item: it, asset });
     }
@@ -232,6 +233,17 @@ async function mixAudio(
       const track = await input.getPrimaryAudioTrack();
       if (!track || !(await track.canDecode())) continue;
       const sink = new AudioBufferSink(track);
+      // 這個物件自己一個音量節點：音量、淡入淡出都在這裡（時間單位是時間軸秒數）
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      const { fi, fo } = fadeSpans(item.duration, item.fadeIn, item.fadeOut);
+      const endAt = item.start + item.duration;
+      gain.gain.setValueAtTime(fi > 0 ? 0 : item.volume, item.start);
+      if (fi > 0) gain.gain.linearRampToValueAtTime(item.volume, item.start + fi);
+      if (fo > 0) {
+        gain.gain.setValueAtTime(item.volume, endAt - fo);
+        gain.gain.linearRampToValueAtTime(0, endAt);
+      }
       const srcStart = item.trimIn;
       const srcEnd = item.trimIn + item.duration * item.speed;
       for await (const wb of sink.buffers(srcStart, srcEnd)) {
@@ -241,9 +253,7 @@ async function mixAudio(
         const node = ctx.createBufferSource();
         node.buffer = wb.buffer;
         node.playbackRate.value = item.speed;
-        const gain = ctx.createGain();
-        gain.gain.value = item.volume;
-        node.connect(gain).connect(ctx.destination);
+        node.connect(gain);
         node.start(item.start + (from - srcStart) / item.speed, from - wb.timestamp, to - from);
         any = true;
       }

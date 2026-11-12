@@ -5,7 +5,7 @@ export type Aspect = '9:16' | '16:9' | '1:1' | '3:4' | '4:3';
 
 export type Asset = {
   id: string;
-  kind: 'video' | 'image';
+  kind: 'video' | 'image' | 'audio';
   name: string;
   mime: string;
   size: number; // bytes
@@ -15,6 +15,8 @@ export type Asset = {
   hasAudio: boolean;
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
+  /** 音樂素材：音量波形，每 0.1 秒一個值（0–100），給時間軸畫波形用 */
+  wave?: number[];
   /** 會動的圖片（GIF／動態 WebP，例如 GIPHY 貼圖）：格數與一圈的長度（秒）；沒有＝一般照片 */
   anim?: { frames: number; duration: number };
   /** 影片的編碼（'avc'、'hevc'、'vp9'…）與是不是 HDR；匯入時讀容器得到，舊專案沒有 */
@@ -49,11 +51,15 @@ export type ItemBase = {
 };
 
 export type VideoItem = ItemBase & {
-  type: 'video' | 'image';
+  /** audio＝背景音樂（只放在 audio 軌，沒有畫面） */
+  type: 'video' | 'image' | 'audio';
   assetId: string;
   trimIn: number; // 素材內的起點（秒）
   speed: number; // 0.25–4；照片固定 1
-  volume: number; // 0–1
+  volume: number; // 0–2（200%）
+  /** 聲音淡入／淡出的秒數（影片與音樂都能用）；沒有＝0 */
+  fadeIn?: number;
+  fadeOut?: number;
   fit: 'cover' | 'contain';
   /** 自由形狀裁切：多邊形的點，座標是「原始素材畫面」的比例 0–1（只留多邊形裡面，外面透明） */
   mask?: [number, number][];
@@ -174,7 +180,7 @@ export type TextItem = ItemBase & { type: 'text'; card: TextCard };
 export type Item = VideoItem | TextItem;
 
 /** 軌道由下往上排列 = 圖層順序；index 0 一定是主軌 */
-export type TrackKind = 'main' | 'overlay' | 'text';
+export type TrackKind = 'main' | 'overlay' | 'text' | 'audio';
 
 export type Track = {
   id: string;

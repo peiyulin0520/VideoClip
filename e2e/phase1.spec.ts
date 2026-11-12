@@ -125,7 +125,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
 
   // 音量：靜音
   await page.getByRole('button', { name: '音量' }).tap();
-  await page.getByRole('button', { name: '靜音', exact: true }).tap();
+  await page.getByRole('button', { name: '關閉聲音', exact: true }).tap();
   await expect(page.getByTestId('volume-value')).toHaveText('0%');
   await page.getByRole('button', { name: '完成' }).tap();
   await expect(clips(page).nth(1)).toContainText('靜音');

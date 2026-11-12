@@ -6,9 +6,9 @@
 - **日期**：2026-11-11
 - **分支**：PR #6（播放順暢＋聲音、裝飾長度／透明度、選色彈窗）**已由使用者合併進 `main`**（2026-11-12）；`claude/zen-tesla-v3brj5` 已 `git merge --ff-only origin/main` 對齊
 - **最後一個程式 commit**：見 `git log -1`（GIPHY 貼圖、我的貼圖素材庫、精靈說明）
-- **測試**：647 個單元測試、102 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
+- **測試**：658 個單元測試、110 個 e2e（iPhone 13 尺寸、Chromium）、lint、build 全過
 - **階段**：Phase 0–2 ✅、3B ✅、實測修正 A–D ✅、第 2 次實測修正 ①–⑤ ✅、預覽優先版面 ✅（Chromium 驗證，iPhone 待真機）；Phase 3A 第 1–4 步 ✅（含貼圖 icon），5（雲朵字）、6（字卡模板）未做；**新需求：拍貼機／膠卷等多格影片模板（規劃中）**；Phase 4–7 未開始
-- **下一步**：feedback-5 ①～⑥ 與 feedback-4 的 **B 匯出影片**（頂列「匯出影片」）都做完了（Chromium 驗證，iPhone 待真機）。**這些都還在分支上，沒有開 PR，網站與手機還是舊版 → 下一步是開 PR 讓使用者合併、用 iPhone 測**（尤其：設定頁「顯示播放效能」錄一段播放；匯出一支影片存到相簿）；還沒做 feedback-4 的 **C 音軌管理＋背景音樂**（匯出的混音已經支援每支影片的音量／靜音，加背景音樂時沿用 `mixAudio`）
+- **下一步**：feedback-5 ①～⑥、feedback-4 **B 匯出影片**與 **C 音軌管理＋背景音樂**都做完了（Chromium 驗證，iPhone 待真機）→ `docs/plans/2026-11-12-feedback-4.md` 與 feedback-5 的項目全部完成。**這些都還在分支上，沒有開 PR，網站與手機還是舊版 → 下一步是開 PR 讓使用者合併、用 iPhone 測**（尤其：設定頁「顯示播放效能」錄一段播放；匯出一支影片存到相簿；加背景音樂）。之後是：缺字體提示、人物去背、多格模板（R22）、介面主題、雲朵字、字卡模板、Google 備份（Phase 6）
 - **等使用者的事**
   - 缺檔字體：LINE Seed 繁中（3 檔，下載中斷）、致一宋體（下載中斷，授權還沒讀）、佮逸體（還沒給檔）。放到 `.font-cache/user/<manifest 的 file 路徑>`（見 `docs/FONTS.md §4`）
   - 要不要開 PR 合併（之後用 iPhone 重測）
@@ -68,6 +68,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-12 feedback-4 C：音軌管理＋背景音樂
+  - 做了什麼：①**背景音樂**：疊加分頁「加入背景音樂」（從「檔案」選 mp3／m4a／wav…），放在播放頭這一秒、最長到影片結束，放進新的**音樂軌**（時間軸有 ♪ 與音量波形）；音樂可以分割、複製、刪除、拖移、用時間軸把手或「修剪」面板（也有波形）修剪；音樂比影片長會在影片結束時切掉，專案長度不被音樂拉長 ②**聲音面板**（原本的「音量」）：音量 0–200%（原本 0–100%）、「關閉聲音」「50%／100%／150%／200%」、**淡入／淡出**（0–5 秒，最長是長度的一半），影片與音樂都能用 ③「**全部影片靜音**」一鍵（影片的軌道靜音，音樂不受影響）與「恢復影片聲音」，一步復原 ④預覽：音樂用 `<audio>` 跟著時間軸播放、對時，走跟影片同一個 `AudioOut`（手機靜音模式下也有聲音、音量與淡入淡出每格算）⑤匯出：音樂與影片一起混音，每個物件的音量與淡入淡出用 `GainNode` 自動化；音量 0、靜音軌道不混 ⑥音樂軌道選單：靜音、刪除（沒有往上／往下一層）
+  - 動了哪些檔：新 `src/engine/wave.ts`、`src/app/editor/Wave.tsx`；`src/model/{types,defaults}.ts`（`Asset.kind='audio'`、`wave`、`type:'audio'`、`fadeIn/fadeOut`、`TrackKind='audio'`）、`src/engine/{timeline,geometry,scene,probe,importMedia,audio,mediaPool,player,exporter}.ts`、`src/store/actions.ts`（`addMusic`、`setAllVideoMuted`）、`src/app/editor/{Toolbar,Timeline,TrimPanel}.tsx`、`styles.css`；測試 `src/engine/music.test.ts`、`e2e/music.spec.ts`、`e2e/phase1.spec.ts`（「靜音」鈕改名「關閉聲音」）；新素材 `tests/fixtures/music-4s.wav`
+  - 驗證：✅ 單元（淡入淡出、音樂的資料與軌道規則：專案長度不算音樂／沒有畫面／修剪限制／哪些要出聲、音檔判斷、波形正規化）；✅ e2e（匯入音樂：波形、音樂軌、長度、專案長度不變；比影片長會被切；音樂工具列只有分割／刪除／複製／修剪／音量；音量 200%、關閉聲音、淡入淡出；分割／複製／刪除／修剪面板有波形；軌道選單靜音與刪除；預覽播放有聲音、軌道靜音就沒聲音；匯出：聲音在對的時間、淡入生效、音量一半約一半、關閉聲音沒有音軌；全部影片靜音；沒有影片不能加音樂）；全部 110 個 e2e、658 個單元、lint、build 過；截圖 `docs/screenshots/feedback-5/music-*.png`  🔴 iPhone 沒測：從「檔案」App 選音樂、音樂與影片同時播放（iOS 同時多個媒體元素）、靜音模式、匯出的 AAC 音樂  🔴 沒做：音樂循環（短音樂用「複製」接）、影片的聲音波形、每支影片單獨的「刪除音軌」（用「關閉聲音」＝音量 0 達成）
+  - 使用者的決定/回饋：「目前影片沒有音軌聲音，需要加入，並保留選項可自由刪除選擇各項影片之音軌，以及導入背景音樂之功能」
+  - 踩到的坑：`tsc --noEmit -p .` 沒真的檢查，要 `tsc -b`；e2e 量輸出音量要注入 `audioSession`，不然 iPhone 模擬走「元素出聲」量不到；音樂軌的 `trimStartFree` 會被前一段音樂擋住（只能往前拉到它結束）
+  - 下一步：開 PR 讓使用者合併，用 iPhone 測全部
 - 2026-11-12 feedback-4 B：匯出整支影片
   - 做了什麼：頂列新增「匯出影片」→ 面板選解析度（1080p／720p）、更新率（30／60）、畫質（標準／高），顯示輸出尺寸與預估檔案大小 → 開始匯出：進度條＋階段（準備／聲音／畫面／收尾）＋剩餘時間，可取消 → 完成後顯示尺寸、更新率、檔案大小、有沒有聲音，「儲存到相簿／分享」（`navigator.share({files})`，不支援就下載）、「下載檔案」。**引擎**：不播放，一格一格依時間走；影片格用 Mediabunny `CanvasSink` 取精準那一格，畫面走預覽同一套 `buildScene`＋`Compositor`，WebCodecs 編碼；聲音用 `OfflineAudioContext` 依時間軸混好（開始時間、修剪、速度、音量；靜音／隱藏軌道、音量 0、沒音軌的素材都不混）；MP4（H.264＋AAC），這個瀏覽器編不出 AAC 就輸出無聲 MP4 並明講，編不出 H.264 才用 WebM；輸出寫到 OPFS 暫存檔（不整支放記憶體），取消／出錯／關閉面板都清掉，啟動時再清一次殘留
   - 動了哪些檔：新 `src/engine/exporter.ts`、`src/app/editor/ExportSheet.tsx`；`src/app/pages/Editor.tsx`（頂列按鈕）、`src/engine/debug.ts`（`exportAndInspect`）、`src/main.tsx`（清暫存）、`styles.css`；測試 `src/engine/exporter.test.ts`、`e2e/export.spec.ts`

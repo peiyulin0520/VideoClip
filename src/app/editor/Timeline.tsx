@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Film, Layers, Lock, Plus, Type, Volume2, VolumeX } from 'lucide-react';
+import { Eye, EyeOff, Film, Layers, Lock, Music, Plus, Type, Volume2, VolumeX } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -22,6 +22,7 @@ import {
 } from '../../engine/timeline';
 import type { Asset, Item, Track, VideoItem } from '../../model/types';
 import { useProxyProgress } from '../../engine/proxyQueue';
+import { Wave } from './Wave';
 import { moveTrackTo, patchTrack, placeItem, removeTrack, shiftTrackLayer } from '../../store/actions';
 import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
@@ -466,6 +467,8 @@ export function Timeline({
                     <Film size={16} />
                   ) : track.kind === 'text' ? (
                     <Type size={16} />
+                  ) : track.kind === 'audio' ? (
+                    <Music size={16} />
                   ) : (
                     <Layers size={16} />
                   )}
@@ -507,7 +510,7 @@ export function Timeline({
                   return (
                     <div
                       key={it.id}
-                      className={`clip${selected ? ' selected' : ''}${dragging ? ' dragging' : ''}${it.type === 'text' ? ' is-text' : ''}${it.duration * pps < 80 ? ' short' : ''}`}
+                      className={`clip${selected ? ' selected' : ''}${dragging ? ' dragging' : ''}${it.type === 'text' ? ' is-text' : ''}${it.type === 'audio' ? ' is-audio' : ''}${it.duration * pps < 80 ? ' short' : ''}`}
                       data-testid="clip"
                       data-selected={selected}
                       data-item-id={it.id}
@@ -519,15 +522,21 @@ export function Timeline({
                       }}
                       onPointerDown={(e) => startItemGesture(e, it, track)}
                     >
-                      {isVideoItem(it) ? <Tiles item={it} asset={asset} pps={pps} h={h} /> : null}
+                      {it.type === 'audio' ? (
+                        <Wave wave={asset?.wave} from={it.trimIn} to={it.trimIn + it.duration} />
+                      ) : isVideoItem(it) ? (
+                        <Tiles item={it} asset={asset} pps={pps} h={h} />
+                      ) : null}
                       <div className="clip-label">
                         {it.type === 'text'
                           ? it.card.runs[0]?.text === ''
                             ? '圖形'
                             : `Aa ${it.card.runs[0]?.text.replace(/\n/g, ' ') ?? ''}`
-                          : `${it.type === 'image' ? '照片' : '影片'} ${it.duration.toFixed(1)}s`}
+                          : it.type === 'audio'
+                            ? `♪ ${asset?.name ?? '音樂'} ${it.duration.toFixed(1)}s`
+                            : `${it.type === 'image' ? '照片' : '影片'} ${it.duration.toFixed(1)}s`}
                         {isVideoItem(it) && it.speed !== 1 && ` · ${it.speed}x`}
-                        {isVideoItem(it) && it.type === 'video' && it.volume === 0 && ' · 靜音'}
+                        {isVideoItem(it) && it.type !== 'image' && it.volume === 0 && ' · 靜音'}
                         {asset && proxyProgress[asset.id] !== undefined && (
                           <span className="proxy-note" data-testid="proxy-note">
                             {' '}
@@ -613,26 +622,30 @@ export function Timeline({
             )}
             {menuTrack.kind !== 'main' && (
               <>
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    if (menuIndex >= project.tracks.length - 1) toast('已經在最上層');
-                    else shiftTrackLayer(menuTrack.id, 1);
-                    setMenuTrackId(null);
-                  }}
-                >
-                  ▲ 往上一層
-                </button>
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    if (menuIndex <= 1) toast('不能放到主軌下面');
-                    else shiftTrackLayer(menuTrack.id, -1);
-                    setMenuTrackId(null);
-                  }}
-                >
-                  ▼ 往下一層
-                </button>
+                {menuTrack.kind !== 'audio' && (
+                  <>
+                    <button
+                      className="menu-item"
+                      onClick={() => {
+                        if (menuIndex >= project.tracks.length - 1) toast('已經在最上層');
+                        else shiftTrackLayer(menuTrack.id, 1);
+                        setMenuTrackId(null);
+                      }}
+                    >
+                      ▲ 往上一層
+                    </button>
+                    <button
+                      className="menu-item"
+                      onClick={() => {
+                        if (menuIndex <= 1) toast('不能放到主軌下面');
+                        else shiftTrackLayer(menuTrack.id, -1);
+                        setMenuTrackId(null);
+                      }}
+                    >
+                      ▼ 往下一層
+                    </button>
+                  </>
+                )}
                 <button
                   className="menu-item danger"
                   onClick={() => {

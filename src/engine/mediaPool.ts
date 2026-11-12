@@ -6,9 +6,10 @@ export class VideoPool {
   readonly els: HTMLVideoElement[] = [];
   private tick = 0;
 
-  constructor(host: HTMLElement, size: number, onChange: () => void) {
+  /** tag：影片用 'video'；背景音樂用 'audio'（元素型別都當 HTMLVideoElement 用，音樂用不到 videoWidth） */
+  constructor(host: HTMLElement, size: number, onChange: () => void, tag: 'video' | 'audio' = 'video') {
     for (let i = 0; i < size; i++) {
-      const v = document.createElement('video');
+      const v = document.createElement(tag) as HTMLVideoElement;
       v.playsInline = true;
       v.muted = true;
       v.preload = 'auto';
