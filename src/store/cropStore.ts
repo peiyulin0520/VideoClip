@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { cropKeepingPlace, isNoCrop, NO_CROP, polygonCrop } from '../engine/crop';
 import { cellRect, cellTransform } from '../engine/layouts';
+import { composeWith } from '../engine/groupTransform';
 import { findItem, isVideoItem } from '../engine/timeline';
 import { geoCtx } from '../engine/scene';
 import { itemBox, aabb } from '../engine/geometry';
@@ -107,15 +108,23 @@ export function finishCrop() {
     if (isNoCrop(res.crop)) delete it.crop;
     else it.crop = res.crop;
     // 版型的格子：畫面一律填滿那個格子；其他物件：留下來的那塊位置大小不變
-    it.transform = item.cell
-      ? cellTransform(
-          asset,
-          res.crop,
-          cellRect(item.cell, project.width, project.height),
-          project.width,
-          project.height,
-        )
-      : res.transform;
+    if (item.cell) {
+      // 先算「版型還沒動過」時的格子位置，再套上整組目前的位置、大小、角度
+      const frame = project.tracks
+        .flatMap((t) => t.items)
+        .find((x) => x.type !== 'text' && x.group === item.group && !x.cell);
+      const base = cellTransform(
+        asset,
+        res.crop,
+        cellRect(item.cell, project.width, project.height),
+        project.width,
+        project.height,
+      );
+      it.transform =
+        frame && frame.type !== 'text'
+          ? composeWith(base, frame.transform, project.width, project.height)
+          : base;
+    } else it.transform = res.transform;
     if (s.mask && s.mask.length >= 3) it.mask = s.mask;
     else delete it.mask;
   });

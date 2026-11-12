@@ -363,6 +363,26 @@ export function removeGroup(group: string) {
   );
 }
 
+/** 版型整組動畫：不動／捲動／滑入滑出 */
+export function setGroupMotion(group: string, motion: 'drift' | 'slide' | undefined) {
+  const p = store().project;
+  const frame = p && groupFrame(p, group);
+  if (!frame) return;
+  editItem(frame.item.id, (it) => {
+    if (it.type === 'text') return;
+    if (motion) it.motion = motion;
+    else delete it.motion;
+  });
+}
+
+/** 版型某一格的素材放完（或這段是空位）時顯示的色塊：反黑或反白 */
+export function setCellFill(trackId: string, fill: 'black' | 'white') {
+  store().apply((d) => {
+    const t = d.tracks.find((x) => x.id === trackId);
+    if (t) t.fill = fill;
+  });
+}
+
 export function addText(t: number, shape = false): string {
   const item = shape ? createShapeItem(t) : createTextItem(t);
   store().apply((d) => {

@@ -42,6 +42,7 @@ export function LayoutPicker() {
   const project = useProjectStore((s) => s.project)!;
   const [def, setDef] = useState<LayoutDef | null>(null);
   const [colorId, setColorId] = useState('white');
+  const [motion, setMotion] = useState<'' | 'drift' | 'slide'>('');
   const input = useRef<HTMLInputElement>(null);
   const W = project.width;
   const H = project.height;
@@ -73,12 +74,22 @@ export function LayoutPicker() {
       const videoCells = cells.filter((c) => c.asset.kind === 'video').length;
       const maxVideo = Math.max(0, ...media.filter((a) => a.kind === 'video').map((a) => a.duration));
       const duration = maxVideo > 0 ? Math.min(Math.max(maxVideo, 1), 15) : 3;
+      const rs = b.panels.length ? b.panels : b.windows;
+      const l = Math.min(...rs.map((r) => r.x));
+      const tp = Math.min(...rs.map((r) => r.y));
       addLayout({
         cells,
         frame,
         start: player?.time ?? 0,
         duration,
-        frameName: `版型外框 · ${def.name}`,
+        frameName: def.name,
+        frameVisible: {
+          x: l,
+          y: tp,
+          w: Math.max(...rs.map((r) => r.x + r.w)) - l,
+          h: Math.max(...rs.map((r) => r.y + r.h)) - tp,
+        },
+        motion: motion || undefined,
       });
       setDef(null);
       toast(
@@ -86,7 +97,7 @@ export function LayoutPicker() {
           ? `版型加好了。同時播放超過 ${MAX_CELL_VIDEOS} 支影片，手機可能會卡，建議多放照片`
           : media.length > cells.length
             ? `版型加好了（有 ${cells.length} 格，只用了前 ${cells.length} 個素材）`
-            : `版型加好了。點時間軸上的格子可以個別調整，外框是鎖住的`,
+            : `版型加好了。整個版型一起縮放移動；再點一下預覽上的格子，可以選那一格要用的片段`,
         6000,
       );
     } finally {
@@ -136,6 +147,29 @@ export function LayoutPicker() {
                 >
                   <i className="frame-dot" style={{ background: c.color }} />
                   {c.name}
+                </button>
+              ))}
+            </div>
+            <div className="panel-head">
+              <span>動畫</span>
+            </div>
+            <div className="chips" role="radiogroup" aria-label="版型動畫">
+              {(
+                [
+                  ['', '不動'],
+                  ['drift', '捲動'],
+                  ['slide', '滑入滑出'],
+                ] as const
+              ).map(([id, name]) => (
+                <button
+                  key={id}
+                  role="radio"
+                  aria-checked={motion === id}
+                  aria-label={`動畫 ${name}`}
+                  className={`chip${motion === id ? ' active' : ''}`}
+                  onClick={() => setMotion(id)}
+                >
+                  {name}
                 </button>
               ))}
             </div>

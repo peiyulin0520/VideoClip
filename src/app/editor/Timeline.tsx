@@ -31,6 +31,7 @@ import {
   patchTrack,
   placeItem,
   removeTrack,
+  setGroupDuration,
   shiftTrackLayer,
 } from '../../store/actions';
 import { setTrackItems, useProjectStore } from '../../store/projectStore';
@@ -185,7 +186,11 @@ export function Timeline({
   const slotZone = draggedItem ? ZONE[trackKindOf(draggedItem)] : null;
   const showAll = expanded || !!drag; // 拖素材的時候全部展開（才找得到要放的軌道）
   const layout = useMemo(() => {
-    const all = project.tracks.map((track, index) => ({ track, index })).reverse();
+    // 版型的各格軌道藏起來（時間軸上由外框那一條代表整個版型）
+    const all = project.tracks
+      .map((track, index) => ({ track, index }))
+      .filter((r) => r.track.groupRole !== 'cell')
+      .reverse();
     const list = [
       ...all.filter((r) => r.track.kind !== 'audio'),
       ...all.filter((r) => r.track.kind === 'audio'),
@@ -477,7 +482,12 @@ export function Timeline({
         if (cancelled) return;
         const start = item.start + snapStart(dx).dx / pps;
         const target = targetFor(resolveHover(ev.clientY));
-        if (!target || (target.type === 'track' && target.trackId === track.id)) placeItem(item.id, start);
+        if (
+          !target ||
+          (target.type === 'track' && target.trackId === track.id) ||
+          track.groupRole === 'frame'
+        )
+          placeItem(item.id, start); // 版型只能左右移動（換時間），不換軌道
         else if (target.type === 'invalid')
           toast(`${KIND_LABEL[target.kind]}只能放在${KIND_LABEL[target.kind]}的軌道上，已放回原位`);
         else moveItemTo(item.id, target, start);
@@ -502,6 +512,12 @@ export function Timeline({
     target.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
       const delta = (ev.clientX - startX) / pps;
+      if (track.groupRole === 'frame' && isVideoItem(item) && item.group) {
+        // 版型：改整組的長度（各格超出的部分切掉）
+        setGroupDuration(item.group, item.duration + delta, { coalesce: `trim:${item.id}` });
+        player?.peek(item.start + Math.max(item.duration + delta, 0.5) - 0.05);
+        return;
+      }
       const next =
         side === 'start'
           ? trimStartFree(startItems, item.id, delta)
@@ -741,11 +757,13 @@ export function Timeline({
                       </div>
                       {selected && !dragging && !track.locked && (
                         <>
-                          <div
-                            className="handle left"
-                            data-testid="trim-start"
-                            onPointerDown={(e) => startTrim(e, it, track, 'start')}
-                          />
+                          {track.groupRole !== 'frame' && (
+                            <div
+                              className="handle left"
+                              data-testid="trim-start"
+                              onPointerDown={(e) => startTrim(e, it, track, 'start')}
+                            />
+                          )}
                           <div
                             className="handle right"
                             data-testid="trim-end"
