@@ -49,7 +49,14 @@ export class VideoPool {
     if (el.dataset.assetId !== assetId) {
       el.src = url;
       el.dataset.assetId = assetId;
+      el.dataset.url = url;
       delete el.dataset.primed;
+    } else if (el.dataset.url !== url && el.paused) {
+      // 同一個素材換了網址（預覽用輕量影片做好了）：停著的時候才換，播放中的等下次
+      const t = el.currentTime;
+      el.src = url;
+      el.dataset.url = url;
+      el.currentTime = t;
     }
     el.dataset.used = String(++this.tick);
     return el;

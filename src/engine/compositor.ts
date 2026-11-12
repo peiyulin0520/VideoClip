@@ -13,6 +13,21 @@ import type { BlendMode, Crop, Outline } from '../model/types';
 import type { Box } from './geometry';
 import { uiScale } from './textRender';
 
+/** 每個 <video> 已經呈現過幾個新畫面（requestVideoFrameCallback）；沒有這個 API 就回傳 null */
+const frameCounts = new WeakMap<HTMLVideoElement, number>();
+function videoFrameCount(v: HTMLVideoElement): number | null {
+  if (typeof v.requestVideoFrameCallback !== 'function') return null;
+  if (!frameCounts.has(v)) {
+    frameCounts.set(v, 0);
+    const loop = () => {
+      frameCounts.set(v, (frameCounts.get(v) ?? 0) + 1);
+      v.requestVideoFrameCallback(loop);
+    };
+    v.requestVideoFrameCallback(loop);
+  }
+  return frameCounts.get(v)!;
+}
+
 export type LayerSource = HTMLVideoElement | HTMLImageElement | HTMLCanvasElement | ImageBitmap;
 
 /** 一個要畫的圖層（由 scene.ts 依專案與時間算出）。座標都是合成器畫布的像素。 */
@@ -59,6 +74,8 @@ type Obj = {
 
 export class Compositor {
   private objs = new Map<string, Obj>();
+  /** 這一輪合成裡，影片貼圖上傳（update）花的毫秒；Player 讀走後歸零 */
+  private uploadMs = 0;
   private constructor(
     private app: Application,
     readonly width: number,
@@ -85,6 +102,12 @@ export class Compositor {
     });
     app.ticker.stop();
     return new Compositor(app, opts.width, opts.height);
+  }
+
+  takeUploadMs(): number {
+    const v = this.uploadMs;
+    this.uploadMs = 0;
+    return v;
   }
 
   get canvas(): HTMLCanvasElement {
@@ -192,11 +215,15 @@ export class Compositor {
       f.height = h;
       o.texture.update(); // 通知精靈：貼圖的範圍改了
     }
-    // 影片沒有新畫面（暫停、或螢幕更新比影片快）就不重新上傳
-    const uploadKey = `${v.currentTime}`;
+    // 影片沒有新畫面（暫停、或螢幕更新比影片快）就不重新上傳：播放中看「呈現過幾個新畫面」，
+    // 暫停（拖時間軸 seek）時看 currentTime（iPhone 播放中 currentTime 每次都不一樣，用它會每次都上傳）
+    const fc = v.paused ? null : videoFrameCount(v);
+    const uploadKey = fc === null ? `t${v.currentTime}` : `f${fc}`;
     if (!o.hasFrame || o.uploadKey !== uploadKey) {
       try {
+        const t0 = performance.now();
         o.textureSource?.update();
+        this.uploadMs += performance.now() - t0;
         o.hasFrame = true;
         o.uploadKey = uploadKey;
       } catch {

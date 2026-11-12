@@ -1,5 +1,5 @@
 import type { Asset, Project, Track, VideoItem } from '../model/types';
-import { AudioOut } from './audio';
+import { AudioOut, isIOSDevice } from './audio';
 import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
 import { captureThumb } from './probe';
@@ -17,16 +17,19 @@ type Deps = {
 type Listener = (t: number, playing: boolean) => void;
 
 /** 影片和時鐘差超過這個秒數才硬跳（會頓一下）；小的差距用 playbackRate 慢慢追 */
+const IOS = isIOSDevice();
 const HARD_DRIFT = 0.5;
 const SOFT_DRIFT = 0.04;
 const PREFETCH_S = 1.0;
 const POOL_SIZE = 6;
 
 /** 播放中對時：diff = 該在的位置 − 影片目前位置（正的＝影片落後） */
-export function driftPlan(diff: number, speed: number): { seek: boolean; rate: number } {
+export function driftPlan(diff: number, speed: number, soft = true): { seek: boolean; rate: number } {
   const a = Math.abs(diff);
   if (a > HARD_DRIFT) return { seek: true, rate: speed };
-  if (a > SOFT_DRIFT) return { seek: false, rate: speed * (1 + Math.max(-0.15, Math.min(0.15, diff * 0.5))) };
+  // soft=false（iPhone）：不微調播放速度——改 playbackRate 會讓 Safari 的解碼卡一下，小差距就讓它去
+  if (soft && a > SOFT_DRIFT)
+    return { seek: false, rate: speed * (1 + Math.max(-0.15, Math.min(0.15, diff * 0.5))) };
   return { seek: false, rate: speed };
 }
 
@@ -57,6 +60,14 @@ export class Player {
   private statMs = 0;
   private statFps = 0;
   private statAvgMs = 0;
+  private statBuild = 0;
+  private statComp = 0;
+  private statUpload = 0;
+  private accBuild = 0;
+  private accComp = 0;
+  private accUpload = 0;
+  private seg = { build: 0, comp: 0, upload: 0 };
+  private videoInfo = '';
 
   private constructor(
     readonly compositor: Compositor,
@@ -179,20 +190,48 @@ export class Player {
   private recordStats(renderStart: number) {
     const now = performance.now();
     this.statMs += now - renderStart;
+    this.accBuild += this.seg.build;
+    this.accComp += this.seg.comp;
+    this.accUpload += this.seg.upload;
     this.statFrames++;
     if (this.statSince === 0) this.statSince = now;
     if (now - this.statSince >= 1000) {
       this.statFps = (this.statFrames * 1000) / (now - this.statSince);
       this.statAvgMs = this.statMs / this.statFrames;
+      this.statBuild = this.accBuild / this.statFrames;
+      this.statComp = this.accComp / this.statFrames;
+      this.statUpload = this.accUpload / this.statFrames;
+      this.accBuild = this.accComp = this.accUpload = 0;
       this.statFrames = 0;
       this.statMs = 0;
       this.statSince = now;
     }
   }
 
-  /** 最近一秒的播放畫格數與每格平均合成時間（毫秒） */
-  stats(): { fps: number; renderMs: number } {
-    return { fps: this.statFps, renderMs: this.statAvgMs };
+  /** 最近一秒的播放畫格數與每格各段花的毫秒（算場景／影片上傳／整個合成）、掉格數、目前影片資訊 */
+  stats(): {
+    fps: number;
+    renderMs: number;
+    buildMs: number;
+    compMs: number;
+    uploadMs: number;
+    dropped: number;
+    video: string;
+  } {
+    let dropped = 0;
+    for (const v of this.pool.els) {
+      if (v.paused) continue;
+      dropped += v.getVideoPlaybackQuality?.().droppedVideoFrames ?? 0;
+    }
+    return {
+      fps: this.statFps,
+      renderMs: this.statAvgMs,
+      buildMs: this.statBuild,
+      compMs: this.statComp,
+      uploadMs: this.statUpload,
+      dropped,
+      video: this.videoInfo,
+    };
   }
 
   private imageFor(assetId: string): HTMLImageElement | null {
@@ -212,7 +251,7 @@ export class Player {
     const s = sourceTimeAt(item, t);
     this.audio.apply(el, item.volume, !!track.muted || !asset.hasAudio);
     if (this.playing) {
-      const plan = driftPlan(s - el.currentTime, item.speed);
+      const plan = driftPlan(s - el.currentTime, item.speed, !IOS);
       if (plan.seek) el.currentTime = s;
       if (el.playbackRate !== plan.rate) el.playbackRate = plan.rate;
       if (el.paused)
@@ -242,6 +281,7 @@ export class Player {
     }
     const used = new Set<HTMLVideoElement>();
 
+    const t0 = performance.now();
     const scene = buildScene(p, t, comp.width, comp.height, (item, asset, track) => {
       const url = this.deps.urlFor(asset.id);
       if (!url) return null;
@@ -260,6 +300,8 @@ export class Player {
       used.add(el);
       this.syncVideo(el, item, asset, track, t);
       this.maybeCaptureThumb(el, asset);
+      if (track.kind === 'main' && el.videoWidth)
+        this.videoInfo = `${el.videoWidth}×${el.videoHeight} ${asset.codec ?? ''}${asset.hdr ? ' HDR' : ''}｜預覽檔：${asset.proxy?.status ?? '無'}`;
       return {
         source: el,
         ready: el.readyState >= 2 && !el.seeking && el.videoWidth > 0,
@@ -282,7 +324,10 @@ export class Player {
       if (!el.paused) el.pause();
     }
     this.pool.pauseAllExcept(used);
+    const t1 = performance.now();
     comp.render(scene);
+    const t2 = performance.now();
+    this.seg = { build: t1 - t0, comp: t2 - t1, upload: comp.takeUploadMs() };
   }
 
   private maybeCaptureThumb(el: HTMLVideoElement, asset: Asset) {

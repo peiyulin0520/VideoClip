@@ -20,6 +20,7 @@ import {
   trimStartFree,
 } from '../../engine/timeline';
 import type { Asset, Item, Track, VideoItem } from '../../model/types';
+import { useProxyProgress } from '../../engine/proxyQueue';
 import { patchTrack, placeItem, removeTrack, shiftTrackLayer } from '../../store/actions';
 import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
@@ -97,6 +98,7 @@ export function Timeline({
   const [half, setHalf] = useState(180);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [menuTrackId, setMenuTrackId] = useState<string | null>(null);
+  const proxyProgress = useProxyProgress((s) => s.progress);
 
   const total = totalDuration(project);
   const main = mainItems(project);
@@ -435,6 +437,12 @@ export function Timeline({
                         : `${it.type === 'image' ? '照片' : '影片'} ${it.duration.toFixed(1)}s`}
                       {isVideoItem(it) && it.speed !== 1 && ` · ${it.speed}x`}
                       {isVideoItem(it) && it.type === 'video' && it.volume === 0 && ' · 靜音'}
+                      {asset && proxyProgress[asset.id] !== undefined && (
+                        <span className="proxy-note" data-testid="proxy-note">
+                          {' '}
+                          · 預覽檔製作中 {Math.round(proxyProgress[asset.id]! * 100)}%
+                        </span>
+                      )}
                     </div>
                     {selected && !dragging && !track.locked && (
                       <>

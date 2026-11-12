@@ -134,6 +134,13 @@ export async function copyProjectMedia(
   for (const a of assets) {
     const f = await getMedia(fromId, a.id, a.mime);
     await putMedia(toId, a.id, f);
+    // 預覽用輕量影片（檔名 <id>~p）有就一起複製，沒有就算了
+    try {
+      const p = await getMedia(fromId, `${a.id}~p`, 'video/mp4');
+      await putMedia(toId, `${a.id}~p`, p);
+    } catch {
+      /* 沒有預覽檔 */
+    }
   }
 }
 

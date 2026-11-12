@@ -1493,3 +1493,34 @@ button {
   background: #e5484d;
   border-radius: 50%;
 }
+
+/* 播放效能小黑框（設定頁打開才顯示） */
+.perf {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 5;
+  padding: 4px 8px;
+  font:
+    11px/1.4 ui-monospace,
+    monospace;
+  color: #7cfc6a;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 16px;
+}
+.check-row input {
+  width: 24px;
+  height: 24px;
+}
+.proxy-note {
+  color: #ffd23f;
+}

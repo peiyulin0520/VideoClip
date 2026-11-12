@@ -15,6 +15,14 @@ export type Asset = {
   hasAudio: boolean;
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
+  /** 影片的編碼（'avc'、'hevc'、'vp9'…）與是不是 HDR；匯入時讀容器得到，舊專案沒有 */
+  codec?: string;
+  hdr?: boolean;
+  /**
+   * 預覽用的輕量影片（H.264、長邊 960、SDR）：播放用它，匯出用原檔。
+   * none＝原檔夠輕不需要；pending＝製作中；ready＝可用；failed＝做不出來（照用原檔）
+   */
+  proxy?: { status: 'none' | 'pending' | 'ready' | 'failed'; mime?: string; width?: number; height?: number };
   /** 只放在記憶體（手機存不下）：關掉網頁後素材會遺失，要重新匯入 */
   unsaved?: boolean;
 };

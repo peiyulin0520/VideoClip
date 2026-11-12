@@ -13,6 +13,7 @@ import {
   type Box,
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
+import { PerfOverlay } from './PerfOverlay';
 import type { Item } from '../../model/types';
 import { geoCtx } from '../../engine/scene';
 import { findItem, visibleLayers } from '../../engine/timeline';
@@ -326,6 +327,7 @@ export function Preview({
         {/* key：比例改變就換一個新的 canvas（舊的 WebGL 環境被 Pixi 銷毀後不能在同一個 canvas 上重建） */}
         <canvas key={`${width}x${height}`} ref={canvasRef} data-testid="preview-canvas" />
         <div ref={poolRef} className="pool" aria-hidden="true" />
+        <PerfOverlay player={player} />
 
         {(safe || dragging) && (
           <div className="safe" aria-hidden="true" data-testid="safe-zone">

@@ -1,6 +1,6 @@
 import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
-import type { Item, Project, VideoItem } from '../model/types';
+import type { Asset, Item, Project, VideoItem } from '../model/types';
 
 const HISTORY_LIMIT = 100;
 const COALESCE_MS = 800;
@@ -100,11 +100,20 @@ export const useProjectStore = create<State>((set, get) => ({
  * 歷史快照裡同一個素材也一併更新，不然復原後縮圖又會不見。
  */
 export function setAssetThumbs(assetId: string, thumbs: string[]) {
+  patchAssetEverywhere(assetId, { thumbs });
+}
+
+/** 預覽用輕量影片的狀態（不進復原紀錄；歷史快照一起更新，復原後不會變回「還沒做」） */
+export function setAssetProxy(assetId: string, proxy: NonNullable<Asset['proxy']>) {
+  patchAssetEverywhere(assetId, { proxy });
+}
+
+function patchAssetEverywhere(assetId: string, fields: Partial<Asset>) {
   const st = useProjectStore.getState();
   if (!st.project) return;
   const patch = (p: Project): Project =>
     p.assets.some((a) => a.id === assetId)
-      ? { ...p, assets: p.assets.map((a) => (a.id === assetId ? { ...a, thumbs } : a)) }
+      ? { ...p, assets: p.assets.map((a) => (a.id === assetId ? { ...a, ...fields } : a)) }
       : p;
   useProjectStore.setState({
     project: patch(st.project),

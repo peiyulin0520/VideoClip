@@ -17,6 +17,12 @@ export function chooseAudioMode(env: { hasAudioSession: boolean; isIOS: boolean 
 
 type AudioSessionNav = Navigator & { audioSession?: { type: string } };
 
+export function isIOSDevice(): boolean {
+  const nav = navigator as AudioSessionNav;
+  const ua = nav.userAgent ?? '';
+  return /iP(hone|ad|od)/.test(ua) || (nav.platform === 'MacIntel' && (nav.maxTouchPoints ?? 0) > 1);
+}
+
 function detectEnv() {
   const nav = navigator as AudioSessionNav;
   const ua = nav.userAgent ?? '';

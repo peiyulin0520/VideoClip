@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { countEditorRender } from '../../engine/debug';
 import { ensureUrls, releaseProjectUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
+import { enqueueProxies } from '../../engine/proxyQueue';
 import { addOverlayClips } from '../../store/actions';
 import { relayout, totalDuration, formatTime } from '../../engine/timeline';
 import { getProject } from '../../storage/projects';
@@ -38,6 +39,7 @@ function EditorLoader({ projectId }: { projectId: string }) {
       if (cancelled) return;
       useProjectStore.getState().load(p);
       autosave = startAutosave();
+      enqueueProxies(p.id, p.assets); // 舊專案的大影片：背景補做預覽用輕量影片
       setStatus('ready');
       if (missing.length)
         toast(`找不到素材檔：${missing.join('、')}（可能是上次存不下、沒有留在手機裡，請重新匯入）`, 8000);
@@ -142,6 +144,7 @@ function EditorBody() {
       );
       if (res.assets.length) {
         await ensureUrls(pid, res.assets);
+        enqueueProxies(pid, res.assets);
         const player = useUI.getState().player;
         if (importMode.current === 'overlay') {
           // 疊加：放在播放頭這一秒，同一秒疊多個就各佔一條軌道

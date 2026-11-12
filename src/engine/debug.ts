@@ -2,6 +2,7 @@ import { useProjectStore } from '../store/projectStore';
 import { urlFor } from './assetUrls';
 import { ensureFont } from '../fonts/fontStore';
 import type { TextCard } from '../model/types';
+import { __setProxyMaker } from './proxyQueue';
 import { renderFrame } from './exportFrame';
 import { lastImportErrors } from './importMedia';
 import { renderText } from './textRender';
@@ -26,6 +27,15 @@ export function installDebugHook(player: Player) {
   const hook = {
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,
+    /** 測試用：讓預覽用輕量影片做不出來（模擬手機編不出 H.264） */
+    failProxies: (on: boolean) =>
+      __setProxyMaker(
+        on
+          ? async () => {
+              throw new Error('測試：編不出來');
+            }
+          : null,
+      ),
     editorRenders: () => editorRenders,
     /** 播放畫格數與每格合成耗時 */
     stats: () => player.stats(),
@@ -108,7 +118,7 @@ export function installDebugHook(player: Player) {
     /** 用輸出解析度畫出 t 秒那一格（匯出共用的流程），回傳 PNG 大小與幾個取樣點的顏色 */
     async exportFrame(t: number, points: [number, number][]) {
       const p = useProjectStore.getState().project!;
-      const { blob } = await renderFrame(p, t, (id) => urlFor(p.id, id));
+      const { blob } = await renderFrame(p, t, (id) => urlFor(p.id, id, 'export'));
       const bmp = await createImageBitmap(blob);
       const cv = document.createElement('canvas');
       cv.width = bmp.width;

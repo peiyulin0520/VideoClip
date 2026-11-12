@@ -14,7 +14,7 @@ export function mediaKindOf(file: File): MediaKind | null {
   return null;
 }
 
-type Probed = Pick<Asset, 'duration' | 'width' | 'height' | 'hasAudio'>;
+type Probed = Pick<Asset, 'duration' | 'width' | 'height' | 'hasAudio' | 'codec' | 'hdr'>;
 
 /** 讀影片長度、尺寸、有沒有音軌（Mediabunny 直接讀容器，不需要瀏覽器能解碼） */
 async function probeVideoContainer(file: File): Promise<Probed | null> {
@@ -26,7 +26,19 @@ async function probeVideoContainer(file: File): Promise<Probed | null> {
       input.getPrimaryAudioTrack(),
     ]);
     if (!v) return null;
-    return { duration, width: v.displayWidth, height: v.displayHeight, hasAudio: !!a };
+    // 編碼與 HDR：給「要不要做預覽用輕量影片」判斷；讀不到不影響匯入
+    const [codec, hdr] = await Promise.all([
+      v.getCodec().catch(() => null),
+      v.hasHighDynamicRange().catch(() => false),
+    ]);
+    return {
+      duration,
+      width: v.displayWidth,
+      height: v.displayHeight,
+      hasAudio: !!a,
+      ...(codec ? { codec } : {}),
+      ...(hdr ? { hdr: true } : {}),
+    };
   } catch {
     return null;
   } finally {
