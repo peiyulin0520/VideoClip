@@ -40,7 +40,23 @@ export function croppedSource(asset: Asset, crop?: Crop): { w: number; h: number
  */
 export function selectionBox(item: Item, ctx: GeoCtx): Box | null {
   const base = itemBox(item, ctx);
-  if (!base || item.type !== 'text') return base;
+  if (!base) return base;
+  if (item.type === 'video' || item.type === 'image') {
+    // 版型外框：只有「看得到的範圍」算選取範圍（整張外框圖是畫面大小，中間挖洞）
+    const v = item.visible;
+    if (!v) return base;
+    const dx = (v.x + v.w / 2 - 0.5) * base.w;
+    const dy = (v.y + v.h / 2 - 0.5) * base.h;
+    const a = (base.rotation * Math.PI) / 180;
+    return {
+      cx: base.cx + dx * Math.cos(a) - dy * Math.sin(a),
+      cy: base.cy + dx * Math.sin(a) + dy * Math.cos(a),
+      w: v.w * base.w,
+      h: v.h * base.h,
+      rotation: base.rotation,
+    };
+  }
+  if (item.type !== 'text') return base;
   const s = ctx.textSize(item, ctx.canvasW, ctx.canvasH);
   const c = s.content;
   if (!c) return base;

@@ -34,7 +34,7 @@ test('預覽很大而且大小永遠不變：每個分頁、面板開合、選�
   await page.screenshot({ path: `${SHOT}/top.png` });
 
   const base = await stageSize(page);
-  for (const tab of ['疊加', '文字', '圖層', '版型', '素材', '音訊', '剪輯'] as const) {
+  for (const tab of ['疊加', '文字', '圖層', '版型', '特效', '素材', '音訊', '剪輯'] as const) {
     await openTab(page, tab);
     expect(await stageSize(page)).toEqual(base);
   }

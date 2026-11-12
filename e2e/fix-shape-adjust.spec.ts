@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
-import { countColor, createProjectWith, openTab, project, regionHash } from './helpers';
+import { countColor, createProjectWith, legacyBox, openTab, project, regionHash } from './helpers';
 
 const SHOT = 'docs/screenshots/fix-feedback-2';
 
@@ -26,6 +26,7 @@ async function startWithShape(page: Page, cat: string, shapeLabel: string) {
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
   if (cat !== '基本') await page.getByRole('button', { name: `圖形分類 ${cat}` }).tap();
   await page.getByRole('radio', { name: shapeLabel, exact: true }).tap();
+  await legacyBox(page);
 }
 
 // 粉紅字塊在預覽中央的像素數（用來看圖形形狀有沒有變）

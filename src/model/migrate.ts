@@ -20,9 +20,30 @@ export type Migrated = {
   reordered: boolean;
 };
 
+/**
+ * 舊的版型（G4 之前）：外框軌鎖住、各格是普通軌道，沒有 group 標記。補上標記：外框軌解鎖，
+ * 各格軌道藏起來、素材放完顯示黑色色塊。已經標記過的不動。
+ */
+export function markLegacyGroups(p: Project): { project: Project; changed: boolean } {
+  let changed = false;
+  const tracks = p.tracks.map((t) => {
+    if (t.groupRole || t.items.length === 0) return t;
+    const first = t.items[0]!;
+    if (first.type === 'text' || first.type === 'audio' || !first.group) return t;
+    changed = true;
+    return first.cell
+      ? { ...t, group: first.group, groupRole: 'cell' as const, fill: 'black' as const }
+      : { ...t, group: first.group, groupRole: 'frame' as const, locked: false };
+  });
+  return { project: changed ? { ...p, tracks } : p, changed };
+}
+
 export function migrateProject(input: Project | LooseProject): Migrated {
   const p = input as LooseProject;
-  if (p.version === 2) return { project: input as Project, changed: false, reordered: false };
+  if (p.version === 2) {
+    const g = markLegacyGroups(input as Project);
+    return { project: g.project, changed: g.changed, reordered: false };
+  }
 
   let mediaCount = 0;
   const tracks: Track[] = p.tracks.map((t) => {
@@ -43,7 +64,7 @@ export function migrateProject(input: Project | LooseProject): Migrated {
   const sorted = normalizeZones(tracks);
   const reordered = sorted.some((t, i) => t !== tracks[i]);
   return {
-    project: { ...p, tracks: sorted, version: 2 } as Project,
+    project: markLegacyGroups({ ...p, tracks: sorted, version: 2 } as Project).project,
     changed: true,
     reordered,
   };

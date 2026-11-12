@@ -131,55 +131,70 @@ export function renderText(card: TextCard, scale: number): TextRender {
     ctx.restore();
   }
 
-  ctx.textBaseline = 'alphabetic';
-  ctx.lineJoin = 'round';
-  const withSkew = (run: TextRun, y: number, draw: () => void) => {
-    if (!run.italic) return draw();
-    ctx.save();
-    ctx.transform(1, 0, -ITALIC_TAN, 1, ITALIC_TAN * y, 0);
-    draw();
-    ctx.restore();
-  };
-  const runOf = (g: GlyphBox) => card.runs[g.run]!;
-  const setFont = (run: TextRun) => {
-    ctx.font = fontOf(run.weight, run.size * scale, run.fontId);
-  };
-  const glyphs = lay.glyphs.filter((g) => g.ch.trim() !== '');
-  const strokesOf = (g: GlyphBox) =>
-    (runOf(g).strokes ?? []).filter((s) => s.width > 0).sort((a, b) => b.width - a.width);
-  const maxStrokes = Math.max(0, ...glyphs.map((g) => strokesOf(g).length));
-  // 陰影只畫一次：有描邊就跟著最外層，沒有就跟著填色
-  const shadowFor = (g: GlyphBox, layer: 'outer' | 'fill') => {
-    const sh = runOf(g).shadow;
-    const hasStroke = strokesOf(g).length > 0;
-    if (!sh || (layer === 'outer') !== hasStroke) {
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      return;
+  const drawGlyphLayer = (ctx: CanvasRenderingContext2D) => {
+    ctx.textBaseline = 'alphabetic';
+    ctx.lineJoin = 'round';
+    const withSkew = (run: TextRun, y: number, draw: () => void) => {
+      if (!run.italic) return draw();
+      ctx.save();
+      ctx.transform(1, 0, -ITALIC_TAN, 1, ITALIC_TAN * y, 0);
+      draw();
+      ctx.restore();
+    };
+    const runOf = (g: GlyphBox) => card.runs[g.run]!;
+    const setFont = (run: TextRun) => {
+      ctx.font = fontOf(run.weight, run.size * scale, run.fontId);
+    };
+    const glyphs = lay.glyphs.filter((g) => g.ch.trim() !== '');
+    const strokesOf = (g: GlyphBox) =>
+      (runOf(g).strokes ?? []).filter((s) => s.width > 0).sort((a, b) => b.width - a.width);
+    const maxStrokes = Math.max(0, ...glyphs.map((g) => strokesOf(g).length));
+    // 陰影只畫一次：有描邊就跟著最外層，沒有就跟著填色
+    const shadowFor = (g: GlyphBox, layer: 'outer' | 'fill') => {
+      const sh = runOf(g).shadow;
+      const hasStroke = strokesOf(g).length > 0;
+      if (!sh || (layer === 'outer') !== hasStroke) {
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        return;
+      }
+      ctx.shadowColor = sh.color;
+      ctx.shadowBlur = sh.blur * scale;
+      ctx.shadowOffsetX = sh.x * scale;
+      ctx.shadowOffsetY = sh.y * scale;
+    };
+    for (let p = 0; p < maxStrokes; p++) {
+      for (const g of glyphs) {
+        const st = strokesOf(g)[p];
+        if (!st) continue;
+        const run = runOf(g);
+        setFont(run);
+        shadowFor(g, p === 0 ? 'outer' : 'fill'); // p>0 時 layer='fill' 且有描邊 → 會關掉陰影
+        ctx.strokeStyle = st.color;
+        ctx.lineWidth = st.width * 2 * scale;
+        withSkew(run, oy + g.y, () => ctx.strokeText(g.ch, ox + g.x, oy + g.y));
+      }
     }
-    ctx.shadowColor = sh.color;
-    ctx.shadowBlur = sh.blur * scale;
-    ctx.shadowOffsetX = sh.x * scale;
-    ctx.shadowOffsetY = sh.y * scale;
-  };
-  for (let p = 0; p < maxStrokes; p++) {
     for (const g of glyphs) {
-      const st = strokesOf(g)[p];
-      if (!st) continue;
       const run = runOf(g);
       setFont(run);
-      shadowFor(g, p === 0 ? 'outer' : 'fill'); // p>0 時 layer='fill' 且有描邊 → 會關掉陰影
-      ctx.strokeStyle = st.color;
-      ctx.lineWidth = st.width * 2 * scale;
-      withSkew(run, oy + g.y, () => ctx.strokeText(g.ch, ox + g.x, oy + g.y));
+      shadowFor(g, 'fill');
+      ctx.fillStyle = run.color;
+      withSkew(run, oy + g.y, () => ctx.fillText(g.ch, ox + g.x, oy + g.y));
     }
-  }
-  for (const g of glyphs) {
-    const run = runOf(g);
-    setFont(run);
-    shadowFor(g, 'fill');
-    ctx.fillStyle = run.color;
-    withSkew(run, oy + g.y, () => ctx.fillText(g.ch, ox + g.x, oy + g.y));
+  };
+  // 文字透明度：描邊、陰影、填色先畫在另一張畫布上，再整張乘透明度（不然描邊會從半透明的字裡透出來）
+  const textOp = Math.min(Math.max(card.runs[0]?.opacity ?? 1, 0), 1);
+  if (textOp >= 1) drawGlyphLayer(ctx);
+  else {
+    const layer = document.createElement('canvas');
+    layer.width = w;
+    layer.height = h;
+    drawGlyphLayer(layer.getContext('2d')!);
+    ctx.save();
+    ctx.globalAlpha = textOp;
+    ctx.drawImage(layer, 0, 0);
+    ctx.restore();
   }
 
   // 看得到的內容範圍：文字墨跡（含描邊）∪ 字塊（含外框、尾巴）∪ 裝飾

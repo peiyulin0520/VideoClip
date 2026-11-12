@@ -6,6 +6,7 @@ import { ensureUrls, releaseProjectUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { enqueueProxies } from '../../engine/proxyQueue';
 import { addOverlayClips, importToBase } from '../../store/actions';
+import { coverFromProject } from '../../engine/cover';
 import { formatTime, totalDuration } from '../../engine/timeline';
 import { getProjectMigrated, saveProject } from '../../storage/projects';
 import { startAutosave } from '../../store/autosave';
@@ -316,6 +317,25 @@ function EditorBody() {
           onChange={(e) => setNameDraft(e.target.value)}
           autoFocus
         />
+        <button
+          className="menu-item"
+          onClick={async () => {
+            const p = useProjectStore.getState().project;
+            if (!p) return;
+            setRenaming(false);
+            try {
+              const cover = await coverFromProject(p, useUI.getState().player?.time ?? 0);
+              useProjectStore.getState().apply((d) => {
+                d.cover = cover;
+              });
+              toast('已用目前預覽畫面當封面');
+            } catch {
+              toast('抓不到預覽畫面');
+            }
+          }}
+        >
+          用目前預覽畫面當封面
+        </button>
         <div className="sheet-row">
           <button className="btn" onClick={() => setRenaming(false)}>
             取消

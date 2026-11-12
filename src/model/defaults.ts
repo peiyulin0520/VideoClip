@@ -133,16 +133,22 @@ export function createOverlayClip(asset: Asset, start: number): VideoItem {
   return { ...c, start, fit: 'contain', transform: { ...c.transform, scale: 0.5 } };
 }
 
+/** 圖形／字塊預設的框線顏色（棕色）。固定色，不跟介面主題：它會被畫進匯出的影片裡 */
+export const SHAPE_LINE = '#8b5a44';
+
 /** 獨立圖形（貼圖用）：沒有文字的字卡，只有字塊；大小用內距調（也可以用右上角縮放） */
 export function createShapeItem(start: number): TextItem {
   const t = createTextItem(start, '');
   const run = t.card.runs[0]!;
   run.shadow = undefined;
   delete run.shadow;
+  // 預設：透明底＋棕色細框線（要填滿到字塊的「填滿」打開、選顏色）
   t.card.box = {
     shape: 'star5',
     fill: '#ffd23f',
+    fillOn: false,
     opacity: 1,
+    stroke: { color: SHAPE_LINE, width: 6, opacity: 1 },
     padding: { top: 70, right: 70, bottom: 70, left: 70 },
     nudgeY: 0,
   };

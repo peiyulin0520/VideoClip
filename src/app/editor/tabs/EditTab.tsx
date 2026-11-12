@@ -6,6 +6,7 @@ import {
   Maximize,
   Minimize,
   MoveHorizontal,
+  Pencil,
   Plus,
   Scissors,
   Trash2,
@@ -13,7 +14,16 @@ import {
 } from 'lucide-react';
 import { isVideoItem, visibleLayers } from '../../../engine/timeline';
 import type { Item } from '../../../model/types';
-import { duplicateAny, editItem, removeAnyItem, rippleRemoveItem, splitAny } from '../../../store/actions';
+import {
+  duplicateAny,
+  editItem,
+  removeAnyItem,
+  renameItem,
+  rippleRemoveItem,
+  splitAny,
+} from '../../../store/actions';
+import { PromptSheet } from '../../../ui/PromptSheet';
+import { useState } from 'react';
 import { startCrop, useCrop } from '../../../store/cropStore';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
@@ -35,6 +45,7 @@ export function EditTab({
 }) {
   const project = useProjectStore((s) => s.project)!;
   const player = useUI((s) => s.player);
+  const [naming, setNaming] = useState(false);
   const cropping = useCrop((s) => !!s.s);
   const selected = found?.item;
 
@@ -102,6 +113,7 @@ export function EditTab({
       <ToolButton icon={Trash2} label="刪除" onClick={remove} />
       <ToolButton icon={ArrowLeftToLine} label="刪除並補齊" onClick={removeAndClose} />
       <ToolButton icon={Copy} label="複製" onClick={() => need() && duplicateAny(selected!.id)} />
+      <ToolButton icon={Pencil} label="命名" onClick={() => need() && setNaming(true)} />
       <ToolButton icon={MoveHorizontal} label="修剪" onClick={() => openPanel('trim')} />
       <ToolButton
         icon={CropIcon}
@@ -119,6 +131,15 @@ export function EditTab({
         icon={selected && isVideoItem(selected) && selected.fit === 'contain' ? Minimize : Maximize}
         label={selected && isVideoItem(selected) && selected.fit === 'contain' ? '填滿' : '完整'}
         onClick={toggleFit}
+      />
+      <PromptSheet
+        open={naming && !!selected}
+        title="片段命名"
+        label="片段名稱"
+        initial={selected?.label ?? ''}
+        placeholder="例如：開場・揮手（空白＝用預設名稱）"
+        onSubmit={(v) => selected && renameItem(selected.id, v)}
+        onClose={() => setNaming(false)}
       />
     </div>
   );

@@ -76,7 +76,7 @@ test('補齊空位：開場留白的虛線框點一下選取、再點一下補�
   expect((await main(page))[0]!.start).toBeCloseTo(1, 1);
 });
 
-test('修剪面板：整段素材攤開、選取窗；拖把手／拖中間／按鈕都能改；文字寫清楚；片段位置不變；一次拖曳一步復原', async ({
+test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖旗標／拖中間／按鈕都能改；文字寫清楚；片段位置不變；一次拖曳一步復原', async ({
   page,
 }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
@@ -103,15 +103,15 @@ test('修剪面板：整段素材攤開、選取窗；拖把手／拖中間／�
   await page.getByRole('button', { name: '後面多 1 秒' }).tap();
   await expect(info).toContainText('第 0.0 秒 → 第 2.0 秒');
 
-  // 拖左把手往右 1/4 條：起點約 0.5 秒
+  // 拖起點旗標往右 1/4 條：起點約 0.5 秒
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
-  await drag(page, 'trim-grip-left', strip.width / 4);
+  await drag(page, 'range-flag-start-0', strip.width / 4);
   m = await main(page);
   expect(m[0]!.trimIn).toBeGreaterThan(0.35);
   expect(m[0]!.trimIn).toBeLessThan(0.65);
   await page.screenshot({ path: 'docs/screenshots/feedback-5/trim-panel-dragged.png' });
-  // 拖右把手往左 1/4 條：終點約 1.5 秒
-  await drag(page, 'trim-grip-right', -strip.width / 4);
+  // 拖終點旗標往左 1/4 條：終點約 1.5 秒
+  await drag(page, 'range-flag-end-0', -strip.width / 4);
   m = await main(page);
   expect(m[0]!.trimIn + m[0]!.duration).toBeGreaterThan(1.35);
   expect(m[0]!.trimIn + m[0]!.duration).toBeLessThan(1.65);
@@ -119,7 +119,7 @@ test('修剪面板：整段素材攤開、選取窗；拖把手／拖中間／�
   const s0 = m[0]!.trimIn;
   // 拖中間：長度不變、區段平移（等一下再拖，才不會跟前面的拖曳併成同一步復原）
   await page.waitForTimeout(1500);
-  await drag(page, 'trim-window', strip.width / 8);
+  await drag(page, 'range-body-0', strip.width / 8);
   m = await main(page);
   expect(m[0]!.duration).toBeCloseTo(len, 2);
   expect(m[0]!.trimIn).toBeGreaterThan(s0 + 0.1);

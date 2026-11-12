@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { findItem } from '../../engine/timeline';
 import { cancelCrop } from '../../store/cropStore';
 import { useProjectStore } from '../../store/projectStore';
+import { useUI } from '../../store/uiStore';
 import { AssetsTab } from './tabs/AssetsTab';
 import { AudioTab } from './tabs/AudioTab';
 import { EditTab } from './tabs/EditTab';
 import { LayersTab } from './tabs/LayersTab';
 import { LayoutTab } from './tabs/LayoutTab';
+import { EffectTab } from './tabs/EffectTab';
 import { OverlayTab } from './tabs/OverlayTab';
 import { TABS, type Panel, type Tab } from './tabs/shared';
 import { TextTab } from './tabs/TextTab';
@@ -39,22 +41,46 @@ export function BottomBar({
   const found = findItem(project, selectedId);
   const barRef = useRef<HTMLDivElement>(null);
 
-  // 選取的東西換了：自動切到對應的分頁（render 期間調整 state，React 建議的寫法）
-  const [prevSel, setPrevSel] = useState(selectedId);
-  if (prevSel !== selectedId) {
-    setPrevSel(selectedId);
-    if (found) {
-      const next = tabForSelection(
-        tab,
-        found.item.type === 'text' ? 'text' : found.item.type === 'audio' ? 'audio' : 'media',
-      );
-      if (next !== tab) {
-        setTab(next);
-        setPanel(null);
-        cancelCrop();
-      }
-    }
-  }
+  // 選取的東西換了：自動切到對應的分頁。
+  // 晚一點才切：手指放開後瀏覽器還會補送一個 click；如果馬上換分頁、版面跟著變，那個 click 會落在別的按鈕上
+  const tabRef = useRef(tab);
+  useEffect(() => {
+    tabRef.current = tab;
+  }, [tab]);
+  useEffect(() => {
+    if (!selectedId) return;
+    const tabAtSelect = tabRef.current;
+    const timer = setTimeout(() => {
+      if (tabRef.current !== tabAtSelect) return; // 這段時間使用者自己切了分頁：不要再把人帶走
+      const st = useProjectStore.getState();
+      const f = st.project && findItem(st.project, st.selectedId);
+      if (!f || st.selectedId !== selectedId) return;
+      const kind = f.item.type === 'text' ? 'text' : f.item.type === 'audio' ? 'audio' : 'media';
+      const next = tabForSelection(tabRef.current, kind);
+      if (next === tabRef.current) return;
+      tabRef.current = next;
+      setTab(next);
+      setPanel(null);
+      cancelCrop();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [selectedId]);
+
+  // 其他地方要求切分頁（點時間軸的轉場小圓圈 → 特效）
+  const requestTab = useUI((s) => s.requestTab);
+  useEffect(() => {
+    if (!requestTab) return;
+    const want = TABS.find((x) => x.id === requestTab)?.id;
+    useUI.setState({ requestTab: null });
+    if (!want) return;
+    setTimeout(() => {
+      tabRef.current = want;
+      setTab(want);
+      setPanel(null);
+      setCollapsed(false);
+      cancelCrop();
+    }, 250);
+  }, [requestTab]);
 
   // 點目前的分頁＝收合/展開下面的面板（讓出空間給預覽畫面）
   const switchTab = (t: Tab) => {
@@ -102,6 +128,7 @@ export function BottomBar({
       {!collapsed && tab === 'text' && <TextTab found={found} />}
       {!collapsed && tab === 'layers' && <LayersTab />}
       {!collapsed && tab === 'layout' && <LayoutTab found={found} />}
+      {!collapsed && tab === 'effect' && <EffectTab found={found} />}
       {!collapsed && tab === 'assets' && <AssetsTab />}
       {!collapsed && tab === 'audio' && <AudioTab found={found} panel={panel} setPanel={setPanel} />}
     </div>

@@ -12,6 +12,8 @@ type UI = {
   player: Player | null;
   /** 全螢幕預覽：隱藏時間軸與底部面板 */
   previewFull: boolean;
+  /** 要求底部工具列切到某個分頁（例如點時間軸上的轉場小圓圈 → 特效）；工具列切完會清掉 */
+  requestTab: string | null;
 };
 
 export const useUI = create<UI>((set, get) => ({
@@ -25,6 +27,7 @@ export const useUI = create<UI>((set, get) => ({
   setBusy: (busy) => set({ busy }),
   player: null,
   previewFull: false,
+  requestTab: null,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

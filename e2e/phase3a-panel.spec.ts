@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { countColor, createProjectWith, openTab, project } from './helpers';
+import { countColor, createProjectWith, legacyBox, openTab, project } from './helpers';
 
 const SHOT = 'docs/screenshots/phase3a';
 
@@ -75,6 +75,7 @@ test('字卡面板：文字／版面／字塊／描邊陰影，每個按鈕都�
   expect((await card(page)).box).toBeUndefined();
   await page.getByRole('radio', { name: '圓角' }).tap();
   expect((await card(page)).box!.shape).toBe('roundRect');
+  await legacyBox(page); // 預設是透明底＋棕框線，這裡要看填滿的粉紅
   // 字塊是粉紅色：預覽中間出現粉紅像素
   await expect.poll(() => countColor(page, [255, 77, 141], 30, [0.2, 0.4, 0.8, 0.6])).toBeGreaterThan(200);
   await page.screenshot({ path: `${SHOT}/box-default.png` });

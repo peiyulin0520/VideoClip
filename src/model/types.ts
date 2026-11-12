@@ -40,6 +40,8 @@ export type Crop = { l: number; t: number; r: number; b: number };
 
 export type ItemBase = {
   id: string;
+  /** 使用者自己取的名字（時間軸片段、圖層清單上顯示）；沒有＝用預設名稱 */
+  label?: string;
   start: number; // 時間軸位置（秒）。所有軌道都是自由擺放（2026-11-12 起沒有磁吸的主軌）
   duration: number; // 時間軸上的長度（秒）
   /** x、y：中心點，佔畫面寬/高的比例；scale：乘上「填滿/完整」算出的基本大小；rotation：度，順時針 */
@@ -65,9 +67,22 @@ export type VideoItem = ItemBase & {
   mask?: [number, number][];
   /** 多格版型：這個物件所在的格子（佔畫面寬、高的比例）。裁切模式完成時，畫面會填滿這個格子 */
   cell?: { x: number; y: number; w: number; h: number };
-  /** 同一個版型的物件（外框與各格）共用的 id，用來「刪除整個版型」 */
+  /** 同一個版型的物件（外框與各格）共用的 id：一起縮放、移動、同一段時間，也用來「刪除整個版型」 */
   group?: string;
+  /** 版型外框專用：看得到的範圍（佔整張外框圖的比例）；選取框、點選範圍用它，不用整張透明的圖 */
+  visible?: { x: number; y: number; w: number; h: number };
+  /** 版型外框專用：整個版型的動畫（捲動＝由下往上捲過畫面；滑入滑出＝開頭從右邊滑進來、結尾往左滑出去） */
+  motion?: 'drift' | 'slide';
+  /** 動態模板的格子：格子的範圍從 from（佔畫面寬、高的比例）在 t0–t1 秒（片段開始後）滑到 cell；之前停在 from */
+  cellAnim?: { from: { x: number; y: number; w: number; h: number }; t0: number; t1: number };
+  /** 動態模板外框：這個版型是哪一種動態模板（有整套的時間表，見 engine/story.ts） */
+  template?: 'story3';
+  /** 進場轉場：跟前面緊接的片段之間的效果（以兩個片段的接縫為中心，前半在前一個片段、後半在這個片段） */
+  transitionIn?: { kind: TransitionKind; duration: number };
 };
+
+/** 轉場種類：淡入淡出、黑場、白閃、暖色閃光、左推、上推、縮放 */
+export type TransitionKind = 'fade' | 'black' | 'white' | 'flash' | 'push' | 'rise' | 'zoom';
 
 // 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
 export type Stroke = {
@@ -85,11 +100,40 @@ export type TextRun = {
   letterSpacing: number; // em，-0.2 ~ 1.0
   lineHeight: number; // 倍數，0.8 ~ 2.5
   weight: 'normal' | 'bold';
+  /** 文字本身（含描邊、陰影）的透明度 0.1–1，沒有＝1；字塊、裝飾各自有自己的透明度 */
+  opacity?: number;
   italic?: boolean; // 字型沒有斜體就斜切 -12°
   /** 多層描邊（由外到內，畫的時候依厚度由大到小）。例：白 12 + 粉 6 */
   strokes?: Stroke[];
   shadow?: TextShadow;
 };
+/** 文字樣式（一套）：新增文字時沿用上一次的樣式、「套用樣式到所有文字」都用這組欄位 */
+export type TextStyle = Pick<
+  TextRun,
+  | 'fontId'
+  | 'size'
+  | 'color'
+  | 'opacity'
+  | 'weight'
+  | 'italic'
+  | 'letterSpacing'
+  | 'lineHeight'
+  | 'strokes'
+  | 'shadow'
+>;
+export const TEXT_STYLE_KEYS = [
+  'fontId',
+  'size',
+  'color',
+  'opacity',
+  'weight',
+  'italic',
+  'letterSpacing',
+  'lineHeight',
+  'strokes',
+  'shadow',
+] as const;
+
 export type DecorationKind =
   | 'tail-loop'
   | 'wave-underline'
@@ -177,7 +221,14 @@ export type TextCard = {
   box?: CardBox;
   decorations?: Decoration[];
 };
-export type TextItem = ItemBase & { type: 'text'; card: TextCard };
+export type TextItem = ItemBase & {
+  type: 'text';
+  card: TextCard;
+  /** 屬於哪個動態模板（標題、副標）：模板整個移動、拿掉、改長度時它們跟著 */
+  group?: string;
+  /** 字體輪播：開始後 until 秒內每 interval 秒換下一個字體（依序輪流），之後固定用 fonts[0] */
+  fontCycle?: { fonts: string[]; interval: number; until: number };
+};
 
 export type Item = VideoItem | TextItem;
 
@@ -196,6 +247,14 @@ export type Track = {
   hidden: boolean;
   locked: boolean;
   muted?: boolean;
+  /**
+   * 版型：外框軌（frame）與各格的軌道（cell）共用同一個 group。時間軸上只畫外框那一條（代表整個版型），
+   * 各格的軌道藏起來；在預覽上點格子可以個別選片段。
+   */
+  group?: string;
+  groupRole?: 'frame' | 'cell';
+  /** 格子軌道：素材放完（或這段時間沒有素材）時，格子顯示的色塊顏色 */
+  fill?: 'black' | 'white';
   items: Item[];
 };
 
@@ -213,6 +272,10 @@ export type Project = {
   assets: Asset[];
   tracks: Track[];
   thumbnail?: string;
+  /** 自訂封面（JPEG data URL，長邊 480）；沒有＝用第一個素材的縮圖 */
+  cover?: string;
+  /** 最後一次新增或編輯的文字樣式；新增文字沿用它，才不會跟之前的不一樣 */
+  lastTextStyle?: TextStyle;
   /** 2＝2026-11-12 起：影像軌統一、沒有主軌；舊的 1 讀進來時由 migrateProject 轉換 */
   version: 2;
 };

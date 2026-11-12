@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, openTab, project, touchDrag } from './helpers';
+import { createProjectWith, legacyBox, openTab, project, touchDrag } from './helpers';
 
 const SHOT = 'docs/screenshots/fix-feedback-2';
 
@@ -179,6 +179,7 @@ test('所有顏色設定處都用同一個選擇器：字塊、字塊外框、�
   await newText(page);
   await section(page, '字塊');
   await page.getByRole('radio', { name: '圓角' }).tap();
+  await legacyBox(page);
   await page.getByRole('button', { name: '字塊顏色 #ffd23f' }).tap();
   expect((await card(page)).box!.fill).toBe('#ffd23f');
   await page.getByRole('button', { name: '字塊顏色 更多顏色' }).tap();

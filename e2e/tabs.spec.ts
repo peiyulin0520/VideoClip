@@ -1,14 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addOverlays, clips, createProjectWith, fixture, openTab } from './helpers';
+import { addOverlays, clips, createProjectWith, fixture, openTab, showTimeline } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-6/tabs';
-const NAMES = ['剪輯', '疊加', '文字', '圖層', '版型', '素材', '音訊'] as const;
+const NAMES = ['剪輯', '疊加', '文字', '圖層', '版型', '特效', '素材', '音訊'] as const;
+const expectTab = (page: Page, name: string) =>
+  expect.poll(async () => activeTab(page), { message: `目前的分頁應該是 ${name}` }).toBe(name);
 const activeTab = async (page: Page) => page.getByRole('tab', { selected: true }).first().textContent();
 
-test('七個分頁都在、390 寬點得到每一個（放不下時分頁列可以左右滑）；每一頁有該有的內容', async ({ page }) => {
+test('八個分頁都在、390 寬點得到每一個（放不下時分頁列可以左右滑）；每一頁有該有的內容', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   const tabs = page.getByRole('tab');
-  await expect(tabs).toHaveCount(7);
+  await expect(tabs).toHaveCount(8);
   expect(await tabs.allTextContents()).toEqual([...NAMES]);
 
   const want: Record<(typeof NAMES)[number], string | RegExp> = {
@@ -17,6 +19,7 @@ test('七個分頁都在、390 寬點得到每一個（放不下時分頁列可�
     文字: /新增文字/,
     圖層: '這一秒的圖層',
     版型: '拍貼機直條',
+    特效: /轉場/,
     素材: '貼圖',
     音訊: /加入背景音樂/,
   };
@@ -58,24 +61,27 @@ test('選了東西自動切分頁：字卡→文字、音樂→音訊、從文�
   // 新增文字（在文字分頁）→ 留在文字
   await openTab(page, '文字');
   await page.getByRole('button', { name: /新增文字/ }).tap();
-  expect(await activeTab(page)).toBe('文字');
+  await expectTab(page, '文字');
   // 點影片 → 從文字切到剪輯
   const video = page.locator('[data-testid="clip"][data-kind="video"]').first();
   await video.tap();
-  expect(await activeTab(page)).toBe('剪輯');
-  // 點時間軸上的字卡 → 切到文字
+  await expectTab(page, '剪輯');
+  // 點時間軸上的字卡 → 切到文字（先捲到看得到時間軸：黏在上面的分頁列會蓋住字卡）
+  await showTimeline(page);
   await page.locator('[data-testid="clip"][data-kind="text"]').first().tap();
-  expect(await activeTab(page)).toBe('文字');
+  await expectTab(page, '文字');
   // 加音樂（在音訊分頁）→ 留在音訊；再點影片 → 剪輯；再點音樂 → 音訊
   await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
   await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
-  expect(await activeTab(page)).toBe('音訊');
+  await expectTab(page, '音訊');
+  await showTimeline(page);
   await video.tap();
-  expect(await activeTab(page)).toBe('剪輯');
+  await expectTab(page, '剪輯');
+  await showTimeline(page);
   await page.locator('[data-testid="clip"][data-kind="audio"]').first().tap();
-  expect(await activeTab(page)).toBe('音訊');
+  await expectTab(page, '音訊');
   // 疊加分頁加素材：自動選取新的，但分頁不變
   await addOverlays(page, ['solid-green.webm']);
-  expect(await activeTab(page)).toBe('疊加');
+  await expectTab(page, '疊加');
 });

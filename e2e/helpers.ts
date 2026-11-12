@@ -9,6 +9,8 @@ export async function createProjectWith(page: Page, files: string[]) {
   await page.addInitScript(() => {
     localStorage.setItem('vc-debug', '1');
     localStorage.setItem('vc-skip-onboarding', '1');
+    // 時間軸預設收合；舊測試要看到每一條軌道，所以沒設過就展開（收合的測試自己設成 '0'）
+    if (localStorage.getItem('vc-tl-expanded') === null) localStorage.setItem('vc-tl-expanded', '1');
   });
   await page.goto('./');
   await page.getByRole('button', { name: '新增專案' }).tap();
@@ -150,7 +152,7 @@ export const exportFrame = async (page: Page, t: number, pts: [number, number][]
 /** 切到底部分頁 */
 export async function openTab(
   page: Page,
-  name: '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '素材' | '音訊',
+  name: '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '素材' | '音訊',
 ) {
   const tab = page.locator('.tabs').getByRole('tab', { name, exact: true }); // 只找底部分頁列（文字面板裡也有叫「文字」的小分頁）
   // 點「目前的分頁」會收合面板，所以已經在這個分頁且展開時就不用再點
@@ -250,4 +252,16 @@ export async function deselect(page: Page) {
     .first()
     .click({ position: { x: 100, y: 4 } });
   await page.evaluate(() => window.scrollTo(0, 0)); // 點時間軸會把頁面捲下去，回到預覽
+}
+
+/** 開關（填滿、框線…）設成指定狀態；已經是那個狀態就不動 */
+export async function setSwitch(page: Page, name: string, on: boolean) {
+  const sw = page.getByRole('switch', { name, exact: true });
+  if (((await sw.getAttribute('aria-checked')) === 'true') !== on) await sw.tap();
+}
+
+/** 字塊回到「舊預設」：填滿開、框線關（2026-11-12 起字塊預設是透明底＋棕色框線；這些測試要的是粉紅／黃色實心的長相） */
+export async function legacyBox(page: Page) {
+  await setSwitch(page, '填滿', true);
+  await setSwitch(page, '框線', false);
 }

@@ -71,6 +71,14 @@ export async function duplicateProject(id: string): Promise<Project | undefined>
   return copy;
 }
 
+/** 換封面（undefined＝恢復預設）；會更新「最近修改」時間 */
+export async function setProjectCover(p: Project, cover: string | undefined): Promise<void> {
+  const next: Project = { ...p, updatedAt: Date.now() };
+  if (cover) next.cover = cover;
+  else delete next.cover;
+  await saveProject(next);
+}
+
 export async function renameProject(id: string, name: string): Promise<void> {
   const p = await getProject(id);
   if (!p) return;
