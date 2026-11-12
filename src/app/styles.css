@@ -1952,3 +1952,36 @@ button {
 .theme-swatches i {
   flex: 1;
 }
+
+/* 版型（拍貼機、膠卷…） */
+.layout-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 8px 0;
+}
+.layout-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: auto;
+  min-width: 0;
+  padding: 6px 2px;
+  font-size: 12px;
+  background: var(--btn);
+  border-radius: 10px;
+}
+.layout-thumb {
+  width: 100%;
+  max-width: 72px;
+  height: auto;
+  border-radius: 6px;
+}
+.frame-dot {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  border: 1px solid rgba(128, 128, 128, 0.6);
+  border-radius: 50%;
+}

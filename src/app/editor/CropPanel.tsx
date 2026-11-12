@@ -16,6 +16,15 @@ export function CropPanel() {
 
   const PRESETS: { key: string; label: string; ratio: number | null }[] = [
     { key: 'free', label: '自由', ratio: null },
+    ...(item.cell
+      ? [
+          {
+            key: 'cell',
+            label: '格子比例',
+            ratio: (item.cell.w * project.width) / (item.cell.h * project.height),
+          },
+        ]
+      : []),
     { key: 'orig', label: '原比例', ratio: A },
     { key: '1:1', label: '1:1', ratio: 1 },
     { key: '9:16', label: '9:16', ratio: 9 / 16 },

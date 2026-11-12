@@ -102,6 +102,9 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 
 ## 5. 踩過的坑（避免再踩）
 
+- **介面主題**（`src/ui/theme.ts`、`styles.css`）：顏色全部是 `:root` 的變數（`--bg --fg --muted --accent --on-accent --panel --line --btn --btn2 --field --border --clip --bar --timeline`），`:root[data-theme='mono'|'fresh'|'warm']` 只覆蓋變數；暗黑是預設（沒有 data-theme）。新的 CSS 不要寫死中性色（#222、#444…），用變數；預覽畫面（`.stage`）永遠黑底。`index.html` 有一小段 inline script 先套用，避免打開時閃暗色；`applyTheme` 也會換 `theme-color` meta。
+- **多格版型**見 `docs/LAYOUTS.md`（外框 PNG＋每格一個普通疊加物件＋鎖住的外框軌道）。
+
 - **背景音樂（audio 軌）**：`TrackKind` 多了 `'audio'`，音樂是 `VideoItem` 的 `type: 'audio'`（有 `trimIn`、`volume`、`fadeIn`／`fadeOut`，`transform`、`fit` 只是湊欄位）。所以所有「自由軌」的分割、複製、修剪、移動、軌道選單都直接沿用。要記得的幾個地方：`layersAt`／`scene`／`itemBox` 對音樂回傳沒有畫面；`totalDuration` **不算**音樂（音樂比影片長就在影片結束時切掉）；`Asset.kind='audio'`、`Asset.wave`（每 0.1 秒一個 0–100 的值，匯入時 `engine/wave.ts` 算）。預覽：`Player` 多一個 `<audio>` 池（`VideoPool(…, 'audio')`，3 個），`syncMusic` 跟著時間軸對時；聲音走跟影片同一個 `AudioOut`（音量可到 200%、淡入淡出用 `fadeGain` 每格算）。匯出：`mixAudio` 每個物件一個 `GainNode`，音量與淡入淡出用 `setValueAtTime`／`linearRampToValueAtTime`。**沒做循環**（音樂比影片短就用「複製」接起來）。
 - 驗證聲音用 `AudioOut.level()` 時，e2e 要先注入 `navigator.audioSession`，否則 iPhone 模擬的 UA 會走「直接用元素出聲」的路徑（量不到）。
 - `npx tsc --noEmit -p .` 不會真的檢查（專案是 solution-style tsconfig），要用 `npx tsc -b`（`npm run build` 內也有）。

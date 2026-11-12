@@ -6,6 +6,7 @@ import {
   createShapeItem,
   createTextItem,
   createTrack,
+  newId,
   pickAspect,
 } from '../model/defaults';
 import type { Aspect, Asset, Item, Project, TextItem, Track, Transform, VideoItem } from '../model/types';
@@ -26,6 +27,7 @@ import {
   splitItem,
   totalDuration,
 } from '../engine/timeline';
+import { cellItem, type Rect } from '../engine/layouts';
 import { useProjectStore } from './projectStore';
 
 const store = () => useProjectStore.getState();
@@ -114,6 +116,59 @@ export function setAllVideoMuted(muted: boolean) {
   store().apply((d) => {
     for (const t of d.tracks) if (t.kind === 'main' || t.kind === 'overlay') t.muted = muted;
   });
+}
+
+/**
+ * 加一個多格版型：每一格一個疊加物件（各自一條軌道，放在下面）＋最上面一條鎖住的外框軌道（外框是有洞的 PNG）。
+ * 外框鎖住是為了點預覽時點得到下面的格子（要動外框，到軌道選單解鎖）。一步復原整個拿掉。
+ */
+export function addLayout(o: {
+  cells: { asset: Asset; win: Rect }[];
+  frame: Asset;
+  start: number;
+  duration: number;
+  frameName: string;
+}): string | null {
+  const proj = store().project;
+  if (!proj || o.cells.length === 0) return null;
+  const { width: W, height: H } = proj;
+  const group = newId('g_');
+  let firstId: string | null = null;
+  store().apply((d) => {
+    for (const a of [...o.cells.map((c) => c.asset), o.frame])
+      if (!d.assets.some((x) => x.id === a.id)) d.assets.push(a);
+    for (const c of o.cells) {
+      const dur = c.asset.kind === 'image' ? o.duration : Math.min(c.asset.duration, o.duration);
+      const item = cellItem(c.asset, c.win, W, H, o.start, dur, group);
+      const tr = createTrack('overlay', d.tracks as Track[]);
+      tr.items.push(item);
+      d.tracks.push(tr);
+      firstId ??= item.id;
+    }
+    const frame = createOverlayClip(o.frame, o.start);
+    frame.duration = o.duration;
+    frame.fit = 'contain';
+    frame.transform = { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 };
+    frame.group = group;
+    const ft = createTrack('overlay', d.tracks as Track[]);
+    ft.name = o.frameName;
+    ft.locked = true;
+    ft.items.push(frame);
+    d.tracks.push(ft);
+  });
+  if (firstId) store().select(firstId);
+  return firstId;
+}
+
+/** 刪掉整個版型（同一個 group 的外框與所有格子），空掉的軌道一起拿掉；一步復原 */
+export function removeGroup(group: string) {
+  store().apply(
+    (d) => {
+      for (const t of d.tracks) t.items = t.items.filter((x) => (x as VideoItem).group !== group) as never;
+      d.tracks = d.tracks.filter((t, i) => i === 0 || t.items.length > 0) as never;
+    },
+    { select: null },
+  );
 }
 
 export function addText(t: number, shape = false): string {

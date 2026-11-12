@@ -47,6 +47,7 @@ import {
   editItem,
   patchTrack,
   removeAnyItem,
+  removeGroup,
   shiftTrackLayer,
   setAllVideoMuted,
   splitAny,
@@ -55,6 +56,7 @@ import {
 import { setMainItems, setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Slider } from '../../ui/Slider';
+import { LayoutPicker } from './LayoutPicker';
 import { StickerPicker } from './StickerPicker';
 import { TextPanel } from './TextPanel';
 import { CropPanel } from './CropPanel';
@@ -381,6 +383,9 @@ function EditTab({
       <ToolButton icon={Plus} label="匯入" onClick={onImport} />
       <ToolButton icon={Scissors} label="分割" onClick={split} />
       <ToolButton icon={Trash2} label="刪除" onClick={remove} />
+      {selected && isVideoItem(selected) && selected.group && (
+        <ToolButton icon={Trash2} label="移除版型" onClick={() => removeGroup(selected.group!)} />
+      )}
       <ToolButton icon={Copy} label="複製" onClick={() => need() && duplicateAny(selected!.id)} />
       <ToolButton icon={ArrowLeft} label="前移" onClick={() => move(-1)} />
       <ToolButton icon={ArrowRight} label="後移" onClick={() => move(1)} />
@@ -482,6 +487,7 @@ function OverlayTab({ onImportOverlay }: { onImportOverlay: () => void }) {
         <span>貼圖</span>
       </div>
       <StickerPicker />
+      <LayoutPicker />
       <MusicImport />
     </div>
   );

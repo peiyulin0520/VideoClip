@@ -63,6 +63,10 @@ export type VideoItem = ItemBase & {
   fit: 'cover' | 'contain';
   /** 自由形狀裁切：多邊形的點，座標是「原始素材畫面」的比例 0–1（只留多邊形裡面，外面透明） */
   mask?: [number, number][];
+  /** 多格版型：這個物件所在的格子（佔畫面寬、高的比例）。裁切模式完成時，畫面會填滿這個格子 */
+  cell?: { x: number; y: number; w: number; h: number };
+  /** 同一個版型的物件（外框與各格）共用的 id，用來「刪除整個版型」 */
+  group?: string;
   /** 主軌專用：這個片段「前面」的空白秒數（黑畫面，疊加與文字照常）。沒有＝0＝首尾相接 */
   gap?: number;
 };

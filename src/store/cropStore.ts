@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { cropKeepingPlace, isNoCrop, NO_CROP, polygonCrop } from '../engine/crop';
+import { cellRect, cellTransform } from '../engine/layouts';
 import { findItem, isVideoItem } from '../engine/timeline';
 import { geoCtx } from '../engine/scene';
 import { itemBox, aabb } from '../engine/geometry';
@@ -60,7 +61,15 @@ export function startCrop(itemId: string): boolean {
     apply: (it) => ({ ...it, crop: undefined, mask: undefined, fit: view.fit, transform: view.transform }),
   });
   useCrop.setState({
-    s: { itemId, crop: item.crop ?? NO_CROP, mask: item.mask ?? null, lock: null, lasso: false, view },
+    s: {
+      itemId,
+      crop: item.crop ?? NO_CROP,
+      mask: item.mask ?? null,
+      // 版型的格子：預設鎖住格子的比例，拖動只是換「露出哪一塊」，畫面還是填滿格子
+      lock: item.cell ? (item.cell.w * project.width) / (item.cell.h * project.height) : null,
+      lasso: false,
+      view,
+    },
   });
   return true;
 }
@@ -97,7 +106,16 @@ export function finishCrop() {
     const it = f.item;
     if (isNoCrop(res.crop)) delete it.crop;
     else it.crop = res.crop;
-    it.transform = res.transform;
+    // 版型的格子：畫面一律填滿那個格子；其他物件：留下來的那塊位置大小不變
+    it.transform = item.cell
+      ? cellTransform(
+          asset,
+          res.crop,
+          cellRect(item.cell, project.width, project.height),
+          project.width,
+          project.height,
+        )
+      : res.transform;
     if (s.mask && s.mask.length >= 3) it.mask = s.mask;
     else delete it.mask;
   });
