@@ -10,18 +10,23 @@ import {
 } from 'react';
 import {
   baseMediaTrack,
+  dropTarget,
   isVideoItem,
   itemEnd,
+  KIND_LABEL,
   totalDuration,
+  trackKindOf,
   trimEndFree,
   trimStartFree,
   ZONE,
+  type DropTarget,
 } from '../../engine/timeline';
 import type { Asset, Item, Track, VideoItem } from '../../model/types';
 import { useProxyProgress } from '../../engine/proxyQueue';
 import { Wave } from './Wave';
 import {
   closeGap,
+  moveItemTo,
   moveTrackTo,
   patchTrack,
   placeItem,
@@ -33,6 +38,7 @@ import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 
 const BASE_H = 64; // 最下面那條影像軌高一點，縮圖看得清楚
+const SLOT_H = 26; // 拖素材時，同一區上下各多出一條「＋ 新增一軌」的放置區
 const GAP_MIN = 0.1; // 小於這個秒數的空位不畫
 const ROW_H = 44;
 const ROW_GAP = 6;
@@ -97,7 +103,16 @@ function gapsOf(items: Item[], includeLeading: boolean): { start: number; len: n
   return out;
 }
 
-type Drag = { kind: 'move'; id: string; dx: number; snapX: number | null };
+type Hover = { trackId: string | null; newEdge: 'top' | 'bottom' | null };
+type Drag = {
+  kind: 'move';
+  id: string;
+  dx: number;
+  dy: number;
+  snapX: number | null;
+  hover: Hover;
+  target: DropTarget | null;
+};
 
 export function Timeline({
   pps,
@@ -125,19 +140,38 @@ export function Timeline({
   const baseId = baseMediaTrack(project)?.id;
   const [gapSel, setGapSel] = useState<{ trackId: string; at: number } | null>(null);
 
-  // 由上到下顯示：字卡 → 特效 → 影像（最上層的軌道在最上面），音訊沒有畫面，畫在最下面、跟上面隔一小段
-  const rows = useMemo(() => {
+  // 由上到下顯示：字卡 → 特效 → 影像（最上層的軌道在最上面），音訊沒有畫面，畫在最下面、跟上面隔一小段。
+  // 拖素材時（slotZone），那個素材所屬的區上下各多出一條「＋ 新增一軌」的放置區
+  const draggedItem = drag ? project.tracks.flatMap((t) => t.items).find((x) => x.id === drag.id) : undefined;
+  const slotZone = draggedItem ? ZONE[trackKindOf(draggedItem)] : null;
+  const layout = useMemo(() => {
     const all = project.tracks.map((track, index) => ({ track, index })).reverse();
     const list = [...all.filter((r) => r.track.kind !== 'audio'), ...all.filter((r) => r.track.kind === 'audio')];
-    const heights = list.map((r) => (r.track.id === baseId ? BASE_H : ROW_H));
+    const slots: { edge: 'top' | 'bottom'; top: number }[] = [];
     let y = RULER_H + ROW_GAP;
-    return list.map((r, i) => {
+    const rows = list.map((r, i) => {
+      const z = ZONE[r.track.kind];
       if (i > 0 && r.track.kind === 'audio' && list[i - 1]!.track.kind !== 'audio') y += ROW_GAP * 2;
+      if (slotZone === z && (i === 0 || ZONE[list[i - 1]!.track.kind] !== z)) {
+        slots.push({ edge: 'top', top: y });
+        y += SLOT_H + ROW_GAP;
+      }
+      const h = r.track.id === baseId ? BASE_H : ROW_H;
       const top = y;
-      y += heights[i]! + ROW_GAP;
-      return { ...r, h: heights[i]!, top };
+      y += h + ROW_GAP;
+      if (slotZone === z && (i === list.length - 1 || ZONE[list[i + 1]!.track.kind] !== z)) {
+        slots.push({ edge: 'bottom', top: y });
+        y += SLOT_H + ROW_GAP;
+      }
+      return { ...r, h, top };
     });
-  }, [project.tracks, baseId]);
+    return { rows, slots };
+  }, [project.tracks, baseId, slotZone]);
+  const rows = layout.rows;
+  const layoutRef = useRef(layout);
+  useLayoutEffect(() => {
+    layoutRef.current = layout; // 拖素材的事件處理要讀最新的版面（含放置區）
+  });
   // 拖到的位置（顯示列）：只跟同一區（同種類）的列比；不能跨區
   const dropRow = (from: number, dy: number): number => {
     const me = rows[from];
@@ -184,7 +218,11 @@ export function Timeline({
     el.addEventListener('pointercancel', cancel);
   };
 
-  const contentH = (rows.length ? rows[rows.length - 1]!.top + rows[rows.length - 1]!.h : RULER_H) + 12;
+  const contentEnd = Math.max(
+    rows.length ? rows[rows.length - 1]!.top + rows[rows.length - 1]!.h : RULER_H,
+    ...layout.slots.map((sl) => sl.top + SLOT_H),
+  );
+  const contentH = contentEnd + 12;
 
   useLayoutEffect(() => {
     const el = scrollRef.current!;
@@ -293,11 +331,25 @@ export function Timeline({
       return { dx: (want + best.d - item.start) * pps, snapX: best.at };
     };
 
+    // 手指現在在哪一條軌道／哪個「＋ 新增一軌」放置區（用時間軸內容的座標比對目前的版面）
+    const hoverAt = (clientY: number): Hover => {
+      const el = scrollRef.current;
+      if (!el) return { trackId: null, newEdge: null };
+      const y = clientY - el.getBoundingClientRect().top + el.scrollTop;
+      const lay = layoutRef.current;
+      for (const sl of lay.slots) if (y >= sl.top && y < sl.top + SLOT_H) return { trackId: null, newEdge: sl.edge };
+      for (const r of lay.rows) if (y >= r.top - ROW_GAP / 2 && y < r.top + r.h + ROW_GAP / 2) return { trackId: r.track.id, newEdge: null };
+      return { trackId: null, newEdge: null };
+    };
+    const targetFor = (hover: Hover): DropTarget | null =>
+      dropTarget(useProjectStore.getState().project!.tracks, item, hover);
+
     const timer = setTimeout(() => {
       if (mode !== 'pending' || track.locked) return;
       mode = 'drag';
       window.addEventListener('touchmove', blockScroll, { passive: false });
-      setDrag({ kind: 'move', id: item.id, dx: 0, snapX: null });
+      const hover = { trackId: track.id, newEdge: null };
+      setDrag({ kind: 'move', id: item.id, dx: 0, dy: 0, snapX: null, hover, target: targetFor(hover) });
       navigator.vibrate?.(15);
     }, LONG_PRESS_MS);
 
@@ -309,7 +361,8 @@ export function Timeline({
       }
       if (mode !== 'drag') return;
       const s = snapStart(dx);
-      setDrag({ kind: 'move', id: item.id, dx: s.dx, snapX: s.snapX });
+      const hover = hoverAt(ev.clientY);
+      setDrag({ kind: 'move', id: item.id, dx: s.dx, dy: ev.clientY - startY, snapX: s.snapX, hover, target: targetFor(hover) });
     };
     const finish = (ev: PointerEvent, cancelled: boolean) => {
       clearTimeout(timer);
@@ -324,7 +377,12 @@ export function Timeline({
         const dx = ev.clientX - startX;
         setDrag(null);
         if (cancelled) return;
-        placeItem(item.id, item.start + snapStart(dx).dx / pps);
+        const start = item.start + snapStart(dx).dx / pps;
+        const target = targetFor(hoverAt(ev.clientY));
+        if (!target || (target.type === 'track' && target.trackId === track.id)) placeItem(item.id, start);
+        else if (target.type === 'invalid')
+          toast(`${KIND_LABEL[target.kind]}只能放在${KIND_LABEL[target.kind]}的軌道上，已放回原位`);
+        else moveItemTo(item.id, target, start);
       }
     };
     const up = (ev: PointerEvent) => finish(ev, false);
@@ -369,6 +427,13 @@ export function Timeline({
   const step = tickStep(pps);
   for (let t = 0; t <= total + 1e-6; t += step) ticks.push(t);
 
+  /** 拖素材時，每一列的樣子：放得進去的亮起來、不同種類的變灰 */
+  const dropClass = (track: Track): string => {
+    if (!drag || !draggedItem) return '';
+    if (track.kind !== trackKindOf(draggedItem)) return ' drop-bad';
+    return drag.hover.trackId === track.id ? ' drop-ok' : '';
+  };
+
   const menuTrack = project.tracks.find((t) => t.id === menuTrackId) ?? null;
   const menuIndex = menuTrack ? project.tracks.indexOf(menuTrack) : -1;
   // 時間軸高度＝全部軌道（不在裡面上下捲；上下交給整頁捲動）
@@ -396,6 +461,17 @@ export function Timeline({
             ))}
           </div>
 
+          {layout.slots.map((sl) => (
+            <div
+              key={sl.edge}
+              className={`new-slot${drag?.target?.type === 'new' && drag.target.edge === sl.edge ? ' hot' : ''}`}
+              data-testid="new-track-slot"
+              data-edge={sl.edge}
+              style={{ top: sl.top, height: SLOT_H }}
+            >
+              ＋ 新增一軌
+            </div>
+          ))}
           {rows.map(({ track, top, h }, rowIdx) => {
             // 拖軌道時：被拖的那列跟著手指，中間經過的列讓位
             let shift = 0;
@@ -410,7 +486,7 @@ export function Timeline({
             return (
               <div
                 key={track.id}
-                className={`track${track.hidden ? ' off' : ''}${isDragged ? ' track-dragging' : ''}`}
+                className={`track${track.hidden ? ' off' : ''}${isDragged ? ' track-dragging' : ''}${dropClass(track)}`}
                 data-testid="track"
                 data-kind={track.kind}
                 data-track-id={track.id}
@@ -477,6 +553,7 @@ export function Timeline({
                   const selected = it.id === selectedId;
                   const dragging = drag?.id === it.id;
                   const dx = dragging ? drag!.dx : 0;
+                  const dy = dragging ? drag!.dy : 0;
                   return (
                     <div
                       key={it.id}
@@ -488,7 +565,7 @@ export function Timeline({
                       style={{
                         left: half + it.start * pps,
                         width: Math.max(it.duration * pps, 4),
-                        transform: dragging ? `translateX(${dx}px)` : undefined,
+                        transform: dragging ? `translate(${dx}px, ${dy}px)` : undefined,
                       }}
                       onPointerDown={(e) => startItemGesture(e, it, track)}
                     >

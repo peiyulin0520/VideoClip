@@ -13,12 +13,14 @@ import type { Aspect, Asset, Item, Project, TextItem, Track, Transform, VideoIte
 import {
   baseMediaTrack,
   duplicateFree,
+  type DropTarget,
   findItem,
   findFreeStart,
   firstFreeTrack,
   insertIndexFor,
   isVideoItem,
   mediaItems,
+  moveItemToTrack,
   moveTrack,
   placeSequential,
   reorderTrack,
@@ -318,6 +320,21 @@ export function removeTrack(trackId: string) {
     },
     { select: null },
   );
+}
+
+/**
+ * 把物件搬到另一條軌道（同種類）或新增的軌道，並放在 start 秒（那裡有東西就移到最近的空位）。
+ * 種類不符回傳 false。一步復原。原軌道空了也不自動刪掉。
+ */
+export function moveItemTo(id: string, target: DropTarget, start: number): boolean {
+  const p = store().project;
+  if (!p) return false;
+  const next = moveItemToTrack(p.tracks, id, target, start, createTrack);
+  if (!next) return false;
+  store().apply((d) => {
+    d.tracks = next as never;
+  });
+  return true;
 }
 
 /** 物件放到新位置（自由放置，避開同軌其他物件） */

@@ -29,7 +29,8 @@ test('舊專案（v1：主軌＋疊加，字卡在疊加下面）打開後自動
     });
     const tx = db.transaction('projects', 'readwrite');
     const store = tx.objectStore('projects');
-    const p = await new Promise<any>((res) => {
+    type LooseTrack = { kind: string; name: string; items: { gap?: number }[] };
+    const p = await new Promise<{ tracks: LooseTrack[]; version: number }>((res) => {
       const g = store.get(id);
       g.onsuccess = () => res(g.result);
     });

@@ -27,7 +27,7 @@
 src/
   model/types.ts, defaults.ts     資料模型（Project / Track / Item …）與建立函式
   engine/
-    timeline.ts                   純函式：主軌 relayout/split/trim/speed、疊加軌自由放置（不重疊）、visibleLayers/layersAt
+    timeline.ts                   純函式：所有軌道自由放置（不重疊）的 split/trim/speed/move、軌道分區（ZONE、normalizeZones、insertIndexFor、reorderTrack 夾在同區）、rippleDelete、dropTarget／moveItemToTrack（長按拖到別軌）、visibleLayers/layersAt
     geometry.ts                   itemBox（物件在畫面的方框）、hit-test、吸附（中心線/邊緣/平台安全區）
     scene.ts                      buildScene：專案＋時間 t → 要畫的圖層清單（預覽與匯出共用）
     compositor.ts                 PixiJS 合成器（每個影片/照片圖層用 canvas 暫存畫面 → CanvasSource；遮罩圓角、外框、混合模式）
@@ -60,14 +60,14 @@ docs/      PLAN / TEXT_CARDS / EFFECTS / FONTS / PROGRESS / HANDOFF / font-cover
 ```
 
 ### 資料流
-`Project`（Zustand + immer，可復原）→ `visibleLayers(project, t)`（軌道順序＝圖層由下到上；主軌用 `itemAt`）→ `buildScene`（算每層的方框、透明度、混合、圓角、外框、裁切；字卡用 `renderText`）→ `Compositor.render`（Pixi）→ canvas。
+`Project`（Zustand + immer，可復原）→ `visibleLayers(project, t)`（軌道順序＝圖層由下到上；每一軌只在 [start, end) 顯示，最後一格仍顯示最後結束的物件）→ `buildScene`（算每層的方框、透明度、混合、圓角、外框、裁切；字卡用 `renderText`）→ `Compositor.render`（Pixi）→ canvas。
 `Player` 管時鐘與 `<video>`：每格 render 時替「正在顯示」的影片物件找一個 `<video>`（沿用同一個元素，不重設 src）、同步時間/速度/音量，預載即將出現的素材。
 單格匯出：`exportFrame.renderFrame` 另開 Compositor（輸出解析度）、用獨立 `<video>` 精準 seek，**與預覽用同一套 buildScene**，e2e 驗證兩者在取樣點顏色一致。
 
 ### 座標與單位
 - `transform.x/y`：物件中心，佔畫面寬/高的比例（0–1）；`scale`：乘上「填滿(cover)/完整(contain)」算出的基本大小；`rotation`：度，順時針。
 - 專案座標＝專案解析度（9:16 為 1080×1920）；預覽 canvas 長邊 960。字卡字級以 1080 寬為基準，畫的時候乘 `canvasW/1080`。
-- 圖層順序＝`project.tracks` 陣列順序；`tracks[0]` 一定是主軌。同一條疊加/文字軌的物件不能重疊（`findFreeStart`）。
+- 圖層順序＝`project.tracks` 陣列順序，並且**依種類分區**：影像（media）→ 特效（effect）→ 字卡（text）→ 音訊（audio），同一區可以自由換順序、不能跨區（2026-11-12 起沒有「主軌」，主軌與疊加合併成影像軌；`Project.version` 2，舊的 v1 讀進來時 `migrateProject` 轉換）。素材只能放進同種類的軌道（`trackKindOf`）。同一條軌的物件不能重疊（`findFreeStart`）。時間軸上音訊區畫在最下面（只是顯示順序，陣列裡 audio 在最後）。
 
 ### 儲存位置
 IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、`userFonts`）；OPFS（素材原檔）；Cache Storage `vc-fonts-v1`（官方字體）；localStorage 只放小旗標（安全區開關、iOS 提示已關閉、測試旗標）。
@@ -97,7 +97,7 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 | 圖形調整值 `CardBox.adj`＋`fitInset` 執行時重算外框大小（沒調過用 inset 表） | 像 Office 圖形的調整點；舊字卡大小不變 |
 | 字卡大小/外框粗細跟畫面短邊走（`uiScale = min(w,h)/1080`） | 改成橫式時字不會被放大 1.78 倍；9:16、3:4、1:1 不受影響 |
 | 安全區參考線預設關（localStorage `vc-safe-zone-v2`），只在拖移時自動出現；拖移一律吸附安全區邊界 | 使用者誤以為粉紅斜線是背景 |
-| 主軌：匯入不自動選、預覽單點不選也不拖、選取時只有細框和縮放鈕（沒有 ✕） | 主軌滿版，選取框像「需要手動縮小」 |
+| 匯入的影片接在最下面那條影像軌後面、不自動選取 | 滿版影片選取框像「需要手動縮小」。（2026-11-12 更新：預覽上**可以**點影片選取、縮放——見下面「預覽點選」） |
 | 縮圖：Mediabunny `CanvasSink` 優先 → `<video>` → 預覽播放器拿到畫面後 `setAssetThumbs`（不進復原歷史，歷史快照一併更新） | iPhone 隱藏 `<video>` 常不觸發 `loadeddata` |
 
 ## 5. 踩過的坑（避免再踩）
@@ -115,7 +115,7 @@ IndexedDB `videoclip`（專案 JSON、`meta.appState`、`meta.installedFonts`、
 - **會動的圖片（GIF／動態 WebP）**：`engine/animImage.ts` 解成 `ImageBitmap[]`＋每格長度（有 `ImageDecoder` 用它；沒有就 GIF 用 `gifuct-js`（MIT，npm 套件）自己處理 disposal；動態 WebP 在沒有 `ImageDecoder` 的瀏覽器解不了，所以 `giphyToFile` 那種情況改抓 GIF 版本）。`Asset.anim = { frames, duration }` 在匯入時決定（超過 150 格或解開後 > 96MB 就當一般照片）。預覽（`Player.render`）與單格輸出（`exportFrame`）都用 `frameIndexAt(delays, t − item.start)` 取格，循環播放。快取只存在記憶體，每個素材解一次。
 
 - **預覽用輕量影片（proxy）**：`engine/proxy.ts`（Mediabunny `Conversion`，先試 H.264/mp4，沒有再用 VP9/webm；HDR 在 `process` 裡畫到 OffscreenCanvas 轉 SDR）、`engine/proxyQueue.ts`（一次一支，狀態寫進 `Asset.proxy`，不進復原紀錄）、`assetUrls.urlFor(…, 'preview'|'export')`（預覽用 proxy、匯出一律原檔）。proxy 存在跟素材同一處，檔名 `<assetId>~p`。池子裡的 `<video>` 只有停著時才換網址。沙盒 Chromium 沒有 H.264，所以測試走 VP9；iPhone 實際走 H.264，沒驗證。
-- **主軌空白（gap）**：`VideoItem.gap` 是「這個片段前面的空白秒數」，`relayout` 先加 gap 再排；`trimStart` 的語意是「尾巴不動、切掉的變空白」，往左拉先吃空白；`layersAt` 在空白時主軌沒有圖層（黑畫面）；分割時空白只留前半段、複製品沒有空白。修剪面板（`setTrimWindow`）不動片段位置，只改長度。
+- **空位**（2026-11-12 取代「主軌 gap」）：所有影像軌都是自由擺放，沒有磁吸、沒有 `gap` 欄位（v1 的 gap 效果已經在 `start` 裡，migrate 時刪掉）。`trimStartFree`：尾巴不動、起點往後（前面空出來＝空位）；`layersAt` 在空位時沒有圖層（黑畫面）；刪除只刪這一段，「刪除並補齊」（`rippleDelete`）讓同軌後面的往前移；時間軸對影像軌物件之間的空位（最下面那條連開頭也算）畫虛線框，點一下選取、再點一下補齊（`closeGap`）。修剪面板（`setTrimWindowFree`）不動片段位置，只改長度（不能壓到後面的物件）。
 - **CDP 觸控／滑鼠事件有延遲**：讀 React 狀態前要等一下（e2e 裡 `waitForTimeout(250)`）；圓角元素的最邊角點不到。
 
 - **影片直接當 Pixi 貼圖**：用 `ImageSource({ resource: <video> })`，**不要**用 `VideoSource`（它會對元素 `load()`、自己接管播放）。改裁切（`texture.frame`）後要 `texture.update()`，而且貼圖建構時要給 `frame`（否則 `noFrame` 會把 frame 重設）、要 `dynamic: true`（精靈才聽得到 `update`）。
@@ -178,3 +178,10 @@ npm run check                      # lint + 41 個單元測試 + build
 npm run e2e -- --trace off         # 22 個 e2e（iPhone 13 尺寸、Chromium）
 ```
 e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會被 commit）。
+
+## 2026-11-12 第 6 次回報的架構變動（feedback-6，詳見 `docs/plans/2026-11-12-feedback-6.md`）
+- **預覽點選**：點預覽（按下到放開 < 350ms、移動 < 8px、沒被瀏覽器接手去捲頁面）才算點；點空白**不取消選取**（取消選取＝點時間軸空白）；沒選取的大物件（≥ 舞台一半）觸控區是 `touch-action: pan-y`（上下滑＝捲頁面），小物件與已選取的物件按下去就能拖（`touch-action:none`，已選取的外擴 40px）；已選的再點一次＝換下面那層（`nextHit`）；預覽右上「圖層」＝`LayerPeek` 清單。**取捨**：整個預覽都 `touch-action:none` 就不能在預覽上捲頁面，所以「雙指放哪裡都行」做不到，只有物件旁 40px 內。
+- **分頁**：`Toolbar.tsx` 只留分頁列＋自動切換（`tabForSelection`），每一頁一個檔在 `src/app/editor/tabs/`；`ClipPanel`（變速、音量、修剪）剪輯與音訊分頁共用。
+- **長按拖移素材**：`Timeline.tsx` 長按 400ms 後可以左右（改時間、吸附）、上下（換軌道）移動；同一區上下各出現「＋ 新增一軌」放置區（拖的時候版面會多出 26px 的列）；種類不符的軌道變灰、放開彈回並提示；放進去的位置有東西＝移到最近的空位；原軌道空了不自動刪。純函式在 `timeline.ts` 的 `dropTarget`／`moveItemToTrack`，動作 `actions.moveItemTo`。**沒做**：拖到時間軸邊緣自動捲動（時間軸的水平捲動＝播放頭，要另外設計）。
+- **坑**：①`deselect()`（e2e）點時間軸會把整頁捲下去，之後要先 `scrollTo(0,0)` 才能用舊座標點預覽 ②`openTab` 要限定在 `.tabs`（文字面板裡也有叫「文字」的小分頁）③新增軌道一律用 `insertIndexFor`＋`splice`，不要 `push`，否則會破壞分區順序（字卡跑到音訊後面）④「刪除」按鈕多了「刪除並補齊」，e2e 找「刪除」要 `exact: true`。
+
