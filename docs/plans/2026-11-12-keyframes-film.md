@@ -8,20 +8,29 @@
   4. 播放頭移到**結尾**，把影片往上拖**出畫面上方**（Y −514）——這時自動多一個關鍵影格。
   5. 播放：影片從下往上**滾過畫面**（中間經過 Y 282、−32 等位置）。
   6. 最後一張：每段影片外面套一個**底片框**（像掃描的負片：深色細邊、邊上有小字「底片型號＋格數」、邊緣微紅），幾段接起來往上捲＝**膠卷捲動**的效果。
+- **第二個教學**（使用者 2026-11-12 18:44，8 張剪映截圖，原話：「這是關鍵幀我想使用的另一種方法，請參考，並確認目前的形式可以做出類似效果」）。步驟：
+  1. 把影片的某一格做成**定格圖片**（剪映的「定格」），在主軌上變成一段圖片。
+  2. 在定格圖片**開頭**打一個關鍵影格。
+  3. 時間軸往後移一點，**雙指把圖片縮小、放到左邊**（自動多一個關鍵影格）。
+  4. 在第二個關鍵影格的位置打開「**調節**」，把**飽和度拉到 −50**。
+  5. 播放：圖片**從大縮到小、移到左邊**，同時**顏色慢慢變成黑白**。
+  - 結論：位置／大小的部分 K1 就做得到；**「定格」和「調節（調色）＋關鍵影格」目前的規劃沒有**，所以加了 **K5 定格**、**K6 調節（調色），可以打關鍵影格**。
 - 狀態：**規劃完成，尚未實作**（Opus 規劃，Sonnet 實作）。這份就是 `docs/LAYOUTS.md` 的 **L2（物件動畫核心）**＋部分 **L3（膠卷捲動）**。
 - **建議順序**：**K1 關鍵影格核心 → K2 一鍵動畫預設（捲過畫面等）→ K3 膠卷外框樣式 → K4 一鍵「膠卷捲動」**。K1 做完就能照剪映教學的步驟手動做出來；K2～K4 是讓它一鍵完成。
 
 ---
 
-## K1. 關鍵影格核心（任何疊加影片、照片、貼圖、文字都能用）
+## K1. 關鍵影格核心（主軌片段、疊加影片、照片、貼圖、文字都能用）
 
 ### 資料
 - `ItemBase.keyframes?: Keyframe[]`（照時間排序）
-  `Keyframe = { t: number /* 物件開始後幾秒 */; x: number; y: number; scale: number; rotation: number; opacity: number; ease?: 'linear' | 'ease' }`
+  `Keyframe = { t: number /* 物件開始後幾秒 */; x: number; y: number; scale: number; rotation: number; opacity: number; adjust?: Partial<Adjust>; ease?: 'linear' | 'ease' }`
+  - `adjust`：這個時間點的**調節（調色）**值（K6），沒寫的項目沿用物件本身的調節值。這樣「位置大小」和「顏色」都能用同一組關鍵影格做漸變（第二個教學）。
 - 沒有 `keyframes`（或少於 1 個）＝跟現在一樣，用 `transform`。
 - 有關鍵影格時：`transform` 當作「沒動畫時的值」保留；畫面上用的是依時間內插的值。
 
 ### 計算（`src/engine/keyframes.ts`，純函式＋單元測試）
+- 主軌片段也要能用（第二個教學是在主軌上的定格圖片縮小移到左邊；主軌片段縮小後露出黑底）。
 - `transformAt(item, t): Transform`：`local = t − item.start`；在第一個之前＝第一個的值，最後一個之後＝最後一個的值，中間依兩個關鍵影格線性內插（`ease` 時用 smoothstep）。旋轉照數字內插（不繞最短路）。
 - `withTimeTransform(item, t)`：回傳 transform 換成 `transformAt` 的物件（給 scene／selection 用）。
 - `upsertKeyframe(item, local, values)`：同一時間（±1/30 秒）就更新，不然插入並排序。
@@ -107,11 +116,37 @@
 
 ---
 
+## K5. 定格（把影片的某一格變成一段圖片）
+
+- 剪輯分頁加「**定格**」按鈕：選到影片（主軌或疊加）→ 在播放頭這一格：
+  - 用 Mediabunny 精準取出這一格（原檔解析度，跟匯出取格同一套 `CanvasSink`），存成 PNG 素材；
+  - **主軌**：把影片在播放頭切開，中間插入一段 **3 秒**的定格圖片（後面的片段往後移）；**疊加**：一樣切開、插入，後面的物件往後移（放不下就放到新的軌道）。
+  - 一步復原。
+- 定格圖片就是普通照片片段：可以縮放、移動、打關鍵影格、調色、修剪長度。
+- 驗收：單元（切開與插入後的時間）；e2e：影片播到某處按定格 → 主軌多一段圖片、長度 3 秒、圖片顏色跟那一格一樣（取樣）、後面的片段順延、一步復原。🔴 真機：iPhone HEVC 影片取格。
+
+## K6. 調節（調色），而且可以打關鍵影格
+
+- 剪輯分頁加「**調節**」：選到影片／照片 → 面板：**亮度、對比、飽和度、色溫、色調、褪色（Fade）、暗角**（−100～+100，0＝原本）＋「重設」。（濾鏡預設是 PLAN R17 的另一部分，之後再做。）
+- 畫面：合成器對該圖層加 Pixi `ColorMatrixFilter`（亮度、對比、飽和、色溫色調用矩陣），暗角用遮罩或簡單的 shader；預覽、匯出共用。⚠ PLAN 規定不要用 Canvas2D `ctx.filter`（Safari 不穩）。
+- 資料：`ItemBase.adjust?: Adjust`（`Adjust = { brightness, contrast, saturation, temperature, tint, fade, vignette }`，都是 −100～100，沒有＝0）。
+- **跟關鍵影格一起用**：物件有關鍵影格時，調節面板改的是**播放頭這個時間**的關鍵影格的 `adjust`（沒有就新增），跟拖移一樣。內插時每個調節項目各自線性內插 → 第二個教學「顏色慢慢變黑白」：開頭的關鍵影格飽和度 0、第二個 −50（或 −100＝完全黑白）。
+- 時間軸片段上：有調節的片段左上角一個小圖示；關鍵影格的菱形不分種類（一個關鍵影格同時記位置與調節）。
+- 驗收：單元（顏色矩陣：飽和度 −100＝灰階、亮度、對比；關鍵影格內插 adjust）；e2e：照片加調節飽和度 −100 → 預覽取樣 R＝G＝B；關鍵影格 0→−100 → 中間時間的飽和度約一半（取樣色彩差）；單格輸出與匯出一樣。
+
+## 第二個教學能不能做到（結論）
+- 「定格」：K5 ✅
+- 「開頭打關鍵影格 → 往後移時間 → 雙指縮小放到左邊」：K1 ✅（雙指縮放與拖移在有關鍵影格時自動新增關鍵影格；主軌片段也支援）
+- 「在第二個關鍵影格打開調節、飽和度 −50」：K6 ✅
+- 「播放時從大到小、顏色慢慢變黑白」：K1 內插 transform＋K6 內插 adjust ✅
+
 ## 會動到的檔案（總覽）
 - K1：新 `src/engine/keyframes.ts`（＋test）、`src/model/types.ts`（`keyframes`）、`src/engine/{scene,timeline,geometry}.ts`、`src/store/{actions,cropStore}.ts`（`setTransform` 依關鍵影格）、`src/app/editor/{Preview,Timeline,TransformControls,Toolbar}.tsx`、`src/app/pages/Editor.tsx`（播放列 ◇ 按鈕）
 - K2：新 `src/engine/motionPresets.ts`（＋test）、`Toolbar.tsx`（動畫面板）
 - K3：`src/engine/{compositor,scene,geometry}.ts`、新 `src/engine/frameStyles.ts`、`Toolbar.tsx`（圖層分頁外框樣式）
 - K4：`src/engine/layouts.ts`／新 `filmScroll.ts`、`LayoutPicker.tsx`
+- K5：`src/engine/{exporter 或新 freezeFrame}.ts`（取格成 PNG）、`src/store/actions.ts`（`freezeFrame`：切開＋插入）、`Toolbar.tsx`（定格鈕）
+- K6：新 `src/engine/adjust.ts`（顏色矩陣，純函式＋test）、`compositor.ts`（`ColorMatrixFilter`）、`scene.ts`（帶 `adjust`）、`keyframes.ts`（內插 adjust）、新 `src/app/editor/AdjustPanel.tsx`、`src/model/types.ts`（`Adjust`）
 - 既有測試要改的（改不要刪）：用到 `transform` 的單元測試照舊（沒有關鍵影格時行為不變）；`e2e/preview-first.spec.ts` 的拖移／縮放測試要確認沒有關鍵影格時不受影響。
 - 文件：`docs/LAYOUTS.md`（L2／L3 狀態）、`docs/EFFECTS.md`（§2 物件動畫改成關鍵影格）、`docs/PLAN.md §7`、`docs/PROGRESS.md`、`docs/HANDOFF.md`。
 
