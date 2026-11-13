@@ -82,3 +82,18 @@ describe('GIPHY', () => {
     expect(e.kind).toBe('network');
   });
 });
+
+describe('giphyPage：分頁', () => {
+  it('帶 offset、回傳總數與這一頁的筆數', async () => {
+    const { giphyPage } = await import('./giphy');
+    const f = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ data: [{}, {}], pagination: { total_count: 99 } })),
+      );
+    const r = await giphyPage('cat', 'K', 24, 48);
+    expect(new URL(String(f.mock.calls[0]![0])).searchParams.get('offset')).toBe('48');
+    expect(r.total).toBe(99);
+    expect(r.count).toBe(2);
+  });
+});

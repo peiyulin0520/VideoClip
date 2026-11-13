@@ -1943,9 +1943,14 @@ button {
   padding: 0 12px;
   white-space: nowrap;
   background: rgba(20, 20, 20, 0.85);
+  color: #fff; /* 固定白字：底色固定是深色，不跟著淺色主題變成深色字 */
+}
+.crop-bar .btn:disabled {
+  color: rgba(255, 255, 255, 0.45);
 }
 .crop-bar .btn.primary {
   background: var(--accent, #ff4d8d);
+  color: #fff;
 }
 
 /* 匯出面板 */
@@ -2336,10 +2341,33 @@ button {
   align-items: flex-start;
   margin: 6px 0;
 }
-.range-mini {
+.range-mini-wrap {
+  position: relative;
   flex: none;
-  width: 96px;
+  width: 112px;
+}
+.range-mini {
+  display: block;
+  width: 112px;
   background: #000;
+  border-radius: 8px;
+}
+.range-mini-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.range-mini-t {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
   border-radius: 8px;
 }
 .range-main {
@@ -2559,21 +2587,42 @@ button {
   color: inherit;
 }
 
-.story-thumb {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 54px;
-  height: 90px;
-  padding: 4px;
-  border-radius: 6px;
-  background: #4a4a50;
+/* 音訊分頁：每一列左邊是那支影片開始那一格的縮圖 */
+.audio-thumb {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--btn2, #333);
+  background-size: cover;
+  background-position: center;
 }
-.story-thumb i {
-  flex: 1;
-  border-radius: 3px;
-  background: #8aa4b8;
+.audio-thumb b {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
 }
-.story-thumb i:nth-child(2) {
-  background: #b8a48a;
+
+/* 流暢預覽的小標籤（點一下改回清楚） */
+.quality-chip {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 4;
+  min-height: 0;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 12px;
 }

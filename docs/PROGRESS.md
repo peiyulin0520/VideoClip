@@ -75,6 +75,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-13 H1 修 bug、H2 拿掉動態模板、H3 預覽順暢（feedback-8 H1–H3，Sonnet 實作）
+  - **H1**：①「刪除並補齊」、一般刪除、刪軌道（`rippleRemoveItem`／`removeAnyItem`／`removeTrack`）遇到版型的外框或格子軌道＝整個版型一起拿掉（以前只刪外框，格子還留著）；`migrate.repairGroups`：舊專案裡沒有外框的孤兒格子變回普通影像軌（時間軸看得到、可自己刪），打開專案時自動修復②圖層分頁「位置、大小、旋轉歸位」與「整個圖層透明度」走 `resetTransform`／`setTransform`＝整組；`buildScene` 加 `guardCell` 保險（格子位置跟外框算出來的差 >2% 就以算的為準，裁切模式的暫時修改時不啟用）③裁切工具列字固定白色、裁切時隱藏預覽「圖層」鈕④音訊分頁每一列左邊是影片首圖（`thumbOf`）、名稱前有序號⑤GIPHY 往下滑載入更多（`giphyPage`、IntersectionObserver、最多 240 個、次數用完保留已載入的）。測試：`groupDelete.test.ts`、`migrate.test.ts`、`giphy.test.ts`、e2e `h1.spec.ts`＋giphy 分頁
+  - **H2**：拿掉動態模板（版型分頁區塊、`addStory`、`engine/story.ts`、`scene.ts` 的染色與動態格子、`g6.spec`、`story.test`）；舊專案的 `template`／`cellAnim`／`fontCycle`／字卡 `group` 由 `repairGroups` 清掉（型別欄位先留著）
+  - **H3**：①預覽畫質：設定頁「預覽畫質」自動／清楚／流暢（`vc-preview-quality`），流暢＝預覽畫布長邊 480（清楚 960）；自動＝同時 3 支以上影片（`maxVideoOverlap`）或連續 3 秒播放 <20 格/秒就改流暢（`Player.onSlow`）；預覽左下「流暢預覽」小標籤（點一下改回清楚）；匯出完全不受影響（e2e 驗證單格匯出尺寸）②影片池不夠用時（`pool.acquire` 回 null）那一格改畫素材縮圖（`thumbFallback`），提示一次，不再變黑③修剪面板：拖旗標時小畫面先顯示縮圖＋「第 N 秒」，放開才更新片段與 seek（`RangePicker.onChange(final)`），不再每一下都 seek 影片；新增「▶ 播放這一段」。Preview 的 canvas key 加上畫質（重建 Player 要換新的 canvas）
+  - 🟡 iPhone 的流暢預覽實際差多少、自動切換的門檻（3 支／20 格）還要真機調；修剪面板拖旗標時縮圖密度取決於素材縮圖數量（長影片只有少少幾張時會比較粗）
 - 2026-11-13 規劃 feedback-8（Opus，只規劃）
   - 做了什麼：讀使用者 7 項回報與 Insta360 轉場截圖；查到兩個 bug 的原因：①「刪除並補齊」（`rippleRemoveItem`）不認得版型，刪外框只刪外框，各格（時間軸上藏起來）還在預覽裡畫，還佔掉影片池讓新版型的格子變黑；②圖層分頁「位置、大小、旋轉歸位」直接改 transform、沒走整組變形 → 跑版；③裁切工具列固定深色底但字用主題色。寫 `docs/plans/2026-11-13-feedback-8.md`（H1–H7）
 - 2026-11-12 G6 動態模板「三格故事」（feedback-7 G6）

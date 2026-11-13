@@ -5,6 +5,8 @@ import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
 import { captureThumb } from './probe';
 import { buildScene } from './scene';
+import { previewSizeFor } from './previewQuality';
+import { thumbOf } from './labels';
 import { baseMediaTrack, sourceTimeAt, totalDuration } from './timeline';
 
 type Deps = {
@@ -14,6 +16,12 @@ type Deps = {
   onThumb?: (assetId: string, thumbs: string[]) => void;
   /** iPhone 擋住了出聲播放（要使用者再按一次播放） */
   onAudioBlocked?: () => void;
+  /** 播放了幾秒，同時有 2 支以上影片，平均每秒不到 20 格：建議改用流暢預覽（只通知一次） */
+  onSlow?: () => void;
+  /** 流暢預覽（畫布小一半） */
+  smooth?: boolean;
+  /** 同時要播的影片超過影片池上限，多的格子先改畫縮圖（只通知一次） */
+  onPoolFull?: () => void;
 };
 type Listener = (t: number, playing: boolean) => void;
 
@@ -35,10 +43,12 @@ export function driftPlan(diff: number, speed: number, soft = true): { seek: boo
   return { seek: false, rate: speed };
 }
 
-/** 預覽畫面的內部解析度：長邊 960（1:1 也是 960） */
-export function previewSize(p: Pick<Project, 'width' | 'height'>): { width: number; height: number } {
-  const k = 960 / Math.max(p.width, p.height);
-  return { width: Math.round(p.width * k), height: Math.round(p.height * k) };
+/** 預覽畫面的內部解析度：長邊 960（1:1 也是 960）；流暢預覽 480 */
+export function previewSize(
+  p: Pick<Project, 'width' | 'height'>,
+  smooth = false,
+): { width: number; height: number } {
+  return previewSizeFor(p, smooth);
 }
 
 /**
@@ -70,6 +80,11 @@ export class Player {
   private accUpload = 0;
   private seg = { build: 0, comp: 0, upload: 0 };
   private videoInfo = '';
+  private videoCount = 0;
+  private poolFullTold = false;
+  private thumbImgs = new Map<string, HTMLImageElement>();
+  private slowSecs = 0;
+  private slowTold = false;
   /** 裁切模式：暫時把某個物件換成「完整畫面」來畫（不改專案資料） */
   private patch: { itemId: string; apply: (it: VideoItem) => VideoItem } | null = null;
 
@@ -83,7 +98,7 @@ export class Player {
 
   static async create(opts: { host: HTMLElement; canvas: HTMLCanvasElement } & Deps): Promise<Player> {
     const p = opts.getProject();
-    const size = p ? previewSize(p) : { width: 540, height: 960 };
+    const size = p ? previewSize(p, opts.smooth) : { width: 540, height: 960 };
     const compositor = await Compositor.create({ ...size, canvas: opts.canvas });
     let player: Player | null = null;
     const pool = new VideoPool(opts.host, POOL_SIZE, () => player?.scheduleRender());
@@ -204,6 +219,13 @@ export class Player {
     if (this.statSince === 0) this.statSince = now;
     if (now - this.statSince >= 1000) {
       this.statFps = (this.statFrames * 1000) / (now - this.statSince);
+      // 連續 3 秒：播放中、同時 2 支以上影片、每秒不到 20 格 → 建議流暢預覽
+      if (this.playing && this.videoCount >= 2 && this.statFps < 20) this.slowSecs++;
+      else this.slowSecs = 0;
+      if (this.slowSecs >= 3 && !this.slowTold) {
+        this.slowTold = true;
+        this.deps.onSlow?.();
+      }
       this.statAvgMs = this.statMs / this.statFrames;
       this.statBuild = this.accBuild / this.statFrames;
       this.statComp = this.accComp / this.statFrames;
@@ -307,6 +329,30 @@ export class Player {
     this.music.pauseAllExcept(used);
   }
 
+  /** 影片池不夠用時，那個影片物件這一刻先畫素材縮圖（靜態、零成本），不要變黑 */
+  private thumbFallback(item: VideoItem, asset: Asset, t: number) {
+    if (!this.poolFullTold) {
+      this.poolFullTold = true;
+      queueMicrotask(() => this.deps.onPoolFull?.());
+    }
+    const url = thumbOf({ ...item, trimIn: sourceTimeAt(item, t) }, asset);
+    if (!url) return null;
+    let img = this.thumbImgs.get(url);
+    if (!img) {
+      if (this.thumbImgs.size > 60) this.thumbImgs.clear();
+      img = new Image();
+      img.onload = () => this.scheduleRender();
+      img.src = url;
+      this.thumbImgs.set(url, img);
+    }
+    return {
+      source: img,
+      ready: img.complete && img.naturalWidth > 0,
+      srcW: img.naturalWidth || asset.width,
+      srcH: img.naturalHeight || asset.height,
+    };
+  }
+
   private blocked() {
     if (!this.playing) return;
     this.pause();
@@ -324,48 +370,57 @@ export class Player {
     const used = new Set<HTMLVideoElement>();
 
     const t0 = performance.now();
-    const scene = buildScene(p, t, comp.width, comp.height, (item, asset, track) => {
-      const url = this.deps.urlFor(asset.id);
-      if (!url) return null;
-      if (item.type === 'image' && asset.anim) {
-        // 會動的圖片：依「物件開始後經過的時間」取第幾格（預覽、暫停、拖時間軸都準確）
-        const anim = peekAnim(asset.id);
-        if (anim === undefined) {
-          void loadAnim(asset.id, async () => (await fetch(url)).blob()).then(() => this.scheduleRender());
-        } else if (anim) {
+    const scene = buildScene(
+      p,
+      t,
+      comp.width,
+      comp.height,
+      (item, asset, track) => {
+        const url = this.deps.urlFor(asset.id);
+        if (!url) return null;
+        if (item.type === 'image' && asset.anim) {
+          // 會動的圖片：依「物件開始後經過的時間」取第幾格（預覽、暫停、拖時間軸都準確）
+          const anim = peekAnim(asset.id);
+          if (anim === undefined) {
+            void loadAnim(asset.id, async () => (await fetch(url)).blob()).then(() => this.scheduleRender());
+          } else if (anim) {
+            return {
+              source: anim.frames[frameIndexAt(anim.delays, t - item.start)]!,
+              ready: true,
+              srcW: anim.width,
+              srcH: anim.height,
+            };
+          }
+          // 還沒解好（或解不了）：先用第一格的靜態圖
+        }
+        if (item.type === 'image') {
+          const img = this.imageFor(asset.id);
+          if (!img) return null;
           return {
-            source: anim.frames[frameIndexAt(anim.delays, t - item.start)]!,
-            ready: true,
-            srcW: anim.width,
-            srcH: anim.height,
+            source: img,
+            ready: img.complete && img.naturalWidth > 0,
+            srcW: img.naturalWidth || asset.width,
+            srcH: img.naturalHeight || asset.height,
           };
         }
-        // 還沒解好（或解不了）：先用第一格的靜態圖
-      }
-      if (item.type === 'image') {
-        const img = this.imageFor(asset.id);
-        if (!img) return null;
+        const el = this.pool.acquire(item.id, asset.id, url, used);
+        if (!el) return this.thumbFallback(item, asset, t); // 同時疊的影片超過上限：多的先畫縮圖
+        used.add(el);
+        this.syncVideo(el, item, asset, track, t);
+        this.maybeCaptureThumb(el, asset);
+        if (track.kind === 'media' && el.videoWidth)
+          this.videoInfo = `${el.videoWidth}×${el.videoHeight} ${asset.codec ?? ''}${asset.hdr ? ' HDR' : ''}｜預覽檔：${asset.proxy?.status ?? '無'}`;
         return {
-          source: img,
-          ready: img.complete && img.naturalWidth > 0,
-          srcW: img.naturalWidth || asset.width,
-          srcH: img.naturalHeight || asset.height,
+          source: el,
+          ready: el.readyState >= 2 && !el.seeking && el.videoWidth > 0,
+          srcW: el.videoWidth || asset.width,
+          srcH: el.videoHeight || asset.height,
         };
-      }
-      const el = this.pool.acquire(item.id, asset.id, url, used);
-      if (!el) return null; // 同時疊的影片超過上限，多的不畫
-      used.add(el);
-      this.syncVideo(el, item, asset, track, t);
-      this.maybeCaptureThumb(el, asset);
-      if (track.kind === 'media' && el.videoWidth)
-        this.videoInfo = `${el.videoWidth}×${el.videoHeight} ${asset.codec ?? ''}${asset.hdr ? ' HDR' : ''}｜預覽檔：${asset.proxy?.status ?? '無'}`;
-      return {
-        source: el,
-        ready: el.readyState >= 2 && !el.seeking && el.videoWidth > 0,
-        srcW: el.videoWidth || asset.width,
-        srcH: el.videoHeight || asset.height,
-      };
-    });
+      },
+      { guardCells: !this.patch },
+    );
+
+    this.videoCount = used.size;
 
     // 預載：下一個主軌片段、1 秒內要開始的疊加影片
     for (const { item, asset } of this.upcoming(p, t)) {

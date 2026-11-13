@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PointerEvent as RPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { Range } from '../../engine/timeline';
 import type { Asset } from '../../model/types';
 import { Wave } from './Wave';
@@ -25,7 +25,8 @@ export function RangePicker({
   ranges: Range[];
   sel: number;
   onSelect: (i: number) => void;
-  onChange: (next: Range[], hint: RangeHint) => void;
+  /** 旗標移動中 final=false（只更新畫面上的旗標與小縮圖，不去動預覽的影片）；放開手指 final=true */
+  onChange: (next: Range[], hint: RangeHint, final: boolean) => void;
   /** 一段最短的素材秒數 */
   minSrc: number;
   /** 每次增加就把預覽畫布目前的畫面複製到小畫面（晚一點再畫幾次，等影片 seek 完） */
@@ -35,6 +36,8 @@ export function RangePicker({
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
   const miniRef = useRef<HTMLCanvasElement>(null);
+  // 拖旗標的時候：小畫面先顯示素材縮圖（零延遲，手機上 seek 影片太慢會跳格）；放開才去 seek 精準的那一格
+  const [live, setLive] = useState<number | null>(null);
   const dur = Math.max(asset.duration, 0.1);
 
   useEffect(() => {
@@ -63,6 +66,7 @@ export function RangePicker({
     const width = stripRef.current!.getBoundingClientRect().width || 1;
     const prevEnd = i > 0 ? base[i - 1]![1] : 0;
     const nextStart = i < base.length - 1 ? base[i + 1]![0] : dur;
+    let latest: Range[] = base;
     const move = (ev: PointerEvent) => {
       const d = ((ev.clientX - x0) / width) * dur;
       const [a, b] = base[i]!;
@@ -75,9 +79,13 @@ export function RangePicker({
         r = [ns, ns + len];
       }
       const next = base.map((x, k): Range => (k === i ? r : x));
-      onChange(next, { index: i, edge });
+      latest = next;
+      setLive(edge === 'end' ? r[1] : r[0]);
+      onChange(next, { index: i, edge }, false);
     };
     const up = () => {
+      setLive(null);
+      onChange(latest, { index: i, edge }, true);
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
@@ -99,14 +107,28 @@ export function RangePicker({
 
   return (
     <div className="range-picker" data-testid="range-picker">
-      <canvas
-        ref={miniRef}
-        className="range-mini"
-        width={96}
-        height={Math.max(Math.round(96 / Math.max(aspect, 0.2)), 40)}
-        aria-label="拖旗標時，這一秒的畫面"
-        data-testid="range-mini"
-      />
+      <div className="range-mini-wrap">
+        <canvas
+          ref={miniRef}
+          className="range-mini"
+          width={112}
+          height={Math.max(Math.round(112 / Math.max(aspect, 0.2)), 48)}
+          aria-label="拖旗標時，這一秒的畫面"
+          data-testid="range-mini"
+        />
+        {live !== null && asset.thumbs.length > 0 && (
+          <img
+            className="range-mini-thumb"
+            data-testid="range-mini-thumb"
+            alt=""
+            draggable={false}
+            src={
+              asset.thumbs[clamp(Math.floor((live / dur) * asset.thumbs.length), 0, asset.thumbs.length - 1)]
+            }
+          />
+        )}
+        {live !== null && <span className="range-mini-t">第 {live.toFixed(1)} 秒</span>}
+      </div>
       <div className="range-main">
         <div className="range-wrap">
           <div className="range-flags">

@@ -9,8 +9,7 @@ import {
   renderFramePng,
   type LayoutDef,
 } from '../../engine/layouts';
-import { monthTitle } from '../../engine/story';
-import { addLayout, addStory } from '../../store/actions';
+import { addLayout } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
@@ -45,11 +44,6 @@ export function LayoutPicker() {
   const [colorId, setColorId] = useState('white');
   const [motion, setMotion] = useState<'' | 'drift' | 'slide'>('');
   const input = useRef<HTMLInputElement>(null);
-  // 動態模板「三格故事」
-  const [storyOpen, setStoryOpen] = useState(false);
-  const [title, setTitle] = useState(() => monthTitle());
-  const [subtitle, setSubtitle] = useState('Hello, hello');
-  const storyInput = useRef<HTMLInputElement>(null);
   const W = project.width;
   const H = project.height;
 
@@ -111,61 +105,8 @@ export function LayoutPicker() {
     }
   };
 
-  const onStoryFiles = async (list: FileList | null) => {
-    const files = list ? Array.from(list) : [];
-    if (storyInput.current) storyInput.current.value = '';
-    if (!files.length) return;
-    const { setBusy, player } = useUI.getState();
-    const pid = useProjectStore.getState().project!.id;
-    setBusy('做模板中…');
-    try {
-      const res = await importFiles(pid, files);
-      const media = res.assets.filter((a) => a.kind !== 'audio');
-      if (res.failed.length)
-        toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`, 7000);
-      if (media.length === 0) return;
-      // 第 1 個是開場，後面 3 個是三格；不夠就輪流重複使用
-      const four = [0, 1, 2, 3].map((i) => media[i % media.length]!);
-      // 全透明的外框圖（只是代表整個模板的物件，沒有畫面）
-      const c = document.createElement('canvas');
-      c.width = Math.round(W);
-      c.height = Math.round(H);
-      const blob = await new Promise<Blob>((ok, bad) =>
-        c.toBlob((b) => (b ? ok(b) : bad(new Error('做不出來'))), 'image/png'),
-      );
-      const fr = await importFiles(pid, [new File([blob], '模板-三格故事.png', { type: 'image/png' })]);
-      const frame = fr.assets[0];
-      if (!frame) return toast('做不出來', 6000);
-      await ensureUrls(pid, [...media, frame]);
-      addStory({
-        frame,
-        media: four,
-        start: player?.time ?? 0,
-        title: title.trim() || monthTitle(),
-        subtitle,
-      });
-      setStoryOpen(false);
-      toast('模板加好了。整個模板可以在預覽上縮放移動；標題、副標在「文字」分頁改', 6000);
-    } finally {
-      setBusy(null);
-    }
-  };
-
   return (
     <>
-      <div className="panel-head">
-        <span>動態模板</span>
-      </div>
-      <div className="layout-grid" data-testid="story-grid">
-        <button className="layout-card" aria-label="模板 三格故事" onClick={() => setStoryOpen(true)}>
-          <span className="story-thumb" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-          <span>三格故事</span>
-        </button>
-      </div>
       <div className="panel-head">
         <span>版型（拍貼機、膠卷…）</span>
       </div>
@@ -246,49 +187,6 @@ export function LayoutPicker() {
           </div>
         )}
       </Sheet>
-      <Sheet open={storyOpen} title="動態模板：三格故事（8 秒）" onClose={() => setStoryOpen(false)}>
-        <div data-testid="story-sheet">
-          <p className="hint">
-            開場影片先在中間，上下撐開成滿版 → 三格從上、右、下依序滑進來 → 中間的標題快速換字體 → 染成暖橘色
-            → 閃光。 選 1–4 個照片或影片：第 1 個是開場，後面 3 個放三格（不夠會輪流重複使用）。
-          </p>
-          <label className="field">
-            標題
-            <input
-              className="text-input"
-              aria-label="模板標題"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </label>
-          <label className="field">
-            副標（可以留空）
-            <input
-              className="text-input"
-              aria-label="模板副標"
-              value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
-            />
-          </label>
-          <div className="sheet-row">
-            <button className="btn" onClick={() => setStoryOpen(false)}>
-              取消
-            </button>
-            <button className="btn primary" onClick={() => storyInput.current?.click()}>
-              選照片或影片
-            </button>
-          </div>
-        </div>
-      </Sheet>
-      <input
-        ref={storyInput}
-        type="file"
-        accept="video/*,image/*"
-        multiple
-        hidden
-        data-testid="story-input"
-        onChange={(e) => void onStoryFiles(e.target.files)}
-      />
       <input
         ref={input}
         type="file"

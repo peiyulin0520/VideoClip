@@ -58,9 +58,10 @@ export function TrimPanel({
     setSig((n) => n + 1);
   };
 
-  const change = (next: Range[], hint: RangeHint) => {
+  const change = (next: Range[], hint: RangeHint, final = true) => {
     setRanges(next);
     player?.pause();
+    if (!final) return; // 拖旗標中：只動旗標；放開才更新片段與預覽（不然手機上每一下都 seek 影片，會跳格）
     if (next.length === 1) {
       const next1 = setTrimWindowFree(track.items, item.id, next[0]![0], next[0]![1], asset);
       setTrackItems(track.id, next1, { coalesce: `trim:${item.id}` });
@@ -115,6 +116,30 @@ export function TrimPanel({
     else showAt(next[Math.min(sel, next.length - 1)]!, 'start', true);
   };
 
+  /** 只播目前選的這一段（播到終點自動停） */
+  const playRange = () => {
+    if (!player) return;
+    const r0 = ranges[sel]!;
+    const len = (r0[1] - r0[0]) / item.speed;
+    let t0: number;
+    if (ranges.length > 1) {
+      // 多段：片段本身還沒拆，先用暫時修改讓預覽顯示這一段
+      showAt(r0, 'start', true);
+      t0 = startRef.current;
+    } else {
+      t0 = project.tracks.flatMap((x) => x.items).find((x) => x.id === item.id)?.start ?? item.start;
+    }
+    player.pause();
+    player.seek(t0);
+    player.play();
+    const unsub = player.subscribe((t, playing) => {
+      if (t >= t0 + len - 0.03 || !playing) {
+        unsub();
+        if (playing) player.pause();
+      }
+    });
+  };
+
   const done = () => {
     if (ranges.length > 1) {
       const id = applyRanges(item.id, ranges);
@@ -159,6 +184,9 @@ export function TrimPanel({
         </button>
       </div>
       <div className="range-actions">
+        <button className="btn" data-testid="range-play" onClick={playRange}>
+          ▶ 播放這一段
+        </button>
         <button className="btn" data-testid="range-add" onClick={addRange}>
           ＋ 再加一段
         </button>

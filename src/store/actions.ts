@@ -46,7 +46,6 @@ import {
 } from '../engine/timeline';
 import { cellItem, type Rect } from '../engine/layouts';
 import { DEFAULT_TRANSITION_DURATION } from '../engine/transitions';
-import { STORY_CYCLE_FONTS, STORY_SECONDS, STORY_SUB_FONT, storyParts } from '../engine/story';
 import { groupPatch, transformAbout } from '../engine/groupTransform';
 import { useProjectStore } from './projectStore';
 
@@ -102,6 +101,26 @@ export function renameItem(id: string, label: string) {
   editItem(id, (it) => {
     if (label.trim()) it.label = label.trim();
     else delete it.label;
+  });
+}
+
+/**
+ * 位置、大小、旋轉歸位。版型的任何物件＝整個版型歸位（外框回到正中央、原大小）；
+ * 最下面那條影像軌的片段與字卡回到滿版／原大小，疊在上面的（畫中畫）預設縮小一半。
+ */
+export function resetTransform(id: string): void {
+  const p = store().project;
+  const f = p && findItem(p, id);
+  if (!p || !f) return;
+  if (f.item.type !== 'text' && f.item.type !== 'audio' && f.item.group) {
+    const frame = groupFrame(p, f.item.group);
+    if (frame) return setTransform(frame.item.id, { x: 0.5, y: 0.5, scale: 1, rotation: 0 }, `reset:${id}`);
+  }
+  editItem(id, (x) => {
+    x.transform.x = 0.5;
+    x.transform.y = 0.5;
+    x.transform.scale = x.type === 'text' || f.track.id === baseMediaTrack(p)?.id ? 1 : 0.5;
+    x.transform.rotation = 0;
   });
 }
 
@@ -300,99 +319,6 @@ export function addLayout(o: {
     ft.groupRole = 'frame';
     ft.items.push(frame);
     d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, ft);
-  });
-  if (firstId) store().select(firstId);
-  return firstId;
-}
-
-/**
- * 動態模板「三格故事」：開場影片（16:9 → 撐開成滿版）→ 三格依序從上／右／下滑進來 → 標題字體輪播 → 暖色染色＋閃光。
- * 做法跟版型一樣：每個畫面一條藏起來的軌道＋一個透明的外框（代表整個模板）；標題、副標是普通的字卡（放在上面的字卡軌）。
- * media 要 4 個素材（開場＋三格，不夠的呼叫的人先輪流補齊）。一步復原。
- */
-export function addStory(o: {
-  frame: Asset;
-  media: Asset[];
-  start: number;
-  title: string;
-  subtitle: string;
-  total?: number;
-}): string | null {
-  const proj = store().project;
-  if (!proj || o.media.length < 4) return null;
-  const { width: W, height: H } = proj;
-  const total = o.total ?? STORY_SECONDS;
-  const group = newId('g_');
-  const parts = storyParts(W, H, total);
-  let firstId: string | null = null;
-  store().apply((d) => {
-    for (const a of [...o.media.slice(0, 4), o.frame])
-      if (!d.assets.some((x) => x.id === a.id)) d.assets.push(a);
-    parts.forEach((part, i) => {
-      const asset = o.media[i]!;
-      const start = o.start + part.start;
-      const room = o.start + part.until - start;
-      const dur = asset.kind === 'image' ? room : Math.min(asset.duration, room);
-      const item = cellItem(
-        asset,
-        { x: part.cell.x * W, y: part.cell.y * H, w: part.cell.w * W, h: part.cell.h * H },
-        W,
-        H,
-        start,
-        dur,
-        group,
-      );
-      item.cellAnim = part.anim;
-      if (!part.sound) item.volume = 0;
-      const tr = createTrack('media', d.tracks as Track[]);
-      tr.group = group;
-      tr.groupRole = 'cell';
-      tr.fill = 'black';
-      tr.items.push(item);
-      d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, tr);
-      firstId ??= item.id;
-    });
-    const frame = createOverlayClip(o.frame, o.start);
-    frame.duration = total;
-    frame.fit = 'contain';
-    frame.transform = { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 };
-    frame.group = group;
-    frame.label = '三格故事';
-    frame.visible = { x: 0, y: 0, w: 1, h: 1 };
-    frame.template = 'story3';
-    const ft = createTrack('media', d.tracks as Track[]);
-    ft.name = '三格故事';
-    ft.group = group;
-    ft.groupRole = 'frame';
-    ft.items.push(frame);
-    d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, ft);
-
-    // 標題（字體輪播）與副標
-    const titleStart = o.start + 3.4;
-    const titleDur = Math.max(total - 0.6 - 3.4, 1);
-    const title = createTextItem(titleStart, o.title);
-    title.duration = titleDur;
-    title.label = '標題';
-    const run = title.card.runs[0]!;
-    run.fontId = STORY_CYCLE_FONTS[0]!;
-    run.size = Math.round(Math.min(W, H) * 0.16);
-    run.letterSpacing = 0.04;
-    title.transform.y = 0.5;
-    title.fontCycle = { fonts: STORY_CYCLE_FONTS, interval: 0.18, until: 3 };
-    title.group = group;
-    d.tracks[trackIndexFor(d.tracks as Track[], 'text', titleStart, titleDur)]!.items.push(title);
-    if (o.subtitle.trim()) {
-      const sub = createTextItem(titleStart + 0.4, o.subtitle.trim());
-      sub.duration = Math.max(titleDur - 0.4, 1);
-      sub.label = '副標';
-      const sr = sub.card.runs[0]!;
-      sr.fontId = STORY_SUB_FONT;
-      sr.size = Math.round(Math.min(W, H) * 0.065);
-      sr.weight = 'normal';
-      sub.transform.y = 0.6;
-      sub.group = group;
-      d.tracks[trackIndexFor(d.tracks as Track[], 'text', sub.start, sub.duration)]!.items.push(sub);
-    }
   });
   if (firstId) store().select(firstId);
   return firstId;
@@ -623,6 +549,8 @@ export function rippleRemoveItem(id: string): boolean {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f) return false;
+  // 版型：外框＝整個版型一起拿掉；格子只是空出來（不補齊）
+  if (f.item.type !== 'text' && f.item.type !== 'audio' && f.item.group) return removeAnyItem(id);
   store().apply(
     (d) => {
       d.tracks[f.trackIndex]!.items = rippleDelete(d.tracks[f.trackIndex]!.items as Item[], id) as never;
@@ -687,6 +615,8 @@ export function moveTrackTo(trackId: string, toIndex: number) {
 }
 
 export function removeTrack(trackId: string) {
+  const t0 = store().project?.tracks.find((t) => t.id === trackId);
+  if (t0?.group) return removeGroup(t0.group); // 版型的軌道：整個版型一起拿掉
   store().apply(
     (d) => {
       const i = d.tracks.findIndex((t) => t.id === trackId);

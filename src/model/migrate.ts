@@ -35,6 +35,59 @@ export function markLegacyGroups(p: Project): { project: Project; changed: boole
       ? { ...t, group: first.group, groupRole: 'cell' as const, fill: 'black' as const }
       : { ...t, group: first.group, groupRole: 'frame' as const, locked: false };
   });
+  const marked = changed ? { ...p, tracks } : p;
+  const fixed = repairGroups(marked);
+  return { project: fixed.project, changed: changed || fixed.changed };
+}
+
+/**
+ * 修復版型資料：①只有格子、沒有外框的 group（以前「刪除並補齊」只刪外框造成的孤兒格子，時間軸上看不到、預覽卻還在畫）
+ * → 格子變回普通影像軌；②已移除的動態模板（story3）→ 清掉模板欄位，變成靜態版型；字卡的輪播欄位也清掉。
+ */
+export function repairGroups(p: Project): { project: Project; changed: boolean } {
+  let changed = false;
+  const hasFrame = new Set<string>();
+  for (const t of p.tracks)
+    if (t.groupRole === 'frame')
+      for (const it of t.items) if (it.type !== 'text' && it.group) hasFrame.add(it.group);
+  const tracks = p.tracks.map((t) => {
+    let tr = t;
+    const orphan = t.groupRole === 'cell' && !!t.group && !hasFrame.has(t.group);
+    if (orphan) {
+      const { group: _g, groupRole: _r, fill: _f, ...rest } = t;
+      void _g;
+      void _r;
+      void _f;
+      tr = rest as Track;
+      changed = true;
+    }
+    const items = tr.items.map((it) => {
+      if (it.type === 'text') {
+        if (!it.fontCycle && !it.group) return it;
+        changed = true;
+        const { fontCycle: _c, group: _gg, ...rest } = it;
+        void _c;
+        void _gg;
+        return rest;
+      }
+      if (it.type === 'audio') return it;
+      if (orphan || it.template || it.cellAnim) {
+        const next = { ...it };
+        if (orphan) {
+          delete next.group;
+          delete next.cell;
+          delete next.visible;
+          delete next.motion;
+        }
+        delete next.template;
+        delete next.cellAnim;
+        changed = true;
+        return next;
+      }
+      return it;
+    });
+    return items.some((x, i) => x !== tr.items[i]) ? ({ ...tr, items } as Track) : tr;
+  });
   return { project: changed ? { ...p, tracks } : p, changed };
 }
 

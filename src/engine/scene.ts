@@ -4,8 +4,7 @@ import { fittedSize, itemBox, type GeoCtx } from './geometry';
 import { renderText, measureTextItem, uiScale } from './textRender';
 import { visibleLayers } from './timeline';
 import { composeWith, motionOffset } from './groupTransform';
-import { cellRect } from './layouts';
-import { animatedCell, cycleFont, storyTint } from './story';
+import { cellRect, cellTransform } from './layouts';
 import {
   applyLook,
   transitionLook,
@@ -86,6 +85,7 @@ export function buildScene(
   canvasW: number,
   canvasH: number,
   provide: SourceProvider,
+  opts: { guardCells?: boolean } = {},
 ): SceneLayer[] {
   const ctx = geoCtx(project, canvasW, canvasH);
   const out: SceneLayer[] = [];
@@ -117,7 +117,7 @@ export function buildScene(
       : { x: 0, y: 0 };
     if (l) {
       const layer = toLayer(
-        shaped(l.item, t, frame?.item, project, canvasW, canvasH),
+        opts.guardCells === false ? l.item : guardCell(l.item, frame?.item, project, canvasW, canvasH),
         track,
         project,
         ctx,
@@ -138,7 +138,6 @@ export function buildScene(
       if (t < fr.start || t >= fr.start + fr.duration) return;
       const ref = track.items.find((x) => x.type !== 'text' && x.cell);
       if (!ref || ref.type === 'text' || !ref.cell) return;
-      if (ref.cellAnim && t < ref.start) return; // 動態模板的格子還沒進場
       const r = cellRect(ref.cell, canvasW, canvasH);
       const c = composeWith(
         { x: (r.x + r.w / 2) / canvasW, y: (r.y + r.h / 2) / canvasH, scale: 1, rotation: 0, opacity: 1 },
@@ -168,17 +167,6 @@ export function buildScene(
       });
     }
   });
-  // 動態模板的結尾：暖橘色染色與白色閃光
-  for (const tr of project.tracks) {
-    if (tr.groupRole !== 'frame' || tr.hidden) continue;
-    const fr = tr.items[0];
-    if (!fr || fr.type === 'text' || fr.type === 'audio' || fr.template !== 'story3') continue;
-    if (t < fr.start || t >= fr.start + fr.duration) continue;
-    const k = storyTint(t - fr.start, fr.duration);
-    if (k.warm > 0.001) covers.set(`story-warm-${fr.id}`, { kind: 'flash', color: '#ffb457', alpha: k.warm });
-    if (k.white > 0.001)
-      covers.set(`story-white-${fr.id}`, { kind: 'solid', color: '#ffffff', alpha: k.white });
-  }
   // 轉場的顏色層：蓋在最上面
   for (const [id, c] of covers)
     out.push({
@@ -198,31 +186,31 @@ export function buildScene(
 }
 
 /**
- * 這一刻實際要畫的樣子：動態模板的格子（範圍隨時間滑動／撐開，再套上整組的變形）、字體輪播的字卡。
- * 其他物件原樣回傳。
+ * 版型格子的保險：格子應該永遠在外框的洞裡（由「格子在版型自己座標裡的位置」套上整組的變形算出來）。
+ * 如果存的 transform 跟這個差太多（有哪一條路徑單獨動了格子造成跑版），以算出來的為準。
  */
-function shaped(
+export function guardCell(
   item: Item,
-  t: number,
   frame: VideoItem | undefined,
   project: Project,
   W: number,
   H: number,
 ): Item {
-  if (item.type === 'text') {
-    if (!item.fontCycle) return item;
-    const fontId = cycleFont(item.fontCycle, t - item.start);
-    return {
-      ...item,
-      card: { ...item.card, runs: item.card.runs.map((r, i) => (i === 0 ? { ...r, fontId } : r)) },
-    };
-  }
-  if (item.type === 'audio' || !item.cell || !item.cellAnim) return item;
+  if (item.type === 'text' || item.type === 'audio' || !item.cell || !frame || item.group !== frame.group)
+    return item;
   const asset = project.assets.find((a) => a.id === item.assetId);
   if (!asset) return item;
-  const a = animatedCell(item, asset, t - item.start, W, H);
-  const transform = frame ? composeWith(a.transform, frame.transform, W, H) : a.transform;
-  return { ...item, crop: a.crop, transform: { ...transform, opacity: item.transform.opacity } };
+  const want = composeWith(
+    cellTransform(asset, item.crop, cellRect(item.cell, W, H), W, H),
+    frame.transform,
+    W,
+    H,
+  );
+  const cur = item.transform;
+  const off = Math.max(Math.abs(cur.x - want.x), Math.abs(cur.y - want.y));
+  const ratio = want.scale > 1e-9 ? cur.scale / want.scale : 1;
+  if (off < 0.02 && Math.abs(ratio - 1) < 0.02 && Math.abs(cur.rotation - want.rotation) < 1) return item;
+  return { ...item, transform: { ...want, opacity: cur.opacity } };
 }
 
 function toLayer(

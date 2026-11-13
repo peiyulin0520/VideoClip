@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ensureUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import {
   getGiphyKey,
+  giphyPage,
   giphyStickers,
   GiphyError,
   giphyToFile,
@@ -153,6 +154,12 @@ export function GiphyPanel() {
   const [items, setItems] = useState<GiphySticker[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // 往下滑載入更多：目前的搜尋字、下一頁從第幾筆開始、還有沒有更多
+  const query = useRef('');
+  const nextOffset = useRef(0);
+  const [more, setMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinel = useRef<HTMLDivElement>(null);
 
   const fail = useCallback((e: unknown) => {
     setItems([]);
@@ -163,12 +170,54 @@ export function GiphyPanel() {
     setError(e instanceof Error ? e.message : String(e));
   }, []);
 
+  const begin = (q0: string, r: { total: number | null; count: number }) => {
+    query.current = q0;
+    nextOffset.current = r.count;
+    setMore(r.count >= 24 && (r.total === null || r.count < r.total));
+  };
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const r = await giphyPage(query.current, undefined, 24, nextOffset.current);
+      nextOffset.current += r.count;
+      setItems((cur) => {
+        const seen = new Set((cur ?? []).map((x) => x.id));
+        return [...(cur ?? []), ...r.items.filter((x) => !seen.has(x.id))];
+      });
+      // 最多 10 頁（240 個）
+      setMore(
+        r.count >= 24 && nextOffset.current < 240 && (r.total === null || nextOffset.current < r.total),
+      );
+    } catch (e) {
+      // 次數用完等錯誤：保留已經載入的，底下顯示原因
+      setMore(false);
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore]);
+
+  // 滑到最底下的哨兵出現在畫面裡，就載入下一頁
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !more) return;
+    const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && void loadMore(), {
+      rootMargin: '200px',
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [more, loadMore, items]);
+
   // 搜尋（按鈕觸發）
   const search = async (query: string) => {
     setLoading(true);
     setError(null);
     try {
-      setItems(await giphyStickers(query));
+      const r = await giphyPage(query);
+      setItems(r.items);
+      begin(query, r);
     } catch (e) {
       fail(e);
     } finally {
@@ -180,8 +229,12 @@ export function GiphyPanel() {
   useEffect(() => {
     if (!hasKey) return;
     let alive = true;
-    giphyStickers('')
-      .then((r) => alive && setItems(r))
+    giphyPage('')
+      .then((r) => {
+        if (!alive) return;
+        setItems(r.items);
+        begin('', r);
+      })
       .catch((e) => alive && fail(e));
     return () => {
       alive = false;
@@ -237,6 +290,8 @@ export function GiphyPanel() {
           </button>
         ))}
       </div>
+      {more && <div ref={sentinel} className="giphy-more" data-testid="giphy-sentinel" aria-hidden="true" />}
+      {loadingMore && <p className="hint">載入更多…</p>}
       {items && items.length === 0 && !error && !loading && (
         <p className="hint">找不到貼圖，換個關鍵字試試。</p>
       )}
