@@ -104,7 +104,7 @@ export const TEXT_DEFAULT_DURATION = 3;
 
 export const TRACK_NAMES: Record<TrackKind, string> = {
   media: '影像',
-  effect: '特效',
+  sticker: '貼圖',
   text: '文字',
   audio: '音樂',
 };

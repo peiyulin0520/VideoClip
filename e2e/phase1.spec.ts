@@ -172,7 +172,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await page.getByRole('button', { name: '專案名稱', exact: true }).tap();
   await page.getByLabel('專案名稱輸入').fill('我的片頭');
   await page.getByRole('button', { name: '確定' }).tap();
-  await expect(page.getByRole('button', { name: '專案名稱', exact: true })).toHaveText('我的片頭');
+  await expect(page.getByRole('button', { name: '專案名稱', exact: true })).toContainText('我的片頭');
 });
 
 async function clipsStartSeconds(page: import('@playwright/test').Page): Promise<number[]> {

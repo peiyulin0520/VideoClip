@@ -229,3 +229,65 @@ describe('repairGroups', () => {
     expect(repairGroups(r.project).changed).toBe(false);
   });
 });
+
+describe('migrateStickers：貼圖自成一類', () => {
+  const asset = (id: string, name: string, origin?: 'sticker') => ({ id, name, kind: 'image', origin });
+  const it_ = (id: string, assetId: string, start: number, duration = 2) => ({
+    id,
+    type: 'image',
+    assetId,
+    start,
+    duration,
+  });
+  const track = (id: string, name: string, items: unknown[], kind = 'media') => ({
+    id,
+    kind,
+    name,
+    hidden: false,
+    locked: false,
+    items,
+  });
+
+  it('舊專案：檔名「貼圖-」「GIPHY-」開頭的素材補上 origin；整條都是貼圖的軌道改成貼圖軌', async () => {
+    const { migrateStickers } = await import('./migrate');
+    const p = {
+      assets: [asset('v', 'a.mp4'), asset('s', '貼圖-愛心.png'), asset('g', 'GIPHY-abc.webp')],
+      tracks: [
+        track('m1', '影像 1', [it_('i1', 'v', 0, 4)]),
+        track('m2', '影像 2', [it_('i2', 's', 0), it_('i3', 'g', 3)]),
+      ],
+    } as never;
+    const r = migrateStickers(p);
+    expect(r.changed).toBe(true);
+    expect(r.project.assets.map((a) => a.origin)).toEqual([undefined, 'sticker', 'sticker']);
+    expect(r.project.tracks.map((t) => t.kind)).toEqual(['media', 'sticker']);
+    expect(r.project.tracks[1]!.name).toBe('貼圖 2');
+    expect(migrateStickers(r.project).changed).toBe(false);
+  });
+
+  it('混在同一條：貼圖搬到貼圖軌（時間不變），影片、照片留下；至少留一條影像軌', async () => {
+    const { migrateStickers } = await import('./migrate');
+    const p = {
+      assets: [asset('v', 'a.mp4'), asset('s', 'x.png', 'sticker')],
+      tracks: [track('m1', '影像 1', [it_('i1', 'v', 0, 4), it_('i2', 's', 1), it_('i3', 's', 1.5)])],
+    } as never;
+    const r = migrateStickers(p);
+    const kinds = r.project.tracks.map((t) => t.kind);
+    expect(kinds).toEqual(['media', 'sticker', 'sticker']); // 兩個貼圖時間重疊，各自一條貼圖軌
+    expect(r.project.tracks[0]!.items.map((i) => i.id)).toEqual(['i1']);
+    const sticker = r.project.tracks.filter((t) => t.kind === 'sticker').flatMap((t) => t.items);
+    expect(sticker.map((i) => [i.id, i.start])).toEqual([
+      ['i2', 1],
+      ['i3', 1.5],
+    ]);
+  });
+
+  it('只有貼圖的專案：那一條影像軌不改（至少留一條影像軌）', async () => {
+    const { migrateStickers } = await import('./migrate');
+    const p = {
+      assets: [asset('s', 'x.png', 'sticker')],
+      tracks: [track('m1', '影像 1', [it_('i1', 's', 0)])],
+    } as never;
+    expect(migrateStickers(p).project.tracks[0]!.kind).toBe('media');
+  });
+});

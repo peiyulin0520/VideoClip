@@ -13,6 +13,8 @@ export type Asset = {
   width: number;
   height: number;
   hasAudio: boolean;
+  /** 貼圖（內建貼圖、GIPHY、我的貼圖）加進專案時記下來：時間軸上自成一類「貼圖」，放在貼圖軌 */
+  origin?: 'sticker';
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
   /** 音樂素材：音量波形，每 0.1 秒一個值（0–100），給時間軸畫波形用 */
@@ -278,7 +280,7 @@ export type Item = VideoItem | TextItem;
  * tracks 陣列由下往上＝圖層順序，並且依種類分區排好：影像 → 特效 → 字卡 → 音訊（音訊沒有畫面，時間軸畫在最下面）。
  * 同一區裡的軌道可以自由換順序，不能跨區。
  */
-export type TrackKind = 'media' | 'effect' | 'text' | 'audio';
+export type TrackKind = 'media' | 'sticker' | 'text' | 'audio';
 
 export type Track = {
   id: string;

@@ -26,7 +26,7 @@ export async function addSticker(name: string): Promise<string | null> {
       return null;
     }
     await ensureUrls(pid, res.assets);
-    const id = addOverlayClips(res.assets, player?.time ?? 0, { scale: STICKER_SCALE });
+    const id = addOverlayClips(res.assets, player?.time ?? 0, { scale: STICKER_SCALE, sticker: true });
     // 整頁往下捲在選貼圖時，預覽可能看不到：提醒一下
     if (window.scrollY > 200) toast('已加入貼圖，往上滑看預覽');
     return id;

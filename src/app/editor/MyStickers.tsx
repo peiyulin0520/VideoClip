@@ -39,7 +39,7 @@ async function addLibrarySticker(id: string) {
     const res = await importFiles(pid, [file]);
     if (!res.assets.length) return toast(`貼圖加不進去：${res.failed[0]?.reason ?? '不明原因'}`, 6000);
     await ensureUrls(pid, res.assets);
-    addOverlayClips(res.assets, player?.time ?? 0, { scale: 0.3 });
+    addOverlayClips(res.assets, player?.time ?? 0, { scale: 0.3, sticker: true });
     if (window.scrollY > 200) toast('已加入貼圖，往上滑看預覽');
   } finally {
     setBusy(null);

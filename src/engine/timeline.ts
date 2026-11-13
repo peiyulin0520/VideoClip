@@ -1,8 +1,8 @@
 import { MAX_SPEED, MIN_CLIP_DURATION, MIN_SPEED, newId } from '../model/defaults';
 import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../model/types';
 
-/** 軌道種類的分區：影像 → 特效 → 字卡 → 音訊（陣列由前到後＝由下到上的圖層順序）。素材只能放進同種類的軌道。 */
-export const ZONE: Record<TrackKind, number> = { media: 0, effect: 1, text: 2, audio: 3 };
+/** 軌道種類的分區：影像 → 貼圖 → 字卡 → 音訊（陣列由前到後＝由下到上的圖層順序）。素材只能放進同種類的軌道。 */
+export const ZONE: Record<TrackKind, number> = { media: 0, sticker: 1, text: 2, audio: 3 };
 
 /** 依分區排好（同一區維持原本的相對順序） */
 export function normalizeZones(tracks: Track[]): Track[] {
@@ -338,15 +338,17 @@ export function firstFreeTrack(p: Project, kind: Track['kind'], start: number, d
 
 // ---------- 長按拖移素材：拖到別的軌道、別的時間 ----------
 
-/** 物件屬於哪一種軌道（影片、照片、貼圖＝影像；字卡＝字卡；音樂＝音訊） */
-export function trackKindOf(item: Item): TrackKind {
-  return item.type === 'text' ? 'text' : item.type === 'audio' ? 'audio' : 'media';
+/** 物件屬於哪一種軌道（影片、照片＝影像；貼圖＝貼圖；字卡＝字卡；音樂＝音訊）。要傳素材清單才分得出貼圖 */
+export function trackKindOf(item: Item, assets?: Pick<Asset, 'id' | 'origin'>[]): TrackKind {
+  if (item.type === 'text') return 'text';
+  if (item.type === 'audio') return 'audio';
+  return assets?.find((a) => a.id === item.assetId)?.origin === 'sticker' ? 'sticker' : 'media';
 }
 
 /** 軌道種類的中文名（提示用） */
 export const KIND_LABEL: Record<TrackKind, string> = {
-  media: '影像（影片、照片、貼圖）',
-  effect: '特效',
+  media: '影像（影片、照片）',
+  sticker: '貼圖',
   text: '字卡',
   audio: '音樂和音效',
 };
@@ -365,8 +367,9 @@ export function dropTarget(
   tracks: Track[],
   item: Item,
   hover: { trackId: string | null; newEdge: 'top' | 'bottom' | null },
+  assets?: Pick<Asset, 'id' | 'origin'>[],
 ): DropTarget | null {
-  const kind = trackKindOf(item);
+  const kind = trackKindOf(item, assets);
   if (hover.newEdge) return { type: 'new', edge: hover.newEdge };
   if (!hover.trackId) return null;
   const tr = tracks.find((t) => t.id === hover.trackId);
@@ -386,11 +389,12 @@ export function moveItemToTrack(
   target: DropTarget,
   start: number,
   makeTrack: (kind: TrackKind, existing: Track[]) => Track,
+  assets?: Pick<Asset, 'id' | 'origin'>[],
 ): Track[] | null {
   const srcIdx = tracks.findIndex((t) => t.items.some((x) => x.id === itemId));
   if (srcIdx < 0 || target.type === 'invalid') return null;
   const item = tracks[srcIdx]!.items.find((x) => x.id === itemId)!;
-  const kind = trackKindOf(item);
+  const kind = trackKindOf(item, assets);
   const at = Math.max(start, 0);
   if (target.type === 'track') {
     const dstIdx = tracks.findIndex((t) => t.id === target.trackId);

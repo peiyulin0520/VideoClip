@@ -42,6 +42,7 @@ test('影像軌左把手往右拉：尾巴不動、前面留空位（黑畫面�
     .not.toBe('0,0,0');
 
   // 左把手往左拉回來：吃掉空白、素材起點還原
+  await seekTo(page, 1); // 片段開頭對到播放頭（0 秒貼左之後，往右捲太多左把手會被軌道圖示蓋住）
   await clips(page).first().tap();
   await drag(page, 'trim-start', -60);
   m = await main(page);

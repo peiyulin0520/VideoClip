@@ -6,17 +6,20 @@ export function Sheet({
   title,
   onClose,
   children,
+  tall,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** 高的面板（片段標記軸）：最高一個螢幕、內容太多可以在裡面捲 */
+  tall?: boolean;
 }) {
   if (!open) return null;
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div
-        className="sheet"
+        className={`sheet${tall ? ' tall' : ''}`}
         role="dialog"
         aria-label={title}
         aria-modal="true"

@@ -447,6 +447,14 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.15;
+}
+.name-btn .proj-ver {
+  margin-top: 0;
 }
 .stage-wrap {
   position: relative;
@@ -770,7 +778,7 @@ button {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 50%;
+  left: 56px; /* = Timeline.tsx 的 GUTTER：播放頭固定在軌道圖示右邊，0 秒的內容直接從這裡開始 */
   z-index: 3;
   width: 2px;
   background: var(--fg);
@@ -2292,15 +2300,33 @@ button {
   background: var(--btn);
   border-radius: 11px;
 }
-.track-summary {
+.cat-head {
   position: absolute;
   left: 0;
   right: 0;
   overflow: hidden;
 }
+.cat-toggle {
+  position: sticky;
+  left: 4px;
+  z-index: 5;
+  min-height: 0;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  white-space: nowrap;
+}
+.cat-toggle:disabled {
+  opacity: 0.7;
+}
 .sum-bar {
   position: absolute;
-  top: 7px;
+  top: 8px;
   height: 6px;
   border-radius: 3px;
   opacity: 0.75;
@@ -2799,4 +2825,173 @@ button {
   font-weight: 400;
   color: var(--muted);
   letter-spacing: 0.02em;
+}
+
+/* 共用的片段標記軸（RangeMarkerSheet） */
+.sheet.tall {
+  position: relative;
+  max-height: 94dvh;
+  overflow-y: auto;
+}
+.rm-undo {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0;
+  background: var(--btn);
+  border-radius: 14px;
+}
+.rm-undo:disabled {
+  opacity: 0.4;
+}
+.rm-preview {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 8px;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.rm-preview video,
+.rm-preview canvas {
+  display: block;
+  width: 100%;
+  max-height: 34dvh;
+  object-fit: contain;
+  background: #000;
+}
+.rm-nopreview {
+  padding: 24px;
+  color: #888;
+  font-size: 13px;
+}
+.rm-play-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+}
+.rm-now {
+  font-size: 14px;
+  color: var(--muted);
+}
+.rm-ruler {
+  display: flex;
+  justify-content: space-between;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rm-wrap {
+  position: relative;
+  padding-top: 40px;
+  margin-top: -2px;
+}
+.rm-flags {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+}
+.rm-flag {
+  position: absolute;
+  top: 0;
+  width: 44px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  transform: translateX(-50%);
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.rm-flag i {
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 12px solid var(--accent);
+}
+.rm-flag small {
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--fg);
+}
+.rm-strip {
+  position: relative;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--btn2);
+  touch-action: none;
+}
+.rm-tiles {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.rm-tiles img {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+}
+.rm-tiles .wave {
+  width: 100%;
+  height: 100%;
+}
+.rm-gray {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: rgba(70, 70, 70, 0.62);
+  backdrop-filter: grayscale(1);
+}
+.rm-body {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+}
+.rm-cursor {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  transform: translateX(-1.5px);
+  pointer-events: none;
+}
+.rm-add {
+  width: auto;
+  margin: 12px 0 4px;
+}
+.rm-list {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+}
+.rm-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 15px;
+}
+.rm-summary {
+  margin: 10px 0 4px;
+  font-size: 15px;
 }
