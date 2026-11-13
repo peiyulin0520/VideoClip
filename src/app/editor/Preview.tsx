@@ -480,14 +480,16 @@ export function Preview({
         </button>
       )}
       {peek && <LayerPeek project={project} time={player?.time ?? 0} onClose={() => setPeek(false)} />}
-      <button
-        className="full-toggle"
-        aria-label={previewFull ? '結束全螢幕預覽' : '全螢幕預覽'}
-        aria-pressed={previewFull}
-        onClick={() => useUI.setState({ previewFull: !previewFull })}
-      >
-        {previewFull ? <Minimize size={20} /> : <Maximize size={20} />}
-      </button>
+      {!cropping && (
+        <button
+          className="full-toggle"
+          aria-label={previewFull ? '結束全螢幕預覽' : '全螢幕預覽'}
+          aria-pressed={previewFull}
+          onClick={() => useUI.setState({ previewFull: !previewFull })}
+        >
+          {previewFull ? <Minimize size={20} /> : <Maximize size={20} />}
+        </button>
+      )}
       <button
         className={`safe-toggle${safe ? ' on' : ''}`}
         aria-label="安全區參考線"

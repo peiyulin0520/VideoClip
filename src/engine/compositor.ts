@@ -50,6 +50,9 @@ export type SceneLayer = {
   crop?: Crop;
   /** 自由形狀遮罩：多邊形，座標是原始素材畫面的比例（搭配 crop 換算到方框內） */
   mask?: [number, number][];
+  /** 點陣圖遮罩（整張原始畫面的 canvas，不透明＝留下）；maskKey 變了才重建貼圖 */
+  maskBitmap?: HTMLCanvasElement;
+  maskKey?: string;
   opacity: number;
   blend: BlendMode;
   cornerRadius: number; // 0–0.5
@@ -84,6 +87,8 @@ type Obj = {
   outlineKey: string;
   shape: Graphics | null;
   shapeKey: string;
+  maskSprite: Sprite | null;
+  maskSpriteKey: string;
 };
 
 export class Compositor {
@@ -186,6 +191,8 @@ export class Compositor {
       outlineKey: '',
       shape: null,
       shapeKey: '',
+      maskSprite: null,
+      maskSpriteKey: '',
     };
     this.objs.set(layer.id, o);
     return o;
@@ -306,6 +313,45 @@ export class Compositor {
     // ---- 遮罩：自由形狀（多邊形）優先，沒有才用圓角 ----
     const radius = Math.min(layer.cornerRadius * Math.min(box.w, box.h), Math.min(box.w, box.h) / 2);
     const poly = layer.mask && layer.mask.length >= 3 ? layer.mask : null;
+    if (layer.maskBitmap) {
+      // 點陣圖遮罩：貼圖只取留下來的那一塊（crop），大小跟畫面一樣
+      const c = layer.crop ?? { l: 0, t: 0, r: 0, b: 0 };
+      const bw = layer.maskBitmap.width;
+      const bh = layer.maskBitmap.height;
+      const key = `${layer.maskKey}|${c.l}|${c.t}|${c.r}|${c.b}`;
+      if (!o.maskSprite || o.maskSpriteKey !== key) {
+        o.maskSprite?.texture.destroy(false);
+        const source = new CanvasSource({ resource: layer.maskBitmap, scaleMode: 'linear' });
+        const tex = new Texture({
+          source,
+          frame: new Rectangle(
+            bw * c.l,
+            bh * c.t,
+            Math.max(bw * (1 - c.l - c.r), 1),
+            Math.max(bh * (1 - c.t - c.b), 1),
+          ),
+        });
+        if (!o.maskSprite) {
+          o.maskSprite = new Sprite(tex);
+          o.maskSprite.anchor.set(0.5);
+          o.container.addChild(o.maskSprite);
+        } else o.maskSprite.texture = tex;
+        o.maskSpriteKey = key;
+      }
+      o.maskSprite.width = box.w;
+      o.maskSprite.height = box.h;
+      o.sprite.mask = o.maskSprite;
+      this.finishOutline(o, layer, radius);
+      return;
+    }
+    if (o.maskSprite) {
+      o.sprite.mask = null;
+      o.container.removeChild(o.maskSprite);
+      o.maskSprite.texture.destroy(false);
+      o.maskSprite.destroy();
+      o.maskSprite = null;
+      o.maskSpriteKey = '';
+    }
     if (poly) {
       const c = layer.crop ?? { l: 0, t: 0, r: 0, b: 0 };
       const kw = Math.max(1 - c.l - c.r, 0.001);
@@ -361,6 +407,11 @@ export class Compositor {
       }
     }
 
+    this.finishOutline(o, layer, radius);
+  }
+
+  private finishOutline(o: Obj, layer: SceneLayer, radius: number) {
+    const { box } = layer;
     // ---- 外框（畫在框內側，方框大小不變，選取框才對得準）----
     if (layer.outline && layer.outline.width > 0) {
       const w = layer.outline.width * uiScale(this.width, this.height);

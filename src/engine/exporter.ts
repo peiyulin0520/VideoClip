@@ -22,6 +22,7 @@ import { animBitmapAt } from './animImage';
 import { fadeSpans } from './audio';
 import { Compositor } from './compositor';
 import { buildScene, sceneItems } from './scene';
+import { preloadMasks } from './maskBitmap';
 import { sourceTimeClamped, totalDuration } from './timeline';
 
 // 匯出整支影片（PLAN §2.4）：不播放，一格一格依時間走——
@@ -355,6 +356,7 @@ export async function exportProject(
   const mime = ext === 'mp4' ? 'video/mp4' : 'video/webm';
   const name = `${(project.name || 'VideoClip').replace(/[\\/:*?"<>|]/g, '_')}.${ext}`;
   const out = await openTarget();
+  await preloadMasks(project); // 筆刷／橡皮擦畫的遮罩要先解好
   const comp = await Compositor.create({ width, height });
   const frameSources = new Map<string, VideoFrames>();
   const images = new Map<string, HTMLImageElement>();

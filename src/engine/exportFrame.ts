@@ -2,6 +2,7 @@ import type { Asset, Project, VideoItem } from '../model/types';
 import { animBitmapAt, fetchBlob } from './animImage';
 import { Compositor } from './compositor';
 import { buildScene, sceneItems } from './scene';
+import { preloadMasks } from './maskBitmap';
 import { sourceTimeClamped } from './timeline';
 
 function once(el: EventTarget, ok: string, ms = 8000): Promise<void> {
@@ -70,6 +71,7 @@ export async function renderFrame(
       }),
     );
 
+    await preloadMasks(project);
     const comp = await Compositor.create(size);
     try {
       const scene = buildScene(project, t, size.width, size.height, (item: VideoItem, asset: Asset) => {

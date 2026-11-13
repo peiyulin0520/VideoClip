@@ -7,6 +7,7 @@ import { captureThumb } from './probe';
 import { buildScene } from './scene';
 import { previewSizeFor } from './previewQuality';
 import { thumbOf } from './labels';
+import { onMaskReady } from './maskBitmap';
 import { baseMediaTrack, sourceTimeAt, sourceTimeClamped, totalDuration } from './timeline';
 
 type Deps = {
@@ -82,6 +83,7 @@ export class Player {
   private videoInfo = '';
   private videoCount = 0;
   private poolFullTold = false;
+  offMask: (() => void) | null = null;
   private thumbImgs = new Map<string, HTMLImageElement>();
   private slowSecs = 0;
   private slowTold = false;
@@ -104,6 +106,8 @@ export class Player {
     const pool = new VideoPool(opts.host, POOL_SIZE, () => player?.scheduleRender());
     const music = new VideoPool(opts.host, MUSIC_POOL_SIZE, () => {}, 'audio');
     player = new Player(compositor, pool, music, opts);
+    const p2 = player;
+    p2.offMask = onMaskReady(() => p2.scheduleRender());
     return player;
   }
 
@@ -506,6 +510,7 @@ export class Player {
   destroy() {
     cancelAnimationFrame(this.raf);
     cancelAnimationFrame(this.renderRaf);
+    this.offMask?.();
     this.playing = false;
     this.listeners.clear();
     this.pool.destroy();

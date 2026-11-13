@@ -65,6 +65,11 @@ export type VideoItem = ItemBase & {
   fit: 'cover' | 'contain';
   /** 自由形狀裁切：多邊形的點，座標是「原始素材畫面」的比例 0–1（只留多邊形裡面，外面透明） */
   mask?: [number, number][];
+  /**
+   * 點陣圖遮罩（裁切模式的筆刷／橡皮擦）：PNG data URL，座標是整張原始素材畫面，不透明＝留下、透明＝去掉。
+   * 有它時優先於 mask（多邊形）。
+   */
+  maskBitmap?: string;
   /** 多格版型：這個物件所在的格子（佔畫面寬、高的比例）。裁切模式完成時，畫面會填滿這個格子 */
   cell?: { x: number; y: number; w: number; h: number };
   /** 同一個版型的物件（外框與各格）共用的 id：一起縮放、移動、同一段時間，也用來「刪除整個版型」 */

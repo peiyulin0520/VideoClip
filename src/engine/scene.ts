@@ -5,6 +5,7 @@ import { renderText, measureTextItem, uiScale } from './textRender';
 import { visibleLayers } from './timeline';
 import { composeWith, motionOffset } from './groupTransform';
 import { cellRect, cellTransform } from './layouts';
+import { maskCanvasFor } from './maskBitmap';
 import { activeTransition, applyLook, clipPx, type Cover } from './transitions';
 
 /** 預覽/匯出各自提供「這個影片/照片物件現在的畫面」 */
@@ -260,6 +261,7 @@ function toLayer(
   if (!asset) return null;
   const src = provide(item, asset, track);
   if (!src) return null;
+  const maskCanvas = item.maskBitmap ? maskCanvasFor(item.maskBitmap) : undefined;
   // 暫存畫面的解析度：scale=1 時的顯示大小，最多放大 2 倍（縮放手勢時才不會一直重建貼圖）
   const crop = item.crop ?? { l: 0, t: 0, r: 0, b: 0 };
   const cw = Math.max(asset.width * (1 - crop.l - crop.r), 1);
@@ -269,9 +271,11 @@ function toLayer(
   return {
     ...common,
     kind: item.type,
-    mask: item.mask,
+    mask: item.maskBitmap ? undefined : item.mask,
+    maskBitmap: maskCanvas,
+    maskKey: item.maskBitmap ? item.maskBitmap.slice(-48) + item.maskBitmap.length : undefined,
     source: src.source,
-    ready: src.ready,
+    ready: src.ready && (!item.maskBitmap || !!maskCanvas), // 遮罩還在解碼：先不畫，免得閃一下沒遮罩的樣子
     srcW: src.srcW,
     srcH: src.srcH,
     frameW: base.w * k,

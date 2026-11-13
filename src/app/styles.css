@@ -1934,13 +1934,15 @@ button {
   position: absolute;
   top: 8px;
   left: 8px;
+  right: 8px;
   z-index: 3;
   display: flex;
   gap: 6px;
 }
 .crop-bar .btn {
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 9px;
+  font-size: 13px;
   white-space: nowrap;
   background: rgba(20, 20, 20, 0.85);
   color: #fff; /* 固定白字：底色固定是深色，不跟著淺色主題變成深色字 */
@@ -2713,4 +2715,56 @@ button {
   max-width: 68px;
   text-align: center;
   line-height: 1.15;
+}
+
+/* 裁切：筆刷／橡皮擦 */
+.crop-tint {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.crop-paint {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: crosshair;
+}
+.brush-cursor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.crop-bar.paint-bar {
+  top: 60px;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(20, 20, 20, 0.85);
+  color: #fff;
+}
+.crop-bar.paint-bar {
+  right: 8px;
+}
+.crop-bar.paint-bar .paint-size {
+  flex: 1;
+  min-width: 0;
+  color: #fff;
+}
+.crop-bar.paint-bar .slider-row {
+  min-width: 0;
+}
+.crop-bar.paint-bar .slider-label {
+  min-width: 0;
+  color: #ddd;
+}
+.crop-bar.paint-bar .btn {
+  flex: none;
+}
+.crop-bar.paint-bar .btn {
+  background: rgba(255, 255, 255, 0.12);
 }
