@@ -186,3 +186,10 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **坑**：①`deselect()`（e2e）點時間軸會把整頁捲下去，之後要先 `scrollTo(0,0)` 才能用舊座標點預覽 ②`openTab` 要限定在 `.tabs`（文字面板裡也有叫「文字」的小分頁）③新增軌道一律用 `insertIndexFor`＋`splice`，不要 `push`，否則會破壞分區順序（字卡跑到音訊後面）④「刪除」按鈕多了「刪除並補齊」，e2e 找「刪除」要 `exact: true`。
 - **提交前一定跑完整的 `npm run check`**（含 `prettier --check .`）。只跑 `eslint` 會漏掉排版：2026-11-12 PR #8 因此 CI 的 lint 步驟失敗、部署被跳過（19 個新檔案排版不符）。改完檔案先 `npx prettier --write .`。
 
+
+## feedback-8（2026-11-13）新增的東西（給下一位）
+- **轉場 v2**：`engine/transitions.ts`（目錄 `TRANSITIONS`、純函式 `transitionFrame`、`activeTransition` 產生延長／提前的虛擬物件，id 跟原物件相同）；`scene.ts` 的 `sceneItems` 是「這個時間點要畫的物件」，匯出備畫面要用它；合成器圖層外多一層 holder（裁切遮罩）、`SceneLayer.clip/blur`；選單的 A→B 示意動畫 `engine/transitionPreview.ts`＋`TransitionCards.tsx`。舊轉場名稱由 `migrate.repairGroups` 轉換
+- **版型修復**：`migrate.repairGroups`（孤兒格子變回普通軌、動態模板欄位清掉）；刪除版型的路徑一律走 `removeGroup`；`scene.guardCell` 保險
+- **預覽畫質**：`engine/previewQuality.ts`、`Player.onSlow／onPoolFull`、影片池滿時 `thumbFallback`
+- **軌道多選**：`timeline.ts` 的 `moveTracksBy／removeTracksByIds／mergeTracksByIds`＋`Timeline.tsx` 的 `MultiBar`
+- **點陣圖遮罩**：`VideoItem.maskBitmap`、`engine/maskBitmap.ts`、`cropStore` 的 `ensureMaskCanvas／paintMask／undoMaskStroke`

@@ -1,5 +1,7 @@
 import { APP_VERSION } from '../pwa';
 import { isPerfOn, setPerfOn } from '../editor/PerfOverlay';
+import { QUALITY_LABELS, readQuality, writeQuality, type PreviewQuality } from '../../engine/previewQuality';
+import { Segmented } from '../../ui/Segmented';
 import { getTheme, setTheme, THEMES, type ThemeId } from '../../ui/theme';
 import { GiphyKeySetup } from '../editor/GiphyPanel';
 import { ChevronLeft, Download, Plus, Trash2 } from 'lucide-react';
@@ -31,6 +33,7 @@ export function Settings() {
   const [driveUrl, setDriveUrl] = useState(backup.driveFolderUrl ?? '');
   const [openLicenses, setOpenLicenses] = useState(false);
   const [perf, setPerf] = useState(isPerfOn);
+  const [quality, setQuality] = useState<PreviewQuality>(readQuality);
   const [theme, setThemeState] = useState<ThemeId>(getTheme);
 
   useEffect(() => {
@@ -271,6 +274,27 @@ export function Settings() {
           <br />
           {persisted === true && '瀏覽器已承諾不會自動清掉這些資料。'}
           {persisted === false && '瀏覽器可能在空間不足時清掉資料。iPhone 請「加入主畫面」，並定期備份。'}
+        </p>
+      </section>
+
+      <section aria-label="預覽畫質">
+        <h2>預覽畫質</h2>
+        <Segmented
+          label="預覽畫質"
+          options={(['auto', 'clear', 'smooth'] as const).map((q) => QUALITY_LABELS[q])}
+          value={QUALITY_LABELS[quality]}
+          onChange={(name) => {
+            const q = (Object.keys(QUALITY_LABELS) as PreviewQuality[]).find(
+              (k) => QUALITY_LABELS[k] === name,
+            )!;
+            writeQuality(q);
+            setQuality(q);
+          }}
+        />
+        <p className="hint">
+          預覽卡、會跳格時選「流暢」：預覽畫面的解析度減半，播放順很多。「自動」＝同時播 3
+          支以上影片、或偵測到播放太吃力時才改成流暢。
+          <b>匯出的影片不受影響</b>，畫質照你選的輸出設定。
         </p>
       </section>
 

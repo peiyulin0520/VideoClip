@@ -1934,18 +1934,25 @@ button {
   position: absolute;
   top: 8px;
   left: 8px;
+  right: 8px;
   z-index: 3;
   display: flex;
   gap: 6px;
 }
 .crop-bar .btn {
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 9px;
+  font-size: 13px;
   white-space: nowrap;
   background: rgba(20, 20, 20, 0.85);
+  color: #fff; /* 固定白字：底色固定是深色，不跟著淺色主題變成深色字 */
+}
+.crop-bar .btn:disabled {
+  color: rgba(255, 255, 255, 0.45);
 }
 .crop-bar .btn.primary {
   background: var(--accent, #ff4d8d);
+  color: #fff;
 }
 
 /* 匯出面板 */
@@ -2336,10 +2343,33 @@ button {
   align-items: flex-start;
   margin: 6px 0;
 }
-.range-mini {
+.range-mini-wrap {
+  position: relative;
   flex: none;
-  width: 96px;
+  width: 112px;
+}
+.range-mini {
+  display: block;
+  width: 112px;
   background: #000;
+  border-radius: 8px;
+}
+.range-mini-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.range-mini-t {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
   border-radius: 8px;
 }
 .range-main {
@@ -2559,21 +2589,182 @@ button {
   color: inherit;
 }
 
-.story-thumb {
+/* 音訊分頁：每一列左邊是那支影片開始那一格的縮圖 */
+.audio-thumb {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--btn2, #333);
+  background-size: cover;
+  background-position: center;
+}
+.audio-thumb b {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* 流暢預覽的小標籤（點一下改回清楚） */
+.quality-chip {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 4;
+  min-height: 0;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 12px;
+}
+
+/* 軌道多選：動作列蓋在時間軸尺規上；軌道圖示變成打勾框 */
+.multi-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--accent);
+  overflow-x: auto;
+}
+.multi-count {
+  flex: none;
+  margin-right: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.multi-bar .chip {
+  flex: none;
+  white-space: nowrap;
+}
+.multi-bar .chip:disabled {
+  opacity: 0.4;
+}
+.multi-bar .chip.danger {
+  color: #d64545;
+}
+.track-chip.multi-on {
+  outline: 2px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.track-chip.multi-off {
+  opacity: 0.6;
+}
+
+/* 轉場卡片：方形小畫面＋名稱，橫向可以滑；選到的粗外框 */
+.tr-grid {
+  display: flex;
+  gap: 10px;
+  padding: 6px 2px 10px;
+  overflow-x: auto;
+}
+.tr-card {
+  flex: none;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  width: 54px;
-  height: 90px;
-  padding: 4px;
-  border-radius: 6px;
-  background: #4a4a50;
+  align-items: center;
+  gap: 4px;
+  width: 72px;
+  min-height: 0;
+  padding: 4px 4px 2px;
+  font-size: 12px;
+  color: var(--fg);
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 10px;
 }
-.story-thumb i {
+.tr-card canvas,
+.tr-card .tr-none {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: #111;
+}
+.tr-card .tr-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: #aaa;
+}
+.tr-card.on {
+  border-color: var(--accent);
+}
+.tr-card .tr-name {
+  max-width: 68px;
+  text-align: center;
+  line-height: 1.15;
+}
+
+/* 裁切：筆刷／橡皮擦 */
+.crop-tint {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.crop-paint {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: crosshair;
+}
+.brush-cursor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.crop-bar.paint-bar {
+  top: 60px;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(20, 20, 20, 0.85);
+  color: #fff;
+}
+.crop-bar.paint-bar {
+  right: 8px;
+}
+.crop-bar.paint-bar .paint-size {
   flex: 1;
-  border-radius: 3px;
-  background: #8aa4b8;
+  min-width: 0;
+  color: #fff;
 }
-.story-thumb i:nth-child(2) {
-  background: #b8a48a;
+.crop-bar.paint-bar .slider-row {
+  min-width: 0;
+}
+.crop-bar.paint-bar .slider-label {
+  min-width: 0;
+  color: #ddd;
+}
+.crop-bar.paint-bar .btn {
+  flex: none;
+}
+.crop-bar.paint-bar .btn {
+  background: rgba(255, 255, 255, 0.12);
 }

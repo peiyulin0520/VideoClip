@@ -1,5 +1,6 @@
 import {
   Application,
+  BlurFilter,
   CanvasSource,
   Container,
   Graphics,
@@ -49,14 +50,26 @@ export type SceneLayer = {
   crop?: Crop;
   /** 自由形狀遮罩：多邊形，座標是原始素材畫面的比例（搭配 crop 換算到方框內） */
   mask?: [number, number][];
+  /** 點陣圖遮罩（整張原始畫面的 canvas，不透明＝留下）；maskKey 變了才重建貼圖 */
+  maskBitmap?: HTMLCanvasElement;
+  maskKey?: string;
   opacity: number;
   blend: BlendMode;
   cornerRadius: number; // 0–0.5
   outline?: Outline;
+  /** 轉場：只畫這個範圍裡面的（畫布像素；矩形可以有好幾塊，或一個圓） */
+  clip?: { rects?: [number, number, number, number][]; circle?: { cx: number; cy: number; r: number } };
+  /** 轉場：模糊程度（畫布像素） */
+  blur?: number;
 };
 
 type Obj = {
+  /** 最外層（沒有位移旋轉）：轉場的裁切遮罩用畫布座標，掛在這一層 */
+  holder: Container;
   container: Container;
+  clip: Graphics | null;
+  clipKey: string;
+  blurF: BlurFilter | null;
   sprite: Sprite;
   texture: Texture | null;
   textureSource: CanvasSource | ImageSource | null;
@@ -74,6 +87,8 @@ type Obj = {
   outlineKey: string;
   shape: Graphics | null;
   shapeKey: string;
+  maskSprite: Sprite | null;
+  maskSpriteKey: string;
 };
 
 export class Compositor {
@@ -128,8 +143,8 @@ export class Compositor {
       if (!layer.ready) allReady = false;
       const o = this.ensure(layer);
       this.update(o, layer);
-      if (stage.children[index] !== o.container)
-        stage.addChildAt(o.container, Math.min(index, stage.children.length));
+      if (stage.children[index] !== o.holder)
+        stage.addChildAt(o.holder, Math.min(index, stage.children.length));
     });
 
     // 還沒準備好的新圖層出現時，先留著舊圖層（例如換片時的上一個片段），避免閃黑
@@ -152,7 +167,13 @@ export class Compositor {
     sprite.anchor.set(0.5);
     container.addChild(sprite);
     container.visible = false;
+    const holder = new Container();
+    holder.addChild(container);
     o = {
+      holder,
+      clip: null,
+      clipKey: '',
+      blurF: null,
       container,
       sprite,
       texture: null,
@@ -170,6 +191,8 @@ export class Compositor {
       outlineKey: '',
       shape: null,
       shapeKey: '',
+      maskSprite: null,
+      maskSpriteKey: '',
     };
     this.objs.set(layer.id, o);
     return o;
@@ -285,10 +308,50 @@ export class Compositor {
     o.sprite.width = box.w;
     o.sprite.height = box.h;
     o.sprite.blendMode = layer.blend;
+    this.applyClipBlur(o, layer);
 
     // ---- 遮罩：自由形狀（多邊形）優先，沒有才用圓角 ----
     const radius = Math.min(layer.cornerRadius * Math.min(box.w, box.h), Math.min(box.w, box.h) / 2);
     const poly = layer.mask && layer.mask.length >= 3 ? layer.mask : null;
+    if (layer.maskBitmap) {
+      // 點陣圖遮罩：貼圖只取留下來的那一塊（crop），大小跟畫面一樣
+      const c = layer.crop ?? { l: 0, t: 0, r: 0, b: 0 };
+      const bw = layer.maskBitmap.width;
+      const bh = layer.maskBitmap.height;
+      const key = `${layer.maskKey}|${c.l}|${c.t}|${c.r}|${c.b}`;
+      if (!o.maskSprite || o.maskSpriteKey !== key) {
+        o.maskSprite?.texture.destroy(false);
+        const source = new CanvasSource({ resource: layer.maskBitmap, scaleMode: 'linear' });
+        const tex = new Texture({
+          source,
+          frame: new Rectangle(
+            bw * c.l,
+            bh * c.t,
+            Math.max(bw * (1 - c.l - c.r), 1),
+            Math.max(bh * (1 - c.t - c.b), 1),
+          ),
+        });
+        if (!o.maskSprite) {
+          o.maskSprite = new Sprite(tex);
+          o.maskSprite.anchor.set(0.5);
+          o.container.addChild(o.maskSprite);
+        } else o.maskSprite.texture = tex;
+        o.maskSpriteKey = key;
+      }
+      o.maskSprite.width = box.w;
+      o.maskSprite.height = box.h;
+      o.sprite.mask = o.maskSprite;
+      this.finishOutline(o, layer, radius);
+      return;
+    }
+    if (o.maskSprite) {
+      o.sprite.mask = null;
+      o.container.removeChild(o.maskSprite);
+      o.maskSprite.texture.destroy(false);
+      o.maskSprite.destroy();
+      o.maskSprite = null;
+      o.maskSpriteKey = '';
+    }
     if (poly) {
       const c = layer.crop ?? { l: 0, t: 0, r: 0, b: 0 };
       const kw = Math.max(1 - c.l - c.r, 0.001);
@@ -344,6 +407,11 @@ export class Compositor {
       }
     }
 
+    this.finishOutline(o, layer, radius);
+  }
+
+  private finishOutline(o: Obj, layer: SceneLayer, radius: number) {
+    const { box } = layer;
     // ---- 外框（畫在框內側，方框大小不變，選取框才對得準）----
     if (layer.outline && layer.outline.width > 0) {
       const w = layer.outline.width * uiScale(this.width, this.height);
@@ -367,9 +435,45 @@ export class Compositor {
     }
   }
 
+  /** 轉場用：裁切範圍（畫布座標的遮罩）與模糊 */
+  private applyClipBlur(o: Obj, layer: SceneLayer) {
+    const c = layer.clip;
+    if (c) {
+      const key = JSON.stringify(c);
+      if (!o.clip) {
+        o.clip = new Graphics();
+        o.holder.addChild(o.clip);
+      }
+      if (o.clipKey !== key) {
+        o.clip.clear();
+        if (c.circle) o.clip.circle(c.circle.cx, c.circle.cy, Math.max(c.circle.r, 0.5)).fill(0xffffff);
+        for (const [x, y, w, h] of c.rects ?? []) o.clip.rect(x, y, w, h).fill(0xffffff);
+        // 一塊都沒有：遮罩要有東西，不然 Pixi 會當作沒有遮罩 → 畫一個看不到的小點
+        if (!c.circle && (c.rects ?? []).length === 0) o.clip.rect(-10, -10, 1, 1).fill(0xffffff);
+        o.clipKey = key;
+      }
+      o.holder.mask = o.clip;
+    } else if (o.clip) {
+      o.holder.mask = null;
+      o.holder.removeChild(o.clip);
+      o.clip.destroy();
+      o.clip = null;
+      o.clipKey = '';
+    }
+    if (layer.blur && layer.blur > 0.5) {
+      if (!o.blurF) o.blurF = new BlurFilter({ strength: layer.blur, quality: 2 });
+      o.blurF.strength = layer.blur;
+      o.container.filters = [o.blurF];
+    } else if (o.blurF) {
+      o.container.filters = null;
+      o.blurF.destroy();
+      o.blurF = null;
+    }
+  }
+
   private destroyObj(o: Obj) {
-    o.container.parent?.removeChild(o.container);
-    o.container.destroy({ children: true });
+    o.holder.parent?.removeChild(o.holder);
+    o.holder.destroy({ children: true });
     this.dropTexture(o);
   }
 

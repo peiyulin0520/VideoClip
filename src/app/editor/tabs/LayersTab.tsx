@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Eye, EyeOff, Layers, Lock, Type } from 'lucide-react';
 import { BLEND_LABELS } from '../../../engine/geometry';
-import { baseMediaTrack, findItem, isVideoItem, layersAt } from '../../../engine/timeline';
-import { editItem, patchTrack, shiftTrackLayer } from '../../../store/actions';
+import { findItem, isVideoItem, layersAt } from '../../../engine/timeline';
+import { editItem, patchTrack, resetTransform, setTransform, shiftTrackLayer } from '../../../store/actions';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
@@ -104,8 +104,8 @@ export function LayersTab() {
             max={100}
             step={1}
             format={(v) => `${v}%`}
-            onChange={(v) =>
-              editItem(it.id, (x) => void (x.transform.opacity = v / 100), { coalesce: `op:${it.id}` })
+            onChange={
+              (v) => setTransform(it.id, { opacity: v / 100 }, `op:${it.id}`) // 版型＝整個版型一起變
             }
           />
           <div className="slider-label">混合模式</div>
@@ -157,19 +157,7 @@ export function LayersTab() {
               />
             ))}
           </div>
-          <button
-            className="btn"
-            onClick={() =>
-              editItem(it.id, (x) => {
-                x.transform.x = 0.5;
-                x.transform.y = 0.5;
-                // 最下面那條影像軌的片段原本是滿版；疊在上面的（畫中畫）預設縮小一半
-                x.transform.scale =
-                  x.type === 'text' || found?.track.id === baseMediaTrack(project)?.id ? 1 : 0.5;
-                x.transform.rotation = 0;
-              })
-            }
-          >
+          <button className="btn" onClick={() => resetTransform(it.id)}>
             位置、大小、旋轉歸位
           </button>
         </div>

@@ -68,8 +68,23 @@ export class GiphyError extends Error {
 
 /** 熱門（q 是空的）或搜尋 */
 export async function giphyStickers(q: string, key = getGiphyKey(), limit = 24): Promise<GiphySticker[]> {
+  return (await giphyPage(q, key, limit, 0)).items;
+}
+
+/** 一頁結果（offset＝從第幾筆開始）；total＝GIPHY 說這個搜尋總共有幾筆（沒給就是 null） */
+export async function giphyPage(
+  q: string,
+  key = getGiphyKey(),
+  limit = 24,
+  offset = 0,
+): Promise<{ items: GiphySticker[]; total: number | null; count: number }> {
   if (!key) throw new GiphyError('還沒有填 GIPHY API key', 'no-key');
-  const params = new URLSearchParams({ api_key: key, limit: String(limit), rating: 'g' });
+  const params = new URLSearchParams({
+    api_key: key,
+    limit: String(limit),
+    offset: String(offset),
+    rating: 'g',
+  });
   if (q.trim()) {
     params.set('q', q.trim());
     params.set('lang', /[㐀-鿿]/.test(q) ? 'zh-TW' : 'en');
@@ -83,8 +98,9 @@ export async function giphyStickers(q: string, key = getGiphyKey(), limit = 24):
   if (res.status === 401 || res.status === 403) throw new GiphyError('GIPHY API key 不正確', 'bad-key');
   if (res.status === 429) throw new GiphyError('這個小時的搜尋次數用完了，晚一點再試', 'limit');
   if (!res.ok) throw new GiphyError(`GIPHY 回應錯誤（${res.status}）`, 'other');
-  const body = (await res.json()) as { data?: Raw[] };
-  return (body.data ?? []).map(parseGiphy).filter((x): x is GiphySticker => !!x);
+  const body = (await res.json()) as { data?: Raw[]; pagination?: { total_count?: number } };
+  const items = (body.data ?? []).map(parseGiphy).filter((x): x is GiphySticker => !!x);
+  return { items, total: body.pagination?.total_count ?? null, count: body.data?.length ?? 0 };
 }
 
 /**

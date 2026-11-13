@@ -15,7 +15,7 @@ import {
 } from '../../../store/actions';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
-import { itemTitle } from '../../../engine/labels';
+import { itemTitle, ordinalIn, thumbOf } from '../../../engine/labels';
 import { formatTime } from '../../../engine/timeline';
 import { Slider } from '../../../ui/Slider';
 import { ClipPanel, panelActive } from './ClipPanel';
@@ -140,8 +140,19 @@ export function AudioTab({
                   player?.seek(item.start);
                 }}
               >
-                <span className="audio-ico">{item.type === 'audio' ? '♪' : '🎬'}</span>
+                {thumbOf(item, asset) ? (
+                  <span
+                    className="audio-thumb"
+                    data-testid="audio-thumb"
+                    style={{ backgroundImage: `url(${thumbOf(item, asset)})` }}
+                  >
+                    {item.type === 'audio' && <b>♪</b>}
+                  </span>
+                ) : (
+                  <span className="audio-ico">{item.type === 'audio' ? '♪' : '🎬'}</span>
+                )}
                 <span className="audio-text">
+                  {item.type === 'video' ? `${ordinalIn(track.items, item.id)} ` : ''}
                   {itemTitle(item, asset)}
                   <small>
                     {formatTime(item.start)}–{formatTime(item.start + item.duration)}
@@ -160,6 +171,20 @@ export function AudioTab({
               >
                 {item.volume > 0 ? '保留' : '關閉'}
               </button>
+              {item.type === 'audio' && (
+                <button
+                  className="chip sm"
+                  data-testid="audio-trim"
+                  aria-label={`修剪 ${itemTitle(item, asset)}`}
+                  onClick={() => {
+                    useProjectStore.getState().select(item.id);
+                    player?.seek(item.start);
+                    setPanel('trim');
+                  }}
+                >
+                  修剪
+                </button>
+              )}
               {item.type === 'video' && (
                 <button
                   className="chip sm"

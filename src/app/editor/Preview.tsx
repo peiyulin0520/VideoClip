@@ -14,6 +14,7 @@ import {
   type Box,
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
+import { readQuality, useSmooth, writeQuality } from '../../engine/previewQuality';
 import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
 import { CropOverlay } from './CropOverlay';
@@ -79,6 +80,10 @@ export function Preview({
   const player = useUI((s) => s.player);
   const cropping = useCrop((s) => !!s.s);
   const previewFull = useUI((s) => s.previewFull);
+  // 預覽畫質：自動／清楚／流暢（設定頁可改）；自動時同時 3 支以上影片、或偵測到播放太慢就用流暢
+  const [quality, setQuality] = useState(readQuality);
+  const [slow, setSlow] = useState(false);
+  const smooth = useSmooth(quality, project, slow);
   const fontEpoch = useFonts((s) => s.epoch); // 字體載入完成：字卡大小可能變，選取框要重算
 
   // ---- 建立 / 銷毀播放引擎（含 Pixi 合成器）----
@@ -95,6 +100,14 @@ export function Preview({
       urlFor: (id) => urlFor(projectId, id),
       onThumb: setAssetThumbs,
       onAudioBlocked: () => toast('iPhone 擋住了聲音，請再按一次播放', 6000),
+      smooth,
+      onSlow: () => {
+        if (readQuality() === 'auto') {
+          setSlow(true);
+          toast('播放有點吃力，預覽自動改成「流暢」（匯出不受影響）', 6000);
+        }
+      },
+      onPoolFull: () => toast('同時播放的影片太多，有些格子先用縮圖預覽；匯出不受影響', 6000),
     }).then((player) => {
       if (cancelled) return player.destroy();
       created = player;
@@ -120,7 +133,7 @@ export function Preview({
       created?.destroy();
       useUI.setState({ player: null });
     };
-  }, [projectId, width, height]); // 比例改了（寬高變了）就重建預覽引擎
+  }, [projectId, width, height, smooth]); // 比例改了、預覽畫質改了就重建預覽引擎
 
   // ---- 舞台大小（CSS px）----
   useEffect(() => {
@@ -372,7 +385,11 @@ export function Preview({
         onPointerCancel={onPointerCancel}
       >
         {/* key：比例改變就換一個新的 canvas（舊的 WebGL 環境被 Pixi 銷毀後不能在同一個 canvas 上重建） */}
-        <canvas key={`${width}x${height}`} ref={canvasRef} data-testid="preview-canvas" />
+        <canvas
+          key={`${width}x${height}-${smooth ? 's' : 'c'}`}
+          ref={canvasRef}
+          data-testid="preview-canvas"
+        />
         <div ref={poolRef} className="pool" aria-hidden="true" />
         <PerfOverlay player={player} />
 
@@ -434,27 +451,45 @@ export function Preview({
           ＋ 匯入影片或照片
         </button>
       )}
-      <button
-        className="peek-toggle"
-        aria-label="查看圖層"
-        aria-pressed={peek}
-        onClick={() => {
-          player?.pause();
-          setPeek((v) => !v);
-        }}
-      >
-        <Layers size={18} />
-        <span>圖層</span>
-      </button>
+      {smooth && (
+        <button
+          className="quality-chip"
+          data-testid="quality-chip"
+          aria-label="流暢預覽（點一下改回清楚）"
+          onClick={() => {
+            writeQuality('clear');
+            setQuality('clear');
+            setSlow(false);
+          }}
+        >
+          流暢預覽
+        </button>
+      )}
+      {!cropping && (
+        <button
+          className="peek-toggle"
+          aria-label="查看圖層"
+          aria-pressed={peek}
+          onClick={() => {
+            player?.pause();
+            setPeek((v) => !v);
+          }}
+        >
+          <Layers size={18} />
+          <span>圖層</span>
+        </button>
+      )}
       {peek && <LayerPeek project={project} time={player?.time ?? 0} onClose={() => setPeek(false)} />}
-      <button
-        className="full-toggle"
-        aria-label={previewFull ? '結束全螢幕預覽' : '全螢幕預覽'}
-        aria-pressed={previewFull}
-        onClick={() => useUI.setState({ previewFull: !previewFull })}
-      >
-        {previewFull ? <Minimize size={20} /> : <Maximize size={20} />}
-      </button>
+      {!cropping && (
+        <button
+          className="full-toggle"
+          aria-label={previewFull ? '結束全螢幕預覽' : '全螢幕預覽'}
+          aria-pressed={previewFull}
+          onClick={() => useUI.setState({ previewFull: !previewFull })}
+        >
+          {previewFull ? <Minimize size={20} /> : <Maximize size={20} />}
+        </button>
+      )}
       <button
         className={`safe-toggle${safe ? ' on' : ''}`}
         aria-label="安全區參考線"

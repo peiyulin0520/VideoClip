@@ -17,6 +17,14 @@ export function itemTitle(item: Item, asset?: Asset): string {
   return item.type === 'text' ? `Aa ${label}` : item.type === 'audio' ? `♪ ${label}` : label;
 }
 
+/** 這個物件「開始那一格」的縮圖（素材縮圖依入點挑最近的一張）；沒有縮圖回傳 undefined */
+export function thumbOf(item: Item, asset?: Asset): string | undefined {
+  if (item.type === 'text' || !asset || asset.thumbs.length === 0) return undefined;
+  if (item.type === 'image' || asset.duration <= 0) return asset.thumbs[0];
+  const i = Math.floor((item.trimIn / asset.duration) * asset.thumbs.length);
+  return asset.thumbs[Math.min(Math.max(i, 0), asset.thumbs.length - 1)];
+}
+
 /** 同一條軌道上依開始時間排的第幾個（1 起算）；時間軸上片段名稱前面的序號，自動算、不存 */
 export function ordinalIn(items: Item[], id: string): number {
   const sorted = [...items].sort((a, b) => a.start - b.start);

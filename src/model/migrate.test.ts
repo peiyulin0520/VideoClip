@@ -165,3 +165,67 @@ describe('markLegacyGroups', () => {
     expect(markLegacyGroups(r.project).changed).toBe(false);
   });
 });
+
+describe('repairGroups', () => {
+  it('孤兒格子（沒有外框的 group）變回普通影像軌', async () => {
+    const { repairGroups } = await import('./migrate');
+    const p = {
+      tracks: [
+        {
+          id: 'c',
+          kind: 'media',
+          name: 'c',
+          group: 'g1',
+          groupRole: 'cell',
+          fill: 'black',
+          items: [{ id: 'i', type: 'image', group: 'g1', cell: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    } as never;
+    const r = repairGroups(p);
+    expect(r.changed).toBe(true);
+    const t = r.project.tracks[0]!;
+    expect(t.groupRole).toBeUndefined();
+    expect(t.group).toBeUndefined();
+    const it = t.items[0] as unknown as Record<string, unknown>;
+    expect(it.group).toBeUndefined();
+    expect(it.cell).toBeUndefined();
+  });
+  it('有外框的版型不動；已移除的動態模板欄位被清掉', async () => {
+    const { repairGroups } = await import('./migrate');
+    const p = {
+      tracks: [
+        {
+          id: 'c',
+          kind: 'media',
+          group: 'g1',
+          groupRole: 'cell',
+          items: [
+            { id: 'i', type: 'image', group: 'g1', cell: { x: 0, y: 0, w: 1, h: 1 }, cellAnim: { t0: 0 } },
+          ],
+        },
+        {
+          id: 'f',
+          kind: 'media',
+          group: 'g1',
+          groupRole: 'frame',
+          items: [{ id: 'fi', type: 'image', group: 'g1', template: 'story3' }],
+        },
+        {
+          id: 't',
+          kind: 'text',
+          items: [{ id: 'x', type: 'text', group: 'g1', fontCycle: { fonts: [], interval: 1, until: 1 } }],
+        },
+      ],
+    } as never;
+    const r = repairGroups(p);
+    expect(r.changed).toBe(true);
+    const [c, f, t] = r.project.tracks;
+    expect(c!.groupRole).toBe('cell');
+    expect((c!.items[0] as unknown as Record<string, unknown>).cellAnim).toBeUndefined();
+    expect((f!.items[0] as unknown as Record<string, unknown>).template).toBeUndefined();
+    expect((t!.items[0] as unknown as Record<string, unknown>).fontCycle).toBeUndefined();
+    expect((t!.items[0] as unknown as Record<string, unknown>).group).toBeUndefined();
+    expect(repairGroups(r.project).changed).toBe(false);
+  });
+});

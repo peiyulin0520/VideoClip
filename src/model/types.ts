@@ -65,6 +65,11 @@ export type VideoItem = ItemBase & {
   fit: 'cover' | 'contain';
   /** 自由形狀裁切：多邊形的點，座標是「原始素材畫面」的比例 0–1（只留多邊形裡面，外面透明） */
   mask?: [number, number][];
+  /**
+   * 點陣圖遮罩（裁切模式的筆刷／橡皮擦）：PNG data URL，座標是整張原始素材畫面，不透明＝留下、透明＝去掉。
+   * 有它時優先於 mask（多邊形）。
+   */
+  maskBitmap?: string;
   /** 多格版型：這個物件所在的格子（佔畫面寬、高的比例）。裁切模式完成時，畫面會填滿這個格子 */
   cell?: { x: number; y: number; w: number; h: number };
   /** 同一個版型的物件（外框與各格）共用的 id：一起縮放、移動、同一段時間，也用來「刪除整個版型」 */
@@ -81,8 +86,43 @@ export type VideoItem = ItemBase & {
   transitionIn?: { kind: TransitionKind; duration: number };
 };
 
-/** 轉場種類：淡入淡出、黑場、白閃、暖色閃光、左推、上推、縮放 */
-export type TransitionKind = 'fade' | 'black' | 'white' | 'flash' | 'push' | 'rise' | 'zoom';
+/**
+ * 轉場種類（見 engine/transitions.ts 的目錄）。2026-11-13 前存的舊名稱（fade、black、white、push、rise、zoom）
+ * 讀進來時由 migrate 換成新名稱。
+ */
+export type TransitionKind =
+  | 'dissolve'
+  | 'blackflash'
+  | 'whiteflash'
+  | 'overexpose'
+  | 'zoomDissolve'
+  | 'moveL'
+  | 'moveR'
+  | 'moveU'
+  | 'moveD'
+  | 'rollDown'
+  | 'rollUp'
+  | 'circleOut'
+  | 'topOut'
+  | 'bottomOut'
+  | 'blur'
+  | 'defocus'
+  | 'fastL'
+  | 'fastR'
+  | 'slideL'
+  | 'slideR'
+  | 'slideU'
+  | 'slideD'
+  | 'zoomIn'
+  | 'zoomOut'
+  | 'flash'
+  | 'filmUp'
+  | 'filmLeft'
+  | 'grid4'
+  | 'grid9'
+  | 'glitch1'
+  | 'glitch2'
+  | 'glitch3';
 
 // 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
 export type Stroke = {

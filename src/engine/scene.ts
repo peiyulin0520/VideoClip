@@ -4,15 +4,9 @@ import { fittedSize, itemBox, type GeoCtx } from './geometry';
 import { renderText, measureTextItem, uiScale } from './textRender';
 import { visibleLayers } from './timeline';
 import { composeWith, motionOffset } from './groupTransform';
-import { cellRect } from './layouts';
-import { animatedCell, cycleFont, storyTint } from './story';
-import {
-  applyLook,
-  transitionLook,
-  transitionProgress,
-  transitionSpan,
-  type TransitionLook,
-} from './transitions';
+import { cellRect, cellTransform } from './layouts';
+import { maskCanvasFor } from './maskBitmap';
+import { activeTransition, applyLook, clipPx, type Cover } from './transitions';
 
 /** 預覽/匯出各自提供「這個影片/照片物件現在的畫面」 */
 export type SourceProvider = (
@@ -79,6 +73,25 @@ function frameOf(project: Project, group: string): { item: VideoItem } | null {
   return null;
 }
 
+/**
+ * 這個時間點要畫的所有物件（含轉場期間延長／提前的虛擬物件）。匯出時要先備好這些物件的畫面，所以獨立成函式。
+ */
+export function sceneItems(project: Project, t: number): { item: Item; track: Track }[] {
+  const out: { item: Item; track: Track }[] = [];
+  const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
+  project.tracks.forEach((track, i) => {
+    const at =
+      track.kind === 'media' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
+    if (at) {
+      for (const x of [at.a, at.b]) if (x) out.push({ item: x, track });
+      return;
+    }
+    const l = live.get(i);
+    if (l) out.push({ item: l.item, track });
+  });
+  return out;
+}
+
 /** 依專案與時間算出要畫的圖層（由下到上）。canvasW/H 是合成器畫布的像素。 */
 export function buildScene(
   project: Project,
@@ -86,26 +99,13 @@ export function buildScene(
   canvasW: number,
   canvasH: number,
   provide: SourceProvider,
+  opts: { guardCells?: boolean } = {},
 ): SceneLayer[] {
   const ctx = geoCtx(project, canvasW, canvasH);
   const out: SceneLayer[] = [];
   const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
-  // 這一刻正在進行的轉場（每條軌道各自找）：算好每個片段該怎麼畫、要蓋哪些顏色層
-  const covers = new Map<string, NonNullable<TransitionLook['cover']>>();
-  const looks = new Map<string, TransitionLook>(); // key: 軌道序號:片段 id
-  project.tracks.forEach((track, i) => {
-    if (track.kind !== 'media' || track.hidden) return;
-    for (const it of track.items) {
-      if (it.type === 'text' || it.type === 'audio' || it.group || !it.transitionIn) continue;
-      const span = transitionSpan(track.items, it);
-      const p = span && transitionProgress(span, t);
-      if (!span || p === null) continue;
-      const look = transitionLook(it.transitionIn.kind, p);
-      looks.set(`${i}:${p < 0.5 ? span.prev.id : it.id}`, look);
-      if (look.cover) covers.set(it.id, look.cover);
-    }
-  });
-  const lookFor = (trackIndex: number, itemId: string) => looks.get(`${trackIndex}:${itemId}`);
+  // 轉場期間要蓋的顏色層（蓋在最上面）
+  const covers: { id: string; c: Cover }[] = [];
   project.tracks.forEach((track, i) => {
     const l = live.get(i);
     const li = l?.item;
@@ -115,9 +115,27 @@ export function buildScene(
     const off = frame
       ? motionOffset(frame.item.motion, t - frame.item.start, frame.item.duration)
       : { x: 0, y: 0 };
-    if (l) {
+    const at =
+      track.kind === 'media' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
+    if (at) {
+      // 轉場期間：A、B 兩段同時畫（B 在上或 A 在上看轉場種類），各自套上位移、縮放、透明度、裁切、模糊
+      const mk = (item: VideoItem | null, look: (typeof at.frame)['a']): SceneLayer | null => {
+        if (!item) return null;
+        const layer = toLayer(item, track, project, ctx, provide);
+        if (!layer) return null;
+        layer.box = applyLook(layer.box, look, canvasW, canvasH);
+        layer.opacity *= look.opacity;
+        if (look.clip) layer.clip = clipPx(look.clip, canvasW, canvasH);
+        if (look.blur) layer.blur = look.blur * Math.min(canvasW, canvasH);
+        return layer;
+      };
+      const A = mk(at.a, at.frame.a);
+      const B = mk(at.b, at.frame.b);
+      for (const x of at.frame.bOnTop ? [A, B] : [B, A]) if (x) out.push(x);
+      at.frame.covers.forEach((c, n) => covers.push({ id: `${i}-${n}`, c }));
+    } else if (l) {
       const layer = toLayer(
-        shaped(l.item, t, frame?.item, project, canvasW, canvasH),
+        opts.guardCells === false ? l.item : guardCell(l.item, frame?.item, project, canvasW, canvasH),
         track,
         project,
         ctx,
@@ -125,11 +143,6 @@ export function buildScene(
       );
       if (layer) {
         layer.box = { ...layer.box, cx: layer.box.cx + off.x * canvasW, cy: layer.box.cy + off.y * canvasH };
-        const look = lookFor(i, l.item.id);
-        if (look) {
-          layer.box = applyLook(layer.box, look, canvasW, canvasH);
-          layer.opacity *= look.opacity;
-        }
         out.push(layer);
       }
     } else if (track.groupRole === 'cell' && track.fill && !track.hidden && frame) {
@@ -138,7 +151,6 @@ export function buildScene(
       if (t < fr.start || t >= fr.start + fr.duration) return;
       const ref = track.items.find((x) => x.type !== 'text' && x.cell);
       if (!ref || ref.type === 'text' || !ref.cell) return;
-      if (ref.cellAnim && t < ref.start) return; // 動態模板的格子還沒進場
       const r = cellRect(ref.cell, canvasW, canvasH);
       const c = composeWith(
         { x: (r.x + r.w / 2) / canvasW, y: (r.y + r.h / 2) / canvasH, scale: 1, rotation: 0, opacity: 1 },
@@ -168,19 +180,9 @@ export function buildScene(
       });
     }
   });
-  // 動態模板的結尾：暖橘色染色與白色閃光
-  for (const tr of project.tracks) {
-    if (tr.groupRole !== 'frame' || tr.hidden) continue;
-    const fr = tr.items[0];
-    if (!fr || fr.type === 'text' || fr.type === 'audio' || fr.template !== 'story3') continue;
-    if (t < fr.start || t >= fr.start + fr.duration) continue;
-    const k = storyTint(t - fr.start, fr.duration);
-    if (k.warm > 0.001) covers.set(`story-warm-${fr.id}`, { kind: 'flash', color: '#ffb457', alpha: k.warm });
-    if (k.white > 0.001)
-      covers.set(`story-white-${fr.id}`, { kind: 'solid', color: '#ffffff', alpha: k.white });
-  }
   // 轉場的顏色層：蓋在最上面
-  for (const [id, c] of covers)
+  for (const { id, c } of covers) {
+    const r = c.rect ?? [0, 0, 1, 1];
     out.push({
       id: `cover-${id}`,
       kind: 'text',
@@ -189,40 +191,47 @@ export function buildScene(
       srcW: c.kind === 'flash' ? 64 : 8,
       srcH: c.kind === 'flash' ? 64 : 8,
       textKey: c.kind === 'flash' ? 'flash-warm' : `fill-${c.color}`,
-      box: { cx: canvasW / 2, cy: canvasH / 2, w: canvasW, h: canvasH, rotation: 0 },
+      box: {
+        cx: (r[0] + r[2] / 2) * canvasW,
+        cy: (r[1] + r[3] / 2) * canvasH,
+        w: r[2] * canvasW,
+        h: r[3] * canvasH,
+        rotation: 0,
+      },
       opacity: c.alpha,
       blend: 'normal',
       cornerRadius: 0,
     });
+  }
   return out;
 }
 
 /**
- * 這一刻實際要畫的樣子：動態模板的格子（範圍隨時間滑動／撐開，再套上整組的變形）、字體輪播的字卡。
- * 其他物件原樣回傳。
+ * 版型格子的保險：格子應該永遠在外框的洞裡（由「格子在版型自己座標裡的位置」套上整組的變形算出來）。
+ * 如果存的 transform 跟這個差太多（有哪一條路徑單獨動了格子造成跑版），以算出來的為準。
  */
-function shaped(
+export function guardCell(
   item: Item,
-  t: number,
   frame: VideoItem | undefined,
   project: Project,
   W: number,
   H: number,
 ): Item {
-  if (item.type === 'text') {
-    if (!item.fontCycle) return item;
-    const fontId = cycleFont(item.fontCycle, t - item.start);
-    return {
-      ...item,
-      card: { ...item.card, runs: item.card.runs.map((r, i) => (i === 0 ? { ...r, fontId } : r)) },
-    };
-  }
-  if (item.type === 'audio' || !item.cell || !item.cellAnim) return item;
+  if (item.type === 'text' || item.type === 'audio' || !item.cell || !frame || item.group !== frame.group)
+    return item;
   const asset = project.assets.find((a) => a.id === item.assetId);
   if (!asset) return item;
-  const a = animatedCell(item, asset, t - item.start, W, H);
-  const transform = frame ? composeWith(a.transform, frame.transform, W, H) : a.transform;
-  return { ...item, crop: a.crop, transform: { ...transform, opacity: item.transform.opacity } };
+  const want = composeWith(
+    cellTransform(asset, item.crop, cellRect(item.cell, W, H), W, H),
+    frame.transform,
+    W,
+    H,
+  );
+  const cur = item.transform;
+  const off = Math.max(Math.abs(cur.x - want.x), Math.abs(cur.y - want.y));
+  const ratio = want.scale > 1e-9 ? cur.scale / want.scale : 1;
+  if (off < 0.02 && Math.abs(ratio - 1) < 0.02 && Math.abs(cur.rotation - want.rotation) < 1) return item;
+  return { ...item, transform: { ...want, opacity: cur.opacity } };
 }
 
 function toLayer(
@@ -252,6 +261,7 @@ function toLayer(
   if (!asset) return null;
   const src = provide(item, asset, track);
   if (!src) return null;
+  const maskCanvas = item.maskBitmap ? maskCanvasFor(item.maskBitmap) : undefined;
   // 暫存畫面的解析度：scale=1 時的顯示大小，最多放大 2 倍（縮放手勢時才不會一直重建貼圖）
   const crop = item.crop ?? { l: 0, t: 0, r: 0, b: 0 };
   const cw = Math.max(asset.width * (1 - crop.l - crop.r), 1);
@@ -261,9 +271,11 @@ function toLayer(
   return {
     ...common,
     kind: item.type,
-    mask: item.mask,
+    mask: item.maskBitmap ? undefined : item.mask,
+    maskBitmap: maskCanvas,
+    maskKey: item.maskBitmap ? item.maskBitmap.slice(-48) + item.maskBitmap.length : undefined,
     source: src.source,
-    ready: src.ready,
+    ready: src.ready && (!item.maskBitmap || !!maskCanvas), // 遮罩還在解碼：先不畫，免得閃一下沒遮罩的樣子
     srcW: src.srcW,
     srcH: src.srcH,
     frameW: base.w * k,

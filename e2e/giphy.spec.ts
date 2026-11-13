@@ -320,3 +320,41 @@ test('我的貼圖：上傳 GIF 會保留會動；一般圖片還是轉成 PNG',
     })
     .toBe(true);
 });
+
+test('往下滑載入更多：一頁 24 個，滑到底再載下一頁，直到沒有更多；不會重複', async ({ page }) => {
+  await page.addInitScript((k) => localStorage.setItem('vc-giphy-key', k), TEST_KEY);
+  await mockGiphy(page);
+  const offsets: number[] = [];
+  await page.route('https://api.giphy.com/**', async (route: Route) => {
+    const url = new URL(route.request().url());
+    const offset = Number(url.searchParams.get('offset') ?? '0');
+    offsets.push(offset);
+    const n = Math.max(0, Math.min(24, 60 - offset));
+    const data = Array.from({ length: n }, (_, i) => sticker(`m${offset + i}`, `many ${offset + i}`));
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ data, pagination: { total_count: 60, count: n, offset } }),
+    });
+  });
+  await createProjectWith(page, ['solid-blue.webm']);
+  await openGiphy(page);
+  const cells = page.getByTestId('giphy-grid').locator('.sticker-cell');
+  await expect(cells.first()).toBeVisible();
+  // 一直往下滑，直到 60 個都載入
+  await expect
+    .poll(
+      async () => {
+        await page
+          .getByTestId('giphy-sentinel')
+          .scrollIntoViewIfNeeded({ timeout: 500 })
+          .catch(() => {});
+        return cells.count();
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(60);
+  expect(offsets).toEqual([0, 24, 48]);
+  await expect(page.getByTestId('giphy-sentinel')).toHaveCount(0); // 沒有更多了
+});

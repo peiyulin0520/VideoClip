@@ -21,8 +21,9 @@ import { getMedia } from '../storage/media';
 import { animBitmapAt } from './animImage';
 import { fadeSpans } from './audio';
 import { Compositor } from './compositor';
-import { buildScene } from './scene';
-import { sourceTimeAt, totalDuration, visibleLayers } from './timeline';
+import { buildScene, sceneItems } from './scene';
+import { preloadMasks } from './maskBitmap';
+import { sourceTimeClamped, totalDuration } from './timeline';
 
 // 匯出整支影片（PLAN §2.4）：不播放，一格一格依時間走——
 // 影片用 Mediabunny 解碼指定時間的那一格，畫面走跟預覽同一套 buildScene＋Compositor（輸出解析度），
@@ -355,6 +356,7 @@ export async function exportProject(
   const mime = ext === 'mp4' ? 'video/mp4' : 'video/webm';
   const name = `${(project.name || 'VideoClip').replace(/[\\/:*?"<>|]/g, '_')}.${ext}`;
   const out = await openTarget();
+  await preloadMasks(project); // 筆刷／橡皮擦畫的遮罩要先解好
   const comp = await Compositor.create({ width, height });
   const frameSources = new Map<string, VideoFrames>();
   const images = new Map<string, HTMLImageElement>();
@@ -390,7 +392,7 @@ export async function exportProject(
         { source: FrameCanvas | HTMLVideoElement | HTMLImageElement | ImageBitmap; w: number; h: number }
       >();
       await Promise.all(
-        visibleLayers(project, t).map(async ({ item }) => {
+        sceneItems(project, t).map(async ({ item }) => {
           if (item.type === 'text') return;
           const asset = project.assets.find((a) => a.id === item.assetId);
           if (!asset) return;
@@ -414,7 +416,7 @@ export async function exportProject(
             vf = await VideoFrames.open(await getFile(asset), Math.round(Math.max(width, height) * 1.5));
             frameSources.set(asset.id, vf);
           }
-          const f = await vf.frameAt(sourceTimeAt(item, t));
+          const f = await vf.frameAt(sourceTimeClamped(item, t, asset));
           if (f) prepared.set(item.id, { source: f.source, w: f.w, h: f.h });
         }),
       );

@@ -29,23 +29,20 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
       <p className="hint">
         在預覽上拖移、縮放整個版型（格子會一起動）；再點一下格子，可以到「剪輯」選那一格要用的片段。
       </p>
-      {frame.template && <p className="hint">這是動態模板，有自己的時間表；標題、副標在「文字」分頁改。</p>}
-      {!frame.template && (
-        <div className="chips" role="radiogroup" aria-label="版型動畫">
-          {MOTIONS.map((m) => (
-            <button
-              key={m.name}
-              role="radio"
-              aria-checked={frame.motion === m.id}
-              aria-label={`動畫 ${m.name}`}
-              className={`chip${frame.motion === m.id ? ' active' : ''}`}
-              onClick={() => setGroupMotion(group, m.id)}
-            >
-              {m.name}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="chips" role="radiogroup" aria-label="版型動畫">
+        {MOTIONS.map((m) => (
+          <button
+            key={m.name}
+            role="radio"
+            aria-checked={frame.motion === m.id}
+            aria-label={`動畫 ${m.name}`}
+            className={`chip${frame.motion === m.id ? ' active' : ''}`}
+            onClick={() => setGroupMotion(group, m.id)}
+          >
+            {m.name}
+          </button>
+        ))}
+      </div>
       <div className="chips" aria-label="版型長度">
         <button className="chip" aria-label="版型 少 1 秒" onClick={() => dur(-1)}>
           － 1 秒
