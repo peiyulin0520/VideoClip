@@ -2626,3 +2626,91 @@ button {
   background: rgba(0, 0, 0, 0.5);
   border-radius: 12px;
 }
+
+/* 軌道多選：動作列蓋在時間軸尺規上；軌道圖示變成打勾框 */
+.multi-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--accent);
+  overflow-x: auto;
+}
+.multi-count {
+  flex: none;
+  margin-right: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.multi-bar .chip {
+  flex: none;
+  white-space: nowrap;
+}
+.multi-bar .chip:disabled {
+  opacity: 0.4;
+}
+.multi-bar .chip.danger {
+  color: #d64545;
+}
+.track-chip.multi-on {
+  outline: 2px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.track-chip.multi-off {
+  opacity: 0.6;
+}
+
+/* 轉場卡片：方形小畫面＋名稱，橫向可以滑；選到的粗外框 */
+.tr-grid {
+  display: flex;
+  gap: 10px;
+  padding: 6px 2px 10px;
+  overflow-x: auto;
+}
+.tr-card {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 72px;
+  min-height: 0;
+  padding: 4px 4px 2px;
+  font-size: 12px;
+  color: var(--fg);
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 10px;
+}
+.tr-card canvas,
+.tr-card .tr-none {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: #111;
+}
+.tr-card .tr-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: #aaa;
+}
+.tr-card.on {
+  border-color: var(--accent);
+}
+.tr-card .tr-name {
+  max-width: 68px;
+  text-align: center;
+  line-height: 1.15;
+}

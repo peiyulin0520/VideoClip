@@ -81,8 +81,43 @@ export type VideoItem = ItemBase & {
   transitionIn?: { kind: TransitionKind; duration: number };
 };
 
-/** 轉場種類：淡入淡出、黑場、白閃、暖色閃光、左推、上推、縮放 */
-export type TransitionKind = 'fade' | 'black' | 'white' | 'flash' | 'push' | 'rise' | 'zoom';
+/**
+ * 轉場種類（見 engine/transitions.ts 的目錄）。2026-11-13 前存的舊名稱（fade、black、white、push、rise、zoom）
+ * 讀進來時由 migrate 換成新名稱。
+ */
+export type TransitionKind =
+  | 'dissolve'
+  | 'blackflash'
+  | 'whiteflash'
+  | 'overexpose'
+  | 'zoomDissolve'
+  | 'moveL'
+  | 'moveR'
+  | 'moveU'
+  | 'moveD'
+  | 'rollDown'
+  | 'rollUp'
+  | 'circleOut'
+  | 'topOut'
+  | 'bottomOut'
+  | 'blur'
+  | 'defocus'
+  | 'fastL'
+  | 'fastR'
+  | 'slideL'
+  | 'slideR'
+  | 'slideU'
+  | 'slideD'
+  | 'zoomIn'
+  | 'zoomOut'
+  | 'flash'
+  | 'filmUp'
+  | 'filmLeft'
+  | 'grid4'
+  | 'grid9'
+  | 'glitch1'
+  | 'glitch2'
+  | 'glitch3';
 
 // 字卡（規格見 docs/TEXT_CARDS.md）。新欄位都是選填，Phase 2 存的舊字卡不用轉換。
 export type Stroke = {

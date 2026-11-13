@@ -75,6 +75,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-13 H4 音訊修剪、H5 軌道多選、H6 轉場 v2（feedback-8 H4–H6，Sonnet 實作）
+  - **H4**：音訊分頁「音樂」列多一顆「修剪」→ 打開跟影片一樣的修剪面板（上方旗標、底下波形、可多段、「▶ 播放這一段」試聽、小畫面顯示整個專案那一刻的畫面）；完成時拆成多段、中間留空位（`applyRanges` 本來就支援音樂軌）。e2e：留 [0,1]＋[2,4] → 匯出的 1–2 秒是靜音
+  - **H5**：長按軌道圖示 500ms 且手指沒動 → 多選（上方動作列蓋在尺規上：已選 N 條｜上移｜下移｜整併｜刪除｜完成）；點圖示切換打勾；按住上下拖仍是換順序、點一下仍是軌道選單。純函式 `moveTracksBy`／`removeTracksByIds`／`mergeTracksByIds`（`engine/timeline.ts`）：只在自己的分區內移動、選到版型任何一條＝整個版型、整併＝同種類搬到最上面那條（時間重疊的留在原軌並提示）、不同種類／版型不能整併、至少留一條影像軌；每個動作一步復原。多選時時間軸自動全部展開
+  - **H6 轉場 v2**：①**兩段真的重疊**：轉場期間（接縫前後各 d/2）A 延長、B 提前（`activeTransition` 產生同 id 的虛擬物件：A 延長 duration、B 入點往前退；虛擬的那一段靜音；素材不夠長就停在邊緣那一格，`sourceTimeClamped` 避免一直 seek 不存在的時間）；預覽、匯出共用 `buildScene`，匯出前備畫面改用 `sceneItems`②**32 種轉場**（`TRANSITIONS`，分類：基本／相機動作／特效／故障）：疊化、閃黑、閃白、過曝、放大疊化、左右上下移、**捲簾放下／收合**、中心／上部／下部擴散、模糊、虛焦、極速左右移、四向滑動、縮放進出、暖色閃光、膠片上移／左移、四宮格／九宮格、干擾／故障 1／2；每種是純函式 `transitionFrame(kind, p)` → A、B 各自的位移／縮放／透明度／裁切（矩形或圓）／模糊＋顏色層。沒做 Insta360 的「自然」類（要真實素材）③合成器多支援：每個圖層外面包一層 holder（轉場的裁切遮罩用畫布座標）、`BlurFilter`④特效分頁：分類膠囊＋方形卡片，**每張卡片是 A→B 示意小動畫**（`TransitionCard`：看得到的才動、最多 8 張、減少動態效果時只畫一格；`engine/transitionPreview.ts` 用同一個 `transitionFrame` 畫 2D canvas），長度滑桿 0.2–2 秒，「全部套用」；時間軸圓圈代號每種一個字⑤舊專案的轉場名稱（fade、black、white、push、rise、zoom）由 `repairGroups` 換成新名稱
+  - 測試：`timeline.multi.test.ts`（7）、`transitions.test.ts`（46：每種轉場開頭只有 A、結尾只有 B、虛擬物件的素材時間對得上）、e2e `h4/h5.spec.ts`、`g5.spec.ts` 改寫（疊化是紅綠混色、閃黑／閃白、左移左紅右綠、捲簾放下上綠下紅、匯出單格跟預覽一致、卡片動畫會動）
+  - 🟡 iPhone：兩支影片同時解碼（A、B 重疊）的順暢度、模糊／故障在 iPhone 的效能；故障類是用位移＋顏色條做的簡化版（沒有 RGB 分離）；膠片類沒畫齒孔，只有兩條黑邊；多選時沒有「拖一條帶著全部選到的一起移」，改用上移／下移按鈕
 - 2026-11-13 H1 修 bug、H2 拿掉動態模板、H3 預覽順暢（feedback-8 H1–H3，Sonnet 實作）
   - **H1**：①「刪除並補齊」、一般刪除、刪軌道（`rippleRemoveItem`／`removeAnyItem`／`removeTrack`）遇到版型的外框或格子軌道＝整個版型一起拿掉（以前只刪外框，格子還留著）；`migrate.repairGroups`：舊專案裡沒有外框的孤兒格子變回普通影像軌（時間軸看得到、可自己刪），打開專案時自動修復②圖層分頁「位置、大小、旋轉歸位」與「整個圖層透明度」走 `resetTransform`／`setTransform`＝整組；`buildScene` 加 `guardCell` 保險（格子位置跟外框算出來的差 >2% 就以算的為準，裁切模式的暫時修改時不啟用）③裁切工具列字固定白色、裁切時隱藏預覽「圖層」鈕④音訊分頁每一列左邊是影片首圖（`thumbOf`）、名稱前有序號⑤GIPHY 往下滑載入更多（`giphyPage`、IntersectionObserver、最多 240 個、次數用完保留已載入的）。測試：`groupDelete.test.ts`、`migrate.test.ts`、`giphy.test.ts`、e2e `h1.spec.ts`＋giphy 分頁
   - **H2**：拿掉動態模板（版型分頁區塊、`addStory`、`engine/story.ts`、`scene.ts` 的染色與動態格子、`g6.spec`、`story.test`）；舊專案的 `template`／`cellAnim`／`fontCycle`／字卡 `group` 由 `repairGroups` 清掉（型別欄位先留著）

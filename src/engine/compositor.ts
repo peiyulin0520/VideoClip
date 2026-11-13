@@ -1,5 +1,6 @@
 import {
   Application,
+  BlurFilter,
   CanvasSource,
   Container,
   Graphics,
@@ -53,10 +54,19 @@ export type SceneLayer = {
   blend: BlendMode;
   cornerRadius: number; // 0–0.5
   outline?: Outline;
+  /** 轉場：只畫這個範圍裡面的（畫布像素；矩形可以有好幾塊，或一個圓） */
+  clip?: { rects?: [number, number, number, number][]; circle?: { cx: number; cy: number; r: number } };
+  /** 轉場：模糊程度（畫布像素） */
+  blur?: number;
 };
 
 type Obj = {
+  /** 最外層（沒有位移旋轉）：轉場的裁切遮罩用畫布座標，掛在這一層 */
+  holder: Container;
   container: Container;
+  clip: Graphics | null;
+  clipKey: string;
+  blurF: BlurFilter | null;
   sprite: Sprite;
   texture: Texture | null;
   textureSource: CanvasSource | ImageSource | null;
@@ -128,8 +138,8 @@ export class Compositor {
       if (!layer.ready) allReady = false;
       const o = this.ensure(layer);
       this.update(o, layer);
-      if (stage.children[index] !== o.container)
-        stage.addChildAt(o.container, Math.min(index, stage.children.length));
+      if (stage.children[index] !== o.holder)
+        stage.addChildAt(o.holder, Math.min(index, stage.children.length));
     });
 
     // 還沒準備好的新圖層出現時，先留著舊圖層（例如換片時的上一個片段），避免閃黑
@@ -152,7 +162,13 @@ export class Compositor {
     sprite.anchor.set(0.5);
     container.addChild(sprite);
     container.visible = false;
+    const holder = new Container();
+    holder.addChild(container);
     o = {
+      holder,
+      clip: null,
+      clipKey: '',
+      blurF: null,
       container,
       sprite,
       texture: null,
@@ -285,6 +301,7 @@ export class Compositor {
     o.sprite.width = box.w;
     o.sprite.height = box.h;
     o.sprite.blendMode = layer.blend;
+    this.applyClipBlur(o, layer);
 
     // ---- 遮罩：自由形狀（多邊形）優先，沒有才用圓角 ----
     const radius = Math.min(layer.cornerRadius * Math.min(box.w, box.h), Math.min(box.w, box.h) / 2);
@@ -367,9 +384,45 @@ export class Compositor {
     }
   }
 
+  /** 轉場用：裁切範圍（畫布座標的遮罩）與模糊 */
+  private applyClipBlur(o: Obj, layer: SceneLayer) {
+    const c = layer.clip;
+    if (c) {
+      const key = JSON.stringify(c);
+      if (!o.clip) {
+        o.clip = new Graphics();
+        o.holder.addChild(o.clip);
+      }
+      if (o.clipKey !== key) {
+        o.clip.clear();
+        if (c.circle) o.clip.circle(c.circle.cx, c.circle.cy, Math.max(c.circle.r, 0.5)).fill(0xffffff);
+        for (const [x, y, w, h] of c.rects ?? []) o.clip.rect(x, y, w, h).fill(0xffffff);
+        // 一塊都沒有：遮罩要有東西，不然 Pixi 會當作沒有遮罩 → 畫一個看不到的小點
+        if (!c.circle && (c.rects ?? []).length === 0) o.clip.rect(-10, -10, 1, 1).fill(0xffffff);
+        o.clipKey = key;
+      }
+      o.holder.mask = o.clip;
+    } else if (o.clip) {
+      o.holder.mask = null;
+      o.holder.removeChild(o.clip);
+      o.clip.destroy();
+      o.clip = null;
+      o.clipKey = '';
+    }
+    if (layer.blur && layer.blur > 0.5) {
+      if (!o.blurF) o.blurF = new BlurFilter({ strength: layer.blur, quality: 2 });
+      o.blurF.strength = layer.blur;
+      o.container.filters = [o.blurF];
+    } else if (o.blurF) {
+      o.container.filters = null;
+      o.blurF.destroy();
+      o.blurF = null;
+    }
+  }
+
   private destroyObj(o: Obj) {
-    o.container.parent?.removeChild(o.container);
-    o.container.destroy({ children: true });
+    o.holder.parent?.removeChild(o.holder);
+    o.holder.destroy({ children: true });
     this.dropTexture(o);
   }
 

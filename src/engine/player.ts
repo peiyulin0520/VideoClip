@@ -7,7 +7,7 @@ import { captureThumb } from './probe';
 import { buildScene } from './scene';
 import { previewSizeFor } from './previewQuality';
 import { thumbOf } from './labels';
-import { baseMediaTrack, sourceTimeAt, totalDuration } from './timeline';
+import { baseMediaTrack, sourceTimeAt, sourceTimeClamped, totalDuration } from './timeline';
 
 type Deps = {
   getProject: () => Project | null;
@@ -277,7 +277,7 @@ export class Player {
   }
 
   private syncVideo(el: HTMLVideoElement, item: VideoItem, asset: Asset, track: Track, t: number) {
-    const s = sourceTimeAt(item, t);
+    const s = sourceTimeClamped(item, t, asset);
     const vol = item.volume * fadeGain(t - item.start, item.duration, item.fadeIn, item.fadeOut);
     this.audio.apply(el, vol, !!track.muted || !asset.hasAudio);
     if (this.playing) {

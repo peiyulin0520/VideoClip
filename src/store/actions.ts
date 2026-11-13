@@ -34,9 +34,12 @@ import {
   insertIndexFor,
   isVideoItem,
   mediaItems,
+  mergeTracksByIds,
   moveItemToTrack,
   moveTrack,
+  moveTracksBy,
   placeSequential,
+  removeTracksByIds,
   reorderTrack,
   rippleDelete,
   splitByRanges,
@@ -612,6 +615,35 @@ export function moveTrackTo(trackId: string, toIndex: number) {
   store().apply((d) => {
     d.tracks = reorderTrack(d.tracks as Track[], trackId, toIndex) as never;
   });
+}
+
+/** 多選軌道：一起上移（dir=1）／下移（-1），一步復原 */
+export function moveTracksMulti(ids: string[], dir: 1 | -1): boolean {
+  const p = store().project;
+  if (!p) return false;
+  const next = moveTracksBy(p.tracks as Track[], ids, dir);
+  if (next === p.tracks) return false;
+  store().apply((d) => void (d.tracks = next as never));
+  return true;
+}
+
+/** 多選軌道：一起刪（版型整個），一步復原 */
+export function removeTracksMulti(ids: string[]): void {
+  const p = store().project;
+  if (!p) return;
+  const next = removeTracksByIds(p.tracks as Track[], ids);
+  if (next.length === p.tracks.length) return;
+  store().apply((d) => void (d.tracks = next as never), { select: null });
+}
+
+/** 多選軌道：整併成一條；回傳結果（null＝不能整併） */
+export function mergeTracksMulti(ids: string[]): { merged: number; kept: number } | null {
+  const p = store().project;
+  if (!p) return null;
+  const r = mergeTracksByIds(p.tracks as Track[], ids);
+  if (!r) return null;
+  store().apply((d) => void (d.tracks = r.tracks as never));
+  return { merged: r.merged, kept: r.kept };
 }
 
 export function removeTrack(trackId: string) {

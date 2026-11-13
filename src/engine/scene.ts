@@ -5,13 +5,7 @@ import { renderText, measureTextItem, uiScale } from './textRender';
 import { visibleLayers } from './timeline';
 import { composeWith, motionOffset } from './groupTransform';
 import { cellRect, cellTransform } from './layouts';
-import {
-  applyLook,
-  transitionLook,
-  transitionProgress,
-  transitionSpan,
-  type TransitionLook,
-} from './transitions';
+import { activeTransition, applyLook, clipPx, type Cover } from './transitions';
 
 /** 預覽/匯出各自提供「這個影片/照片物件現在的畫面」 */
 export type SourceProvider = (
@@ -78,6 +72,25 @@ function frameOf(project: Project, group: string): { item: VideoItem } | null {
   return null;
 }
 
+/**
+ * 這個時間點要畫的所有物件（含轉場期間延長／提前的虛擬物件）。匯出時要先備好這些物件的畫面，所以獨立成函式。
+ */
+export function sceneItems(project: Project, t: number): { item: Item; track: Track }[] {
+  const out: { item: Item; track: Track }[] = [];
+  const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
+  project.tracks.forEach((track, i) => {
+    const at =
+      track.kind === 'media' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
+    if (at) {
+      for (const x of [at.a, at.b]) if (x) out.push({ item: x, track });
+      return;
+    }
+    const l = live.get(i);
+    if (l) out.push({ item: l.item, track });
+  });
+  return out;
+}
+
 /** 依專案與時間算出要畫的圖層（由下到上）。canvasW/H 是合成器畫布的像素。 */
 export function buildScene(
   project: Project,
@@ -90,22 +103,8 @@ export function buildScene(
   const ctx = geoCtx(project, canvasW, canvasH);
   const out: SceneLayer[] = [];
   const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
-  // 這一刻正在進行的轉場（每條軌道各自找）：算好每個片段該怎麼畫、要蓋哪些顏色層
-  const covers = new Map<string, NonNullable<TransitionLook['cover']>>();
-  const looks = new Map<string, TransitionLook>(); // key: 軌道序號:片段 id
-  project.tracks.forEach((track, i) => {
-    if (track.kind !== 'media' || track.hidden) return;
-    for (const it of track.items) {
-      if (it.type === 'text' || it.type === 'audio' || it.group || !it.transitionIn) continue;
-      const span = transitionSpan(track.items, it);
-      const p = span && transitionProgress(span, t);
-      if (!span || p === null) continue;
-      const look = transitionLook(it.transitionIn.kind, p);
-      looks.set(`${i}:${p < 0.5 ? span.prev.id : it.id}`, look);
-      if (look.cover) covers.set(it.id, look.cover);
-    }
-  });
-  const lookFor = (trackIndex: number, itemId: string) => looks.get(`${trackIndex}:${itemId}`);
+  // 轉場期間要蓋的顏色層（蓋在最上面）
+  const covers: { id: string; c: Cover }[] = [];
   project.tracks.forEach((track, i) => {
     const l = live.get(i);
     const li = l?.item;
@@ -115,7 +114,25 @@ export function buildScene(
     const off = frame
       ? motionOffset(frame.item.motion, t - frame.item.start, frame.item.duration)
       : { x: 0, y: 0 };
-    if (l) {
+    const at =
+      track.kind === 'media' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
+    if (at) {
+      // 轉場期間：A、B 兩段同時畫（B 在上或 A 在上看轉場種類），各自套上位移、縮放、透明度、裁切、模糊
+      const mk = (item: VideoItem | null, look: (typeof at.frame)['a']): SceneLayer | null => {
+        if (!item) return null;
+        const layer = toLayer(item, track, project, ctx, provide);
+        if (!layer) return null;
+        layer.box = applyLook(layer.box, look, canvasW, canvasH);
+        layer.opacity *= look.opacity;
+        if (look.clip) layer.clip = clipPx(look.clip, canvasW, canvasH);
+        if (look.blur) layer.blur = look.blur * Math.min(canvasW, canvasH);
+        return layer;
+      };
+      const A = mk(at.a, at.frame.a);
+      const B = mk(at.b, at.frame.b);
+      for (const x of at.frame.bOnTop ? [A, B] : [B, A]) if (x) out.push(x);
+      at.frame.covers.forEach((c, n) => covers.push({ id: `${i}-${n}`, c }));
+    } else if (l) {
       const layer = toLayer(
         opts.guardCells === false ? l.item : guardCell(l.item, frame?.item, project, canvasW, canvasH),
         track,
@@ -125,11 +142,6 @@ export function buildScene(
       );
       if (layer) {
         layer.box = { ...layer.box, cx: layer.box.cx + off.x * canvasW, cy: layer.box.cy + off.y * canvasH };
-        const look = lookFor(i, l.item.id);
-        if (look) {
-          layer.box = applyLook(layer.box, look, canvasW, canvasH);
-          layer.opacity *= look.opacity;
-        }
         out.push(layer);
       }
     } else if (track.groupRole === 'cell' && track.fill && !track.hidden && frame) {
@@ -168,7 +180,8 @@ export function buildScene(
     }
   });
   // 轉場的顏色層：蓋在最上面
-  for (const [id, c] of covers)
+  for (const { id, c } of covers) {
+    const r = c.rect ?? [0, 0, 1, 1];
     out.push({
       id: `cover-${id}`,
       kind: 'text',
@@ -177,11 +190,18 @@ export function buildScene(
       srcW: c.kind === 'flash' ? 64 : 8,
       srcH: c.kind === 'flash' ? 64 : 8,
       textKey: c.kind === 'flash' ? 'flash-warm' : `fill-${c.color}`,
-      box: { cx: canvasW / 2, cy: canvasH / 2, w: canvasW, h: canvasH, rotation: 0 },
+      box: {
+        cx: (r[0] + r[2] / 2) * canvasW,
+        cy: (r[1] + r[3] / 2) * canvasH,
+        w: r[2] * canvasW,
+        h: r[3] * canvasH,
+        rotation: 0,
+      },
       opacity: c.alpha,
       blend: 'normal',
       cornerRadius: 0,
     });
+  }
   return out;
 }
 

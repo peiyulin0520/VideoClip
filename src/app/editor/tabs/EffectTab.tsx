@@ -1,25 +1,32 @@
+import { useState } from 'react';
 import { isVideoItem } from '../../../engine/timeline';
 import {
   DEFAULT_TRANSITION_DURATION,
+  MAX_TRANSITION,
+  MIN_TRANSITION,
+  TRANSITION_CATS,
   TRANSITIONS,
-  TRANSITION_DURATIONS,
   transitionSpan,
+  type TransitionCat,
 } from '../../../engine/transitions';
 import { setTransition, setTransitionAll } from '../../../store/actions';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast } from '../../../store/uiStore';
+import { Slider } from '../../../ui/Slider';
+import { TransitionCard } from '../TransitionCards';
 import type { Found } from './shared';
 
-/** 特效分頁：目前先放「轉場」——選一個片段，設定它跟前面緊接的片段之間的效果 */
+/** 特效分頁：目前先放「轉場」——選一個片段（或點時間軸上兩個片段中間的圓圈），挑跟前面緊接的片段之間的效果 */
 export function EffectTab({ found }: { found: Found }) {
   useProjectStore((s) => s.project); // 專案變了要重畫
+  const [cat, setCat] = useState<TransitionCat>('基本');
   const item = found && isVideoItem(found.item) && !found.item.group ? found.item : null;
   const track = item ? found!.track : null;
   const cur = item?.transitionIn;
   const hasPrev = !!(
     item &&
     track &&
-    transitionSpan(track.items, { ...item, transitionIn: { kind: 'fade', duration: 1 } })
+    transitionSpan(track.items, { ...item, transitionIn: { kind: 'dissolve', duration: 1 } })
   );
 
   return (
@@ -35,48 +42,47 @@ export function EffectTab({ found }: { found: Found }) {
         </p>
       ) : (
         <>
-          <div className="chips" role="radiogroup" aria-label="轉場效果">
-            <button
-              role="radio"
-              aria-checked={!cur}
-              aria-label="轉場 無"
-              className={`chip${!cur ? ' active' : ''}`}
-              onClick={() => setTransition(item.id, null)}
-            >
-              無
-            </button>
-            {TRANSITIONS.map((t) => (
+          <div className="chips cat-chips" role="tablist" aria-label="轉場分類">
+            {TRANSITION_CATS.map((c) => (
               <button
-                key={t.id}
-                role="radio"
-                aria-checked={cur?.kind === t.id}
-                aria-label={`轉場 ${t.name}`}
-                className={`chip${cur?.kind === t.id ? ' active' : ''}`}
-                onClick={() => setTransition(item.id, t.id)}
+                key={c}
+                role="tab"
+                aria-selected={cat === c}
+                className={`chip3${cat === c ? ' on' : ''}`}
+                onClick={() => setCat(c)}
               >
-                <b className="tcode">{t.code}</b> {t.name}
+                {c}
               </button>
+            ))}
+          </div>
+          <div className="tr-grid" role="radiogroup" aria-label="轉場效果" data-testid="tr-grid">
+            <TransitionCard
+              kind={null}
+              label="無"
+              active={!cur}
+              onPick={() => setTransition(item.id, null)}
+            />
+            {TRANSITIONS.filter((t) => t.cat === cat).map((t) => (
+              <TransitionCard
+                key={t.id}
+                kind={t.id}
+                label={t.name}
+                active={cur?.kind === t.id}
+                onPick={() => setTransition(item.id, t.id)}
+              />
             ))}
           </div>
           {cur && (
             <>
-              <div className="panel-head">
-                <span>長度</span>
-              </div>
-              <div className="chips" role="radiogroup" aria-label="轉場長度">
-                {TRANSITION_DURATIONS.map((d) => (
-                  <button
-                    key={d}
-                    role="radio"
-                    aria-checked={Math.abs(cur.duration - d) < 0.01}
-                    aria-label={`轉場長度 ${d} 秒`}
-                    className={`chip${Math.abs(cur.duration - d) < 0.01 ? ' active' : ''}`}
-                    onClick={() => setTransition(item.id, cur.kind, d, { coalesce: `tr:${item.id}` })}
-                  >
-                    {d} 秒
-                  </button>
-                ))}
-              </div>
+              <Slider
+                label="轉場長度"
+                value={Math.round(cur.duration * 10)}
+                min={Math.round(MIN_TRANSITION * 10)}
+                max={Math.round(MAX_TRANSITION * 10)}
+                step={1}
+                format={(v) => `${(v / 10).toFixed(1)} 秒`}
+                onChange={(v) => setTransition(item.id, cur.kind, v / 10, { coalesce: `tr:${item.id}` })}
+              />
               <button
                 className="btn"
                 onClick={() => {
@@ -84,7 +90,7 @@ export function EffectTab({ found }: { found: Found }) {
                   toast(`已套用到這一軌的 ${n} 個銜接處`);
                 }}
               >
-                套用到這一軌全部銜接處
+                全部套用（這一軌所有銜接處）
               </button>
             </>
           )}

@@ -1,6 +1,7 @@
 import { TRACK_NAMES } from './defaults';
 import type { Project, Track, TrackKind } from './types';
 import { normalizeZones } from '../engine/timeline';
+import { LEGACY_TRANSITIONS } from '../engine/transitions';
 
 // 專案資料格式轉換。
 // v1 → v2（2026-11-12）：主軌（main）與疊加軌（overlay）合併成影像軌（media）；沒有磁吸的主軌，
@@ -71,6 +72,12 @@ export function repairGroups(p: Project): { project: Project; changed: boolean }
         return rest;
       }
       if (it.type === 'audio') return it;
+      // 舊版轉場名稱（fade、black…）換成新名稱
+      const legacyKind = it.transitionIn && LEGACY_TRANSITIONS[it.transitionIn.kind];
+      if (legacyKind) {
+        changed = true;
+        it = { ...it, transitionIn: { ...it.transitionIn!, kind: legacyKind } };
+      }
       if (orphan || it.template || it.cellAnim) {
         const next = { ...it };
         if (orphan) {

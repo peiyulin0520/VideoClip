@@ -1,8 +1,8 @@
 import type { Asset, Project, VideoItem } from '../model/types';
 import { animBitmapAt, fetchBlob } from './animImage';
 import { Compositor } from './compositor';
-import { buildScene } from './scene';
-import { sourceTimeAt, visibleLayers } from './timeline';
+import { buildScene, sceneItems } from './scene';
+import { sourceTimeClamped } from './timeline';
 
 function once(el: EventTarget, ok: string, ms = 8000): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -34,7 +34,7 @@ export async function renderFrame(
   const cleanup: (() => void)[] = [];
   try {
     await Promise.all(
-      visibleLayers(project, t).map(async ({ item }) => {
+      sceneItems(project, t).map(async ({ item }) => {
         if (item.type === 'text') return;
         const asset = project.assets.find((a) => a.id === item.assetId);
         const url = urlFor(item.assetId);
@@ -64,7 +64,7 @@ export async function renderFrame(
           v.load();
         });
         await once(v, 'loadeddata');
-        v.currentTime = sourceTimeAt(item as VideoItem, t);
+        v.currentTime = sourceTimeClamped(item as VideoItem, t, asset);
         await once(v, 'seeked');
         prepared.set(item.id, { source: v, w: v.videoWidth, h: v.videoHeight });
       }),

@@ -138,6 +138,14 @@ export function sourceTimeAt(item: VideoItem, t: number): number {
   return item.trimIn + local * item.speed;
 }
 
+/**
+ * 同上，但不會超過素材的結尾（轉場延長片段時會超過；影片元件停在最後一格，不要一直重複 seek 一個不存在的時間）
+ */
+export function sourceTimeClamped(item: VideoItem, t: number, asset?: Pick<Asset, 'duration'>): number {
+  const s = sourceTimeAt(item, t);
+  return asset && asset.duration > 0.1 ? Math.min(s, asset.duration - 0.05) : s;
+}
+
 /** 這個片段在目前 trimIn/speed 下，最長能有多長（秒） */
 export function maxDuration(item: VideoItem, asset: Asset | undefined): number {
   if (item.type === 'image' || !asset) return 600;
@@ -456,4 +464,92 @@ export function splitByRanges(item: VideoItem, ranges: Range[], assetDuration: n
     }
     return piece;
   });
+}
+
+// ---------- 軌道多選（H5）：一起換順序、整併、一起刪 ----------
+
+/** 選到版型的任何一條軌道＝整個版型的軌道都算（外框＋各格一起動） */
+export function expandGroupTracks(tracks: Track[], ids: string[]): Set<string> {
+  const out = new Set(ids);
+  const groups = new Set(tracks.filter((t) => out.has(t.id) && t.group).map((t) => t.group));
+  for (const t of tracks) if (t.group && groups.has(t.group)) out.add(t.id);
+  return out;
+}
+
+/**
+ * 選到的軌道一起往上（dir=+1，圖層更上面）或往下（dir=-1）移一格：只在自己的分區內移，
+ * 碰到分區邊緣或另一條選到的軌道就不動；選到的軌道彼此的相對順序不變。回傳新的軌道陣列（沒變就是同一個）。
+ */
+export function moveTracksBy(tracks: Track[], ids: string[], dir: 1 | -1): Track[] {
+  const sel = expandGroupTracks(tracks, ids);
+  const a = [...tracks];
+  let changed = false;
+  const swap = (i: number, j: number) => {
+    [a[i], a[j]] = [a[j]!, a[i]!];
+    changed = true;
+  };
+  if (dir === 1) {
+    for (let i = a.length - 2; i >= 0; i--)
+      if (sel.has(a[i]!.id) && !sel.has(a[i + 1]!.id) && ZONE[a[i]!.kind] === ZONE[a[i + 1]!.kind])
+        swap(i, i + 1);
+  } else {
+    for (let i = 1; i < a.length; i++)
+      if (sel.has(a[i]!.id) && !sel.has(a[i - 1]!.id) && ZONE[a[i]!.kind] === ZONE[a[i - 1]!.kind])
+        swap(i, i - 1);
+  }
+  return changed ? a : tracks;
+}
+
+/** 刪掉選到的軌道（版型整個一起）；至少留一條影像軌 */
+export function removeTracksByIds(tracks: Track[], ids: string[]): Track[] {
+  const sel = expandGroupTracks(tracks, ids);
+  const keepMedia = tracks.find((t) => t.kind === 'media' && !sel.has(t.id)) ?? null;
+  if (!keepMedia) {
+    // 影像軌全被選到：留下最下面那一條
+    const base = tracks.find((t) => t.kind === 'media');
+    if (base) sel.delete(base.id);
+  }
+  return tracks.filter((t) => !sel.has(t.id));
+}
+
+const overlaps = (a: Item, b: Item) =>
+  a.start < b.start + b.duration - 1e-6 && b.start < a.start + a.duration - 1e-6;
+
+/**
+ * 整併：選到的同一種類軌道，物件全部搬到最上面那一條（時間位置不變）。時間重疊放不進去的留在原本的軌道，
+ * 搬空的軌道拿掉。版型的軌道、不同種類混選都不能整併（回傳 null）。
+ */
+export function mergeTracksByIds(
+  tracks: Track[],
+  ids: string[],
+): { tracks: Track[]; kept: number; merged: number } | null {
+  const sel = tracks.filter((t) => ids.includes(t.id));
+  if (sel.length < 2 || sel.some((t) => t.group) || new Set(sel.map((t) => t.kind)).size !== 1) return null;
+  const target = sel[sel.length - 1]!; // 陣列越後面＝圖層越上面
+  const targetItems = [...target.items] as Item[];
+  let kept = 0;
+  let merged = 0;
+  const rest = new Map<string, Item[]>();
+  for (const t of sel.slice(0, -1)) {
+    const left: Item[] = [];
+    for (const it of [...t.items].sort((x, y) => x.start - y.start) as Item[]) {
+      if (targetItems.some((o) => overlaps(o, it))) {
+        left.push(it);
+        kept++;
+      } else {
+        targetItems.push(it);
+        merged++;
+      }
+    }
+    rest.set(t.id, left);
+  }
+  const out: Track[] = [];
+  for (const t of tracks) {
+    if (t.id === target.id) out.push({ ...t, items: targetItems.sort((x, y) => x.start - y.start) } as Track);
+    else if (rest.has(t.id)) {
+      const left = rest.get(t.id)!;
+      if (left.length > 0) out.push({ ...t, items: left } as Track);
+    } else out.push(t);
+  }
+  return { tracks: out, kept, merged };
 }

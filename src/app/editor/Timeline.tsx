@@ -21,7 +21,7 @@ import {
   ZONE,
   type DropTarget,
 } from '../../engine/timeline';
-import type { Asset, Item, Track, TrackKind, VideoItem } from '../../model/types';
+import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../../model/types';
 import { useProxyProgress } from '../../engine/proxyQueue';
 import { Wave } from './Wave';
 import {
@@ -31,6 +31,9 @@ import {
   patchTrack,
   placeItem,
   removeTrack,
+  mergeTracksMulti,
+  moveTracksMulti,
+  removeTracksMulti,
   setGroupDuration,
   shiftTrackLayer,
 } from '../../store/actions';
@@ -138,6 +141,71 @@ type Drag = {
   startTop: number;
 };
 
+/** 多選軌道的動作列（蓋在時間軸尺規上）：上移、下移、整併、刪除、完成 */
+function MultiBar({
+  project,
+  ids,
+  onDone,
+  onIds,
+}: {
+  project: Project;
+  ids: string[];
+  onDone: () => void;
+  onIds: (ids: string[]) => void;
+}) {
+  const sel = project.tracks.filter((t) => ids.includes(t.id));
+  const kinds = new Set(sel.map((t) => t.kind));
+  const canMerge = sel.length >= 2 && kinds.size === 1 && !sel.some((t) => t.group);
+  const why =
+    sel.length < 2 ? '選 2 條以上才能整併' : kinds.size > 1 ? '種類不同不能整併' : '版型的軌道不能整併';
+  return (
+    <div className="multi-bar" role="toolbar" aria-label="多選軌道" data-testid="multi-bar">
+      <span className="multi-count" data-testid="multi-count">
+        已選 {sel.length} 條
+      </span>
+      <button className="chip sm" aria-label="選到的軌道上移" onClick={() => moveTracksMulti(ids, 1)}>
+        上移
+      </button>
+      <button className="chip sm" aria-label="選到的軌道下移" onClick={() => moveTracksMulti(ids, -1)}>
+        下移
+      </button>
+      <button
+        className="chip sm"
+        aria-label="整併選到的軌道"
+        disabled={!canMerge}
+        title={canMerge ? undefined : why}
+        onClick={() => {
+          const r = mergeTracksMulti(ids);
+          if (!r) return toast(why);
+          if (r.kept > 0) toast(`有 ${r.kept} 個時間重疊，留在原本的軌道`);
+          else toast(`已整併（搬了 ${r.merged} 個）`);
+          onIds(
+            [ids[ids.length - 1]!].filter((id) =>
+              useProjectStore.getState().project?.tracks.some((t) => t.id === id),
+            ),
+          );
+        }}
+      >
+        整併
+      </button>
+      <button
+        className="chip sm danger"
+        aria-label="刪除選到的軌道"
+        disabled={sel.length === 0}
+        onClick={() => {
+          removeTracksMulti(ids);
+          onDone();
+        }}
+      >
+        刪除
+      </button>
+      <button className="chip sm active" aria-label="完成多選" onClick={onDone}>
+        完成
+      </button>
+    </div>
+  );
+}
+
 export function Timeline({
   pps,
   setPps,
@@ -185,7 +253,9 @@ export function Timeline({
   // 拖素材時（slotZone），那個素材所屬的區上下各多出一條「＋ 新增一軌」的放置區
   const draggedItem = drag ? project.tracks.flatMap((t) => t.items).find((x) => x.id === drag.id) : undefined;
   const slotZone = draggedItem ? ZONE[trackKindOf(draggedItem)] : null;
-  const showAll = expanded || !!drag; // 拖素材的時候全部展開（才找得到要放的軌道）
+  // 多選軌道（長按軌道圖示進入）：一起上移／下移、整併、刪除
+  const [multi, setMulti] = useState<string[] | null>(null);
+  const showAll = expanded || !!drag || !!multi; // 拖素材、多選的時候全部展開（才找得到要放的軌道）
   const layout = useMemo(() => {
     // 版型的各格軌道藏起來（時間軸上由外框那一條代表整個版型）
     const all = project.tracks
@@ -260,13 +330,24 @@ export function Timeline({
 
   const startTrackDrag = (e: RPointerEvent, trackId: string, from: number) => {
     e.stopPropagation();
+    if (multi) return; // 多選模式：點一下切換打勾（onClick），不拖
     const startY = e.clientY;
     const el = e.currentTarget as HTMLElement;
     el.setPointerCapture(e.pointerId);
     let dragging = false;
+    // 長按 500ms 且手指沒動：進入多選（這一條先打勾）
+    let longFired = false;
+    const longTimer = setTimeout(() => {
+      if (dragging) return;
+      longFired = true;
+      player?.pause();
+      navigator.vibrate?.(20);
+      setMulti([trackId]);
+    }, 500);
     const move = (ev: PointerEvent) => {
       const dy = ev.clientY - startY;
-      if (!dragging && Math.abs(dy) > 8) {
+      if (!dragging && !longFired && Math.abs(dy) > 8) {
+        clearTimeout(longTimer);
         dragging = true;
         player?.pause();
         navigator.vibrate?.(10);
@@ -277,6 +358,12 @@ export function Timeline({
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', cancel);
+      clearTimeout(longTimer);
+      if (longFired) {
+        suppressChipClick.current = true; // 長按放開後不要又開選單／又切換打勾
+        setTimeout(() => (suppressChipClick.current = false), 0);
+        return;
+      }
       if (!dragging) return;
       suppressChipClick.current = true; // 拖完不要又開選單
       setTimeout(() => (suppressChipClick.current = false), 0);
@@ -556,14 +643,24 @@ export function Timeline({
 
   return (
     <div className="timeline" style={{ height: viewH, minHeight: viewH }}>
+      {multi && (
+        <MultiBar
+          project={project}
+          ids={multi}
+          onDone={() => setMulti(null)}
+          onIds={(ids) => setMulti(ids)}
+        />
+      )}
       <div
         className="tl-scroll"
         ref={scrollRef}
         onScroll={onScroll}
         onPointerDown={() => player?.pause()}
         onClick={(e) => {
-          if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.bg)
+          if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.bg) {
             useProjectStore.getState().select(null);
+            setMulti(null);
+          }
         }}
         data-testid="timeline-scroll"
       >
@@ -663,13 +760,19 @@ export function Timeline({
                 }}
               >
                 <button
-                  className="track-chip draggable"
+                  className={`track-chip draggable${multi ? (multi.includes(track.id) ? ' multi-on' : ' multi-off') : ''}`}
                   aria-label={`${track.name} 軌道設定`}
                   data-testid="track-chip"
                   onPointerDown={(e) => startTrackDrag(e, track.id, rowIdx)}
                   onClick={() => {
-                    if (!suppressChipClick.current) setMenuTrackId(track.id);
+                    if (suppressChipClick.current) return;
+                    if (multi)
+                      setMulti((m) =>
+                        m ? (m.includes(track.id) ? m.filter((x) => x !== track.id) : [...m, track.id]) : m,
+                      );
+                    else setMenuTrackId(track.id);
                   }}
+                  aria-pressed={multi ? multi.includes(track.id) : undefined}
                 >
                   {track.kind === 'media' ? (
                     <Film size={16} />

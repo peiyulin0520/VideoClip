@@ -171,6 +171,20 @@ export function AudioTab({
               >
                 {item.volume > 0 ? '保留' : '關閉'}
               </button>
+              {item.type === 'audio' && (
+                <button
+                  className="chip sm"
+                  data-testid="audio-trim"
+                  aria-label={`修剪 ${itemTitle(item, asset)}`}
+                  onClick={() => {
+                    useProjectStore.getState().select(item.id);
+                    player?.seek(item.start);
+                    setPanel('trim');
+                  }}
+                >
+                  修剪
+                </button>
+              )}
               {item.type === 'video' && (
                 <button
                   className="chip sm"
