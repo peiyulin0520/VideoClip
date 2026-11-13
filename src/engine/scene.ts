@@ -2,6 +2,7 @@ import type { Asset, Item, Project, Track, VideoItem } from '../model/types';
 import type { SceneLayer } from './compositor';
 import { fittedSize, itemBox, type GeoCtx } from './geometry';
 import { renderText, measureTextItem, uiScale } from './textRender';
+import { applyTextFx, typingCount } from './textFx';
 import { visibleLayers } from './timeline';
 import { composeWith, motionOffset } from './groupTransform';
 import { cellRect, cellTransform } from './layouts';
@@ -114,6 +115,7 @@ export function buildScene(
   const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
   // 轉場期間要蓋的顏色層（蓋在最上面）
   const covers: { id: string; c: Cover }[] = [];
+  const covered = new Set<string>(); // 版型整組的顏色層只蓋一次
   project.tracks.forEach((track, i) => {
     const l = live.get(i);
     const li = l?.item;
@@ -129,7 +131,7 @@ export function buildScene(
       // 轉場期間：A、B 兩段同時畫（B 在上或 A 在上看轉場種類），各自套上位移、縮放、透明度、裁切、模糊
       const mk = (item: Item | null, look: (typeof at.frame)['a']): SceneLayer | null => {
         if (!item) return null;
-        const layer = toLayer(item, track, project, ctx, provide);
+        const layer = toLayer(item, track, project, ctx, provide, { t });
         if (!layer) return null;
         layer.box = applyLook(layer.box, look, canvasW, canvasH);
         layer.opacity *= look.opacity;
@@ -142,18 +144,40 @@ export function buildScene(
       for (const x of at.frame.bOnTop ? [A, B] : [B, A]) if (x) out.push(x);
       at.frame.covers.forEach((c, n) => covers.push({ id: `${i}-${n}`, c }));
     } else if (l) {
+      // 單一素材的進場／出場特效；版型的格子與外框看外框的特效（整組一起動）；字卡的「打字」只決定露出幾個字
+      const fxItem = group ? frame?.item : l.item;
+      const fx = fxItem ? itemEffectAt(fxItem, t - fxItem.start) : null;
+      const visible =
+        l.item.type === 'text' && fx?.kind === 'typewriter'
+          ? typingCount(
+              fx.role,
+              fx.p,
+              Array.from(l.item.card.runs.map((r) => r.text).join('')).filter((c) => c.trim() !== '').length,
+            )
+          : undefined;
       const layer = toLayer(
         opts.guardCells === false ? l.item : guardCell(l.item, frame?.item, project, canvasW, canvasH),
         track,
         project,
         ctx,
         provide,
+        { t, visible },
       );
       if (layer) {
         layer.box = { ...layer.box, cx: layer.box.cx + off.x * canvasW, cy: layer.box.cy + off.y * canvasH };
-        // 單一素材的進場／出場特效（版型整組的另外處理）
-        const fx = group ? null : itemEffectAt(l.item, t - l.item.start);
-        if (fx) applyItemEffect(layer, fx, canvasW, canvasH, covers, `${i}`);
+        if (fx)
+          applyGroupOrItemEffect(
+            layer,
+            fx,
+            group,
+            frame?.item,
+            ctx,
+            canvasW,
+            canvasH,
+            covers,
+            covered,
+            `${i}`,
+          );
         out.push(layer);
       }
     } else if (track.groupRole === 'cell' && track.fill && !track.hidden && frame) {
@@ -170,7 +194,7 @@ export function buildScene(
         canvasH,
       );
       const color = FILL_COLORS[track.fill];
-      out.push({
+      const fillLayer: SceneLayer = {
         id: `fill-${track.id}`,
         kind: 'text',
         source: solidCanvas(color),
@@ -188,7 +212,11 @@ export function buildScene(
         opacity: fr.transform.opacity,
         blend: 'normal',
         cornerRadius: 0,
-      });
+      };
+      const fillFx = itemEffectAt(fr, t - fr.start);
+      if (fillFx)
+        applyGroupOrItemEffect(fillLayer, fillFx, group, fr, ctx, canvasW, canvasH, covers, covered, `${i}`);
+      out.push(fillLayer);
     }
   });
   // 轉場的顏色層：蓋在最上面
@@ -217,29 +245,65 @@ export function buildScene(
   return out;
 }
 
+/**
+ * 版型整組的特效：格子、色塊、外框都用外框「看得到的範圍」當參考方框（一起縮放、一起裁切、顏色層只蓋一次）。
+ * 沒有版型（單一素材）就以素材自己的方框為準。
+ */
+function applyGroupOrItemEffect(
+  layer: SceneLayer,
+  fx: Parameters<typeof effectFrame>[0],
+  group: string | undefined,
+  frameItem: VideoItem | undefined,
+  ctx: GeoCtx,
+  W: number,
+  H: number,
+  covers: { id: string; c: Cover }[],
+  covered: Set<string>,
+  id: string,
+) {
+  if (!group || !frameItem) return applyItemEffect(layer, fx, W, H, covers, id);
+  const fb = itemBox(frameItem, ctx);
+  let ref: { cx: number; cy: number; w: number; h: number } | undefined;
+  if (fb) {
+    const v = frameItem.visible ?? { x: 0, y: 0, w: 1, h: 1 };
+    ref = {
+      cx: fb.cx + (v.x + v.w / 2 - 0.5) * fb.w,
+      cy: fb.cy + (v.y + v.h / 2 - 0.5) * fb.h,
+      w: v.w * fb.w,
+      h: v.h * fb.h,
+    };
+  }
+  const first = !covered.has(group);
+  covered.add(group);
+  applyItemEffect(layer, fx, W, H, first ? covers : null, group, ref);
+}
+
 /** 把單一素材的進出場特效套到它的圖層：位移照畫面比例、縮放與裁切、顏色層都以「素材自己的方框」為準 */
 function applyItemEffect(
   layer: SceneLayer,
   fx: Parameters<typeof effectFrame>[0],
   W: number,
   H: number,
-  covers: { id: string; c: Cover }[],
+  covers: { id: string; c: Cover }[] | null,
   id: string,
+  /** 特效的參考方框（縮放中心、裁切與顏色層的範圍）；版型整組用外框的範圍，沒給＝素材自己的方框 */
+  ref?: { cx: number; cy: number; w: number; h: number },
 ) {
   const { look, covers: cs } = effectFrame(fx);
   const b0 = layer.box;
-  const left = b0.cx - b0.w / 2;
-  const top = b0.cy - b0.h / 2;
+  const r0 = ref ?? b0;
+  const left = r0.cx - r0.w / 2;
+  const top = r0.cy - r0.h / 2;
   const rel = (r: [number, number, number, number]): [number, number, number, number] => [
-    left + r[0] * b0.w,
-    top + r[1] * b0.h,
-    r[2] * b0.w,
-    r[3] * b0.h,
+    left + r[0] * r0.w,
+    top + r[1] * r0.h,
+    r[2] * r0.w,
+    r[3] * r0.h,
   ];
   layer.box = {
     ...b0,
-    cx: b0.cx + look.dx * W,
-    cy: b0.cy + look.dy * H,
+    cx: r0.cx + (b0.cx - r0.cx) * look.scale + look.dx * W,
+    cy: r0.cy + (b0.cy - r0.cy) * look.scale + look.dy * H,
     w: b0.w * look.scale,
     h: b0.h * look.scale,
   };
@@ -253,13 +317,14 @@ function applyItemEffect(
         ? { rects: c.rects.map((r) => rel(r)).map(([x, y, w, h]) => [x + dx, y + dy, w, h]) }
         : {
             circle: {
-              cx: left + c.cx * b0.w + dx,
-              cy: top + c.cy * b0.h + dy,
-              r: c.r * Math.max(b0.w, b0.h),
+              cx: left + c.cx * r0.w + dx,
+              cy: top + c.cy * r0.h + dy,
+              r: c.r * Math.max(r0.w, r0.h),
             },
           };
   }
   if (look.blur) layer.blur = look.blur * Math.min(W, H);
+  if (!covers) return;
   cs.forEach((c, n) => {
     const r = c.rect ?? [0, 0, 1, 1];
     // 顏色層直接換成畫面像素（比例）貼在素材的方框上
@@ -305,6 +370,7 @@ function toLayer(
   project: Project,
   ctx: GeoCtx,
   provide: SourceProvider,
+  extra: { t?: number; visible?: number } = {},
 ): SceneLayer | null {
   if (item.type === 'audio') return null;
   const box = itemBox(item, ctx);
@@ -319,7 +385,19 @@ function toLayer(
     crop: item.crop,
   };
   if (item.type === 'text') {
-    const r = renderText(item.card, uiScale(ctx.canvasW, ctx.canvasH));
+    const sc = uiScale(ctx.canvasW, ctx.canvasH);
+    let r = renderText(item.card, sc, extra.visible);
+    if (item.textFx && extra.t !== undefined) {
+      const run = item.card.runs[0];
+      r = applyTextFx(
+        r,
+        item.textFx.kind,
+        extra.t - item.start,
+        item.id,
+        (run?.size ?? 60) * sc,
+        run?.color ?? '#ffffff',
+      );
+    }
     return { ...common, kind: 'text', source: r.canvas, ready: true, srcW: r.w, srcH: r.h, textKey: r.key };
   }
   const asset = project.assets.find((a) => a.id === item.assetId);

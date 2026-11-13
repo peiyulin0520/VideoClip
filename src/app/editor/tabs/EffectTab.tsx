@@ -11,22 +11,31 @@ import {
   TYPEWRITER_CODE,
   type TransitionCat,
 } from '../../../engine/transitions';
-import type { EffectKind, Item, VideoItem } from '../../../model/types';
-import { editItem, setItemEffect, setTransition, setTransitionAll } from '../../../store/actions';
+import type { EffectKind, Item, TextFxKind, VideoItem } from '../../../model/types';
+import {
+  editItem,
+  setItemEffect,
+  setTextFx,
+  setTransition,
+  setTransitionAll,
+  setTransitionSplit,
+} from '../../../store/actions';
+import { TEXT_FXS, textFxName } from '../../../engine/textFx';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
+import { EffectTimingSheet } from '../EffectTimingSheet';
 import { TransitionCard } from '../TransitionCards';
 import type { Found } from './shared';
 
-type Part = 'in' | 'out' | 'seam';
+type Part = 'in' | 'out' | 'seam' | 'style';
 type CatKey = TransitionCat | '文字';
 
 /** 特效分頁：依選到的素材類別，列出這一類能用的特效——進場、出場（只在素材自己的開頭／結尾）、跟前一段的轉場 */
 export function EffectTab({ found }: { found: Found }) {
   useProjectStore((s) => s.project); // 專案變了要重畫
   const fxFocus = useUI((s) => s.fxFocus);
-  const [cat, setCat] = useState<CatKey>('基本');
+  const [cat, setCat] = useState<CatKey | null>(null);
   const item: Item | null = found && !('group' in found.item && found.item.group) ? found.item : null;
   const track = item ? found!.track : null;
   const part: Part = item && fxFocus?.id === item.id ? fxFocus.role : 'in';
@@ -40,7 +49,7 @@ export function EffectTab({ found }: { found: Found }) {
       </div>
       {!item || !track ? (
         <p className="hint">
-          先在時間軸點一個素材，或點兩個素材中間的小圓圈，再選特效。版型整體的特效請到「版型」分頁。
+          先在時間軸點一個素材（選進場、出場特效），或點兩個素材中間的小圓圈（選轉場），再選特效。版型整體的特效請到「版型」分頁。
         </p>
       ) : item.type === 'audio' ? (
         <AudioFx item={item as VideoItem} />
@@ -52,7 +61,8 @@ export function EffectTab({ found }: { found: Found }) {
                 ['in', '進場'],
                 ['out', '出場'],
                 ['seam', '轉場'],
-              ] as const
+                ...(item.type === 'text' ? [['style', '文字特效'] as const] : []),
+              ] as (readonly [Part, string])[]
             ).map(([k, name]) => (
               <button
                 key={k}
@@ -66,12 +76,17 @@ export function EffectTab({ found }: { found: Found }) {
                 {k === 'in' && item.inEffect ? ` ·${transitionName(item.inEffect.kind)}` : ''}
                 {k === 'out' && item.outEffect ? ` ·${transitionName(item.outEffect.kind)}` : ''}
                 {k === 'seam' && item.transitionIn ? ` ·${transitionName(item.transitionIn.kind)}` : ''}
+                {k === 'style' && item.type === 'text' && item.textFx
+                  ? ` ·${textFxName(item.textFx.kind)}`
+                  : ''}
               </button>
             ))}
           </div>
           {part === 'seam' ? (
             <SeamBlock item={item} track={track} cat={cat} setCat={setCat} />
-          ) : (
+          ) : part === 'style' && item.type === 'text' ? (
+            <StyleBlock item={item} />
+          ) : part === 'style' ? null : (
             <SingleBlock item={item} role={part} cat={cat} setCat={setCat} />
           )}
         </>
@@ -80,9 +95,62 @@ export function EffectTab({ found }: { found: Found }) {
   );
 }
 
-function Cats({ cat, setCat, withText }: { cat: CatKey; setCat: (c: CatKey) => void; withText: boolean }) {
+/** 字卡的文字樣式特效：整段字一直在動（IG 那種），選一種或「無」 */
+function StyleBlock({ item }: { item: Item }) {
+  const cur = item.type === 'text' ? item.textFx?.kind : undefined;
+  const pick = (k: TextFxKind | null) => {
+    setTextFx(item.id, k);
+    useUI.setState({ fxFocus: { id: item.id, role: 'style' } });
+  };
+  return (
+    <>
+      <div className="tr-grid" role="radiogroup" aria-label="文字特效" data-testid="tr-grid">
+        <button
+          role="radio"
+          aria-checked={!cur}
+          aria-label="文字特效 無"
+          className={`tr-card${cur ? '' : ' on'}`}
+          onClick={() => pick(null)}
+        >
+          <span className="tr-none" aria-hidden="true">
+            ⊘
+          </span>
+          <span className="tr-name">無</span>
+        </button>
+        {TEXT_FXS.map((f) => (
+          <button
+            key={f.id}
+            role="radio"
+            aria-checked={cur === f.id}
+            aria-label={`文字特效 ${f.name}`}
+            className={`tr-card${cur === f.id ? ' on' : ''}`}
+            onClick={() => pick(f.id)}
+          >
+            <span className="tr-none" aria-hidden="true">
+              {f.code}
+            </span>
+            <span className="tr-name">{f.name}</span>
+          </button>
+        ))}
+      </div>
+      <p className="hint">
+        整段字一直在動：閃爍＝亮光從左掃到右；發光閃亮＝字邊發光＋小星星；方格字＝粗方格一直動；震動＝左右抖動。進場、出場可以同時再加別的特效。
+      </p>
+    </>
+  );
+}
+
+function Cats({
+  cat,
+  setCat,
+  withText,
+}: {
+  cat: CatKey | null;
+  setCat: (c: CatKey) => void;
+  withText: boolean;
+}) {
   const cats: CatKey[] = withText ? ['文字', ...TRANSITION_CATS] : TRANSITION_CATS;
-  const cur = cats.includes(cat) ? cat : cats[0]!;
+  const cur = cat && cats.includes(cat) ? cat : cats[0]!;
   return (
     <div className="chips cat-chips" role="tablist" aria-label="特效分類">
       {cats.map((c) => (
@@ -108,19 +176,20 @@ function SingleBlock({
 }: {
   item: Item;
   role: 'in' | 'out';
-  cat: CatKey;
+  cat: CatKey | null;
   setCat: (c: CatKey) => void;
 }) {
   const isText = item.type === 'text';
   const cur = role === 'in' ? item.inEffect : item.outEffect;
   const cats: CatKey[] = isText ? ['文字', ...TRANSITION_CATS] : TRANSITION_CATS;
-  const shown = cats.includes(cat) ? cat : cats[0]!;
+  const shown = cat && cats.includes(cat) ? cat : cats[0]!;
   const focus = () => useUI.setState({ fxFocus: { id: item.id, role } });
   const pick = (kind: EffectKind | null) => {
     setItemEffect(item.id, role, kind);
     focus();
   };
   const maxLen = Math.max(Math.round(item.duration * 10) / 10, MIN_EFFECT);
+  const [adjust, setAdjust] = useState(false);
   return (
     <>
       <Cats cat={cat} setCat={setCat} withText={isText} />
@@ -152,6 +221,24 @@ function SingleBlock({
             />
           ))}
       </div>
+      {cur && adjust && (
+        <EffectTimingSheet
+          mode={role}
+          item={item}
+          initial={{ d: Math.min(cur.duration, item.duration) }}
+          onClose={() => setAdjust(false)}
+          onApply={(v) => {
+            setItemEffect(item.id, role, cur.kind, v.d);
+            focus();
+            setAdjust(false);
+          }}
+        />
+      )}
+      {cur && (
+        <button className="btn" data-testid="fx-adjust" onClick={() => setAdjust(true)}>
+          調整時間
+        </button>
+      )}
       {cur && (
         <Slider
           label={role === 'in' ? '進場幾秒' : '出場幾秒'}
@@ -183,12 +270,15 @@ function SeamBlock({
 }: {
   item: Item;
   track: NonNullable<Found>['track'];
-  cat: CatKey;
+  cat: CatKey | null;
   setCat: (c: CatKey) => void;
 }) {
   const cur = item.type === 'audio' ? undefined : item.transitionIn;
-  const hasPrev = !!transitionSpan(track.items, { ...item, transitionIn: { kind: 'dissolve', duration: 1 } });
-  const shown = (TRANSITION_CATS as string[]).includes(cat) ? (cat as TransitionCat) : TRANSITION_CATS[0]!;
+  const spanNow = transitionSpan(track.items, { ...item, transitionIn: { kind: 'dissolve', duration: 1 } });
+  const hasPrev = !!spanNow;
+  const [adjust, setAdjust] = useState(false);
+  const shown =
+    cat && (TRANSITION_CATS as string[]).includes(cat) ? (cat as TransitionCat) : TRANSITION_CATS[0]!;
   const focus = () => useUI.setState({ fxFocus: { id: item.id, role: 'seam' } });
   if (!hasPrev)
     return (
@@ -222,8 +312,28 @@ function SeamBlock({
           />
         ))}
       </div>
+      {cur && adjust && spanNow && (
+        <EffectTimingSheet
+          mode="seam"
+          item={item}
+          prev={spanNow.prev}
+          initial={{
+            before: cur.before ?? cur.duration / 2,
+            after: cur.after ?? cur.duration / 2,
+          }}
+          onClose={() => setAdjust(false)}
+          onApply={(v) => {
+            setTransitionSplit(item.id, v.before, v.after);
+            focus();
+            setAdjust(false);
+          }}
+        />
+      )}
       {cur && (
         <>
+          <button className="btn" data-testid="fx-adjust" onClick={() => setAdjust(true)}>
+            調整分配（前後各幾秒）
+          </button>
           <Slider
             label="轉場長度"
             value={Math.round(cur.duration * 10)}

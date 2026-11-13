@@ -54,11 +54,14 @@ const canvasMeasurer = (() => {
 const ITALIC_TAN = Math.tan((12 * Math.PI) / 180);
 
 /** scale：畫布短邊 / 1080（uiScale）。字級以 1080 為基準，所以預覽（較小）與輸出（1080）看起來一樣。 */
-export function renderText(card: TextCard, scale: number): TextRender {
+/**
+ * visible：只畫前幾個字（打字特效用；版面、字塊大小照完整的字算，不會跳）；沒給＝全部。
+ */
+export function renderText(card: TextCard, scale: number, visible?: number): TextRender {
   // 字體還沒載入完成時畫的是備用字體，所以「各字體載入了沒」也要算進快取鍵，載入後才會重畫
   for (const run of card.runs) requestFont(run.fontId);
   const loaded = card.runs.map((r) => (cssFamily(r.fontId) ? 1 : 0)).join('');
-  const key = `${scale.toFixed(4)}|${loaded}|${JSON.stringify(card)}`;
+  const key = `${scale.toFixed(4)}|${loaded}|${visible ?? ''}|${JSON.stringify(card)}`;
   const hit = cache.get(key);
   if (hit) {
     cache.delete(key);
@@ -145,7 +148,8 @@ export function renderText(card: TextCard, scale: number): TextRender {
     const setFont = (run: TextRun) => {
       ctx.font = fontOf(run.weight, run.size * scale, run.fontId);
     };
-    const glyphs = lay.glyphs.filter((g) => g.ch.trim() !== '');
+    const allGlyphs = lay.glyphs.filter((g) => g.ch.trim() !== '');
+    const glyphs = visible === undefined ? allGlyphs : allGlyphs.slice(0, Math.max(visible, 0));
     const strokesOf = (g: GlyphBox) =>
       (runOf(g).strokes ?? []).filter((s) => s.width > 0).sort((a, b) => b.width - a.width);
     const maxStrokes = Math.max(0, ...glyphs.map((g) => strokesOf(g).length));
@@ -181,6 +185,19 @@ export function renderText(card: TextCard, scale: number): TextRender {
       shadowFor(g, 'fill');
       ctx.fillStyle = run.color;
       withSkew(run, oy + g.y, () => ctx.fillText(g.ch, ox + g.x, oy + g.y));
+    }
+    // 打字中：最後一個字後面一條游標
+    if (visible !== undefined && visible < allGlyphs.length) {
+      const last = glyphs[glyphs.length - 1] ?? allGlyphs[0];
+      if (last) {
+        const run = runOf(last);
+        const px = run.size * scale;
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = run.color;
+        const x = ox + last.x + (glyphs.length > 0 ? last.adv : 0) + px * 0.06;
+        ctx.fillRect(x, oy + last.y - px * 0.85, Math.max(2, px * 0.06), px * 0.95);
+      }
     }
   };
   // 文字透明度：描邊、陰影、填色先畫在另一張畫布上，再整張乘透明度（不然描邊會從半透明的字裡透出來）

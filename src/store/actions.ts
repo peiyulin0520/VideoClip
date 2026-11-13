@@ -16,6 +16,7 @@ import {
   type EffectKind,
   type Item,
   type Project,
+  type TextFxKind,
   type TextItem,
   type TextRun,
   type TextStyle,
@@ -300,6 +301,9 @@ export function addLayout(o: {
   /** 外框看得到的範圍（px，畫面座標）：選取框、點選範圍用它 */
   frameVisible?: Rect;
   motion?: 'drift' | 'slide';
+  /** 整個版型的進場／出場特效（外框、各格、色塊一起） */
+  inEffect?: TransitionKind;
+  outEffect?: TransitionKind;
 }): string | null {
   const proj = store().project;
   if (!proj || o.cells.length === 0) return null;
@@ -328,6 +332,10 @@ export function addLayout(o: {
     frame.group = group;
     frame.label = o.frameName;
     if (o.motion) frame.motion = o.motion;
+    if (o.inEffect)
+      frame.inEffect = { kind: o.inEffect, duration: Math.min(DEFAULT_EFFECT_DURATION, o.duration) };
+    if (o.outEffect)
+      frame.outEffect = { kind: o.outEffect, duration: Math.min(DEFAULT_EFFECT_DURATION, o.duration) };
     if (o.frameVisible)
       frame.visible = {
         x: o.frameVisible.x / W,
@@ -436,6 +444,19 @@ export function setTransition(id: string, kind: TransitionKind | null, duration?
             duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
           ),
         };
+    },
+    opts,
+  );
+}
+
+/** 字卡的文字樣式特效（閃爍、發光閃亮、方格字、震動）；null＝取消 */
+export function setTextFx(id: string, kind: TextFxKind | null, opts?: Opts): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type !== 'text') return;
+      if (!kind) delete it.textFx;
+      else it.textFx = { kind };
     },
     opts,
   );

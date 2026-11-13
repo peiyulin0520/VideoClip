@@ -42,6 +42,7 @@ import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemTitle, ordinalIn } from '../../engine/labels';
+import { textFxCode, textFxName } from '../../engine/textFx';
 import { effectDurations, seamsOf, transitionCode, transitionName } from '../../engine/transitions';
 import { renameItem } from '../../store/actions';
 
@@ -935,11 +936,12 @@ export function Timeline({
                     );
                   })}
 
-                {/* 單一素材的進場／出場特效：特效佔的那一段（淡色）＋代表字圓圈（跟接縫的轉場不同色） */}
+                {/* 單一素材的進場／出場特效：特效佔的那一段（淡色）＋代表字圓圈（跟接縫的轉場不同色）；版型看外框那一條 */}
                 {track.kind !== 'audio' &&
-                  !track.groupRole &&
+                  track.groupRole !== 'cell' &&
                   track.items.map((it) => {
-                    if (it.type === 'audio' || (!it.inEffect && !it.outEffect)) return null;
+                    const styleFx = it.type === 'text' ? it.textFx : undefined;
+                    if (it.type === 'audio' || (!it.inEffect && !it.outEffect && !styleFx)) return null;
                     const d = effectDurations(it);
                     const x0 = half + it.start * pps;
                     const x1 = x0 + it.duration * pps;
@@ -961,7 +963,10 @@ export function Timeline({
                             onClick={(e) => {
                               e.stopPropagation();
                               useProjectStore.getState().select(it.id);
-                              useUI.setState({ requestTab: 'effect', fxFocus: { id: it.id, role } });
+                              useUI.setState({
+                                requestTab: track.groupRole === 'frame' ? 'layout' : 'effect',
+                                fxFocus: { id: it.id, role },
+                              });
                               player?.seek(it.start + (role === 'in' ? 0.02 : it.duration - 0.05));
                             }}
                           >
@@ -970,8 +975,28 @@ export function Timeline({
                         </span>
                       );
                     };
+                    const styleSel =
+                      it.id === selectedId && fxFocus?.id === it.id && fxFocus.role === 'style';
                     return (
                       <span key={`fx-${it.id}`}>
+                        {styleFx && (
+                          <button
+                            className={`fx-circle style${styleSel ? ' sel' : ''}`}
+                            data-testid="fx-circle-style"
+                            data-item-id={it.id}
+                            aria-label={`文字特效 ${textFxName(styleFx.kind)}`}
+                            style={{ left: x0 + Math.max((x1 - x0) / 2 - 11, 13) }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              useProjectStore.getState().select(it.id);
+                              useUI.setState({ requestTab: 'effect', fxFocus: { id: it.id, role: 'style' } });
+                              player?.seek(it.start + 0.3);
+                            }}
+                          >
+                            {textFxCode(styleFx.kind)}
+                          </button>
+                        )}
                         {it.inEffect && d.in > 0.01 && mk('in', it.inEffect.kind, x0 + 13, d.in * pps)}
                         {it.outEffect &&
                           d.out > 0.01 &&

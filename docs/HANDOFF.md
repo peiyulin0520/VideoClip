@@ -193,3 +193,13 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **預覽畫質**：`engine/previewQuality.ts`、`Player.onSlow／onPoolFull`、影片池滿時 `thumbFallback`
 - **軌道多選**：`timeline.ts` 的 `moveTracksBy／removeTracksByIds／mergeTracksByIds`＋`Timeline.tsx` 的 `MultiBar`
 - **點陣圖遮罩**：`VideoItem.maskBitmap`、`engine/maskBitmap.ts`、`cropStore` 的 `ensureMaskCanvas／paintMask／undoMaskStroke`
+
+
+## feedback-9（2026-11-14）新增的東西（給下一位）
+- **更新到手機**：`vite.config.ts` 輸出 `version.json`；`src/app/pwa.ts`、`store/updateStore.ts`、`ui/UpdateBanner.tsx`；設定頁「檢查更新」
+- **時間軸**：四類各自收合（`vc-tl-cats`）、貼圖軌（`TrackKind 'sticker'`、`Asset.origin`）、0 秒貼左（`GUTTER`）
+- **共用片段標記軸**：`RangeMarkerSheet`（修剪、靜音標記都用它）、`TrimSheet`、`MuteSheet`；`VideoItem.audioRanges`（`engine/audioRanges.ts`）；舊的 `TrimPanel／RangePicker` 已刪
+- **特效 v3（I5）**：`ItemBase.transitionIn { kind, duration, before?, after? }`（沒寫 before／after＝各一半）、`inEffect／outEffect`（單一素材進場＝B、出場＝A，只在開頭／結尾；`engine/transitions.ts` 的 `itemEffectAt／effectFrame／effectDurations`，A 不會自己離開的轉場出場時把 B 倒著放）；轉場只在同類之間（`sameFamily`：影像＝影片＋照片、貼圖、字卡）；`scene.ts` 的 `applyItemEffect`（以素材自己的方框為準）與 `applyGroupOrItemEffect`（版型整組以外框為準、顏色層只蓋一次）；代表字 `TRANSITIONS[].code`（類型字，可重複）
+- **文字特效**：`engine/textFx.ts`（`TextItem.textFx`：閃爍／發光閃亮／方格字／震動，時間量化成「步」＋id 當種子，預覽與匯出一致）；`renderText(card, scale, visible)` 的 `visible` 是打字露出幾個字（進場往後打、出場像 delete 從後往前刪）
+- **特效分頁**：`EffectTab`（進場／出場／轉場／文字特效；音訊只有淡入淡出滑桿）、`EffectTimingSheet`（預覽左軸右的細調面板：進場只有「迄」、出場只有「起」、轉場「起／迄」＋欄位連動）、`GroupFxSelect`（版型整體進出場）；時間軸圓圈用 `useUI.fxFocus` 判斷「選取中」顏色（4 個顏色固定，不隨主題換）
+- **坑**：e2e 裡面板（Sheet）剛開會滑上來，量 `boundingBox` 前先 `waitForTimeout(500)`；旗標的 `boundingBox` 是 44px 寬的按鈕，拖曳要從中心算（`x + width/2`），不是左邊

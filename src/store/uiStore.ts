@@ -15,7 +15,7 @@ type UI = {
   /** 要求底部工具列切到某個分頁（例如點時間軸上的轉場小圓圈 → 特效）；工具列切完會清掉 */
   requestTab: string | null;
   /** 特效分頁／時間軸上目前選的是哪一塊（進場、出場、跟前一段的轉場）：時間軸的圓圈用它顯示「選取中」的顏色 */
-  fxFocus: { id: string; role: 'in' | 'out' | 'seam' } | null;
+  fxFocus: { id: string; role: 'in' | 'out' | 'seam' | 'style' } | null;
 };
 
 export const useUI = create<UI>((set, get) => ({

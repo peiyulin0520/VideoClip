@@ -1,7 +1,14 @@
 import { Trash2 } from 'lucide-react';
 import { isVideoItem } from '../../../engine/timeline';
 import type { Project, Track, VideoItem } from '../../../model/types';
-import { removeGroup, setCellFill, setGroupDuration, setGroupMotion } from '../../../store/actions';
+import {
+  removeGroup,
+  setCellFill,
+  setGroupDuration,
+  setGroupMotion,
+  setItemEffect,
+} from '../../../store/actions';
+import { GroupFxSelect } from '../GroupFxSelect';
 import { useProjectStore } from '../../../store/projectStore';
 import { LayoutPicker } from '../LayoutPicker';
 import { ToolButton, type Found } from './shared';
@@ -29,6 +36,18 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
       <p className="hint">
         在預覽上拖移、縮放整個版型（格子會一起動）；再點一下格子，可以到「剪輯」選那一格要用的片段。
       </p>
+      <div className="group-fx-row">
+        <GroupFxSelect
+          label="版型進場特效"
+          value={frame.inEffect?.kind && frame.inEffect.kind !== 'typewriter' ? frame.inEffect.kind : ''}
+          onChange={(v) => setItemEffect(frame.id, 'in', v || null)}
+        />
+        <GroupFxSelect
+          label="版型出場特效"
+          value={frame.outEffect?.kind && frame.outEffect.kind !== 'typewriter' ? frame.outEffect.kind : ''}
+          onChange={(v) => setItemEffect(frame.id, 'out', v || null)}
+        />
+      </div>
       <div className="chips" role="radiogroup" aria-label="版型動畫">
         {MOTIONS.map((m) => (
           <button

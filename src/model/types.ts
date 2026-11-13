@@ -284,7 +284,12 @@ export type TextItem = ItemBase & {
   group?: string;
   /** 字體輪播：開始後 until 秒內每 interval 秒換下一個字體（依序輪流），之後固定用 fonts[0] */
   fontCycle?: { fonts: string[]; interval: number; until: number };
+  /** 文字樣式特效（IG 那種，整段一直動）；沒有＝無 */
+  textFx?: { kind: TextFxKind };
 };
+
+/** 文字樣式特效（整段字卡一直在動）：閃爍（亮光掃過）、發光閃亮、方格字、震動 */
+export type TextFxKind = 'shimmer' | 'sparkle' | 'pixel' | 'shake';
 
 export type Item = VideoItem | TextItem;
 
