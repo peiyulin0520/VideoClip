@@ -10,7 +10,9 @@ import {
   cancelCrop,
   ensureMaskCanvas,
   finishCrop,
+  MAX_REACH,
   paintMask,
+  saveReach,
   pushMaskUndo,
   setLassoMask,
   undoMaskStroke,
@@ -44,7 +46,8 @@ export function CropOverlay({
   const selectedId = useProjectStore((st) => st.selectedId);
   const frameRef = useRef<HTMLDivElement>(null);
   const [lassoPts, setLassoPts] = useState<Pt[] | null>(null);
-  const [cursor, setCursor] = useState<Pt | null>(null); // 筆刷游標（原始畫面的比例）
+  const [cursor, setCursor] = useState<Pt | null>(null); // 焦點圓（真正畫的地方，原始畫面的比例）
+  const [finger, setFinger] = useState<Pt | null>(null); // 手指圓 A（手指的位置，原始畫面的比例，可以超出畫面）
 
   // 選了別的片段、或片段不見了（復原）就離開裁切模式
   useEffect(() => {
@@ -131,29 +134,59 @@ export function CropOverlay({
     el.addEventListener('pointercancel', up);
   };
 
+  /** 手指的位置（不夾在畫面內）→ 原始畫面的比例；dyPx＝再往上移幾 px（焦點圓用） */
+  const rawPoint = (ev: { clientX: number; clientY: number }, dyPx = 0): Pt => {
+    const r = frameRef.current!.getBoundingClientRect();
+    const [fx, fy] = toFrac(ev.clientX - (r.left + r.width / 2), ev.clientY - dyPx - (r.top + r.height / 2));
+    return [fx + 0.5, fy + 0.5];
+  };
+
   const startPaint = (e: RPointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
     const el = e.currentTarget as HTMLElement;
     el.setPointerCapture(e.pointerId);
-    pushMaskUndo();
     const tool = () => useCrop.getState().s?.paint ?? 'brush';
-    let last = pointOf(e);
-    paintMask(last, last, tool());
-    bumpMask();
+    const reach = () => useCrop.getState().s?.reach ?? 0;
+    const focusOf = (ev: { clientX: number; clientY: number }): Pt => {
+      const q = rawPoint(ev, reach());
+      return [clamp(q[0], 0, 1), clamp(q[1], 0, 1)];
+    };
+    // 按下去先只移動、不畫（不會在錯的地方點一點）：手指移動超過 4px、或按住 250ms 才開始畫
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let drawing = false;
+    let last = focusOf(e);
+    setFinger(rawPoint(e));
     setCursor(last);
+    const begin = (at: Pt) => {
+      if (drawing) return;
+      drawing = true;
+      pushMaskUndo();
+      paintMask(at, at, tool());
+      last = at;
+      bumpMask();
+    };
+    const timer = window.setTimeout(() => begin(last), 250);
     const move = (ev: PointerEvent) => {
-      const p = pointOf(ev);
+      const p = focusOf(ev);
+      setFinger(rawPoint(ev));
+      setCursor(p);
+      if (!drawing) {
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) <= 4) return;
+        begin(last); // 從按下去時焦點圓的位置開始畫起
+      }
       paintMask(last, p, tool());
       last = p;
       bumpMask();
-      setCursor(p);
     };
     const up = () => {
+      window.clearTimeout(timer);
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
       setCursor(null);
+      setFinger(null);
     };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
@@ -211,9 +244,17 @@ export function CropOverlay({
         {s.maskCanvas && <MaskTint s={s} />}
         {s.paint && (
           <div className="crop-paint" data-testid="crop-paint" onPointerDown={startPaint}>
+            {finger && (
+              <i
+                className="brush-finger"
+                data-testid="brush-finger"
+                style={{ left: `${finger[0] * 100}%`, top: `${finger[1] * 100}%` }}
+              />
+            )}
             {cursor && (
               <i
                 className="brush-cursor"
+                data-testid="brush-cursor"
                 style={{
                   left: `${cursor[0] * 100}%`,
                   top: `${cursor[1] * 100}%`,
@@ -321,6 +362,20 @@ export function CropOverlay({
               step={1}
               format={(v) => `${v}%`}
               onChange={(v) => updateCrop({ brush: v / 100 })}
+            />
+          </div>
+          <div className="paint-size">
+            <Slider
+              label="距離"
+              value={s.reach}
+              min={0}
+              max={MAX_REACH}
+              step={5}
+              format={(v) => `${v}px`}
+              onChange={(v) => {
+                saveReach(v);
+                updateCrop({ reach: v });
+              }}
             />
           </div>
           <button className="btn" disabled={s.undo.length === 0} onClick={undoMaskStroke}>

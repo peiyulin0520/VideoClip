@@ -2644,6 +2644,36 @@ button {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
+/* 焦點圓中間一個十字 */
+.brush-cursor::before,
+.brush-cursor::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+}
+.brush-cursor::before {
+  width: 11px;
+  height: 1.5px;
+}
+.brush-cursor::after {
+  width: 1.5px;
+  height: 11px;
+}
+/* 手指圓 A：白色實心 */
+.brush-finger {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
 .crop-bar.paint-bar {
   top: 60px;
   align-items: center;
@@ -2655,9 +2685,23 @@ button {
 .crop-bar.paint-bar {
   right: 8px;
 }
+.crop-bar.paint-bar {
+  flex-wrap: wrap;
+}
 .crop-bar.paint-bar .paint-size {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
+  color: #fff;
+}
+.crop-bar.paint-bar .slider-row input[type='range'] {
+  height: 34px;
+}
+.crop-bar.paint-bar .slider-label {
+  min-width: 44px;
+  white-space: nowrap;
+  color: #ddd;
+}
+.crop-bar.paint-bar .slider-val {
   color: #fff;
 }
 .crop-bar.paint-bar .slider-row {

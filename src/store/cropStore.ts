@@ -26,6 +26,8 @@ export type CropSession = {
   paint: 'brush' | 'erase' | null;
   /** 筆刷粗細（佔整張原始畫面寬的比例） */
   brush: number;
+  /** 焦點圓在手指圓上方幾 px（0＝直接畫在手指下面）；存在這台手機 */
+  reach: number;
   /** 筆刷／橡皮擦編輯中的遮罩（整張原始畫面座標，長邊 MASK_SIDE；不透明＝留下）；null＝還沒開始畫 */
   maskCanvas: HTMLCanvasElement | null;
   /** 這個物件原本就有點陣圖遮罩（沒被重設／重新圈選的話完成時保留） */
@@ -90,6 +92,7 @@ export function startCrop(itemId: string): boolean {
       mask: item.mask ?? null,
       paint: null,
       brush: 0.04,
+      reach: readReach(),
       maskCanvas: null,
       hasBitmap: !!item.maskBitmap,
       dropBitmap: false,
@@ -251,6 +254,27 @@ export function undoMaskStroke() {
 }
 
 /** 在遮罩上畫一小段（from→to 是原始畫面的比例；r 是半徑，佔畫面寬的比例）：筆刷＝留下，橡皮擦＝去掉 */
+const REACH_KEY = 'vc-brush-reach';
+export const DEFAULT_REACH = 70;
+export const MAX_REACH = 150;
+function readReach(): number {
+  try {
+    const v = Number(localStorage.getItem(REACH_KEY));
+    if (localStorage.getItem(REACH_KEY) !== null && Number.isFinite(v))
+      return Math.min(Math.max(v, 0), MAX_REACH);
+  } catch {
+    /* 沒有儲存空間就用預設 */
+  }
+  return DEFAULT_REACH;
+}
+export function saveReach(v: number) {
+  try {
+    localStorage.setItem(REACH_KEY, String(v));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function paintMask(from: Pt, to: Pt, tool: 'brush' | 'erase') {
   const s = useCrop.getState().s;
   const cv = s?.maskCanvas;

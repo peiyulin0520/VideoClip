@@ -32,6 +32,7 @@ async function stroke(page: Page, from: [number, number], to: [number, number]) 
   const at = (p: [number, number]) => [fr.x + fr.width * p[0], fr.y + fr.height * p[1]] as const;
   const [x0, y0] = at(from);
   const [x1, y1] = at(to);
+  await page.getByLabel('距離').fill('0'); // 焦點圓直接在手指下面（距離另外有 i6 的測試）
   await page.mouse.move(x0, y0);
   await page.mouse.down();
   for (let i = 1; i <= 10; i++) await page.mouse.move(x0 + ((x1 - x0) * i) / 10, y0 + ((y1 - y0) * i) / 10);
