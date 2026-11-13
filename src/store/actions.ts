@@ -13,6 +13,7 @@ import {
   TEXT_STYLE_KEYS,
   type Aspect,
   type Asset,
+  type EffectKind,
   type Item,
   type Project,
   type TextItem,
@@ -48,7 +49,7 @@ import {
   trackEnd,
 } from '../engine/timeline';
 import { cellItem, type Rect } from '../engine/layouts';
-import { DEFAULT_TRANSITION_DURATION } from '../engine/transitions';
+import { DEFAULT_EFFECT_DURATION, DEFAULT_TRANSITION_DURATION, seamsOf } from '../engine/transitions';
 import { groupPatch, transformAbout } from '../engine/groupTransform';
 import { useProjectStore } from './projectStore';
 
@@ -93,6 +94,8 @@ export function separateAudio(id: string): string | null {
     delete audio.group;
     delete audio.maskBitmap;
     delete audio.transitionIn;
+    delete audio.inEffect;
+    delete audio.outEffect;
     v.volume = 0;
     const ti = trackIndexFor(d.tracks as Track[], 'audio', audio.start, audio.duration);
     d.tracks[ti]!.items.push(audio);
@@ -404,50 +407,91 @@ export function removeGroup(group: string) {
   );
 }
 
+/** 轉場資料換成新的總長（前後的分配照原本的比例；沒分別設定就維持對稱） */
+function withDuration(
+  prev: { duration: number; before?: number; after?: number } | undefined,
+  duration: number,
+) {
+  if (!prev || (prev.before === undefined && prev.after === undefined)) return { duration };
+  const total = (prev.before ?? 0) + (prev.after ?? 0) || 1;
+  return {
+    duration,
+    before: ((prev.before ?? 0) / total) * duration,
+    after: ((prev.after ?? 0) / total) * duration,
+  };
+}
+
 /** 設定（或取消）一個片段的進場轉場；duration 沒給就沿用原本的 */
 export function setTransition(id: string, kind: TransitionKind | null, duration?: number, opts?: Opts): void {
   editItem(
     id,
     (it) => {
-      if (it.type === 'text' || it.type === 'audio') return;
+      if (it.type === 'audio') return;
       if (!kind) delete it.transitionIn;
       else
         it.transitionIn = {
           kind,
-          duration: duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+          ...withDuration(
+            it.transitionIn,
+            duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+          ),
         };
     },
     opts,
   );
 }
 
-/** 同一軌上所有「前面緊接著另一個片段」的片段都套用同一種轉場；回傳套用了幾個 */
+/** 轉場分配：佔前一段結尾 before 秒、佔這一段開頭 after 秒（總長＝兩者相加） */
+export function setTransitionSplit(id: string, before: number, after: number, opts?: Opts): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type === 'audio' || !it.transitionIn) return;
+      it.transitionIn = { ...it.transitionIn, before, after, duration: before + after };
+    },
+    opts,
+  );
+}
+
+/** 單一素材的進場（role in）／出場（role out）特效；kind 是 null＝取消；duration 沒給就沿用原本的（預設 0.8 秒） */
+export function setItemEffect(
+  id: string,
+  role: 'in' | 'out',
+  kind: EffectKind | null,
+  duration?: number,
+  opts?: Opts,
+): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type === 'audio') return;
+      const key = role === 'in' ? 'inEffect' : 'outEffect';
+      if (!kind) delete it[key];
+      else it[key] = { kind, duration: duration ?? it[key]?.duration ?? DEFAULT_EFFECT_DURATION };
+    },
+    opts,
+  );
+}
+
+/** 同一軌上所有「前面緊接著另一個同類片段」的片段都套用同一種轉場；回傳套用了幾個 */
 export function setTransitionAll(trackId: string, kind: TransitionKind | null, duration?: number): number {
   const p = store().project;
   const tr = p?.tracks.find((t) => t.id === trackId);
   if (!p || !tr) return 0;
-  const ids = tr.items
-    .filter((it) => it.type !== 'text' && it.type !== 'audio')
-    .filter((it) =>
-      tr.items.some(
-        (x) =>
-          x !== it &&
-          x.type !== 'text' &&
-          x.type !== 'audio' &&
-          Math.abs(x.start + x.duration - it.start) < 0.03,
-      ),
-    )
-    .map((it) => it.id);
+  const ids = seamsOf(tr.items).map((x) => x.next.id);
   if (ids.length === 0) return 0;
   store().apply((d) => {
     const t = d.tracks.find((x) => x.id === trackId);
     for (const it of t?.items ?? []) {
-      if (!ids.includes(it.id) || it.type === 'text' || it.type === 'audio') continue;
+      if (!ids.includes(it.id) || it.type === 'audio') continue;
       if (!kind) delete it.transitionIn;
       else
         it.transitionIn = {
           kind,
-          duration: duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+          ...withDuration(
+            it.transitionIn,
+            duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+          ),
         };
     }
   });

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { drawTransitionDemo } from '../../engine/transitionPreview';
-import type { TransitionKind } from '../../model/types';
+import type { EffectKind } from '../../model/types';
 
 const SIZE = 64;
 const CYCLE = 1.8; // 秒：轉場 1.2 秒＋停一下
@@ -20,11 +20,14 @@ export function TransitionCard({
   label,
   active,
   onPick,
+  role,
 }: {
-  kind: TransitionKind | null;
+  kind: EffectKind | null;
   label: string;
   active: boolean;
   onPick: () => void;
+  /** 單一素材的進場／出場卡片（畫「空→B」「A→空」）；沒給＝兩個片段之間的轉場（A→B） */
+  role?: 'in' | 'out';
 }) {
   const cv = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -36,14 +39,14 @@ export function TransitionCard({
     c.width = c.height = SIZE * scale;
     ctx.scale(scale, scale);
     if (reduced()) {
-      drawTransitionDemo(ctx, SIZE, SIZE, kind, 0.5);
+      drawTransitionDemo(ctx, SIZE, SIZE, kind, 0.5, role);
       return;
     }
     let visible = false;
     let raf = 0;
     const draw = (now: number) => {
       const ph = (now / 1000) % CYCLE;
-      drawTransitionDemo(ctx, SIZE, SIZE, kind, Math.min(ph / GO, 1));
+      drawTransitionDemo(ctx, SIZE, SIZE, kind, Math.min(ph / GO, 1), role);
       raf = requestAnimationFrame(draw);
     };
     const start = () => {
@@ -59,7 +62,7 @@ export function TransitionCard({
         liveCount--;
       }
     };
-    drawTransitionDemo(ctx, SIZE, SIZE, kind, 0.5); // 還沒動之前先有一張靜態的
+    drawTransitionDemo(ctx, SIZE, SIZE, kind, 0.5, role); // 還沒動之前先有一張靜態的
     const io = new IntersectionObserver((es) => {
       visible = es.some((e) => e.isIntersecting);
       if (visible) start();
@@ -71,12 +74,12 @@ export function TransitionCard({
       stop();
       void visible;
     };
-  }, [kind]);
+  }, [kind, role]);
   return (
     <button
       role="radio"
       aria-checked={active}
-      aria-label={`轉場 ${label}`}
+      aria-label={`${role === 'in' ? '進場' : role === 'out' ? '出場' : '轉場'} ${label}`}
       className={`tr-card${active ? ' on' : ''}`}
       data-kind={kind ?? 'none'}
       onClick={onPick}

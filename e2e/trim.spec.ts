@@ -90,6 +90,7 @@ test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖�
   await page.screenshot({ path: 'docs/screenshots/feedback-5/trim-panel.png' });
 
   // 拖起點旗標往右 1/4 條、終點旗標往左 1/4 條：留約 0.5–1.5 秒
+  await page.waitForTimeout(500); // 等面板滑上來
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
   await drag(page, 'range-flag-start-0', strip.width / 4);
   await drag(page, 'range-flag-end-0', -strip.width / 4);
@@ -103,6 +104,7 @@ test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖�
 
   // 再開一次，拖完按套用
   await page.getByRole('button', { name: '修剪' }).tap();
+  await page.waitForTimeout(500);
   await drag(page, 'range-flag-start-0', strip.width / 4);
   await drag(page, 'range-flag-end-0', -strip.width / 4);
   await page.getByTestId('rm-apply').tap();

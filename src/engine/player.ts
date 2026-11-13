@@ -453,7 +453,7 @@ export class Player {
       if (el.dataset.primed !== '1') {
         // 有轉場的話 B 會提前出現：直接停在提前出現的那一格，轉場一開始就不用再 seek
         const back = item.transitionIn
-          ? Math.min((item.transitionIn.duration / 2) * item.speed, item.trimIn)
+          ? Math.min((item.transitionIn.before ?? item.transitionIn.duration / 2) * item.speed, item.trimIn)
           : 0;
         el.currentTime = item.trimIn - back;
         el.dataset.primed = '1';

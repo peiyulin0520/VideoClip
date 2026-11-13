@@ -52,7 +52,18 @@ export type ItemBase = {
   cornerRadius?: number; // 0–0.5，佔短邊的比例（畫中畫圓角）
   outline?: Outline;
   crop?: Crop;
+  /**
+   * 進場轉場：跟前面緊接的同類素材（影像接影像、貼圖接貼圖、字卡接字卡）之間的效果，以兩個片段的接縫為中心。
+   * duration＝總長；before＝佔前一段結尾幾秒、after＝佔這一段開頭幾秒（沒寫就各一半，舊資料也是）。
+   */
+  transitionIn?: { kind: TransitionKind; duration: number; before?: number; after?: number };
+  /** 單一素材的進場特效（這個素材當 B，一定從開頭開始）與出場特效（這個素材當 A，一定在結尾結束）；duration＝特效幾秒 */
+  inEffect?: { kind: EffectKind; duration: number };
+  outEffect?: { kind: EffectKind; duration: number };
 };
+
+/** 單一素材的特效：32 種轉場，字卡另外有「打字」 */
+export type EffectKind = TransitionKind | 'typewriter';
 
 export type VideoItem = ItemBase & {
   /** audio＝背景音樂（只放在 audio 軌，沒有畫面） */
@@ -89,8 +100,6 @@ export type VideoItem = ItemBase & {
    * 影片原音、背景音樂都能用（音訊分頁的「靜音標記」）。
    */
   audioRanges?: [number, number][];
-  /** 進場轉場：跟前面緊接的片段之間的效果（以兩個片段的接縫為中心，前半在前一個片段、後半在這個片段） */
-  transitionIn?: { kind: TransitionKind; duration: number };
 };
 
 /**

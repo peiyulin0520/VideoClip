@@ -43,7 +43,7 @@ test('時間軸兩個緊接的片段中間有小圓圈（沒轉場是「＋」�
   await page.getByRole('radio', { name: '轉場 疊化' }).tap();
   expect((await items(page))[1]!.transitionIn?.kind).toBe('dissolve');
   expect(b!.id).toBe((await items(page))[1]!.id);
-  await expect(page.getByTestId('tr-circle')).toHaveText('疊');
+  await expect(page.getByTestId('tr-circle')).toHaveText('溶');
   await page.screenshot({ path: `${SHOT}/circle-effect-tab.png` });
 });
 

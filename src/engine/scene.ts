@@ -6,7 +6,15 @@ import { visibleLayers } from './timeline';
 import { composeWith, motionOffset } from './groupTransform';
 import { cellRect, cellTransform } from './layouts';
 import { maskCanvasFor } from './maskBitmap';
-import { activeTransition, applyLook, clipPx, type Cover } from './transitions';
+import {
+  activeTransition,
+  applyLook,
+  clipPx,
+  effectFrame,
+  itemEffectAt,
+  type ClipFrac,
+  type Cover,
+} from './transitions';
 
 /** 預覽/匯出各自提供「這個影片/照片物件現在的畫面」 */
 export type SourceProvider = (
@@ -81,7 +89,7 @@ export function sceneItems(project: Project, t: number): { item: Item; track: Tr
   const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
   project.tracks.forEach((track, i) => {
     const at =
-      track.kind === 'media' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
+      track.kind !== 'audio' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
     if (at) {
       for (const x of [at.a, at.b]) if (x) out.push({ item: x, track });
       return;
@@ -116,10 +124,10 @@ export function buildScene(
       ? motionOffset(frame.item.motion, t - frame.item.start, frame.item.duration)
       : { x: 0, y: 0 };
     const at =
-      track.kind === 'media' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
+      track.kind !== 'audio' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
     if (at) {
       // 轉場期間：A、B 兩段同時畫（B 在上或 A 在上看轉場種類），各自套上位移、縮放、透明度、裁切、模糊
-      const mk = (item: VideoItem | null, look: (typeof at.frame)['a']): SceneLayer | null => {
+      const mk = (item: Item | null, look: (typeof at.frame)['a']): SceneLayer | null => {
         if (!item) return null;
         const layer = toLayer(item, track, project, ctx, provide);
         if (!layer) return null;
@@ -143,6 +151,9 @@ export function buildScene(
       );
       if (layer) {
         layer.box = { ...layer.box, cx: layer.box.cx + off.x * canvasW, cy: layer.box.cy + off.y * canvasH };
+        // 單一素材的進場／出場特效（版型整組的另外處理）
+        const fx = group ? null : itemEffectAt(l.item, t - l.item.start);
+        if (fx) applyItemEffect(layer, fx, canvasW, canvasH, covers, `${i}`);
         out.push(layer);
       }
     } else if (track.groupRole === 'cell' && track.fill && !track.hidden && frame) {
@@ -204,6 +215,60 @@ export function buildScene(
     });
   }
   return out;
+}
+
+/** 把單一素材的進出場特效套到它的圖層：位移照畫面比例、縮放與裁切、顏色層都以「素材自己的方框」為準 */
+function applyItemEffect(
+  layer: SceneLayer,
+  fx: Parameters<typeof effectFrame>[0],
+  W: number,
+  H: number,
+  covers: { id: string; c: Cover }[],
+  id: string,
+) {
+  const { look, covers: cs } = effectFrame(fx);
+  const b0 = layer.box;
+  const left = b0.cx - b0.w / 2;
+  const top = b0.cy - b0.h / 2;
+  const rel = (r: [number, number, number, number]): [number, number, number, number] => [
+    left + r[0] * b0.w,
+    top + r[1] * b0.h,
+    r[2] * b0.w,
+    r[3] * b0.h,
+  ];
+  layer.box = {
+    ...b0,
+    cx: b0.cx + look.dx * W,
+    cy: b0.cy + look.dy * H,
+    w: b0.w * look.scale,
+    h: b0.h * look.scale,
+  };
+  layer.opacity *= look.opacity;
+  const dx = look.dx * W;
+  const dy = look.dy * H;
+  if (look.clip) {
+    const c: ClipFrac = look.clip;
+    layer.clip =
+      c.kind === 'rects'
+        ? { rects: c.rects.map((r) => rel(r)).map(([x, y, w, h]) => [x + dx, y + dy, w, h]) }
+        : {
+            circle: {
+              cx: left + c.cx * b0.w + dx,
+              cy: top + c.cy * b0.h + dy,
+              r: c.r * Math.max(b0.w, b0.h),
+            },
+          };
+  }
+  if (look.blur) layer.blur = look.blur * Math.min(W, H);
+  cs.forEach((c, n) => {
+    const r = c.rect ?? [0, 0, 1, 1];
+    // 顏色層直接換成畫面像素（比例）貼在素材的方框上
+    const px = rel(r);
+    covers.push({
+      id: `${id}-fx${n}`,
+      c: { ...c, rect: [px[0] / W, px[1] / H, px[2] / W, px[3] / H] },
+    });
+  });
 }
 
 /**

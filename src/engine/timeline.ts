@@ -242,6 +242,7 @@ export function splitFree(items: Item[], id: string, t: number): Item[] | null {
   const local = t - it.start;
   if (local < MIN_CLIP_DURATION || it.duration - local < MIN_CLIP_DURATION) return null;
   const a: Item = { ...it, duration: local };
+  delete a.outEffect; // 出場特效在結尾，前半段沒有
   const b: Item = isVideoItem(it)
     ? {
         ...it,
@@ -251,7 +252,8 @@ export function splitFree(items: Item[], id: string, t: number): Item[] | null {
         trimIn: it.trimIn + local * it.speed,
       }
     : { ...it, id: newId('i_'), start: t, duration: it.duration - local };
-  if (b.type !== 'text' && b.type !== 'audio') delete b.transitionIn; // 轉場在片段的開頭，後半段沒有
+  delete b.transitionIn; // 轉場、進場特效在片段的開頭，後半段沒有
+  delete b.inEffect;
   return [...items.slice(0, i), a, b, ...items.slice(i + 1)];
 }
 
@@ -450,7 +452,8 @@ export function mergeRanges(ranges: Range[], total: number, minLen: number): Ran
  */
 export function splitByRanges(item: VideoItem, ranges: Range[], assetDuration: number): VideoItem[] {
   const minSrc = MIN_CLIP_DURATION * item.speed;
-  return mergeRanges(ranges, assetDuration, minSrc).map(([a, b], i) => {
+  const arr = mergeRanges(ranges, assetDuration, minSrc);
+  return arr.map(([a, b], i) => {
     let start = item.start + (a - item.trimIn) / item.speed;
     let trimIn = a;
     let duration = (b - a) / item.speed;
@@ -464,8 +467,10 @@ export function splitByRanges(item: VideoItem, ranges: Range[], assetDuration: n
     if (i > 0) {
       piece.id = newId('i_');
       delete piece.label; // 命名只留在第一段
-      delete piece.transitionIn; // 轉場只留在第一段
+      delete piece.transitionIn; // 轉場、進場特效只留在第一段
+      delete piece.inEffect;
     }
+    if (i < arr.length - 1) delete piece.outEffect; // 出場特效只留在最後一段
     return piece;
   });
 }

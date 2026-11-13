@@ -21,7 +21,7 @@ import {
   ZONE,
   type DropTarget,
 } from '../../engine/timeline';
-import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../../model/types';
+import type { Asset, EffectKind, Item, Project, Track, TrackKind, VideoItem } from '../../model/types';
 import { useProxyProgress } from '../../engine/proxyQueue';
 import { Wave } from './Wave';
 import {
@@ -42,7 +42,7 @@ import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemTitle, ordinalIn } from '../../engine/labels';
-import { seamsOf, transitionCode, transitionName } from '../../engine/transitions';
+import { effectDurations, seamsOf, transitionCode, transitionName } from '../../engine/transitions';
 import { renameItem } from '../../store/actions';
 
 const BASE_H = 44; // 最下面那條影像軌（主要影片）高一點，縮圖與兩行名稱看得清楚
@@ -224,6 +224,7 @@ export function Timeline({
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
+  const fxFocus = useUI((s) => s.fxFocus);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSet = useRef(-100);
   const [vw, setVw] = useState(360);
@@ -908,10 +909,10 @@ export function Timeline({
                   );
                 })}
 
-                {track.kind === 'media' &&
+                {track.kind !== 'audio' &&
                   !track.groupRole &&
                   seamsOf(track.items).map(({ next }) => {
-                    const sel = next.id === selectedId;
+                    const sel = next.id === selectedId && fxFocus?.id === next.id && fxFocus.role === 'seam';
                     const tr = next.transitionIn;
                     return (
                       <button
@@ -925,12 +926,57 @@ export function Timeline({
                         onClick={(e) => {
                           e.stopPropagation();
                           useProjectStore.getState().select(next.id);
+                          useUI.setState({ requestTab: 'effect', fxFocus: { id: next.id, role: 'seam' } });
                           player?.seek(next.start + 0.02);
-                          useUI.setState({ requestTab: 'effect' });
                         }}
                       >
                         {tr ? transitionCode(tr.kind) : '＋'}
                       </button>
+                    );
+                  })}
+
+                {/* 單一素材的進場／出場特效：特效佔的那一段（淡色）＋代表字圓圈（跟接縫的轉場不同色） */}
+                {track.kind !== 'audio' &&
+                  !track.groupRole &&
+                  track.items.map((it) => {
+                    if (it.type === 'audio' || (!it.inEffect && !it.outEffect)) return null;
+                    const d = effectDurations(it);
+                    const x0 = half + it.start * pps;
+                    const x1 = x0 + it.duration * pps;
+                    const mk = (role: 'in' | 'out', kind: EffectKind, left: number, w: number) => {
+                      const sel = it.id === selectedId && fxFocus?.id === it.id && fxFocus.role === role;
+                      return (
+                        <span key={`${it.id}-${role}`}>
+                          <span
+                            className={`fx-span ${role}${sel ? ' sel' : ''}`}
+                            style={{ left: role === 'in' ? x0 : x1 - w, width: w }}
+                          />
+                          <button
+                            className={`fx-circle ${role}${sel ? ' sel' : ''}`}
+                            data-testid={`fx-circle-${role}`}
+                            data-item-id={it.id}
+                            aria-label={`${role === 'in' ? '進場' : '出場'}特效 ${transitionName(kind)}`}
+                            style={{ left }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              useProjectStore.getState().select(it.id);
+                              useUI.setState({ requestTab: 'effect', fxFocus: { id: it.id, role } });
+                              player?.seek(it.start + (role === 'in' ? 0.02 : it.duration - 0.05));
+                            }}
+                          >
+                            {transitionCode(kind)}
+                          </button>
+                        </span>
+                      );
+                    };
+                    return (
+                      <span key={`fx-${it.id}`}>
+                        {it.inEffect && d.in > 0.01 && mk('in', it.inEffect.kind, x0 + 13, d.in * pps)}
+                        {it.outEffect &&
+                          d.out > 0.01 &&
+                          mk('out', it.outEffect.kind, Math.max(x1 - 35, x0 + 37), d.out * pps)}
+                      </span>
                     );
                   })}
 
