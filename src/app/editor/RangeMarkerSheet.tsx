@@ -215,7 +215,7 @@ export function RangeMarkerSheet({
   const defaultSummary =
     mode === 'timing'
       ? `特效：${ranges[0] ? `${fmt2(ranges[0][0])} → ${fmt2(ranges[0][1])} 秒（共 ${fmt2(ranges[0][1] - ranges[0][0])} 秒）` : '還沒有標記'}`
-      : `來源 ${fmt2(ranges[0]?.[0] ?? 0)} 秒 → ${fmt2(ranges[ranges.length - 1]?.[1] ?? 0)} 秒 · ${
+      : `${ranges.length > 1 ? `共 ${ranges.length} 組 · ` : ''}來源 ${fmt2(ranges[0]?.[0] ?? 0)} 秒 → ${fmt2(ranges[ranges.length - 1]?.[1] ?? 0)} 秒 · ${
           mode === 'mute' ? '保留聲音' : '選取'
         } ${kept.toFixed(1)} 秒 / 原始素材 ${dur.toFixed(1)} 秒`;
 

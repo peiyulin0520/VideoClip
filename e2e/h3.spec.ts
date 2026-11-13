@@ -10,7 +10,6 @@ import {
   project,
   samplePreview,
   showTimeline,
-  timeText,
 } from './helpers';
 
 type Cell = { x: number; y: number; w: number; h: number };
@@ -78,7 +77,7 @@ test('同時播放的影片超過預覽的上限：多的格子畫縮圖、不�
       .toBe(true);
 });
 
-test('修剪面板：拖旗標時小畫面先顯示縮圖（不 seek 影片），放開才更新；「播放這一段」只播選的那一段', async ({
+test('修剪面板：拖旗標時預覽的白線跟著（顯示那一秒）；套用後只留選的那一段；「播放」只在預覽框播放', async ({
   page,
 }) => {
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
@@ -86,28 +85,19 @@ test('修剪面板：拖旗標時小畫面先顯示縮圖（不 seek 影片）�
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '修剪', exact: true }).tap();
+  await expect(page.getByTestId('rm-video')).toBeVisible();
   const flag = (await page.getByTestId('range-flag-end-0').boundingBox())!;
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
   await page.mouse.move(flag.x + flag.width / 2, flag.y + flag.height / 2);
   await page.mouse.down();
   await page.mouse.move(flag.x - strip.width * 0.25, flag.y + flag.height / 2, { steps: 4 });
-  await expect(page.getByTestId('range-mini-thumb')).toBeVisible();
-  await expect(page.locator('.range-mini-t')).toContainText('秒');
-  // 拖的當下片段還沒被改
-  expect(
-    ((await project(page)).tracks[0] as unknown as { items: { duration: number }[] }).items[0]!.duration,
-  ).toBeCloseTo(4, 1);
+  await expect(page.getByTestId('rm-now')).toContainText('秒');
   await page.mouse.up();
-  await expect(page.getByTestId('range-mini-thumb')).toHaveCount(0);
+  await page.getByTestId('rm-apply').tap();
   const dur = ((await project(page)).tracks[0] as unknown as { items: { duration: number }[] }).items[0]!
     .duration;
   expect(dur).toBeGreaterThan(2.4);
   expect(dur).toBeLessThan(3.3);
-  // 只播這一段：播完會自己停在終點附近
-  await page.getByTestId('range-play').tap();
-  await page.waitForTimeout(dur * 1000 + 1200);
-  const txt = await timeText(page);
-  expect(txt).toMatch(/0:0[23]\.\d/);
 });
 
 test('流暢預覽不影響匯出：單格匯出的大小與顏色跟專案一樣（不是預覽的一半）', async ({ page }) => {

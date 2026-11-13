@@ -41,15 +41,14 @@ test('音訊修剪：音訊列的「修剪」→ 上方旗標＋波形；留 [0,
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
   await expect(page.getByTestId('audio-trim')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('audio-trim').tap();
-  await expect(page.getByTestId('range-picker')).toBeVisible();
-  await expect(
-    page.locator('.range-picker svg, .range-picker canvas.wave, .range-picker .wave').first(),
-  ).toBeVisible();
+  await expect(page.getByTestId('trim-strip').getByTestId('wave')).toBeVisible();
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
   await drag(page, 'range-flag-end-0', -strip.width * 0.75); // 留 [0,1]
-  await page.getByTestId('range-add').tap(); // 最大的空檔（1–4）中間放 1 秒 → [2,3]
+  const sb = (await page.getByTestId('trim-strip').boundingBox())!;
+  await page.mouse.click(sb.x + sb.width * 0.5, sb.y + sb.height / 2); // 白線移到 2 秒
+  await page.getByTestId('range-add').tap(); // 白線位置放 1 秒 → [2,3]
   await drag(page, 'range-flag-end-1', strip.width * 0.25); // 終點拉到 4 秒
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('rm-apply').tap();
   const items = await audioItems(page);
   expect(items).toHaveLength(2);
   expect(items[0]!.start).toBeCloseTo(0, 1);

@@ -84,6 +84,11 @@ export type VideoItem = ItemBase & {
   cellAnim?: { from: { x: number; y: number; w: number; h: number }; t0: number; t1: number };
   /** 動態模板外框：這個版型是哪一種動態模板（有整套的時間表，見 engine/story.ts） */
   template?: 'story3';
+  /**
+   * 保留聲音的範圍（素材秒數，可以有好幾段）：範圍外靜音，片段本身不拆開、畫面不變；沒有這個欄位＝整段都有聲音。
+   * 影片原音、背景音樂都能用（音訊分頁的「靜音標記」）。
+   */
+  audioRanges?: [number, number][];
   /** 進場轉場：跟前面緊接的片段之間的效果（以兩個片段的接縫為中心，前半在前一個片段、後半在這個片段） */
   transitionIn?: { kind: TransitionKind; duration: number };
 };

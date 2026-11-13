@@ -1,5 +1,5 @@
 import { Copy, MoveHorizontal, Scissors, Trash2, Volume2, VolumeX } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ensureUrls } from '../../../engine/assetUrls';
 import { importFiles } from '../../../engine/importMedia';
 import { isVideoItem, totalDuration } from '../../../engine/timeline';
@@ -18,6 +18,7 @@ import { toast, useUI } from '../../../store/uiStore';
 import { itemTitle, ordinalIn, thumbOf } from '../../../engine/labels';
 import { formatTime } from '../../../engine/timeline';
 import { Slider } from '../../../ui/Slider';
+import { MuteSheet } from '../MuteSheet';
 import { ClipPanel, panelActive } from './ClipPanel';
 import { ToolButton, type Found, type Panel } from './shared';
 import type { VideoItem } from '../../../model/types';
@@ -85,6 +86,7 @@ export function AudioTab({
 }) {
   const project = useProjectStore((s) => s.project)!;
   const player = useUI((s) => s.player);
+  const [muteFor, setMuteFor] = useState<string | null>(null);
   const selected = found?.item.type === 'audio' && isVideoItem(found.item) ? found.item : null;
   if (selected && panelActive(panel, found))
     return <ClipPanel panel={panel} setPanel={setPanel} found={found} />;
@@ -97,8 +99,12 @@ export function AudioTab({
       return asset?.hasAudio ? [{ item, asset, track }] : [];
     }),
   );
+  const muteItem = muteFor ? entries.find((e) => e.item.id === muteFor) : undefined;
   return (
     <>
+      {muteItem && isVideoItem(muteItem.item) && (
+        <MuteSheet item={muteItem.item} asset={muteItem.asset} onClose={() => setMuteFor(null)} />
+      )}
       {selected && (
         <div className="toolbar" role="toolbar" aria-label="音樂工具">
           <ToolButton
@@ -170,6 +176,14 @@ export function AudioTab({
                 }
               >
                 {item.volume > 0 ? '保留' : '關閉'}
+              </button>
+              <button
+                className={`chip sm${item.audioRanges ? ' active' : ''}`}
+                data-testid="audio-mute"
+                aria-label={`靜音標記 ${itemTitle(item, asset)}`}
+                onClick={() => setMuteFor(item.id)}
+              >
+                靜音標記{item.audioRanges ? `（${item.audioRanges.length}）` : ''}
               </button>
               {item.type === 'audio' && (
                 <button

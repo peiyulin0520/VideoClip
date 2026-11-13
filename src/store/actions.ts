@@ -91,6 +91,8 @@ export function separateAudio(id: string): string | null {
     delete audio.mask;
     delete audio.cell;
     delete audio.group;
+    delete audio.maskBitmap;
+    delete audio.transitionIn;
     v.volume = 0;
     const ti = trackIndexFor(d.tracks as Track[], 'audio', audio.start, audio.duration);
     d.tracks[ti]!.items.push(audio);

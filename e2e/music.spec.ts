@@ -148,10 +148,21 @@ test('音樂可以分割、複製、刪除；修剪面板顯示波形；音樂�
   // 修剪面板：有波形，可以改留下的區段
   await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '修剪' }).tap();
   await expect(page.getByTestId('trim-strip').getByTestId('wave')).toBeVisible();
-  await page.getByRole('button', { name: '後面少 1 秒' }).tap();
+  await page.waitForTimeout(500); // 等面板滑上來
+  const assetSec = ((await project(page)).assets as unknown as { kind: string; duration: number }[]).find(
+    (a) => a.kind === 'audio',
+  )!.duration;
+  const strip = (await page.getByTestId('trim-strip').boundingBox())!;
+  const flag = (await page.getByTestId('range-flag-end-0').boundingBox())!;
+  await page.mouse.move(flag.x + flag.width / 2, flag.y + flag.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(flag.x + flag.width / 2 - strip.width / assetSec, flag.y + flag.height / 2, {
+    steps: 6,
+  }); // 後面少 1 秒
+  await page.mouse.up();
+  await page.getByTestId('rm-apply').tap();
   items = (await audioTrack(page))!.items;
   expect(items.find((x) => x.trimIn > 1)!.duration).toBeCloseTo(1, 1);
-  await page.getByRole('button', { name: '完成' }).tap();
 
   // 複製
   await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '複製' }).tap();

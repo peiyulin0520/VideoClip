@@ -8,6 +8,7 @@ import { buildScene } from './scene';
 import { previewSizeFor } from './previewQuality';
 import { thumbOf } from './labels';
 import { onMaskReady } from './maskBitmap';
+import { audioRetained } from './audioRanges';
 import { baseMediaTrack, sourceTimeAt, sourceTimeClamped, totalDuration } from './timeline';
 
 type Deps = {
@@ -284,7 +285,10 @@ export class Player {
 
   private syncVideo(el: HTMLVideoElement, item: VideoItem, asset: Asset, track: Track, t: number) {
     const s = sourceTimeClamped(item, t, asset);
-    const vol = item.volume * fadeGain(t - item.start, item.duration, item.fadeIn, item.fadeOut);
+    const vol =
+      item.volume *
+      fadeGain(t - item.start, item.duration, item.fadeIn, item.fadeOut) *
+      (audioRetained(item, s) ? 1 : 0);
     this.audio.apply(el, vol, !!track.muted || !asset.hasAudio);
     if (this.playing) {
       const plan = driftPlan(s - el.currentTime, item.speed, !IOS);
@@ -318,7 +322,10 @@ export class Player {
         if (!el) continue;
         used.add(el);
         const s = it.trimIn + (t - it.start);
-        const vol = it.volume * fadeGain(t - it.start, it.duration, it.fadeIn, it.fadeOut);
+        const vol =
+          it.volume *
+          fadeGain(t - it.start, it.duration, it.fadeIn, it.fadeOut) *
+          (audioRetained(it, s) ? 1 : 0);
         this.audio.apply(el, vol, !!track.muted);
         if (this.playing) {
           const plan = driftPlan(s - el.currentTime, 1, !IOS);
