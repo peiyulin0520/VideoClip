@@ -14,7 +14,8 @@ import {
   type Box,
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
-import { readQuality, useSmooth, writeQuality } from '../../engine/previewQuality';
+import { useSmooth } from '../../engine/previewQuality';
+import { useQuality } from '../../store/qualityStore';
 import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
 import { CropOverlay } from './CropOverlay';
@@ -81,7 +82,7 @@ export function Preview({
   const cropping = useCrop((s) => !!s.s);
   const previewFull = useUI((s) => s.previewFull);
   // 預覽畫質：自動／清楚／流暢（設定頁可改）；自動時同時 3 支以上影片、或偵測到播放太慢就用流暢
-  const [quality, setQuality] = useState(readQuality);
+  const quality = useQuality((s) => s.q);
   const [slow, setSlow] = useState(false);
   const smooth = useSmooth(quality, project, slow);
   const fontEpoch = useFonts((s) => s.epoch); // 字體載入完成：字卡大小可能變，選取框要重算
@@ -102,7 +103,7 @@ export function Preview({
       onAudioBlocked: () => toast('iPhone 擋住了聲音，請再按一次播放', 6000),
       smooth,
       onSlow: () => {
-        if (readQuality() === 'auto') {
+        if (useQuality.getState().q === 'auto') {
           setSlow(true);
           toast('播放有點吃力，預覽自動改成「流暢」（匯出不受影響）', 6000);
         }
@@ -449,20 +450,6 @@ export function Preview({
       {emptyAction && (
         <button className="empty-import" onClick={emptyAction}>
           ＋ 匯入影片或照片
-        </button>
-      )}
-      {smooth && (
-        <button
-          className="quality-chip"
-          data-testid="quality-chip"
-          aria-label="流暢預覽（點一下改回清楚）"
-          onClick={() => {
-            writeQuality('clear');
-            setQuality('clear');
-            setSlow(false);
-          }}
-        >
-          流暢預覽
         </button>
       )}
       {!cropping && (

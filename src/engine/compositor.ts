@@ -461,7 +461,7 @@ export class Compositor {
       o.clipKey = '';
     }
     if (layer.blur && layer.blur > 0.5) {
-      if (!o.blurF) o.blurF = new BlurFilter({ strength: layer.blur, quality: 2 });
+      if (!o.blurF) o.blurF = new BlurFilter({ strength: layer.blur, quality: 1 });
       o.blurF.strength = layer.blur;
       o.container.filters = [o.blurF];
     } else if (o.blurF) {

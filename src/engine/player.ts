@@ -31,6 +31,8 @@ const IOS = isIOSDevice();
 const HARD_DRIFT = 0.5;
 const SOFT_DRIFT = 0.04;
 const PREFETCH_S = 1.0;
+/** 有轉場的片段多提前這麼多秒開始準備（要同時解兩支影片，來不及會卡） */
+const PREFETCH_TRANSITION_S = 1.5;
 const POOL_SIZE = 6;
 const MUSIC_POOL_SIZE = 3;
 
@@ -296,7 +298,9 @@ export class Player {
     } else {
       if (el.playbackRate !== item.speed) el.playbackRate = item.speed;
       if (!el.paused) el.pause();
-      if (Math.abs(el.currentTime - s) > 0.02) el.currentTime = s;
+      // 還在 seek 的時候不要再設新的時間：iPhone 上往回拖很慢，前一個 seek 還沒完成就又設新的，
+      // 會一直在 seeking、畫面一直沒準備好（預覽上只剩白框）。seeked 後重畫時會再對一次最新的時間。
+      if (Math.abs(el.currentTime - s) > 0.02 && !el.seeking) el.currentTime = s;
     }
   }
 
@@ -334,8 +338,8 @@ export class Player {
   }
 
   /** 影片池不夠用時，那個影片物件這一刻先畫素材縮圖（靜態、零成本），不要變黑 */
-  private thumbFallback(item: VideoItem, asset: Asset, t: number) {
-    if (!this.poolFullTold) {
+  private thumbFallback(item: VideoItem, asset: Asset, t: number, quiet = false) {
+    if (!quiet && !this.poolFullTold) {
       this.poolFullTold = true;
       queueMicrotask(() => this.deps.onPoolFull?.());
     }
@@ -414,9 +418,15 @@ export class Player {
         this.maybeCaptureThumb(el, asset);
         if (track.kind === 'media' && el.videoWidth)
           this.videoInfo = `${el.videoWidth}×${el.videoHeight} ${asset.codec ?? ''}${asset.hdr ? ' HDR' : ''}｜預覽檔：${asset.proxy?.status ?? '無'}`;
+        const ready = el.readyState >= 2 && !el.seeking && el.videoWidth > 0;
+        // 暫停（拖時間軸、點選）時影片還沒 seek 完：先畫素材縮圖頂著，不要留舊的一格或什麼都沒有
+        if (!ready && !this.playing) {
+          const th = this.thumbFallback(item, asset, t, true);
+          if (th) return th;
+        }
         return {
           source: el,
-          ready: el.readyState >= 2 && !el.seeking && el.videoWidth > 0,
+          ready,
           srcW: el.videoWidth || asset.width,
           srcH: el.videoHeight || asset.height,
         };
@@ -434,7 +444,11 @@ export class Player {
       if (!el) continue;
       used.add(el);
       if (el.dataset.primed !== '1') {
-        el.currentTime = item.trimIn;
+        // 有轉場的話 B 會提前出現：直接停在提前出現的那一格，轉場一開始就不用再 seek
+        const back = item.transitionIn
+          ? Math.min((item.transitionIn.duration / 2) * item.speed, item.trimIn)
+          : 0;
+        el.currentTime = item.trimIn - back;
         el.dataset.primed = '1';
       }
       if (!el.paused) el.pause();
@@ -472,7 +486,8 @@ export class Player {
       const items = [...(track.items as VideoItem[])].sort((a, b) => a.start - b.start);
       const cur = items.some((x) => t >= x.start && t < x.start + x.duration);
       const next = items.find((x) => x.start > t);
-      if (next && (cur || next.start <= t + PREFETCH_S)) push(next);
+      if (next && (cur || next.start <= t + (next.transitionIn ? PREFETCH_TRANSITION_S : PREFETCH_S)))
+        push(next);
     }
     return out;
   }

@@ -1,6 +1,7 @@
 import { APP_VERSION, checkForUpdate, shortVersion } from '../pwa';
 import { isPerfOn, setPerfOn } from '../editor/PerfOverlay';
-import { QUALITY_LABELS, readQuality, writeQuality, type PreviewQuality } from '../../engine/previewQuality';
+import { QUALITY_LABELS, type PreviewQuality } from '../../engine/previewQuality';
+import { useQuality } from '../../store/qualityStore';
 import { Segmented } from '../../ui/Segmented';
 import { getTheme, setTheme, THEMES, type ThemeId } from '../../ui/theme';
 import { GiphyKeySetup } from '../editor/GiphyPanel';
@@ -34,7 +35,8 @@ export function Settings() {
   const [openLicenses, setOpenLicenses] = useState(false);
   const [perf, setPerf] = useState(isPerfOn);
   const [checking, setChecking] = useState(false);
-  const [quality, setQuality] = useState<PreviewQuality>(readQuality);
+  const quality = useQuality((st) => st.q);
+  const setQuality = useQuality((st) => st.set);
   const [theme, setThemeState] = useState<ThemeId>(getTheme);
 
   useEffect(() => {
@@ -288,7 +290,6 @@ export function Settings() {
             const q = (Object.keys(QUALITY_LABELS) as PreviewQuality[]).find(
               (k) => QUALITY_LABELS[k] === name,
             )!;
-            writeQuality(q);
             setQuality(q);
           }}
         />

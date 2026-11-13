@@ -1547,6 +1547,10 @@ button {
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
+  /* 上下留空：膠囊的框線、選中的下緣陰影才不會被 overflow 切掉 */
+  margin: 0;
+  padding: 6px 2px 10px;
+  scroll-padding: 0 12px;
 }
 .cat-chips .chip {
   flex: none;
