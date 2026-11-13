@@ -316,8 +316,8 @@ docs/
 - **驗收**：給 3 種不同測試專案（快節奏/慢節奏/暖色），推薦結果不同且合理。
 
 ### Phase 8：Vlog 自動挑精華（2026-11-13 使用者選 B）
-- 完整規劃：`docs/plans/2026-11-13-vlog-highlights.md`（V1 本機分析 → V2 挑選與放進時間軸 → V3 介面 → V4 選用 Claude 協助）。
-- 原則：分析在裝置上做；AI 選用、預設關、使用者自己填 key、每次同意才送 ≤384px 縮圖；不加後端（AGENTS 規則 5）。
+- 完整規劃：`docs/plans/2026-11-13-vlog-highlights.md`（V1 本機分析 → V2 挑選與放進時間軸 → V3 介面 → V4 選用 Gemini 免費額度協助）。
+- 原則：分析在裝置上做；AI 選用（Gemini 免費額度）、預設關、使用者自己填 key、每次同意才送 ≤384px 縮圖（免費額度的內容 Google 可能拿去改進產品，同意視窗要列出縮圖讓使用者取消）；不加後端（AGENTS 規則 5）。
 - **驗收**：給多支測試素材，能自動挑出總長接近目標的片段、放進時間軸且一步可復原；AI 路徑在沒有 key／不同意時**零網路請求**。
 
 ---
@@ -335,7 +335,7 @@ docs/
 - [ ] 觸控手勢（右上角縮放鈕、雙指、時間軸捲動與拖曳不衝突）
 - [ ] 大型 CJK 字體在手機上的載入速度與記憶體
 - [ ] Google Drive 授權與上傳
-- [ ] （Phase 8）Vlog 精華：iPhone 上長影片分析的速度與記憶體、HEVC 素材（無 proxy 時）、`File.lastModified` 準不準、Claude API 真實呼叫
+- [ ] （Phase 8）Vlog 精華：iPhone 上長影片分析的速度與記憶體、HEVC 素材（無 proxy 時）、`File.lastModified` 準不準、Gemini API 真實呼叫
 - [ ] （Phase 1）iPhone 匯入照片圖庫的 .mov（HEVC）與 .heic：能不能讀長度、縮圖、播放
 - [ ] （Phase 1）OPFS 寫入大檔（>500MB）；沒有 createWritable 時退回 IndexedDB 是否可用
 - [ ] （Phase 1）預覽跨片段播放時聲音不中斷（第二個 <video> 的解鎖）

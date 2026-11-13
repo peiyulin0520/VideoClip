@@ -1,7 +1,7 @@
 # 2026-11-13 Vlog 自動挑精華（本機分析＋選用 AI）— 規劃
 
 > 規劃者寫、Sonnet 照做。使用者 2026-11-13 選 **B：本機分析為基礎，AI 為選用**。
-> 本檔步驟編號 V1–V4（V5 是之後的選配）。實作前先讀 `AGENTS.md`、`docs/PROGRESS.md` 快照、`docs/HANDOFF.md`。
+> **2026-11-13 更新：AI 改用 Google Gemini 的免費額度**（使用者要求；原本寫的是 Claude）。本檔步驟編號 V1–V4（V5 是之後的選配）。實作前先讀 `AGENTS.md`、`docs/PROGRESS.md` 快照、`docs/HANDOFF.md`。
 
 ## 0. 需求與結論
 
@@ -12,7 +12,7 @@
 - 這裡的「API」是 **App 內部的模組介面**（`analyzeAsset`、`pickHighlights`、`applyHighlights`），**不是對外的後端服務**。原因：`AGENTS.md` 規則 5 禁止會上傳影片的後端或分析服務。
 - 分兩層：
   1. **本機分析（預設、永遠可用）**：抽樣影格＋音量，算出每一段的分數，自動挑出精華並排到時間軸。不上傳、不需要 key。
-  2. **AI 協助（選用、預設關）**：使用者自己填 Claude API key、每次明確同意後，把**每個候選片段 1 張縮圖**＋本機分析數字送去，請 AI 重新打分、排順序、給理由與標題建議。沿用 Phase 7（`docs/PLAN.md` §5 Phase 7）的 key 與同意模式。
+  2. **AI 協助（選用、預設關）**：使用者自己填 **Gemini API key（Google AI Studio 免費申請）**、每次明確同意後，把**每個候選片段 1 張縮圖**＋本機分析數字送去，請 AI 重新打分、排順序、給理由與標題建議。沿用 Phase 7（`docs/PLAN.md` §5 Phase 7）的 key 與同意模式。**免費額度的資料會被 Google 拿來改進產品、人工審核員可能看到內容**（§2.6 有對應做法）；Phase 7 原本寫的 Claude 路線改成之後選配。
 
 ## 1. 使用者看到的流程
 
@@ -35,11 +35,13 @@ src/engine/highlights/
   cache.ts       IndexedDB 快取（見 §2.3）
   types.ts       Signal / Segment / Candidate / PickOptions
 src/ai/
-  claudeKey.ts   key 存取（仿 `src/stickers/giphy.ts` 的 getGiphyKey/setGiphyKey）
-  highlightAi.ts 組 prompt、呼叫 Claude、驗證回傳
+  aiKey.ts       key 存取（仿 `src/stickers/giphy.ts` 的 getGiphyKey/setGiphyKey）
+  provider.ts    介面 `HighlightAiProvider`（之後要換 Claude 或別家只要多寫一個實作）
+  gemini.ts      Gemini 實作（直接 `fetch` REST，不加 SDK 套件）
+  highlightAi.ts 組 prompt、呼叫 provider、驗證回傳、合併分數
 src/store/actions.ts   新增 applyHighlights(picks, opts)
 src/app/editor/HighlightSheet.tsx
-src/app/pages/Settings.tsx   新增「Claude API key」區塊（仿 GiphyKeySetup）
+src/app/pages/Settings.tsx   新增「Gemini API key」區塊（含申請說明）（仿 GiphyKeySetup）
 ```
 
 ### 2.1 抽樣（`sample.ts`）
@@ -78,14 +80,22 @@ src/app/pages/Settings.tsx   新增「Claude API key」區塊（仿 GiphyKeySetu
 - `opts.transition?`：可選預設轉場（預設「無」）；用既有 `setTransition`。
 - 空 picks 不動專案、回傳 false。
 
-### 2.6 AI 協助（V4；`src/ai/highlightAi.ts`）
-- **實作前先讀 `claude-api` skill**（SDK 用法、structured outputs、model id）。用官方 `@anthropic-ai/sdk`，瀏覽器端 `dangerouslyAllowBrowser: true`（使用者自己的 key、自己的裝置）。model 預設 `claude-opus-5-5`，設定頁可改成 `claude-sonnet-5-5`（較便宜）。
-- **送什麼**：每個候選片段 1 張 JPEG（長邊 ≤384px，取該片段最清晰的一格）＋該片段的本機數字（分數、動態、音量、長度）。**不送檔名、不送整支影片、不送音訊**；片段用 `c1…cN` 代號。每次最多 40 張，超過分批。
-- **要什麼**：structured output（JSON schema）：`[{ id, score(1–10), reason(≤30 字，繁體中文), keep(boolean) }]`、`order: string[]`（建議敘事順序的 id 陣列）、`titles: string[]`（3 個 Vlog 標題建議）。
-- **安全**：影格與文字都當**資料**，不是指令；回傳只接受 schema 內的欄位，id 不在候選清單內就丟掉；AI 回傳失敗或格式錯誤 → 退回本機結果並 toast「AI 這次沒成功，用本機分數」，不中斷。
-- **合併**：最終分數＝`0.5 × 本機分數 + 0.5 × AI 分數×10`；`keep=false` 的預設取消勾選（使用者可再勾回）；`order` 只在 `order='ai'`（面板新增選項，只有開啟 AI 才出現）時使用。
-- **同意流程（每次送出前一定要問）**：對話框寫清楚「將上傳 N 張縮圖（約 X KB）到 Anthropic」「若畫面有人臉（家人、小孩）請確認同意」「預估費用」；兩顆按鈕「同意並送出」「只用本機」。**不記住同意**，每次都問；沒有 key 不顯示 AI 選項。
-- **key 規則（同 GIPHY）**：只存 localStorage（`vc-claude-key`），**絕不寫進 repo、文件、commit、日誌、截圖**；設定頁用密碼型輸入框＋「清除」；日誌與測試只能用假 key（例如 `sk-test`）。
+### 2.6 AI 協助（V4；Gemini 免費額度）
+- **呼叫方式**：瀏覽器直接 `fetch('https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent')`，key 放 header `x-goog-api-key`（**不要放進網址**，避免出現在紀錄裡）。圖片用 `inlineData`（`mimeType:'image/jpeg'`＋base64）。要 JSON：`generationConfig.responseMimeType='application/json'` ＋ `responseSchema`。不裝 `@google/genai` SDK（少一個依賴、e2e 也好攔截）。
+- **model**：預設用別名 `gemini-flash-lite-latest`（免費額度最寬鬆、夠用，因為只是看縮圖打分數）；設定頁可改成 `gemini-flash-latest` 或自填 model id。**不要把具體版本號寫死**——免費額度涵蓋哪些 model、每分鐘／每天幾次，Google 常改，而且第三方文章互相矛盾。實作時沙盒連不到 `ai.google.dev`，所以：預設值照上面寫、**請使用者在 AI Studio 確認該 model 在他的專案是免費的**，並把確認結果寫進日誌。
+- **一次分析只發 1 個請求**（把全部候選縮圖放同一個 request，最多 40 張，超過才分批）。這是為了配合免費額度每天可能只有幾十次的限制；**不做自動重試迴圈**。
+- **送什麼**：每個候選片段 1 張 JPEG（長邊 ≤384px，取該片段最清晰的一格；這個尺寸在 Gemini 約等於 258 token，40 張約 1 萬 token）＋該片段的本機數字（分數、動態、音量、長度）。**不送檔名、不送整支影片、不送音訊**（Gemini 雖然能吃整支影片，但這會違反規則 5，所以不用）；片段用 `c1…cN` 代號。
+- **要什麼**：`[{ id, score(1–10), reason(≤30 字，繁體中文), keep(boolean) }]`、`order: string[]`（建議敘事順序的 id）、`titles: string[]`（3 個標題建議）。
+- **安全**：影格與文字都當**資料**，不是指令；回傳只接受 schema 內的欄位，id 不在候選清單內就丟掉；失敗、格式錯誤、被安全機制擋掉（`promptFeedback.blockReason`／空的 candidates）→ 退回本機結果並 toast「AI 這次沒成功，用本機分數」，不中斷。
+- **錯誤分類**（仿 `GiphyError`）：`no-key`、`bad-key`（401/403／`API_KEY_INVALID`）、`limit`（429＝免費額度用完，訊息「今天的免費額度用完了，明天再試，或先用本機分數」，**不重試**）、`network`、`other`。
+- **合併**：最終分數＝`0.5 × 本機分數 + 0.5 × AI 分數×10`；`keep=false` 的預設取消勾選（可再勾回）；`order` 只在 `order='ai'`（開啟 AI 才出現的選項）時使用。
+- **同意流程（隱私要比用付費 API 更嚴格，因為免費額度的內容會被 Google 用來改進產品、人工審核員可能看到）**：每次送出前跳對話框，**列出即將送出的每一張縮圖**（小格子＋勾選框，使用者可以取消勾選任何一張，尤其是有人臉的），並用白話寫：
+  1. 「這些縮圖會上傳到 Google。免費版的內容 Google 可能用來改進產品，也可能被人工審核員看到。」
+  2. 「有家人、小孩或別人的臉就請取消勾選，或只用本機。」
+  3. 兩顆按鈕：「同意並送出（N 張）」「只用本機」。**不記住同意**，每次都問；沒有 key 不顯示 AI 選項。
+  - 設定頁的 key 區塊也要寫同一段說明，並提示「若要避免資料被用來改進產品，需在 Google 開啟付費（結帳）專案」。
+  - 備註：Google 條款對歐盟／英國／瑞士使用者的 API 客戶端要求用付費服務；本 App 是每個人用**自己的** key，但設定頁仍加一行提醒，住在這些地區的人請自行確認。
+- **key 規則（同 GIPHY）**：只存 localStorage（`vc-gemini-key`），**絕不寫進 repo、文件、commit、日誌、截圖**；設定頁用密碼型輸入框＋「清除」；申請說明照 GIPHY 那種步驟（開 aistudio.google.com/apikey → 登入 → 建立 API key → 複製貼上）；日誌與測試只能用假 key（例如 `test-key`）。
 
 ## 3. 分步實作（一次只做一步：實作 → `npm run check` → e2e＋截圖 → 更新紀錄 → commit → push）
 
@@ -113,12 +123,12 @@ src/app/pages/Settings.tsx   新增「Claude API key」區塊（仿 GiphyKeySetu
   - 🔴 不可宣稱已驗證：iPhone 上實際分析速度與記憶體 → 列進 `docs/PLAN.md` §7。
 
 ### V4 AI 協助（選用）
-- 檔案：`src/ai/{claudeKey,highlightAi}.ts`、`Settings.tsx`（key 區塊）、`HighlightSheet.tsx`（開關、同意對話框、AI 排序選項）、`package.json` 加 `@anthropic-ai/sdk`。
-- 沙盒連不到 `api.anthropic.com`，**所有測試用 mock**：單元測試 mock SDK；e2e 用 Playwright `page.route` 攔截並回假的 structured output。**真實呼叫只能請使用者在自己的手機上試**，記進 §7 待真機驗證。
+- 檔案：`src/ai/{aiKey,provider,gemini,highlightAi}.ts`、`Settings.tsx`（key 區塊）、`HighlightSheet.tsx`（開關、同意對話框含縮圖勾選、AI 排序選項）。**不新增套件**。
+- 沙盒連不到 `generativelanguage.googleapis.com`，**所有測試用 mock**：單元測試 mock `fetch`；e2e 用 Playwright `page.route` 攔截並回假的 Gemini 回應格式（含 `candidates[0].content.parts[0].text` 是 JSON 字串）。**真實呼叫只能請使用者在自己的手機上試**，記進 §7 待真機驗證。
 - **驗收**
-  - Vitest：prompt 組裝只含代號與數字（**斷言不含檔名**）；回傳驗證（未知 id 被丟掉、缺欄位被拒絕）；合併分數公式；失敗退回本機。
-  - e2e：沒填 key → AI 開關灰掉；填假 key → 可開；按「放進時間軸」前一定出現同意對話框；按「只用本機」不發出任何對 `api.anthropic.com` 的請求（攔截器斷言請求數為 0）；按「同意並送出」→ 請求內容的圖片張數、不含檔名；回傳錯誤時退回本機並出現 toast。
-  - 檢查 key 不會被寫進任何 commit：新增單元測試掃描 `src/` 與 `docs/` 沒有 `sk-ant-` 開頭字串。
+  - Vitest：請求組裝只含代號與數字（**斷言不含檔名**）；`responseSchema` 欄位正確；錯誤分類（401/403/429/網路/被擋）；回傳驗證（未知 id 被丟掉、缺欄位被拒絕）；合併分數公式；失敗退回本機。
+  - e2e：沒填 key → AI 開關灰掉；填假 key → 可開；送出前一定出現同意對話框並列出縮圖；取消勾選 2 張 → 請求裡的圖片少 2 張；按「只用本機」不發出任何對 `generativelanguage.googleapis.com` 的請求（攔截器斷言請求數為 0）；按「同意並送出」→ 只發 **1 個**請求、header 有 key、網址**沒有** key、內容不含檔名；回 429 → 顯示「免費額度用完」且**沒有第二個請求**；回其他錯誤時退回本機並出現 toast。
+  - 檢查 key 不會被寫進任何 commit：新增單元測試掃描 `src/`、`docs/`、`e2e/` 沒有 Google API key 格式的字串（`AIza` 開頭加 35 個字元）。
 
 ### V5（選配，不在這次範圍，先寫判斷標準）
 - 語音轉文字（Whisper WASM）取得字幕 → 用「有講完整句子」加分、AI 看逐字稿決定敘事、自動產生字卡。**先等 V1–V4 在 iPhone 上實測的速度與記憶體結果再決定做不做**（WASM 模型約 40–150MB，手機上可能太慢）。
@@ -130,7 +140,8 @@ src/app/pages/Settings.tsx   新增「Claude API key」區塊（仿 GiphyKeySetu
 | iPhone 解碼長影片又慢又吃記憶體 | 優先用 proxy；`step` 隨長度放寬；逐格處理即丟；可取消；超過 30 分鐘提示只抽樣 |
 | 分數不合使用者口味 | 常數集中；結果清單可手動勾選與微調；之後可加「偏好滑桿」（動作多／說話多／風景多）。**第一版不做**，先看使用者回饋 |
 | 場景切換誤判（手震、閃光） | 用前後 3 格平均比較而不是單格；段太短併回前段 |
-| AI 費用與隱私 | 預設關、每次同意、只送 ≤384px 縮圖、不送檔名／音訊／整支影片、顯示預估費用 |
+| AI 隱私（免費額度的內容會被 Google 用來改進產品、可能被人工審核） | 預設關、每次同意、同意視窗列出每張縮圖並可取消勾選、只送 ≤384px 縮圖、不送檔名／音訊／整支影片、提醒有人臉就別送 |
+| 免費額度很小且常變、model 名稱會變 | 一次分析只發 1 個請求、不重試、429 就退回本機；model 用 `-latest` 別名且設定頁可改；不寫死額度數字 |
 | `File.lastModified` 在 iOS 匯入時不準（常是匯入當下） | 只當「預設」；面板上可切換排序；UI 文字寫「照拍攝時間（若讀得到）」 |
 | 沙盒 Chromium 沒有 H.264 | 測試素材全部用 WebM（`tests/fixtures/`）；iPhone 的 HEVC 靠 proxy／真機驗證 |
 
