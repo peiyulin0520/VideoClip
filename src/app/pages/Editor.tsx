@@ -13,6 +13,7 @@ import { startAutosave } from '../../store/autosave';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { ASPECTS } from '../../model/defaults';
+import { shortVersion } from '../pwa';
 import type { Aspect } from '../../model/types';
 import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
@@ -189,6 +190,9 @@ function EditorBody() {
           }}
         >
           {project.name}
+          <span className="proj-ver" data-testid="proj-ver">
+            {shortVersion()}
+          </span>
         </button>
         <button className="ratio-btn" aria-label="畫面比例" onClick={() => setRatioOpen(true)}>
           {project.aspect}

@@ -1,4 +1,4 @@
-import { APP_VERSION } from '../pwa';
+import { APP_VERSION, checkForUpdate, shortVersion } from '../pwa';
 import { isPerfOn, setPerfOn } from '../editor/PerfOverlay';
 import { QUALITY_LABELS, readQuality, writeQuality, type PreviewQuality } from '../../engine/previewQuality';
 import { Segmented } from '../../ui/Segmented';
@@ -33,6 +33,7 @@ export function Settings() {
   const [driveUrl, setDriveUrl] = useState(backup.driveFolderUrl ?? '');
   const [openLicenses, setOpenLicenses] = useState(false);
   const [perf, setPerf] = useState(isPerfOn);
+  const [checking, setChecking] = useState(false);
   const [quality, setQuality] = useState<PreviewQuality>(readQuality);
   const [theme, setThemeState] = useState<ThemeId>(getTheme);
 
@@ -339,8 +340,35 @@ export function Settings() {
         <p className="hint" data-testid="app-version">
           {APP_VERSION}
           <br />
-          網站更新後，打開網頁或切回這個分頁時會自動換成新版。如果版本沒變，把 Safari 分頁完全關掉再打開。
+          網站更新後，打開網頁或切回這個分頁時會自動換成新版。如果版本沒變，按下面的「檢查更新」。
         </p>
+        <button
+          className="btn"
+          data-testid="check-update"
+          disabled={checking}
+          onClick={() => {
+            setChecking(true);
+            void checkForUpdate()
+              .then((r) =>
+                toast(
+                  r === 'latest'
+                    ? '已經是最新版'
+                    : r === 'offline'
+                      ? '連不上網路，晚一點再試'
+                      : r === 'dev'
+                        ? '開發版沒有更新檢查'
+                        : r === 'updating'
+                          ? '找到新版，更新中…'
+                          : '找到新版本，請點畫面下方的「點一下更新」',
+                  4000,
+                ),
+              )
+              .finally(() => setChecking(false));
+          }}
+        >
+          {checking ? '檢查中…' : '檢查更新'}
+        </button>
+        <p className="hint">目前版本日期：{shortVersion()}</p>
       </section>
     </main>
   );
