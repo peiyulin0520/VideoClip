@@ -60,6 +60,28 @@ export type ItemBase = {
   /** 單一素材的進場特效（這個素材當 B，一定從開頭開始）與出場特效（這個素材當 A，一定在結尾結束）；duration＝特效幾秒 */
   inEffect?: { kind: EffectKind; duration: number };
   outEffect?: { kind: EffectKind; duration: number };
+  /** 定位（關鍵影格），照時間排序；沒有＝照 transform */
+  keyframes?: Keyframe[];
+  /** 物件本身的色調（沒有定位時用它；有定位時是沒寫的項目的底） */
+  adjust?: Partial<Adjust>;
+};
+
+/** 色調：各項 −1～+1（0＝不變）。亮度、飽和度、色溫（冷↔暖）、色調（綠↔洋紅） */
+export type Adjust = { brightness: number; saturation: number; temperature: number; tint: number };
+
+/**
+ * 定位（關鍵影格）：這個物件在「開始後 t 秒」的位置、大小、旋轉、透明度與色調；
+ * 兩個定位之間全部線性漸變；第一個之前、最後一個之後維持那一個的樣子。
+ * adjust 沒寫的項目沿用物件本身的色調。
+ */
+export type Keyframe = {
+  t: number;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  opacity: number;
+  adjust?: Partial<Adjust>;
 };
 
 /** 單一素材的特效：32 種轉場，字卡另外有「打字」 */

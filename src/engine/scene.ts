@@ -1,6 +1,7 @@
 import type { Asset, Item, Project, Track, VideoItem } from '../model/types';
 import type { SceneLayer } from './compositor';
 import { fittedSize, itemBox, type GeoCtx } from './geometry';
+import { timeResolved } from './keyframes';
 import { renderText, measureTextItem, uiScale } from './textRender';
 import { applyTextFx, typingCount } from './textFx';
 import { visibleLayers } from './timeline';
@@ -103,13 +104,15 @@ export function sceneItems(project: Project, t: number): { item: Item; track: Tr
 
 /** 依專案與時間算出要畫的圖層（由下到上）。canvasW/H 是合成器畫布的像素。 */
 export function buildScene(
-  project: Project,
+  projectIn: Project,
   t: number,
   canvasW: number,
   canvasH: number,
   provide: SourceProvider,
   opts: { guardCells?: boolean } = {},
 ): SceneLayer[] {
+  // 有定位（關鍵影格）的物件換成「這個時間」的位置、大小、色調；預覽、單格輸出、整支匯出都走這裡所以一致
+  const project = timeResolved(projectIn, t);
   const ctx = geoCtx(project, canvasW, canvasH);
   const out: SceneLayer[] = [];
   const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
@@ -383,6 +386,7 @@ function toLayer(
     cornerRadius: item.cornerRadius ?? 0,
     outline: item.outline,
     crop: item.crop,
+    adjust: item.adjust,
   };
   if (item.type === 'text') {
     const sc = uiScale(ctx.canvasW, ctx.canvasH);
