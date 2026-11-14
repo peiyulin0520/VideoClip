@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, openTab, project, seekTo as rawSeekTo, showTimeline } from './helpers';
+import { createProjectWith, project, seekTo as rawSeekTo, showTimeline } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
 type Tr = {
