@@ -1,3 +1,4 @@
+import { showPlaceholders } from '../../engine/placeholder';
 import { Layers, Maximize, Minimize, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { urlFor } from '../../engine/assetUrls';
@@ -185,10 +186,11 @@ export function Preview({
   }, [player, selectedId, project]);
 
   const k = cssW / width; // 專案座標 → CSS px
+  const shown = useMemo(() => showPlaceholders(project), [project]); // 還沒輸入的文字也有框可以選
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const geo = useMemo(() => geoCtx(project, width, height), [project, width, height, fontEpoch]);
+  const geo = useMemo(() => geoCtx(shown, width, height), [shown, width, height, fontEpoch]);
   // 有定格的物件：選取框、觸控區用「播放頭這個時間」的位置
-  const rproject = useMemo(() => timeResolved(project, kfTime), [project, kfTime]);
+  const rproject = useMemo(() => timeResolved(shown, kfTime), [shown, kfTime]);
   const sel = findItem(rproject, selectedId);
   const box = sel && selVisible ? selectionBox(sel.item, geo) : null;
   const selLocked = !!sel?.track.locked || !!sel?.track.hidden;

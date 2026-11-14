@@ -1,3 +1,4 @@
+import { placeholderCount } from '../../engine/placeholder';
 import { Download, Share2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
@@ -124,6 +125,11 @@ export function ExportSheet({
             <p className="hint">還沒有內容可以匯出，先匯入影片或照片。</p>
           ) : (
             <>
+              {placeholderCount(project) > 0 && (
+                <p className="hint" data-testid="export-placeholder-note">
+                  有 {placeholderCount(project)} 個文字還沒輸入內容，不會出現在影片中。
+                </p>
+              )}
               <div className="panel-head">
                 <span>解析度</span>
               </div>

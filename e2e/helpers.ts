@@ -154,12 +154,8 @@ export async function openTab(
   name: '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '色調' | '素材' | '音訊',
 ) {
   const tab = page.locator('.tabs').getByRole('tab', { name, exact: true }); // 只找底部分頁列（文字面板裡也有叫「文字」的小分頁）
-  // 點「目前的分頁」會收合面板，所以已經在這個分頁且展開時就不用再點
-  if (
-    (await tab.getAttribute('aria-selected')) === 'true' &&
-    (await tab.getAttribute('aria-expanded')) === 'true'
-  )
-    return;
+  // 已經在這個分頁就不用再點（再點也不會收合）
+  if ((await tab.getAttribute('aria-selected')) === 'true') return;
   await tab.tap();
 }
 

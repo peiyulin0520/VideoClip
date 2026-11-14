@@ -158,8 +158,9 @@ export function AudioTab({
                   <span className="audio-ico">{item.type === 'audio' ? '♪' : '🎬'}</span>
                 )}
                 <span className="audio-text">
-                  {item.type === 'video' ? `${ordinalIn(track.items, item.id)} ` : ''}
-                  {itemTitle(item, asset)}
+                  {item.type === 'video'
+                    ? `原音 · ${ordinalIn(track.items, item.id)} ${itemTitle(item, asset)}`
+                    : itemTitle(item, asset)}
                   <small>
                     {formatTime(item.start)}–{formatTime(item.start + item.duration)}
                     {track.muted ? ' · 這條軌道靜音' : ''}

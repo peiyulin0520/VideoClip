@@ -81,6 +81,7 @@ export function TextPanel({
             className="text-input area"
             aria-label="文字內容"
             rows={2}
+            placeholder="點兩下編輯文字"
             value={run.text}
             onChange={(e) => edit((c) => void (c.runs[0]!.text = e.target.value), 'txt')}
           />

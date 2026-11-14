@@ -351,6 +351,8 @@ export type TextItem = ItemBase & {
   group?: string;
   /** 字體輪播：開始後 until 秒內每 interval 秒換下一個字體（依序輪流），之後固定用 fonts[0] */
   fontCycle?: { fonts: string[]; interval: number; until: number };
+  /** 還沒輸入內容（新增文字的提示狀態）：內容是空的，預覽顯示半透明的「點兩下編輯文字」，匯出不畫 */
+  placeholder?: boolean;
   /** 文字樣式特效（IG 那種，整段一直動）；沒有＝無 */
   textFx?: { kind: TextFxKind };
 };

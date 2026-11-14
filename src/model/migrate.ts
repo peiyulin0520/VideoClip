@@ -156,7 +156,35 @@ export function repairGroups(p: Project): { project: Project; changed: boolean }
   return { project: changed ? { ...p, tracks } : p, changed };
 }
 
+/** 舊專案：內容剛好是預設提示字「點兩下編輯文字」的文字，改成「還沒輸入」狀態（空內容＋placeholder） */
+export function migratePlaceholders(p: Project): { project: Project; changed: boolean } {
+  let changed = false;
+  const tracks = p.tracks.map((t) => {
+    if (!t.items.some((x) => x.type === 'text' && x.card.runs[0]?.text === '點兩下編輯文字')) return t;
+    changed = true;
+    return {
+      ...t,
+      items: t.items.map((x) =>
+        x.type === 'text' && x.card.runs[0]?.text === '點兩下編輯文字'
+          ? {
+              ...x,
+              placeholder: true,
+              card: { ...x.card, runs: [{ ...x.card.runs[0]!, text: '' }, ...x.card.runs.slice(1)] },
+            }
+          : x,
+      ),
+    };
+  });
+  return { project: changed ? ({ ...p, tracks } as Project) : p, changed };
+}
+
 export function migrateProject(input: Project | LooseProject): Migrated {
+  const m = migrateProjectBase(input);
+  const ph = migratePlaceholders(m.project);
+  return { ...m, project: ph.project, changed: m.changed || ph.changed };
+}
+
+function migrateProjectBase(input: Project | LooseProject): Migrated {
   const p = input as LooseProject;
   if (p.version === 2) {
     const g = markLegacyGroups(input as Project);

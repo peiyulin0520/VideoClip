@@ -82,7 +82,7 @@ function Tiles({
   if (!thumbs.some(Boolean))
     return (
       <div className="tiles no-thumb" data-testid="clip-name">
-        {asset?.name ?? ''}
+        {item.label?.trim() || asset?.name || ''}
       </div>
     );
   const aspect = asset && asset.height ? asset.width / asset.height : 0.56;

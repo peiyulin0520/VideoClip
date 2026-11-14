@@ -5,6 +5,7 @@ import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
 import { expandThumbs, thumbCount, thumbIndex } from './thumbs';
 import { activeTransition } from './transitions';
+import { showPlaceholders } from './placeholder';
 import { driftPlan, videoSyncPlan } from './videoSync';
 import { captureThumb } from './probe';
 import { buildScene } from './scene';
@@ -612,6 +613,7 @@ export class Player {
   }
 
   private effectiveProject(p: Project): Project {
+    p = showPlaceholders(p); // 還沒輸入的文字：預覽顯示半透明提示字（匯出不畫）
     const bypass = this.bypass;
     if (bypass) {
       const hit = (id: string) => bypass === 'all' || bypass.has(id);

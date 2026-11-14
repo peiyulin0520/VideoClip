@@ -913,6 +913,9 @@ export function editText(id: string, recipe: (card: Draft<TextItem['card']>) => 
       if (it.type === 'text') {
         recipe(it.card);
         const run = it.card.runs[0];
+        // 打了字就不再是提示狀態；全部刪光（不是獨立圖形）又變回提示
+        if (run && run.text !== '') delete it.placeholder;
+        else if (run && !it.card.box) it.placeholder = true;
         // 獨立圖形（沒有文字）的樣式不算
         if (run && run.text !== '') d.lastTextStyle = pickTextStyle(run as TextRun);
       }

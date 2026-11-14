@@ -1,3 +1,4 @@
+import { itemTitle } from '../../../engine/labels';
 import { useEffect, useState } from 'react';
 import type { Player } from '../../../engine/player';
 import { ArrowDown, ArrowUp, Eye, EyeOff, Layers, Lock, Type } from 'lucide-react';
@@ -51,12 +52,7 @@ export function LayersTab() {
       <ul className="layer-list" data-testid="layer-list">
         {layers.map(({ item, track, trackIndex }) => {
           const asset = isVideoItem(item) ? project.assets.find((a) => a.id === item.assetId) : undefined;
-          const label =
-            item.type === 'text'
-              ? item.card.runs[0]?.text === ''
-                ? '圖形'
-                : `文字：${item.card.runs[0]?.text.slice(0, 8) ?? ''}`
-              : (asset?.name ?? '素材');
+          const label = itemTitle(item, asset);
           return (
             <li
               key={item.id}

@@ -155,7 +155,8 @@ export function createShapeItem(start: number): TextItem {
   return t;
 }
 
-export function createTextItem(start: number, text = '點兩下編輯文字'): TextItem {
+/** 沒給內容＝還沒輸入的新文字（placeholder）；給空字串＝獨立圖形用 */
+export function createTextItem(start: number, text?: string): TextItem {
   return {
     id: newId('i_'),
     type: 'text',
@@ -166,7 +167,7 @@ export function createTextItem(start: number, text = '點兩下編輯文字'): T
       align: 'center',
       runs: [
         {
-          text,
+          text: text ?? '',
           fontId: 'system',
           size: 96,
           color: '#ffffff',
@@ -177,5 +178,6 @@ export function createTextItem(start: number, text = '點兩下編輯文字'): T
         },
       ],
     },
+    ...(text === undefined ? { placeholder: true } : {}),
   };
 }
