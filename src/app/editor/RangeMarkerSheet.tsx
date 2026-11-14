@@ -2,6 +2,7 @@ import { Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { Range } from '../../engine/timeline';
 import { toast } from '../../store/uiStore';
+import { thumbStrip } from '../../engine/thumbs';
 import { Sheet } from '../../ui/Sheet';
 import { Wave } from './Wave';
 
@@ -309,7 +310,8 @@ export function RangeMarkerSheet({
             {wave && wave.length > 0 ? (
               <Wave wave={wave} from={srcOffset} to={srcOffset + dur * srcSpeed} />
             ) : thumbs && thumbs.length > 0 ? (
-              thumbs.map((t, i) => <img key={i} src={t} alt="" draggable={false} />)
+              // 整條帶平均挑 8 張（縮圖有幾十張，每張都畫會變成一條一條的細縫）
+              thumbStrip(thumbs, 1, 0, 1, 8).map((t, i) => <img key={i} src={t} alt="" draggable={false} />)
             ) : null}
           </div>
           {gaps.map(([a, b], i) => (

@@ -146,7 +146,7 @@ export function captureThumb(v: HTMLVideoElement): string | null {
   }
 }
 
-async function videoThumbs(url: string, duration: number, count: number): Promise<string[]> {
+export async function videoThumbs(url: string, duration: number, count: number): Promise<string[]> {
   const v = document.createElement('video');
   v.preload = 'auto';
   v.muted = true;

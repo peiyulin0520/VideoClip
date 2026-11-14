@@ -5,6 +5,7 @@ import { setAssetProxy } from '../store/projectStore';
 import { useUI } from '../store/uiStore';
 import { ensureProxyUrl, proxyKey } from './assetUrls';
 import { makeProxy } from './proxy';
+import { enqueueThumbs } from './thumbs';
 
 // 預覽用輕量影片的背景工作：一次做一支，不擋住剪輯。進度顯示在時間軸片段上。
 
@@ -35,12 +36,14 @@ async function runOne({ projectId, asset }: Job) {
     const res = await maker(file, { onProgress: (f) => setProgress(asset.id, f) });
     if (res.status === 'none') {
       setAssetProxy(asset.id, { status: 'none' });
+      enqueueThumbs(projectId, [{ ...asset, proxy: { status: 'none' } }]); // 原檔本來就輕：用原檔補滿縮圖
       return;
     }
     await putMedia(projectId, proxyKey(asset.id), res.blob);
     const proxy = { status: 'ready' as const, mime: res.mime, width: res.width, height: res.height };
     setAssetProxy(asset.id, proxy);
     await ensureProxyUrl(projectId, { ...asset, proxy });
+    enqueueThumbs(projectId, [{ ...asset, proxy }]); // 用輕量影片（iPhone 解得動）補滿縮圖
     useUI.getState().player?.refresh(); // 換成輕量影片
   } catch (e) {
     console.warn('[proxy] 預覽用影片做不出來，照用原檔', e);
@@ -73,5 +76,6 @@ export function enqueueProxies(projectId: string, assets: Asset[]): void {
     queue.push({ projectId, asset: a });
     setAssetProxy(a.id, { status: 'pending' });
   }
+  enqueueThumbs(projectId, assets); // 縮圖：原檔解得動的馬上補；大檔等輕量影片做好
   void drain();
 }

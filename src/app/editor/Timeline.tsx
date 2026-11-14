@@ -43,6 +43,7 @@ import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemTitle, ordinalIn } from '../../engine/labels';
 import { textFxCode, textFxName } from '../../engine/textFx';
+import { thumbFor } from '../../engine/thumbs';
 import { tileLayout } from './tiles';
 import { effectDurations, seamsOf, transitionCode, transitionName } from '../../engine/transitions';
 import { renameItem } from '../../store/actions';
@@ -75,7 +76,7 @@ function Tiles({
 }) {
   const thumbs = asset?.thumbs ?? [];
   // 沒有縮圖（例如 iPhone 匯入時產生不出來）：顯示檔名，不要一片灰
-  if (thumbs.length === 0)
+  if (!thumbs.some(Boolean))
     return (
       <div className="tiles no-thumb" data-testid="clip-name">
         {asset?.name ?? ''}
@@ -90,11 +91,12 @@ function Tiles({
       {Array.from({ length: count }, (_, i) => {
         const x = (i + 0.5) * tileW;
         const srcT = item.trimIn + (x / pps) * item.speed;
-        const idx =
+        // 照時間挑縮圖；那一格還沒有就用最近的一張
+        const url =
           item.type === 'image' || !asset || asset.duration <= 0
-            ? 0
-            : Math.min(Math.floor((srcT / asset.duration) * thumbs.length), thumbs.length - 1);
-        return <span key={i} style={{ width: tileW, backgroundImage: `url(${thumbs[Math.max(idx, 0)]})` }} />;
+            ? thumbs[0]
+            : thumbFor(thumbs, srcT, asset.duration);
+        return <span key={i} style={{ width: tileW, backgroundImage: `url(${url ?? thumbs[0]})` }} />;
       })}
     </div>
   );

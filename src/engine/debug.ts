@@ -1,5 +1,5 @@
 import { ALL_FORMATS, AudioBufferSink, BlobSource, CanvasSink, Input } from 'mediabunny';
-import { useProjectStore } from '../store/projectStore';
+import { patchAssetEverywhere, useProjectStore } from '../store/projectStore';
 import { urlFor } from './assetUrls';
 import { ensureFont } from '../fonts/fontStore';
 import type { TextCard } from '../model/types';
@@ -29,6 +29,11 @@ export function installDebugHook(player: Player) {
   const hook = {
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,
+    /** 測試用：把某個素材的縮圖變回「舊版」的樣子（只剩 1 張、沒有補滿的記號）；存檔後重新整理會在背景補滿 */
+    legacyThumbs: (assetId: string) => {
+      const a = useProjectStore.getState().project?.assets.find((x) => x.id === assetId);
+      if (a) patchAssetEverywhere(assetId, { thumbs: a.thumbs.slice(0, 1), thumbsFull: undefined });
+    },
     /** 測試用：匯出整支影片，再用 Mediabunny 讀回來檢查（長度、尺寸、有沒有聲音與音量、指定時間的畫面顏色） */
     async exportAndInspect(
       opts: Partial<ExportOptions>,

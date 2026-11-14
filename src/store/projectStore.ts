@@ -99,8 +99,8 @@ export const useProjectStore = create<State>((set, get) => ({
  * 補上素材縮圖：不進復原歷史（不是使用者的編輯），但會標記有變更讓自動儲存存起來。
  * 歷史快照裡同一個素材也一併更新，不然復原後縮圖又會不見。
  */
-export function setAssetThumbs(assetId: string, thumbs: string[]) {
-  patchAssetEverywhere(assetId, { thumbs });
+export function setAssetThumbs(assetId: string, thumbs: string[], full = false) {
+  patchAssetEverywhere(assetId, full ? { thumbs, thumbsFull: true } : { thumbs });
 }
 
 /** 預覽用輕量影片的狀態（不進復原紀錄；歷史快照一起更新，復原後不會變回「還沒做」） */
@@ -108,7 +108,7 @@ export function setAssetProxy(assetId: string, proxy: NonNullable<Asset['proxy']
   patchAssetEverywhere(assetId, { proxy });
 }
 
-function patchAssetEverywhere(assetId: string, fields: Partial<Asset>) {
+export function patchAssetEverywhere(assetId: string, fields: Partial<Asset>) {
   const st = useProjectStore.getState();
   if (!st.project) return;
   const patch = (p: Project): Project =>
