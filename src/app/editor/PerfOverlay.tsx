@@ -39,6 +39,11 @@ export function PerfOverlay({ player }: { player: Player | null }) {
         場景 {f(s.buildMs)}｜影片上傳 {f(s.uploadMs)}｜合成 {f(s.compMs)}
       </div>
       <div>掉格 {s.dropped}</div>
+      {s.transition.frames > 0 && (
+        <div>
+          最近轉場 {s.transition.frames} 格｜卡頓 {s.transition.drops}｜硬跳 {s.transition.hardSeeks}
+        </div>
+      )}
       {s.video && <div>{s.video}</div>}
     </div>
   );

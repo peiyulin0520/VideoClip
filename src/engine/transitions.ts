@@ -446,15 +446,14 @@ export function activeTransition(items: Item[], t: number): ActiveTransition | n
           ? { ...B, start: B.start - span.before, duration: B.duration + span.before }
           : null;
     } else {
-      // B 提前 before 秒開始：入點往前退（退不到的部分，B 還沒出現）
-      const back = Math.min(span.before * B.speed, B.trimIn);
-      const early = silent({
+      // B 提前 before 秒開始：入點往前退。退到素材開頭之前（入點不夠）的那一段，素材時間是負的，
+      // 播放元件與匯出會停在第一格（sourceTimeClamped），所以 B 仍然從轉場開始就慢慢淡入，不會到接縫才突然跳出來
+      b = silent({
         ...B,
-        start: B.start - back / B.speed,
-        trimIn: B.trimIn - back,
-        duration: B.duration + back / B.speed,
+        start: B.start - span.before,
+        trimIn: B.trimIn - span.before * B.speed,
+        duration: B.duration + span.before,
       });
-      b = t >= early.start ? early : null;
     }
     return { kind: B.transitionIn!.kind, p, a, b, frame: transitionFrame(B.transitionIn!.kind, p) };
   }

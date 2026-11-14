@@ -4,6 +4,8 @@ import { AudioOut, fadeGain, isIOSDevice } from './audio';
 import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
 import { expandThumbs, thumbCount, thumbIndex } from './thumbs';
+import { activeTransition } from './transitions';
+import { driftPlan, videoSyncPlan } from './videoSync';
 import { captureThumb } from './probe';
 import { buildScene } from './scene';
 import { previewSizeFor } from './previewQuality';
@@ -30,23 +32,15 @@ type Listener = (t: number, playing: boolean) => void;
 
 /** 影片和時鐘差超過這個秒數才硬跳（會頓一下）；小的差距用 playbackRate 慢慢追 */
 const IOS = isIOSDevice();
-const HARD_DRIFT = 0.5;
-const SOFT_DRIFT = 0.04;
 const PREFETCH_S = 1.0;
 /** 有轉場的片段多提前這麼多秒開始準備（要同時解兩支影片，來不及會卡） */
 const PREFETCH_TRANSITION_S = 1.5;
+/** 轉場的 B 提早這麼多秒開始（靜音）播放暖機 */
+const WARM_S = 0.4;
 const POOL_SIZE = 6;
 const MUSIC_POOL_SIZE = 3;
 
-/** 播放中對時：diff = 該在的位置 − 影片目前位置（正的＝影片落後） */
-export function driftPlan(diff: number, speed: number, soft = true): { seek: boolean; rate: number } {
-  const a = Math.abs(diff);
-  if (a > HARD_DRIFT) return { seek: true, rate: speed };
-  // soft=false（iPhone）：不微調播放速度——改 playbackRate 會讓 Safari 的解碼卡一下，小差距就讓它去
-  if (soft && a > SOFT_DRIFT)
-    return { seek: false, rate: speed * (1 + Math.max(-0.15, Math.min(0.15, diff * 0.5))) };
-  return { seek: false, rate: speed };
-}
+export { driftPlan };
 
 /** 預覽畫面的內部解析度：長邊 960（1:1 也是 960）；流暢預覽 480 */
 export function previewSize(
@@ -87,6 +81,10 @@ export class Player {
   private accUpload = 0;
   private seg = { build: 0, comp: 0, upload: 0 };
   private videoInfo = '';
+  /** 這一刻正在轉場的片段 id（A、B）：對時規則放寬、統計轉場掉格 */
+  private transIds = new Set<string>();
+  private trans = { frames: 0, drops: 0, hardSeeks: 0, lastAt: 0 };
+  private transHeavyTold = false;
   private videoCount = 0;
   private poolFullTold = false;
   offMask: (() => void) | null = null;
@@ -256,6 +254,8 @@ export class Player {
     uploadMs: number;
     dropped: number;
     video: string;
+    /** 最近一次轉場：畫了幾格、兩格間隔超過 50ms 的次數、為了追時間硬 seek 的次數 */
+    transition: { frames: number; drops: number; hardSeeks: number };
   } {
     let dropped = 0;
     for (const v of this.pool.els) {
@@ -270,6 +270,7 @@ export class Player {
       uploadMs: this.statUpload,
       dropped,
       video: this.videoInfo,
+      transition: { frames: this.trans.frames, drops: this.trans.drops, hardSeeks: this.trans.hardSeeks },
     };
   }
 
@@ -294,8 +295,26 @@ export class Player {
       (audioRetained(item, s) ? 1 : 0);
     this.audio.apply(el, vol, !!track.muted || !asset.hasAudio);
     if (this.playing) {
-      const plan = driftPlan(s - el.currentTime, item.speed, !IOS);
-      if (plan.seek) el.currentTime = s;
+      const transitioning = this.transIds.has(item.id);
+      const plan = videoSyncPlan({
+        target: s,
+        current: el.currentTime,
+        duration: asset.duration,
+        speed: item.speed,
+        ended: el.ended,
+        seeking: el.seeking,
+        soft: !IOS,
+        transitioning,
+      });
+      if (plan.seekTo !== undefined) {
+        el.currentTime = plan.seekTo;
+        if (plan.hardSeek && transitioning) this.trans.hardSeeks++;
+      }
+      // 素材放完了／還沒到開頭：停在那一格，不要呼叫 play()（ended 的影片 play() 會從頭播）
+      if (plan.hold) {
+        if (!el.paused) el.pause();
+        return;
+      }
       if (el.playbackRate !== plan.rate) el.playbackRate = plan.rate;
       if (el.paused)
         el.play().catch((e: unknown) => {
@@ -377,6 +396,44 @@ export class Player {
     this.deps.onAudioBlocked?.();
   }
 
+  /**
+   * 這一刻正在轉場的片段（A、B）：對時規則放寬；播放時順便統計轉場掉格（效能框）；
+   * 兩支都是大檔、輕量影片還沒做好時，建議改流暢預覽（一次）。
+   */
+  private trackTransitions(p: Project, t: number) {
+    const ids = new Set<string>();
+    const heavy: Asset[] = [];
+    for (const tr of p.tracks) {
+      if (tr.kind === 'audio' || tr.hidden || tr.groupRole) continue;
+      const at = activeTransition(tr.items, t);
+      if (!at) continue;
+      for (const x of [at.a, at.b]) {
+        if (!x || x.type === 'text') continue;
+        ids.add(x.id);
+        const a = p.assets.find((y) => y.id === x.assetId);
+        if (
+          a &&
+          a.kind === 'video' &&
+          a.proxy?.status !== 'ready' &&
+          (Math.max(a.width, a.height) > 1920 || a.hdr)
+        )
+          heavy.push(a);
+      }
+    }
+    if (this.playing && ids.size > 0) {
+      const now = performance.now();
+      if (this.transIds.size === 0) this.trans = { frames: 0, drops: 0, hardSeeks: 0, lastAt: now };
+      else if (now - this.trans.lastAt > 50) this.trans.drops++;
+      this.trans.lastAt = now;
+      this.trans.frames++;
+      if (heavy.length >= 2 && !this.transHeavyTold) {
+        this.transHeavyTold = true;
+        this.deps.onSlow?.(); // 兩支大檔同時解碼：建議流暢預覽（預覽檔做好之後會更順）
+      }
+    }
+    this.transIds = ids;
+  }
+
   private render(t: number) {
     const p0 = this.deps.getProject();
     const p = p0 ? this.effectiveProject(p0) : p0;
@@ -386,6 +443,7 @@ export class Player {
       return;
     }
     const used = new Set<HTMLVideoElement>();
+    this.trackTransitions(p, t);
 
     const t0 = performance.now();
     const scene = buildScene(
@@ -447,18 +505,30 @@ export class Player {
     this.videoCount = used.size;
 
     // 預載：下一個主軌片段、1 秒內要開始的疊加影片
-    for (const { item, asset } of this.upcoming(p, t)) {
+    for (const { item, asset, track } of this.upcoming(p, t)) {
       const url = this.deps.urlFor(asset.id);
       if (!url) continue;
       const el = this.pool.acquire(item.id, asset.id, url, used);
       if (!el) continue;
       used.add(el);
+      // 有轉場的話 B 會提前出現（入點不夠的部分停在第一格）：從轉場開始的位置往前算
+      const tr = item.transitionIn;
+      const before = tr ? (tr.before ?? tr.duration / 2) : 0;
+      const early: VideoItem = {
+        ...item,
+        start: item.start - before,
+        trimIn: item.trimIn - before * item.speed,
+        duration: item.duration + before,
+        volume: 0,
+      };
+      if (tr && this.playing && t >= early.start - WARM_S) {
+        // 暖機：轉場開始前 0.4 秒就靜音開始播，轉場一開始它已經在動（iPhone 的 play() 要好幾百毫秒才真的動）
+        this.syncVideo(el, early, asset, track, t);
+        continue;
+      }
       if (el.dataset.primed !== '1') {
-        // 有轉場的話 B 會提前出現：直接停在提前出現的那一格，轉場一開始就不用再 seek
-        const back = item.transitionIn
-          ? Math.min((item.transitionIn.before ?? item.transitionIn.duration / 2) * item.speed, item.trimIn)
-          : 0;
-        el.currentTime = item.trimIn - back;
+        // 先停在轉場開始時要的那一格，轉場一開始就不用再 seek
+        el.currentTime = Math.max(early.trimIn, 0);
         el.dataset.primed = '1';
       }
       if (!el.paused) el.pause();
@@ -496,14 +566,14 @@ export class Player {
     queueMicrotask(() => this.deps.onThumb?.(asset.id, next));
   }
 
-  private upcoming(p: Project, t: number): { item: VideoItem; asset: Asset }[] {
-    const out: { item: VideoItem; asset: Asset }[] = [];
-    const push = (item: VideoItem) => {
-      if (item.type !== 'video') return;
-      const asset = p.assets.find((a) => a.id === item.assetId);
-      if (asset) out.push({ item, asset });
-    };
+  private upcoming(p: Project, t: number): { item: VideoItem; asset: Asset; track: Track }[] {
+    const out: { item: VideoItem; asset: Asset; track: Track }[] = [];
     for (const track of p.tracks) {
+      const push = (item: VideoItem) => {
+        if (item.type !== 'video') return;
+        const asset = p.assets.find((a) => a.id === item.assetId);
+        if (asset) out.push({ item, asset, track });
+      };
       if (track.hidden) continue;
       if (track.kind !== 'media') continue;
       // 這條軌道接下來要開始的影片：目前這個片段正在播就預載下一個（無縫接下去）；
@@ -511,8 +581,14 @@ export class Player {
       const items = [...(track.items as VideoItem[])].sort((a, b) => a.start - b.start);
       const cur = items.some((x) => t >= x.start && t < x.start + x.duration);
       const next = items.find((x) => x.start > t);
-      if (next && (cur || next.start <= t + (next.transitionIn ? PREFETCH_TRANSITION_S : PREFETCH_S)))
-        push(next);
+      // 有轉場的要多提前：轉場在接縫前 before 秒開始，再加暖機的時間
+      const lead = next?.transitionIn
+        ? Math.max(
+            PREFETCH_TRANSITION_S,
+            (next.transitionIn.before ?? next.transitionIn.duration / 2) + WARM_S + 0.5,
+          )
+        : PREFETCH_S;
+      if (next && (cur || next.start <= t + lead)) push(next);
     }
     return out;
   }

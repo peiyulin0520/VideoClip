@@ -231,6 +231,7 @@ export function Timeline({
   const fxFocus = useUI((s) => s.fxFocus);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSet = useRef(-100);
+  const lastSeen = useRef(0); // 上一次看到的 scrollLeft（我們自己設的、或 scroll 事件處理過的）
   const [vw, setVw] = useState(360);
   const half = GUTTER;
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -405,14 +406,18 @@ export function Timeline({
   }, []);
 
   const syncScroll = useCallback(
-    (t: number) => {
+    (t: number, fromPlayer = false) => {
       const el = scrollRef.current;
       if (!el) return;
+      // 播放器通知時間變了：如果時間軸剛被捲動（使用者或程式）、scroll 事件還沒處理，不要用舊的播放時間把它蓋回去
+      // （背景補縮圖、預覽檔做好等重畫會通知播放器，剛好撞到就會把使用者的捲動吃掉）
+      if (fromPlayer && Math.abs(el.scrollLeft - lastSeen.current) >= 1) return;
       const target = t * pps;
       if (Math.abs(el.scrollLeft - target) >= 0.5) {
         lastSet.current = target;
         el.scrollLeft = target;
       }
+      lastSeen.current = el.scrollLeft;
     },
     [pps],
   );
@@ -423,11 +428,12 @@ export function Timeline({
 
   useEffect(() => {
     if (!player) return;
-    return player.subscribe((t) => syncScroll(t));
+    return player.subscribe((t) => syncScroll(t, true));
   }, [player, syncScroll]);
 
   const onScroll = () => {
     const el = scrollRef.current!;
+    lastSeen.current = el.scrollLeft;
     if (Math.abs(el.scrollLeft - lastSet.current) < 1.5) return;
     player?.seek(el.scrollLeft / pps);
   };
