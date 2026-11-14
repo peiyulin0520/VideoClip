@@ -172,7 +172,7 @@ test('W4：播放線碰到菱形＝選到那個定位（菱形變白底）；調
   await seekTo(page, 1);
   await expect.poll(() => here(1)).toBe('0');
   for (let i = 0; i < 4; i++) expect(await here(i)).toBe('0');
-  await expect(page.getByTestId('scope-hint')).toContainText('兩個定位中間');
+  await expect(page.getByTestId('scope-hint')).toContainText('沒有碰到任何定位');
   await page.screenshot({ path: `${SHOT}/pick-keyframe.png`, fullPage: true });
 });
 

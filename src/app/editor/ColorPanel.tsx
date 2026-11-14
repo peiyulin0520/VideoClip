@@ -196,7 +196,7 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
       {keyMode && (
         <p className="hint" data-testid="scope-hint">
           {between
-            ? '現在在兩個定位中間：選一個色調會在這裡新增一個定位。'
+            ? '播放線沒有碰到任何定位：選一個色調會在這裡新增一個定位。'
             : '改的是播放線碰到的這個定位，兩個定位之間的色調會漸漸變過去。'}
         </p>
       )}
