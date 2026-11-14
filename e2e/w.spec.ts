@@ -1,8 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  addOverlays,
   clips,
   createProjectWith,
   exportFrame,
+  isGreen,
   isRed,
   openTab,
   project,
@@ -44,6 +46,7 @@ type Kf = {
   x: number;
   look?: { id: string; amount: number } | null;
   adjust?: Record<string, number>;
+  pulse?: { kind: string; duration: number; strength: number };
 };
 type It = { look?: { id: string; amount: number }; adjust?: Record<string, number>; keyframes?: Kf[] };
 const first = async (page: Page) => (await project(page)).tracks[0]!.items[0] as unknown as It;
@@ -221,4 +224,47 @@ test('W3 順暢度：有色調漂移的片段播放，渲染耗時跟整段同�
   const drift = await play();
   expect(drift.fps).toBeGreaterThan(flat.fps * 0.7);
   expect(drift.renderMs).toBeLessThan(flat.renderMs * 1.6 + 4);
+});
+
+test('W5：定位小特效「彈一下」——彈起來的時候綠色疊加素材變大、結束後回到原位；時間軸菱形旁有「彈」；單格輸出一致；取消後消失', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await createProjectWith(page, ['solid-red.webm']);
+  await addOverlays(page, ['solid-green.webm']);
+  await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
+  const ov = async () => (await project(page)).tracks[1]!.items[0] as unknown as It;
+  await seekTo(page, 0.02);
+  await page.getByTestId('kf-btn').tap();
+  await seekTo(page, 1);
+  await page.getByTestId('kf-btn').tap();
+  await expect.poll(async () => (await ov()).keyframes?.length).toBe(2);
+  const t1 = (await ov()).keyframes![1]!.t;
+  // 播放線碰到第二個定位（差 0.05 秒）
+  await seekTo(page, t1 + 0.05);
+  await openTab(page, '圖層');
+  await expect(page.getByTestId('pulse-hint')).toHaveCount(0);
+  await page.getByRole('radio', { name: '小特效 彈一下' }).tap();
+  await expect.poll(async () => (await ov()).keyframes?.[1]?.pulse?.kind).toBe('pop');
+  // 力道最大、長度 1 秒：最高點在定位後 0.3 秒
+  await page.getByLabel('力道').fill('100');
+  await page.getByLabel('長度').fill('10');
+  const p = (await ov()).keyframes![1]!.pulse!;
+  expect(p.strength).toBeCloseTo(1, 2);
+  expect(p.duration).toBeCloseTo(1, 2);
+  await page.waitForTimeout(1500); // 預覽自己播完一次
+  await expect(page.getByTestId('kf-pulse')).toHaveText('彈');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const edge: [number, number] = [0.8, 0.5];
+  await seekTo(page, t1 + 1.4); // 結束後：回到原位（邊緣外是紅色）
+  await expect.poll(async () => isRed(await samplePreview(page, ...edge))).toBe(true);
+  await seekTo(page, t1 + 0.3); // 最高點：變大，邊緣變綠
+  await expect.poll(async () => isGreen(await samplePreview(page, ...edge))).toBe(true);
+  const out = await exportFrame(page, t1 + 0.3, [edge]);
+  expect(out.samples[0]![1]!).toBeGreaterThan(150);
+  // 取消
+  await page.getByTestId('kf-dot').nth(1).tap(); // 點菱形＝播放線跳到剛好那個定位
+  await page.getByTestId('pulse-none').tap();
+  await expect.poll(async () => (await ov()).keyframes?.[1]?.pulse).toBeUndefined();
+  await expect(page.getByTestId('kf-pulse')).toHaveCount(0);
 });

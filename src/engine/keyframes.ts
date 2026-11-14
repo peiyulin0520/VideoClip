@@ -1,6 +1,7 @@
 import type { Adjust, Item, Keyframe, Project, Transform } from '../model/types';
 import { ADJUST_KEYS, effectiveFull, fullAdjust, isNeutral as isZeroAdjust, ZERO_ADJUST } from './grade';
 import { transformAbout } from './groupTransform';
+import { applyPulse, pulseAt } from './pulse';
 
 export { ADJUST_KEYS, fullAdjust, ZERO_ADJUST };
 
@@ -39,6 +40,10 @@ export function transformAt(item: Item, t: number): Transform {
     opacity: lerp(a.opacity, b.opacity, k),
   };
 }
+
+/** transformAt＋定位小特效的偏移（畫面上真正看到的位置；新增定位用的底值不含小特效，請用 transformAt） */
+export const pulsedTransformAt = (item: Item, t: number): Transform =>
+  applyPulse(transformAt(item, t), pulseAt(item, t - item.start));
 
 /** 有任何定位自己指定了色調組合（含 null＝原色）嗎：有的話調色走「實際調色值內插」 */
 export const usesKeyframeLook = (it: Item): boolean => !!it.keyframes?.some((k) => k.look !== undefined);
@@ -86,7 +91,7 @@ export function adjustAt(item: Item, t: number): Adjust | undefined {
 export function withTime<T extends Item>(item: T, t: number): T {
   if (!hasKeyframes(item)) return item;
   const adj = adjustAt(item, t);
-  const out = { ...item, transform: transformAt(item, t), adjust: adj };
+  const out = { ...item, transform: pulsedTransformAt(item, t), adjust: adj };
   if (usesKeyframeLook(item)) out.look = undefined; // 色調組合已經算進 adjust
   return out;
 }
@@ -103,7 +108,7 @@ export function timeResolved(project: Project, t: number): Project {
       if (it.type !== 'text' && it.type !== 'audio' && it.group && hasKeyframes(it) && !it.cell)
         frames.set(it.group, {
           base: it.transform,
-          now: transformAt(it, t),
+          now: pulsedTransformAt(it, t),
           adj: adjustAt(it, t),
           clearLook: usesKeyframeLook(it),
         });

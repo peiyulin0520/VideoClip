@@ -54,6 +54,7 @@ import {
 import { cellItem, inkFor, type LayoutText, type Rect } from '../engine/layouts';
 import { DEFAULT_EFFECT_DURATION, DEFAULT_TRANSITION_DURATION, seamsOf } from '../engine/transitions';
 import { groupPatch, transformAbout } from '../engine/groupTransform';
+import { DEFAULT_PULSE, type Pulse } from '../engine/pulse';
 import {
   hasKeyframes,
   KEYFRAME_EPS,
@@ -290,6 +291,36 @@ export function deleteNearKeyframe(id: string): boolean {
     else delete it.keyframes;
   });
   return true;
+}
+
+/**
+ * 設定（或取消）播放線碰到的那個定位的小特效（震／彈／晃／跳）。回傳設定到的定位時間（物件自己的秒），沒碰到定位回傳 null。
+ * patch 只改指定的欄位（沒有小特效時用預設值補齊）；null＝取消。
+ */
+export function setKeyframePulse(
+  id: string,
+  patch: Partial<Pulse> | null,
+  coalesce?: string,
+  /** 指定第幾個定位（試播中播放線不在定位上時用）；沒給就用播放線碰到的 */
+  index?: number,
+): number | null {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target || !hasKeyframes(target)) return null;
+  const idx =
+    index ?? keyframeNear(target, localTime(target), KF_HIT_PX / (useUI.getState().timelinePps || 40));
+  if (idx < 0 || !target.keyframes![idx]) return null;
+  const at = target.keyframes![idx]!.t;
+  editItem(
+    target.id,
+    (it) => {
+      const k = it.keyframes![idx]!;
+      if (patch === null) delete k.pulse;
+      else k.pulse = { ...DEFAULT_PULSE, ...k.pulse, ...patch };
+    },
+    coalesce ? { coalesce } : undefined,
+  );
+  return at;
 }
 
 /** 清除全部定位：物件停在播放頭這個時間的樣子（畫面不跳）；一步復原 */
