@@ -1,21 +1,18 @@
 import type { Adjust, Item, Keyframe, Project, Transform } from '../model/types';
+import { ADJUST_KEYS, fullAdjust, isNeutral as isZeroAdjust, ZERO_ADJUST } from './grade';
 import { transformAbout } from './groupTransform';
+
+export { ADJUST_KEYS, fullAdjust, ZERO_ADJUST };
 
 // 定位（關鍵影格）：位置、大小、旋轉、透明度、色調，兩個定位之間線性漸變。
 // 所有「這個時間點物件長什麼樣」的地方（預覽、單格輸出、整支匯出、選取框）都走 withTime / timeResolved。
 
-export const ZERO_ADJUST: Adjust = { brightness: 0, saturation: 0, temperature: 0, tint: 0 };
-export const ADJUST_KEYS = ['brightness', 'saturation', 'temperature', 'tint'] as const;
 /** 同一個時間（±1/60 秒）的定位視為同一個 */
 export const KEYFRAME_EPS = 1 / 60;
 
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 
 export const hasKeyframes = (it: Item): boolean => (it.keyframes?.length ?? 0) > 0;
-
-/** 物件本身的色調補成完整的四項 */
-export const fullAdjust = (a?: Partial<Adjust>): Adjust => ({ ...ZERO_ADJUST, ...a });
-export const isZeroAdjust = (a?: Partial<Adjust>): boolean => !a || ADJUST_KEYS.every((k) => !a[k]);
 
 /** 找「前一個、後一個」定位與兩者之間的比例 */
 function around(kfs: Keyframe[], local: number): { a: Keyframe; b: Keyframe; k: number } {
@@ -155,56 +152,4 @@ export function splitKeyframes(
     ...kfs.filter((k) => k.t > local + KEYFRAME_EPS).map((k) => ({ ...k, t: k.t - local })),
   ];
   return { a, b };
-}
-
-/**
- * 色調 → Pixi ColorMatrixFilter 的 4×5 矩陣（20 個數）：亮度（乘）、飽和度、色溫（紅藍一增一減）、色調（綠↔洋紅）。
- * 全部是 0 回傳 null（不用加濾鏡）。
- */
-export function adjustMatrix(a: Partial<Adjust> | undefined): number[] | null {
-  if (isZeroAdjust(a)) return null;
-  const { brightness: b, saturation: s, temperature: tmp, tint } = fullAdjust(a);
-  // 飽和度：向亮度（灰）靠攏或遠離
-  const sat = 1 + s;
-  const lr = 0.2126;
-  const lg = 0.7152;
-  const lb = 0.0722;
-  const S = [
-    lr * (1 - sat) + sat,
-    lg * (1 - sat),
-    lb * (1 - sat),
-    lr * (1 - sat),
-    lg * (1 - sat) + sat,
-    lb * (1 - sat),
-    lr * (1 - sat),
-    lg * (1 - sat),
-    lb * (1 - sat) + sat,
-  ];
-  // 亮度、色溫、色調都是對 R、G、B 各乘一個倍數
-  const kr = (1 + b) * (1 + 0.3 * tmp) * (1 + 0.12 * tint);
-  const kg = (1 + b) * (1 - 0.18 * tint);
-  const kb = (1 + b) * (1 - 0.3 * tmp) * (1 + 0.12 * tint);
-  const m = [
-    S[0]! * kr,
-    S[1]! * kr,
-    S[2]! * kr,
-    0,
-    0,
-    S[3]! * kg,
-    S[4]! * kg,
-    S[5]! * kg,
-    0,
-    0,
-    S[6]! * kb,
-    S[7]! * kb,
-    S[8]! * kb,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
-  ];
-  return m;
 }

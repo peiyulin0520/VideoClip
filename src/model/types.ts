@@ -64,12 +64,46 @@ export type ItemBase = {
   outEffect?: { kind: EffectKind; duration: number };
   /** 定位（關鍵影格），照時間排序；沒有＝照 transform */
   keyframes?: Keyframe[];
-  /** 物件本身的色調（沒有定位時用它；有定位時是沒寫的項目的底） */
+  /** 物件本身的手動調色（沒有定位時用它；有定位時是沒寫的項目的底） */
   adjust?: Partial<Adjust>;
+  /** 色調組合（黑白、復古、清新…）＋強度；實際調色＝組合×強度＋手動調整 */
+  look?: LookRef;
 };
 
-/** 色調：各項 −1～+1（0＝不變）。亮度、飽和度、色溫（冷↔暖）、色調（綠↔洋紅） */
-export type Adjust = { brightness: number; saturation: number; temperature: number; tint: number };
+/**
+ * 調色：各項 −1～+1（0＝不變；褪色 0～1）。算法見 engine/grade.ts。
+ * 舊專案只有前面的亮度、飽和度、色溫、色調四項，其他沒寫＝0。
+ */
+export type Adjust = {
+  /** 曝光 */
+  exposure: number;
+  /** 對比 */
+  contrast: number;
+  /** 高光（只動亮部） */
+  highlights: number;
+  /** 陰影（只動暗部） */
+  shadows: number;
+  /** 黑點（正＝黑色變灰、負＝黑色更黑） */
+  blacks: number;
+  /** 亮度（中間調） */
+  brightness: number;
+  /** 飽和度 */
+  saturation: number;
+  /** 鮮艷度（越不飽和的顏色加越多） */
+  vibrance: number;
+  /** 色溫（冷↔暖） */
+  temperature: number;
+  /** 色調（綠↔洋紅） */
+  tint: number;
+  /** 褪色（0～1，復古／日系用） */
+  fade: number;
+};
+
+/** 色調組合（濾鏡）：預設的一組調整值×強度（0～1），再加上手動調整；見 engine/grade.ts 的 LOOKS */
+export type LookRef = {
+  id: 'bw' | 'bwHigh' | 'vintage' | 'fresh' | 'cool' | 'warm' | 'cinema' | 'japan' | 'vivid';
+  amount: number;
+};
 
 /**
  * 定位（關鍵影格）：這個物件在「開始後 t 秒」的位置、大小、旋轉、透明度與色調；
