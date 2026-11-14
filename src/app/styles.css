@@ -3491,3 +3491,27 @@ button:not(:disabled):active,
 .ce-toolcard .ce-ctx {
   min-height: 48px;
 }
+
+/* 轉場時的聲音 */
+.tr-audio {
+  margin-top: 8px;
+}
+.tr-audio-axis {
+  margin: 4px 0 8px;
+}
+
+/* 轉場聲音的兩個旗標可能在同一個位置：前迄靠左、後起靠右，各自抓得到 */
+.rm-flag.out {
+  transform: translateX(-100%);
+  align-items: flex-end;
+}
+.rm-flag.in {
+  transform: none;
+  align-items: flex-start;
+}
+.rm-flag.out i {
+  margin-right: -8px;
+}
+.rm-flag.in i {
+  margin-left: -8px;
+}

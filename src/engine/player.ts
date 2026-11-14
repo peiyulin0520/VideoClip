@@ -4,7 +4,7 @@ import { AudioOut, fadeGain, isIOSDevice } from './audio';
 import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
 import { expandThumbs, thumbCount, thumbIndex } from './thumbs';
-import { activeTransition } from './transitions';
+import { activeTransition, transitionAudioGain } from './transitions';
 import { showPlaceholders } from './placeholder';
 import { driftPlan, videoSyncPlan } from './videoSync';
 import { captureThumb } from './probe';
@@ -84,6 +84,8 @@ export class Player {
   private videoInfo = '';
   /** 這一刻正在轉場的片段 id（A、B）：對時規則放寬、統計轉場掉格 */
   private transIds = new Set<string>();
+  /** 每個影片物件最後一次套用的聲音倍數（測試、效能框用） */
+  private gains = new Map<string, number>();
   private trans = { frames: 0, drops: 0, hardSeeks: 0, lastAt: 0 };
   private transHeavyTold = false;
   private videoCount = 0;
@@ -249,6 +251,11 @@ export class Player {
   }
 
   /** 最近一秒的播放畫格數與每格各段花的毫秒（算場景／影片上傳／整個合成）、掉格數、目前影片資訊 */
+  /** 每個影片物件目前的聲音倍數（含轉場聲音） */
+  audioGains(): Record<string, number> {
+    return Object.fromEntries(this.gains);
+  }
+
   stats(): {
     fps: number;
     renderMs: number;
@@ -292,10 +299,16 @@ export class Player {
 
   private syncVideo(el: HTMLVideoElement, item: VideoItem, asset: Asset, track: Track, t: number) {
     const s = sourceTimeClamped(item, t, asset);
+    // 轉場裡的虛擬物件（提前出現的 B、延長的 A）是靜音的；聲音改用「原本的物件」＋轉場聲音倍數算，兩段才能交叉淡化
+    const orig = (track.items.find((x) => x.id === item.id) as VideoItem | undefined) ?? item;
+    let tg = transitionAudioGain(track.items, orig, t);
+    if (this.audio.mode === 'element') tg = tg >= 0.5 ? 1 : 0; // 舊 iPhone 只能開／關
     const vol =
-      item.volume *
-      fadeGain(t - item.start, item.duration, item.fadeIn, item.fadeOut) *
-      (audioRetained(item, s) ? 1 : 0);
+      orig.volume *
+      fadeGain(t - orig.start, orig.duration, orig.fadeIn, orig.fadeOut) *
+      (audioRetained(orig, s) ? 1 : 0) *
+      tg;
+    this.gains.set(item.id, vol);
     this.audio.apply(el, vol, !!track.muted || !asset.hasAudio);
     if (this.playing) {
       const transitioning = this.transIds.has(item.id);
@@ -522,7 +535,6 @@ export class Player {
         start: item.start - before,
         trimIn: item.trimIn - before * item.speed,
         duration: item.duration + before,
-        volume: 0,
       };
       if (tr && this.playing && t >= early.start - WARM_S) {
         // 暖機：轉場開始前 0.4 秒就靜音開始播，轉場一開始它已經在動（iPhone 的 play() 要好幾百毫秒才真的動）

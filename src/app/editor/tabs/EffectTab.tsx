@@ -25,6 +25,7 @@ import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
 import { EffectTimingSheet } from '../EffectTimingSheet';
+import { TransitionAudioBlock } from '../TransitionAudio';
 import { TransitionCard } from '../TransitionCards';
 import type { Found } from './shared';
 
@@ -352,6 +353,7 @@ function SeamBlock({
           >
             全部套用（這一軌所有銜接處）
           </button>
+          {spanNow && <TransitionAudioBlock item={item} prev={spanNow.prev} />}
         </>
       )}
     </>

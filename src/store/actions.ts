@@ -52,7 +52,12 @@ import {
   trackEnd,
 } from '../engine/timeline';
 import { cellItem, inkFor, type LayoutText, type Rect } from '../engine/layouts';
-import { DEFAULT_EFFECT_DURATION, DEFAULT_TRANSITION_DURATION, seamsOf } from '../engine/transitions';
+import {
+  DEFAULT_EFFECT_DURATION,
+  DEFAULT_TRANSITION_DURATION,
+  seamsOf,
+  type TransitionAudioMode,
+} from '../engine/transitions';
 import { groupPatch, transformAbout } from '../engine/groupTransform';
 import { DEFAULT_PULSE, type Pulse } from '../engine/pulse';
 import {
@@ -775,6 +780,25 @@ function withDuration(
   };
 }
 
+/** 換轉場效果時，原本設好的「轉場聲音」要留著 */
+function keepAudio(
+  tr: { audio?: unknown; audioCut?: number; audioOutA?: number; audioInB?: number } | undefined,
+) {
+  if (!tr) return {};
+  const { audio, audioCut, audioOutA, audioInB } = tr as {
+    audio?: TransitionAudioMode;
+    audioCut?: number;
+    audioOutA?: number;
+    audioInB?: number;
+  };
+  return {
+    ...(audio ? { audio } : {}),
+    ...(audioCut !== undefined ? { audioCut } : {}),
+    ...(audioOutA !== undefined ? { audioOutA } : {}),
+    ...(audioInB !== undefined ? { audioInB } : {}),
+  };
+}
+
 /** 設定（或取消）一個片段的進場轉場；duration 沒給就沿用原本的 */
 export function setTransition(id: string, kind: TransitionKind | null, duration?: number, opts?: Opts): void {
   editItem(
@@ -784,6 +808,7 @@ export function setTransition(id: string, kind: TransitionKind | null, duration?
       if (!kind) delete it.transitionIn;
       else
         it.transitionIn = {
+          ...keepAudio(it.transitionIn),
           kind,
           ...withDuration(
             it.transitionIn,
@@ -815,6 +840,29 @@ export function setTransitionSplit(id: string, before: number, after: number, op
     (it) => {
       if (it.type === 'audio' || !it.transitionIn) return;
       it.transitionIn = { ...it.transitionIn, before, after, duration: before + after };
+    },
+    opts,
+  );
+}
+
+/** 轉場時的聲音：模式（交叉淡化／直接切換／自訂起迄／只要前段／只要後段／靜音）與時間點（相對接縫的秒數）。一步復原 */
+export function setTransitionAudio(
+  id: string,
+  patch: {
+    audio?: TransitionAudioMode;
+    audioCut?: number;
+    audioOutA?: number;
+    audioInB?: number;
+  },
+  opts?: Opts,
+): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type === 'audio' || !it.transitionIn) return;
+      Object.assign(it.transitionIn, patch);
+      if (it.transitionIn.audio === 'cross') it.transitionIn.audio = undefined; // 預設不用寫
+      if (it.transitionIn.audio === undefined) delete it.transitionIn.audio;
     },
     opts,
   );
@@ -854,6 +902,7 @@ export function setTransitionAll(trackId: string, kind: TransitionKind | null, d
       if (!kind) delete it.transitionIn;
       else
         it.transitionIn = {
+          ...keepAudio(it.transitionIn),
           kind,
           ...withDuration(
             it.transitionIn,

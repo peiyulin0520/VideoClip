@@ -60,7 +60,20 @@ export type ItemBase = {
    * 進場轉場：跟前面緊接的同類素材（影像接影像、貼圖接貼圖、字卡接字卡）之間的效果，以兩個片段的接縫為中心。
    * duration＝總長；before＝佔前一段結尾幾秒、after＝佔這一段開頭幾秒（沒寫就各一半，舊資料也是）。
    */
-  transitionIn?: { kind: TransitionKind; duration: number; before?: number; after?: number };
+  transitionIn?: {
+    kind: TransitionKind;
+    duration: number;
+    before?: number;
+    after?: number;
+    /** 轉場時的聲音（沒寫＝交叉淡化）；cut／custom 的時間點都是「相對接縫的秒數」 */
+    audio?: 'cross' | 'cut' | 'custom' | 'prev' | 'next' | 'mute';
+    /** cut：從哪個時間直接換成後一段的聲音（沒寫＝接縫，0） */
+    audioCut?: number;
+    /** custom：前一段的聲音停在哪（沒寫＝接縫，0；可以是負的） */
+    audioOutA?: number;
+    /** custom：後一段的聲音從哪裡開始（沒寫＝接縫，0；可以等轉場結束之後） */
+    audioInB?: number;
+  };
   /** 單一素材的進場特效（這個素材當 B，一定從開頭開始）與出場特效（這個素材當 A，一定在結尾結束）；duration＝特效幾秒 */
   inEffect?: { kind: EffectKind; duration: number };
   outEffect?: { kind: EffectKind; duration: number };

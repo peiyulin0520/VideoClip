@@ -7,7 +7,9 @@ import {
   effectDurations,
   effectFrame,
   itemEffectAt,
+  seamAudioExtent,
   seamsOf,
+  transitionAudioGain,
   transitionCode,
   LEGACY_TRANSITIONS,
   TRANSITIONS,
@@ -320,5 +322,62 @@ describe('單一素材的進場／出場特效', () => {
     expect(out[0]!.outEffect).toBeUndefined();
     expect(out[1]!.inEffect).toBeUndefined();
     expect(out[1]!.outEffect).toBeDefined();
+  });
+});
+
+describe('轉場時的聲音（seamGains／transitionAudioGain／seamAudioExtent）', () => {
+  const A = clip('a', 0, 3);
+  const mk = (extra: Partial<NonNullable<VideoItem['transitionIn']>> = {}) =>
+    clip('b', 3, 3, { transitionIn: { kind: 'dissolve', duration: 1, ...extra } });
+  const gains = (b: VideoItem, t: number) => ({
+    a: transitionAudioGain([A, b], A, t),
+    b: transitionAudioGain([A, b], b, t),
+  });
+
+  it('交叉淡化（預設）：轉場前 (1,0)、中間兩段都約 0.707、轉場後 (0,1)', () => {
+    const b = mk(); // 接縫 3、前後各 0.5 → 轉場 2.5～3.5
+    expect(gains(b, 2.4)).toEqual({ a: 1, b: 0 });
+    expect(gains(b, 3).a).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(gains(b, 3).b).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(gains(b, 3.6)).toMatchObject({ b: 1 });
+    expect(gains(b, 3.6).a).toBeCloseTo(0, 6);
+  });
+  it('直接切換：切換點之前只有前段、之後只有後段（不淡化）；切換點相對接縫', () => {
+    const b = mk({ audio: 'cut', audioCut: -0.2 });
+    expect(gains(b, 2.7)).toEqual({ a: 1, b: 0 });
+    expect(gains(b, 2.9)).toEqual({ a: 0, b: 1 });
+    expect(gains(mk({ audio: 'cut' }), 2.99)).toEqual({ a: 1, b: 0 }); // 沒寫＝接縫
+    expect(gains(mk({ audio: 'cut' }), 3.01)).toEqual({ a: 0, b: 1 });
+  });
+  it('自訂起迄：前段迄、後段起各自決定，中間可以沒聲音、也可以重疊；後段起可以晚於轉場結束', () => {
+    const gap = mk({ audio: 'custom', audioOutA: -0.2, audioInB: 0.8 }); // 轉場在 3.5 結束，後段 3.8 才有聲音
+    expect(gains(gap, 2.7)).toEqual({ a: 1, b: 0 });
+    expect(gains(gap, 3.0)).toEqual({ a: 0, b: 0 }); // 中間沒聲音
+    expect(gains(gap, 3.6)).toEqual({ a: 0, b: 0 }); // 轉場已結束，後段還沒開始
+    expect(gains(gap, 3.9)).toEqual({ a: 0, b: 1 });
+    const overlap = mk({ audio: 'custom', audioOutA: 0.3, audioInB: -0.3 });
+    expect(gains(overlap, 3)).toEqual({ a: 1, b: 1 });
+  });
+  it('只要前段／只要後段／靜音', () => {
+    expect(gains(mk({ audio: 'prev' }), 3.2)).toEqual({ a: 1, b: 0 });
+    expect(gains(mk({ audio: 'prev' }), 3.6)).toEqual({ a: 0, b: 1 });
+    expect(gains(mk({ audio: 'next' }), 2.6)).toEqual({ a: 0, b: 1 });
+    expect(gains(mk({ audio: 'next' }), 2.4)).toEqual({ a: 1, b: 0 });
+    expect(gains(mk({ audio: 'mute' }), 3.2)).toEqual({ a: 0, b: 0 });
+    expect(gains(mk({ audio: 'mute' }), 2.4)).toEqual({ a: 1, b: 0 });
+    expect(gains(mk({ audio: 'mute' }), 3.6)).toEqual({ a: 0, b: 1 });
+  });
+  it('沒有轉場的片段、音樂：倍數永遠是 1', () => {
+    const c = clip('c', 3, 3);
+    expect(transitionAudioGain([A, c], c, 3)).toBe(1);
+    const music = { ...clip('m', 0, 5), type: 'audio' } as Item;
+    expect(transitionAudioGain([A, mk(), music], music, 3)).toBe(1);
+  });
+  it('seamAudioExtent：後段要提早放（before）、前段要多放（after）；custom 後段起晚於轉場結束時視窗延長', () => {
+    const b = mk({ audio: 'custom', audioInB: 0.9 });
+    expect(seamAudioExtent([A, b], b)).toEqual({ before: 0.5, after: 0, windows: [[2.5, 3.9]] });
+    expect(seamAudioExtent([A, b], A)).toEqual({ before: 0, after: 0.5, windows: [[2.5, 3.5]] });
+    const solo = clip('s', 0, 3);
+    expect(seamAudioExtent([solo], solo)).toEqual({ before: 0, after: 0, windows: [] });
   });
 });
