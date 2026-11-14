@@ -276,7 +276,7 @@ test('圖層屬性：透明度、混合模式、圓角、外框、裁切', async
   await page.mouse.move(hl.x + hl.width / 2 + fr.width / 4, hl.y + hl.height / 2, { steps: 4 });
   await page.mouse.move(hl.x + hl.width / 2 + fr.width / 2, hl.y + hl.height / 2, { steps: 4 });
   await page.mouse.up();
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   const p = await project(page);
   expect(p.tracks[1]!.items[0]!.crop!.l).toBeCloseTo(0.5, 1);
   await expect.poll(async () => isRed(await samplePreview(page, 0.27, 0.5))).toBe(true);

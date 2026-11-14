@@ -181,8 +181,7 @@ test('版型的格子可以用裁切調整露出的範圍：預設鎖定格子�
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
   await expect(page.getByRole('radio', { name: '格子比例' })).toHaveAttribute('aria-checked', 'true');
-  // 鎖定比例後拖保留區域的角（縮小），再按完成
-  await page.evaluate(() => window.scrollTo(0, 0));
+  // 鎖定比例後拖保留區域的角（縮小），再按套用裁切
   const h = (await page.getByTestId('crop-h-br').boundingBox())!;
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
@@ -191,7 +190,7 @@ test('版型的格子可以用裁切調整露出的範圍：預設鎖定格子�
     steps: 5,
   });
   await page.mouse.up();
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   const after = (await tracks(page)).filter((t) => t.items[0]?.cell)[0]!.items[0]!;
   expect(after.crop).toBeDefined();
   // 位置還是格子中心；方框大小還是格子大小（露出的範圍變小，縮放跟著重算）

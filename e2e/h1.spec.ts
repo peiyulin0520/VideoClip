@@ -74,16 +74,31 @@ test('音訊分頁每一列左邊是那支影片的首圖（縮圖），不再�
   await page.screenshot({ path: 'docs/screenshots/feedback-8/audio-thumb.png' });
 });
 
-test('裁切工具列的字固定是白色（底色固定深色，淺色主題下也看得到）', async ({ page }) => {
+test('裁切畫面的按鈕字在淺色主題下也看得清楚（跟底色的對比夠）', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('vc-theme', 'warm'));
   await createProjectWith(page, ['solid-red.webm']);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
-  const color = await page
-    .locator('.crop-bar .btn')
-    .first()
-    .evaluate((el) => getComputedStyle(el).color);
-  expect(color).toBe('rgb(255, 255, 255)');
+  const contrast = await page.evaluate(() => {
+    const rgb = (c: string) => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+    const lum = ([r, g, b]: number[]) => {
+      const f = (v: number) => {
+        const x = v / 255;
+        return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * f(r!) + 0.7152 * f(g!) + 0.0722 * f(b!);
+    };
+    const out: number[] = [];
+    for (const id of ['crop-apply', 'crop-check']) {
+      const el = document.querySelector(`[data-testid=${id}]`) as HTMLElement;
+      const cs = getComputedStyle(el);
+      const l1 = lum(rgb(cs.color));
+      const l2 = lum(rgb(cs.backgroundColor));
+      out.push((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05));
+    }
+    return out;
+  });
+  for (const c of contrast) expect(c).toBeGreaterThan(3);
 });

@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-12：X1 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X7 轉場聲音 → X2 視窗統一 → X3 裁切重做 → X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
+- **下一步**：feedback-12：X1、X3 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X7 轉場聲音 → X2 視窗統一 → X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -75,6 +75,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 feedback-12 X3 裁切重做（Sonnet 實作）
+  - 做了什麼：裁切改成**獨立的全螢幕編輯畫面** `CropEditor`（`position: fixed`、`100svh`、整頁不能捲）——上面是畫面（用素材自己的 `<video>`／`<img>` 顯示整張原始畫面，所以 4:3 專案裁直式影片也是大的），下面三列：`▶ ↩ ↪ 檢查結果 套用裁切`／`一般裁切｜自由裁切｜筆刷｜橡皮擦`（同一列）／目前工具的選項（比例 chips、粗細＋距離滑桿）；右上角 ❌（不存）＋放大縮小（按鈕、點數字回 100%、兩指捏合）。四個工具互相獨立、可以一起用：`crop`（四邊）＋`mask`（多邊形）＋`strokes`（向量筆畫，座標是整張原始畫面比例）→ `engine/cropCompose.ts` 畫出留下的範圍（只用筆刷＝只留刷到的；只用橡皮擦＝整張扣掉；有框＋筆刷＝聯集，之後再拉框筆畫不會不見）；每一步（拉完框、圈完一圈、畫完一筆）都能 ↩ 復原／↪ 重做（最多 50 步）；去掉的地方是「變暗＋斜線」（不用紅色），「檢查結果」只顯示留下的（棋盤格）；刷的時候只在 canvas 上增量畫（不碰 React 狀態、不重畫預覽，編輯器 render 次數 ≤ 1）；套用時存 `maskBitmap`（結果）＋`VideoItem.cropEdit`（向量筆畫，下次進來接著改）；沒有筆畫時照舊只存 crop／mask。
+  - 動了哪些檔：新 `app/editor/CropEditor.tsx`、`engine/cropCompose.ts`（＋test）；重寫 `store/cropStore.ts`；刪 `CropOverlay.tsx`、`CropPanel.tsx`；`Editor.tsx`、`Preview.tsx`、`EditTab.tsx`、`model/types.ts`（`CropStroke`、`cropEdit`）、`styles.css`
+  - 驗證：✅ 單元（cropCompose）、新 `e2e/x3.spec.ts`（一頁放得下、畫面大、四工具獨立＋復原重做、❌、橡皮擦匯出、斜線變暗、放大縮小含捏合、刷時不重畫、沒改套用不多一步）、改寫 `crop`／`h7`／`i6`／`h1`／`layout`／`phase2`；完整 e2e 全過  🟡 只在 Chromium  🔴 iPhone 真機未測（捏合手感、放大後刷、`100svh` 在 Safari 網址列展開／收起時是否剛好一頁）
+  - 跟規劃不同：①做成獨立全螢幕畫面，不是疊在預覽上（4:3 專案才能放大，也才有地方放列）；②去掉的地方與留下的地方交界沒畫白色細線（只有變暗＋斜線；框和多邊形有白色輪廓）；③播放鍵＝從這一格播素材（有聲音）看，不是播裁切結果
+  - 使用者的決定：預覽（裁切畫面）不能超過一頁、不能捲動；工具列不要蓋住畫面；四個工具獨立；筆刷／橡皮擦不要閃；可放大精細刷；↩↪；❌ 取消；不要重設
+  - 下一步：X7（轉場聲音）→ X2（其他視窗統一 ❌、↩↪）→ X4 → X5 → X6 → X8
 - 2026-11-15 feedback-12 X1 小修（Sonnet 實作，依 `docs/plans/2026-11-14-feedback-12.md`）
   - 做了什麼：X1-1 「定位」全站改「定格」；X1-2 有命名的素材到處用命名（圖層清單、時間軸沒縮圖時、音訊分頁「原音 · 序號 名稱」）；X1-3 新文字是空的＋`placeholder`（預覽半透明「點兩下編輯文字」、輸入框淺灰提示字、匯出／單格輸出不畫、匯出前提醒、舊專案自動轉換）；X1-4 `.chip`／`.chip3`／標籤改圓角（`--radius-ctl`）；X1-6 再點目前的分頁不收合；X1-7 「修剪」全改「片段範圍」、片段範圍視窗的 ▶ ↩ 目前秒數同一列；X1-8 播放／暫停改 lucide 圖示（不再用 emoji）；X1-9 秒數等寬數字＋固定寬度、按鈕固定大小（播放時不抖）；X1-10 視窗右上角不再有按鈕壓住預覽；X1-11 字級變數 `--fs-body`（分頁列的大小，390 寬＝14px，`clamp` 跟螢幕寬縮到 12px）、`--fs-note`（註解）、`--fs-pb`（播放列小字，維持原本 11px）；X1-12 色調名稱縮短（高反差、冷調、暖調、電影）、卡片名稱一行；X1-13 按鈕／chip／間距改 `em`、分頁平均分一列（320 寬也放得下）、頂列窄螢幕縮小、音樂按鈕文字縮短；小標題與上方說明隔開
   - 動了哪些檔：`styles.css`、`engine/{placeholder,labels,grade,player}.ts`、`model/{types,defaults,migrate}.ts`、`store/actions.ts`、`app/editor/{Toolbar,RangeMarkerSheet,Preview,ExportSheet,TextPanel,Timeline,ColorPanel,KeyframeButton,KeyframePanel,tabs/*}.tsx`
