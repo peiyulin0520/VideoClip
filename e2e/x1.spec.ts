@@ -1,14 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import {
-  clips,
-  createProjectWith,
-  exportFrame,
-  fixture,
-  openTab,
-  project,
-  samplePreview,
-  seekTo,
-} from './helpers';
+import { clips, createProjectWith, exportFrame, openTab, project, samplePreview, seekTo } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
 
