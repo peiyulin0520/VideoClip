@@ -1,4 +1,4 @@
-import type { Item, TransitionKind, VideoItem } from '../model/types';
+import type { EffectKind, Item, TransitionKind, VideoItem } from '../model/types';
 
 // 轉場（兩個緊接的片段 A、B 之間）。效果以「接縫」為中心的一小段時間（duration 秒）：
 // 前半 A 還在、B 提前出現；後半 B 在、A 延長（用素材在出點之後／入點之前的畫面，沒有就停在邊緣那一格），
@@ -10,47 +10,51 @@ export type TransitionCat = '基本' | '相機動作' | '特效' | '故障';
 export type TransitionDef = { id: TransitionKind; name: string; code: string; cat: TransitionCat };
 
 export const TRANSITIONS: TransitionDef[] = [
-  { id: 'dissolve', name: '疊化', code: '疊', cat: '基本' },
-  { id: 'blackflash', name: '閃黑', code: '黑', cat: '基本' },
-  { id: 'whiteflash', name: '閃白', code: '白', cat: '基本' },
-  { id: 'overexpose', name: '過曝', code: '曝', cat: '基本' },
-  { id: 'zoomDissolve', name: '放大疊化', code: '放', cat: '基本' },
+  { id: 'dissolve', name: '疊化', code: '溶', cat: '基本' },
+  { id: 'blackflash', name: '閃黑', code: '閃', cat: '基本' },
+  { id: 'whiteflash', name: '閃白', code: '閃', cat: '基本' },
+  { id: 'overexpose', name: '過曝', code: '閃', cat: '基本' },
+  { id: 'zoomDissolve', name: '放大疊化', code: '溶', cat: '基本' },
   { id: 'moveL', name: '左移', code: '左', cat: '基本' },
   { id: 'moveR', name: '右移', code: '右', cat: '基本' },
   { id: 'moveU', name: '上移', code: '上', cat: '基本' },
   { id: 'moveD', name: '下移', code: '下', cat: '基本' },
-  { id: 'rollDown', name: '捲簾放下', code: '捲', cat: '基本' },
-  { id: 'rollUp', name: '捲簾收合', code: '收', cat: '基本' },
+  { id: 'rollDown', name: '捲簾放下', code: '下', cat: '基本' },
+  { id: 'rollUp', name: '捲簾收合', code: '上', cat: '基本' },
   { id: 'circleOut', name: '中心擴散', code: '擴', cat: '基本' },
-  { id: 'topOut', name: '上部擴散', code: '頂', cat: '基本' },
-  { id: 'bottomOut', name: '下部擴散', code: '底', cat: '基本' },
-  { id: 'blur', name: '模糊轉場', code: '糊', cat: '基本' },
-  { id: 'defocus', name: '虛焦轉場', code: '焦', cat: '基本' },
-  { id: 'fastL', name: '極速左移', code: '速', cat: '相機動作' },
-  { id: 'fastR', name: '極速右移', code: '疾', cat: '相機動作' },
-  { id: 'slideL', name: '向左滑動', code: '滑', cat: '相機動作' },
-  { id: 'slideR', name: '向右滑動', code: '划', cat: '相機動作' },
-  { id: 'slideU', name: '向上滑動', code: '升', cat: '相機動作' },
-  { id: 'slideD', name: '向下滑動', code: '降', cat: '相機動作' },
-  { id: 'zoomIn', name: '縮放進', code: '進', cat: '相機動作' },
-  { id: 'zoomOut', name: '縮放出', code: '出', cat: '相機動作' },
+  { id: 'topOut', name: '上部擴散', code: '擴', cat: '基本' },
+  { id: 'bottomOut', name: '下部擴散', code: '擴', cat: '基本' },
+  { id: 'blur', name: '模糊轉場', code: '溶', cat: '基本' },
+  { id: 'defocus', name: '虛焦轉場', code: '溶', cat: '基本' },
+  { id: 'fastL', name: '極速左移', code: '左', cat: '相機動作' },
+  { id: 'fastR', name: '極速右移', code: '右', cat: '相機動作' },
+  { id: 'slideL', name: '向左滑動', code: '左', cat: '相機動作' },
+  { id: 'slideR', name: '向右滑動', code: '右', cat: '相機動作' },
+  { id: 'slideU', name: '向上滑動', code: '上', cat: '相機動作' },
+  { id: 'slideD', name: '向下滑動', code: '下', cat: '相機動作' },
+  { id: 'zoomIn', name: '縮放進', code: '縮', cat: '相機動作' },
+  { id: 'zoomOut', name: '縮放出', code: '縮', cat: '相機動作' },
   { id: 'flash', name: '暖色閃光', code: '閃', cat: '特效' },
-  { id: 'filmUp', name: '膠片上移', code: '膠', cat: '特效' },
-  { id: 'filmLeft', name: '膠片左移', code: '片', cat: '特效' },
-  { id: 'grid4', name: '四宮格', code: '四', cat: '特效' },
-  { id: 'grid9', name: '九宮格', code: '九', cat: '特效' },
-  { id: 'glitch1', name: '干擾', code: '擾', cat: '故障' },
-  { id: 'glitch2', name: '故障 1', code: '障', cat: '故障' },
+  { id: 'filmUp', name: '膠片上移', code: '上', cat: '特效' },
+  { id: 'filmLeft', name: '膠片左移', code: '左', cat: '特效' },
+  { id: 'grid4', name: '四宮格', code: '格', cat: '特效' },
+  { id: 'grid9', name: '九宮格', code: '格', cat: '特效' },
+  { id: 'glitch1', name: '干擾', code: '亂', cat: '故障' },
+  { id: 'glitch2', name: '故障 1', code: '亂', cat: '故障' },
   { id: 'glitch3', name: '故障 2', code: '亂', cat: '故障' },
 ];
 export const TRANSITION_CATS: TransitionCat[] = ['基本', '相機動作', '特效', '故障'];
 export const DEFAULT_TRANSITION_DURATION = 0.5;
+export const DEFAULT_EFFECT_DURATION = 0.8;
+export const MIN_EFFECT = 0.2;
 export const MIN_TRANSITION = 0.2;
 export const MAX_TRANSITION = 2;
-export const transitionCode = (k: TransitionKind): string =>
-  TRANSITIONS.find((x) => x.id === k)?.code ?? '轉';
-export const transitionName = (k: TransitionKind): string =>
-  TRANSITIONS.find((x) => x.id === k)?.name ?? '轉場';
+export const TYPEWRITER_CODE = '打';
+/** 代表字：表示這個特效是哪一種「類型」（不同特效可以同一個字），時間軸上用它辨識 */
+export const transitionCode = (k: EffectKind): string =>
+  k === 'typewriter' ? TYPEWRITER_CODE : (TRANSITIONS.find((x) => x.id === k)?.code ?? '轉');
+export const transitionName = (k: EffectKind): string =>
+  k === 'typewriter' ? '打字' : (TRANSITIONS.find((x) => x.id === k)?.name ?? '轉場');
 
 /** 舊版（2026-11-13 之前）的轉場名稱 → 新名稱 */
 export const LEGACY_TRANSITIONS: Record<string, TransitionKind> = {
@@ -62,29 +66,54 @@ export const LEGACY_TRANSITIONS: Record<string, TransitionKind> = {
   zoom: 'zoomIn',
 };
 
-/** 一個片段進場轉場的位置：接縫時間 cut、整段長度 d（會被限制在兩個片段各自的長度內），前一個片段 */
-export type TransitionSpan = { cut: number; d: number; prev: VideoItem };
+/**
+ * 一個片段進場轉場的位置：接縫時間 cut；before＝佔前一個片段結尾幾秒、after＝佔這個片段開頭幾秒（d＝兩者相加），前一個片段。
+ * 兩邊各自限制在兩個片段的長度內；沒有分別設定（舊資料）就對稱、各取一半。
+ */
+export type TransitionSpan = { cut: number; d: number; before: number; after: number; prev: Item };
 
 const EPS = 0.03;
 
-/** 這個片段前面緊接著另一個片段（同一軌，接縫誤差 30ms 內）才算有轉場 */
-export function transitionSpan(items: Item[], it: Item): TransitionSpan | null {
-  if (it.type === 'text' || it.type === 'audio' || !it.transitionIn) return null;
-  const prev = items.find(
-    (x): x is VideoItem =>
-      x.type !== 'text' && x.type !== 'audio' && Math.abs(x.start + x.duration - it.start) < EPS,
-  );
-  if (!prev) return null;
-  const d = Math.min(it.transitionIn.duration, 2 * Math.min(prev.duration, it.duration));
-  return d > 0.05 ? { cut: it.start, d, prev } : null;
+/** 轉場只在「同一類」之間：字卡接字卡，影像（影片、照片）、貼圖接影像、貼圖；音樂沒有轉場 */
+export const sameFamily = (a: Item, b: Item): boolean =>
+  a.type !== 'audio' && b.type !== 'audio' && (a.type === 'text') === (b.type === 'text');
+
+/** 轉場的前後分配（秒）：沒有分別設定就各一半；不超過兩個片段各自的長度 */
+export function splitTransition(
+  tr: { duration: number; before?: number; after?: number },
+  prevDur: number,
+  curDur: number,
+): { before: number; after: number } {
+  if (tr.before === undefined && tr.after === undefined) {
+    const h = Math.min(tr.duration / 2, prevDur, curDur);
+    return { before: h, after: h };
+  }
+  return {
+    before: Math.min(tr.before ?? tr.duration / 2, prevDur),
+    after: Math.min(tr.after ?? tr.duration / 2, curDur),
+  };
 }
 
-/** 一軌上緊接在一起的片段（接縫處）：可以在這裡加轉場 */
-export function seamsOf(items: Item[]): { prev: VideoItem; next: VideoItem }[] {
-  const vids = items.filter((x): x is VideoItem => x.type !== 'text' && x.type !== 'audio' && !x.group);
-  const out: { prev: VideoItem; next: VideoItem }[] = [];
+/** 這個片段前面緊接著另一個同類片段（同一軌，接縫誤差 30ms 內）才算有轉場 */
+export function transitionSpan(items: Item[], it: Item): TransitionSpan | null {
+  if (it.type === 'audio' || !it.transitionIn) return null;
+  const prev = items.find(
+    (x) => x !== it && sameFamily(x, it) && Math.abs(x.start + x.duration - it.start) < EPS,
+  );
+  if (!prev) return null;
+  const { before, after } = splitTransition(it.transitionIn, prev.duration, it.duration);
+  const d = before + after;
+  return d > 0.05 ? { cut: it.start, d, before, after, prev } : null;
+}
+
+/** 一軌上緊接在一起的同類片段（接縫處）：可以在這裡加轉場 */
+export function seamsOf(items: Item[]): { prev: Item; next: Item }[] {
+  const vids = items.filter((x) => x.type !== 'audio' && !(x.type !== 'text' && x.group));
+  const out: { prev: Item; next: Item }[] = [];
   for (const next of vids) {
-    const prev = vids.find((x) => x !== next && Math.abs(x.start + x.duration - next.start) < EPS);
+    const prev = vids.find(
+      (x) => x !== next && sameFamily(x, next) && Math.abs(x.start + x.duration - next.start) < EPS,
+    );
     if (prev) out.push({ prev, next });
   }
   return out;
@@ -92,7 +121,7 @@ export function seamsOf(items: Item[]): { prev: VideoItem; next: VideoItem }[] {
 
 /** 目前時間 t 在這個轉場的哪裡：0＝開始、0.5＝接縫、1＝結束；不在轉場裡就是 null */
 export function transitionProgress(span: TransitionSpan, t: number): number | null {
-  const p = (t - (span.cut - span.d / 2)) / span.d;
+  const p = (t - (span.cut - span.before)) / span.d;
   return p >= 0 && p < 1 ? p : null;
 }
 
@@ -383,10 +412,14 @@ export type ActiveTransition = {
   kind: TransitionKind;
   p: number;
   /** 這一刻要畫的 A、B（可能是延長／提前過的虛擬物件，id 跟原本的一樣；B 還沒開始時是 null） */
-  a: VideoItem | null;
-  b: VideoItem | null;
+  a: Item | null;
+  b: Item | null;
   frame: TransitionFrame;
 };
+
+/** 虛擬物件不出聲（真的在播的那一個才出聲） */
+const silent = (x: Item): Item =>
+  x.type === 'text' ? x : { ...x, volume: 0, fadeIn: undefined, fadeOut: undefined };
 
 /**
  * 這個時間點、這一軌有沒有轉場正在進行；有的話回傳 A、B 要怎麼畫。
@@ -394,32 +427,33 @@ export type ActiveTransition = {
  */
 export function activeTransition(items: Item[], t: number): ActiveTransition | null {
   for (const it of items) {
-    if (it.type === 'text' || it.type === 'audio' || !it.transitionIn) continue;
+    if (it.type === 'audio' || !it.transitionIn) continue;
     const span = transitionSpan(items, it);
     if (!span) continue;
     const p = transitionProgress(span, t);
     if (p === null) continue;
-    const h = span.d / 2;
     const A = span.prev;
     const B = it;
     const second = t >= span.cut;
-    let a: VideoItem | null = A;
-    let b: VideoItem | null = B;
+    let a: Item | null = A;
+    let b: Item | null = B;
     if (second) {
-      // A 延長到接縫後 h 秒（素材不夠長時，播放元件會停在最後一格）
-      a = { ...A, duration: A.duration + h, volume: 0, fadeIn: undefined, fadeOut: undefined };
+      // A 延長到接縫後 after 秒（素材不夠長時，播放元件會停在最後一格）
+      a = silent({ ...A, duration: A.duration + span.after });
+    } else if (B.type === 'text') {
+      b =
+        t >= B.start - span.before
+          ? { ...B, start: B.start - span.before, duration: B.duration + span.before }
+          : null;
     } else {
-      // B 提前 h 秒開始：入點往前退（退不到的部分，B 還沒出現）
-      const back = Math.min(h * B.speed, B.trimIn);
-      const early = {
+      // B 提前 before 秒開始：入點往前退（退不到的部分，B 還沒出現）
+      const back = Math.min(span.before * B.speed, B.trimIn);
+      const early = silent({
         ...B,
         start: B.start - back / B.speed,
         trimIn: B.trimIn - back,
         duration: B.duration + back / B.speed,
-        volume: 0,
-        fadeIn: undefined,
-        fadeOut: undefined,
-      };
+      });
       b = t >= early.start ? early : null;
     }
     return { kind: B.transitionIn!.kind, p, a, b, frame: transitionFrame(B.transitionIn!.kind, p) };
@@ -427,9 +461,69 @@ export function activeTransition(items: Item[], t: number): ActiveTransition | n
   return null;
 }
 
+// ---------- 單一素材的進場／出場特效（這個素材自己的開頭、結尾，邊播邊動） ----------
+
+export type ItemEffect = { role: 'in' | 'out'; kind: EffectKind; p: number; duration: number };
+
+/** 進出場各佔幾秒：各自不超過素材長度，兩個加起來也不超過（出場讓給進場，縮到剩下的） */
+export function effectDurations(it: Item): { in: number; out: number } {
+  const len = it.duration;
+  const din = it.inEffect ? Math.min(Math.max(it.inEffect.duration, 0), len) : 0;
+  const dout = it.outEffect ? Math.min(Math.max(it.outEffect.duration, 0), Math.max(len - din, 0)) : 0;
+  return { in: din, out: dout };
+}
+
+/** 素材自己的時間 local（開始後幾秒）落在進場或出場特效裡嗎；進度 p：進場 0→1（空→完整）、出場 0→1（完整→空） */
+export function itemEffectAt(it: Item, local: number): ItemEffect | null {
+  if (it.type === 'audio') return null;
+  const d = effectDurations(it);
+  if (it.inEffect && d.in > 0.01 && local < d.in)
+    return { role: 'in', kind: it.inEffect.kind, p: clamp01(local / d.in), duration: d.in };
+  if (it.outEffect && d.out > 0.01 && local >= it.duration - d.out)
+    return {
+      role: 'out',
+      kind: it.outEffect.kind,
+      p: clamp01((local - (it.duration - d.out)) / d.out),
+      duration: d.out,
+    };
+  return null;
+}
+
+/** 這個 Look 結束時，素材已經「走掉」了嗎（看不見、被裁光、移出畫面） */
+function isGone(l: Look): boolean {
+  if (l.opacity < 0.05 || l.scale < 0.05 || Math.abs(l.dx) >= 0.65 || Math.abs(l.dy) >= 0.65) return true;
+  const c = l.clip;
+  if (!c) return false;
+  if (c.kind === 'circle') return c.r <= 0.001;
+  return c.rects.every(([, , w, h]) => w * h <= 1e-6);
+}
+/**
+ * 進出場特效這一刻的樣子（單一素材：前面或後面是「空」）。
+ * 進場：轉場裡 B 一開始看不到的（捲簾放下、擴散、左移…），直接用 B 的動作；B 一開始就看得到（疊化、放大疊化…）
+ * 就改用 A 的動作倒著放（A 會離開，倒著放就是進來）；兩個都不行就用 B 的動作加上淡入。
+ * 出場：對稱——A 會自己離開的直接用 A；不會的（疊化、捲簾放下…）把 B 的進場倒著放；再不行用 A 加淡出。
+ * 「打字」不是轉場，畫面不變（字數另外算）。
+ */
+export function effectFrame(fx: ItemEffect): { look: Look; covers: Cover[] } {
+  if (fx.kind === 'typewriter') return { look: idle(), covers: [] };
+  const k = fx.kind;
+  const f = transitionFrame(k, fx.p);
+  const r = transitionFrame(k, 1 - fx.p);
+  const bGone0 = isGone(transitionFrame(k, 0).b); // B 一開始看不到
+  const aGone1 = isGone(transitionFrame(k, 1).a); // A 最後走掉
+  if (fx.role === 'in') {
+    if (bGone0) return { look: f.b, covers: f.covers };
+    if (aGone1) return { look: r.a, covers: r.covers };
+    return { look: { ...f.b, opacity: f.b.opacity * fx.p }, covers: f.covers };
+  }
+  if (aGone1) return { look: f.a, covers: f.covers };
+  if (bGone0) return { look: r.b, covers: r.covers };
+  return { look: { ...f.a, opacity: f.a.opacity * (1 - fx.p) }, covers: f.covers };
+}
+
 /** 這個時間點，轉場期間要畫的影片物件（匯出用：預先備好這些物件的畫面）；每一軌最多 A、B 兩個 */
 export function transitionItemsAt(items: Item[], t: number): VideoItem[] {
   const at = activeTransition(items, t);
   if (!at) return [];
-  return [at.a, at.b].filter((x): x is VideoItem => !!x);
+  return [at.a, at.b].filter((x): x is VideoItem => !!x && x.type !== 'text');
 }

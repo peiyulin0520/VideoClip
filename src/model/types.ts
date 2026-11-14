@@ -13,6 +13,8 @@ export type Asset = {
   width: number;
   height: number;
   hasAudio: boolean;
+  /** 貼圖（內建貼圖、GIPHY、我的貼圖）加進專案時記下來：時間軸上自成一類「貼圖」，放在貼圖軌 */
+  origin?: 'sticker';
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
   /** 音樂素材：音量波形，每 0.1 秒一個值（0–100），給時間軸畫波形用 */
@@ -50,7 +52,40 @@ export type ItemBase = {
   cornerRadius?: number; // 0–0.5，佔短邊的比例（畫中畫圓角）
   outline?: Outline;
   crop?: Crop;
+  /**
+   * 進場轉場：跟前面緊接的同類素材（影像接影像、貼圖接貼圖、字卡接字卡）之間的效果，以兩個片段的接縫為中心。
+   * duration＝總長；before＝佔前一段結尾幾秒、after＝佔這一段開頭幾秒（沒寫就各一半，舊資料也是）。
+   */
+  transitionIn?: { kind: TransitionKind; duration: number; before?: number; after?: number };
+  /** 單一素材的進場特效（這個素材當 B，一定從開頭開始）與出場特效（這個素材當 A，一定在結尾結束）；duration＝特效幾秒 */
+  inEffect?: { kind: EffectKind; duration: number };
+  outEffect?: { kind: EffectKind; duration: number };
+  /** 定位（關鍵影格），照時間排序；沒有＝照 transform */
+  keyframes?: Keyframe[];
+  /** 物件本身的色調（沒有定位時用它；有定位時是沒寫的項目的底） */
+  adjust?: Partial<Adjust>;
 };
+
+/** 色調：各項 −1～+1（0＝不變）。亮度、飽和度、色溫（冷↔暖）、色調（綠↔洋紅） */
+export type Adjust = { brightness: number; saturation: number; temperature: number; tint: number };
+
+/**
+ * 定位（關鍵影格）：這個物件在「開始後 t 秒」的位置、大小、旋轉、透明度與色調；
+ * 兩個定位之間全部線性漸變；第一個之前、最後一個之後維持那一個的樣子。
+ * adjust 沒寫的項目沿用物件本身的色調。
+ */
+export type Keyframe = {
+  t: number;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  opacity: number;
+  adjust?: Partial<Adjust>;
+};
+
+/** 單一素材的特效：32 種轉場，字卡另外有「打字」 */
+export type EffectKind = TransitionKind | 'typewriter';
 
 export type VideoItem = ItemBase & {
   /** audio＝背景音樂（只放在 audio 軌，沒有畫面） */
@@ -82,8 +117,11 @@ export type VideoItem = ItemBase & {
   cellAnim?: { from: { x: number; y: number; w: number; h: number }; t0: number; t1: number };
   /** 動態模板外框：這個版型是哪一種動態模板（有整套的時間表，見 engine/story.ts） */
   template?: 'story3';
-  /** 進場轉場：跟前面緊接的片段之間的效果（以兩個片段的接縫為中心，前半在前一個片段、後半在這個片段） */
-  transitionIn?: { kind: TransitionKind; duration: number };
+  /**
+   * 保留聲音的範圍（素材秒數，可以有好幾段）：範圍外靜音，片段本身不拆開、畫面不變；沒有這個欄位＝整段都有聲音。
+   * 影片原音、背景音樂都能用（音訊分頁的「靜音標記」）。
+   */
+  audioRanges?: [number, number][];
 };
 
 /**
@@ -268,7 +306,12 @@ export type TextItem = ItemBase & {
   group?: string;
   /** 字體輪播：開始後 until 秒內每 interval 秒換下一個字體（依序輪流），之後固定用 fonts[0] */
   fontCycle?: { fonts: string[]; interval: number; until: number };
+  /** 文字樣式特效（IG 那種，整段一直動）；沒有＝無 */
+  textFx?: { kind: TextFxKind };
 };
+
+/** 文字樣式特效（整段字卡一直在動）：閃爍（亮光掃過）、發光閃亮、方格字、震動 */
+export type TextFxKind = 'shimmer' | 'sparkle' | 'pixel' | 'shake';
 
 export type Item = VideoItem | TextItem;
 
@@ -278,7 +321,7 @@ export type Item = VideoItem | TextItem;
  * tracks 陣列由下往上＝圖層順序，並且依種類分區排好：影像 → 特效 → 字卡 → 音訊（音訊沒有畫面，時間軸畫在最下面）。
  * 同一區裡的軌道可以自由換順序，不能跨區。
  */
-export type TrackKind = 'media' | 'effect' | 'text' | 'audio';
+export type TrackKind = 'media' | 'sticker' | 'text' | 'audio';
 
 export type Track = {
   id: string;

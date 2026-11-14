@@ -3,6 +3,7 @@ import { HashRouter, Route, Routes } from 'react-router-dom';
 import { initFonts } from '../fonts/fontStore';
 import { useApp } from '../store/appStore';
 import { Toasts } from '../ui/Toasts';
+import { UpdateBanner } from '../ui/UpdateBanner';
 import { Editor } from './pages/Editor';
 import { Home } from './pages/Home';
 import { Settings } from './pages/Settings';
@@ -20,6 +21,7 @@ export function App() {
   return (
     <HashRouter>
       <Toasts />
+      <UpdateBanner />
       {loaded && !onboarded && <Welcome />}
       <Routes>
         <Route path="/" element={<Home />} />

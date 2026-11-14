@@ -21,7 +21,7 @@ import {
   ZONE,
   type DropTarget,
 } from '../../engine/timeline';
-import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../../model/types';
+import type { Asset, EffectKind, Item, Project, Track, TrackKind, VideoItem } from '../../model/types';
 import { useProxyProgress } from '../../engine/proxyQueue';
 import { Wave } from './Wave';
 import {
@@ -42,14 +42,15 @@ import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemTitle, ordinalIn } from '../../engine/labels';
-import { seamsOf, transitionCode, transitionName } from '../../engine/transitions';
+import { textFxCode, textFxName } from '../../engine/textFx';
+import { tileLayout } from './tiles';
+import { effectDurations, seamsOf, transitionCode, transitionName } from '../../engine/transitions';
 import { renameItem } from '../../store/actions';
 
 const BASE_H = 44; // 最下面那條影像軌（主要影片）高一點，縮圖與兩行名稱看得清楚
 const SLOT_H = 26; // 拖素材時，同一區上下各多出一條「＋ 新增一軌」的放置區
 const GAP_MIN = 0.1; // 小於這個秒數的空位不畫
 const ROW_H = 32; // 其他軌道：細一點（2026-11-12 使用者：拖拉軸再細一些）
-const SUM_H = 20; // 收合時每一類縮成的摘要列
 const ROW_GAP = 6;
 const RULER_H = 24;
 const LONG_PRESS_MS = 400;
@@ -81,9 +82,9 @@ function Tiles({
       </div>
     );
   const aspect = asset && asset.height ? asset.width / asset.height : 0.56;
-  const tileW = Math.min(Math.max(h * aspect, 30), 114);
   const widthPx = item.duration * pps;
-  const count = Math.min(Math.ceil(widthPx / tileW), 120);
+  // 長影片：需要的格數超過上限時每格放寬，整個片段一定鋪滿（不會 1 分鐘之後變空白）
+  const { count, tileW } = tileLayout(widthPx, Math.min(Math.max(h * aspect, 30), 114));
   return (
     <div className="tiles">
       {Array.from({ length: count }, (_, i) => {
@@ -112,18 +113,25 @@ function gapsOf(items: Item[], includeLeading: boolean): { start: number; len: n
   return out;
 }
 
-const EXPANDED_KEY = 'vc-tl-expanded';
-const readExpanded = () => {
+/** 每一類（影像、貼圖、字卡、音訊）各自收合：記下「收起來的類別」在這台手機；預設全部展開 */
+const CATS_KEY = 'vc-tl-cats';
+const readClosed = (): TrackKind[] => {
   try {
-    return localStorage.getItem(EXPANDED_KEY) === '1';
+    const v = JSON.parse(localStorage.getItem(CATS_KEY) ?? '[]') as unknown;
+    return Array.isArray(v) ? (v.filter((k) => ORDER.includes(k as TrackKind)) as TrackKind[]) : [];
   } catch {
-    return false;
+    return [];
   }
 };
-const KIND_NAME: Record<TrackKind, string> = { media: '影像', effect: '特效', text: '字卡', audio: '音訊' };
+/** 時間軸由上到下的類別順序（跟圖層由上到下一致：字卡 → 貼圖 → 影像，音訊沒有畫面在最下面） */
+const ORDER: TrackKind[] = ['text', 'sticker', 'media', 'audio'];
+/** 左邊留給軌道圖示的寬度：播放頭固定在這裡，0 秒的內容直接從這裡開始（不再有半個畫面的空白） */
+const GUTTER = 56;
+const HEAD_H = 22; // 每一類的標題列
+const KIND_NAME: Record<TrackKind, string> = { media: '影像', sticker: '貼圖', text: '字卡', audio: '音訊' };
 const KIND_BAR: Record<TrackKind, string> = {
   media: 'var(--clip)',
-  effect: 'var(--clip-effect)',
+  sticker: 'var(--clip-effect)',
   text: 'var(--clip-text)',
   audio: 'var(--clip-audio)',
 };
@@ -218,9 +226,11 @@ export function Timeline({
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
+  const fxFocus = useUI((s) => s.fxFocus);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSet = useRef(-100);
-  const [half, setHalf] = useState(180);
+  const [vw, setVw] = useState(360);
+  const half = GUTTER;
   const [drag, setDrag] = useState<Drag | null>(null);
   const [menuTrackId, setMenuTrackId] = useState<string | null>(null);
   const proxyProgress = useProxyProgress((s) => s.progress);
@@ -232,85 +242,87 @@ export function Timeline({
   const total = totalDuration(project);
   const baseId = baseMediaTrack(project)?.id;
   const [gapSel, setGapSel] = useState<{ trackId: string; at: number } | null>(null);
-  // 收合：預設只看最下面那條影像軌，其他每一類縮成一條摘要列；按「圖層」展開全部（記在這台手機）
-  const [expanded, setExpanded] = useState(readExpanded);
-  const [openZones, setOpenZones] = useState<TrackKind[]>([]);
-  const [renameTrackId, setRenameTrackId] = useState<string | null>(null);
-  const [renameItemId, setRenameItemId] = useState<string | null>(null);
-  const toggleExpanded = () => {
-    const v = !expanded;
-    setExpanded(v);
-    setOpenZones([]);
+  const [closed, setClosed] = useState<TrackKind[]>(readClosed);
+  const setClosedSave = (next: TrackKind[]) => {
+    setClosed(next);
     try {
-      localStorage.setItem(EXPANDED_KEY, v ? '1' : '0');
+      localStorage.setItem(CATS_KEY, JSON.stringify(next));
     } catch {
       /* 存不了就只換這一次 */
     }
   };
-  const selectedTrackId = project.tracks.find((t) => t.items.some((x) => x.id === selectedId))?.id;
+  const [renameTrackId, setRenameTrackId] = useState<string | null>(null);
+  const [renameItemId, setRenameItemId] = useState<string | null>(null);
+  // 選到某個物件、或加進新的物件：它那一類自動展開
+  useEffect(
+    () =>
+      useProjectStore.subscribe((next, prev) => {
+        const cur = next.project;
+        if (!cur) return;
+        const kinds = new Set<TrackKind>();
+        if (next.selectedId && next.selectedId !== prev.selectedId) {
+          const t = cur.tracks.find((tr) => tr.items.some((x) => x.id === next.selectedId));
+          if (t) kinds.add(t.kind);
+        }
+        for (const t of cur.tracks)
+          if (t.items.length && !prev.project?.tracks.some((b) => b.id === t.id)) kinds.add(t.kind);
+        if (kinds.size === 0) return;
+        setClosed((c) => {
+          const rest = c.filter((k) => !kinds.has(k));
+          if (rest.length === c.length) return c;
+          try {
+            localStorage.setItem(CATS_KEY, JSON.stringify(rest));
+          } catch {
+            /* 存不了就只換這一次 */
+          }
+          return rest;
+        });
+      }),
+    [],
+  );
 
-  // 由上到下顯示：字卡 → 特效 → 影像（最上層的軌道在最上面），音訊沒有畫面，畫在最下面、跟上面隔一小段。
-  // 拖素材時（slotZone），那個素材所屬的區上下各多出一條「＋ 新增一軌」的放置區
+  // 由上到下顯示：字卡 → 貼圖 → 影像（最上層的軌道在最上面），音訊沒有畫面，畫在最下面、跟上面隔一小段。
+  // 每一類有一條標題列（▾／▸ 可以各自收合，收合時標題列上畫出那一類每個物件的位置）。
+  // 拖素材時（slotZone），那個素材所屬的類別上下各多出一條「＋ 新增一軌」的放置區
   const draggedItem = drag ? project.tracks.flatMap((t) => t.items).find((x) => x.id === drag.id) : undefined;
-  const slotZone = draggedItem ? ZONE[trackKindOf(draggedItem)] : null;
+  const slotZone = draggedItem ? ZONE[trackKindOf(draggedItem, project.assets)] : null;
   // 多選軌道（長按軌道圖示進入）：一起上移／下移、整併、刪除
   const [multi, setMulti] = useState<string[] | null>(null);
-  const showAll = expanded || !!drag || !!multi; // 拖素材、多選的時候全部展開（才找得到要放的軌道）
+  const showAll = !!drag || !!multi; // 拖素材、多選的時候全部展開（才找得到要放的軌道）
   const layout = useMemo(() => {
     // 版型的各格軌道藏起來（時間軸上由外框那一條代表整個版型）
     const all = project.tracks
       .map((track, index) => ({ track, index }))
       .filter((r) => r.track.groupRole !== 'cell')
       .reverse();
-    const list = [
-      ...all.filter((r) => r.track.kind !== 'audio'),
-      ...all.filter((r) => r.track.kind === 'audio'),
-    ];
-    const shown = (r: (typeof list)[number]) =>
-      showAll || r.track.id === baseId || r.track.id === selectedTrackId || openZones.includes(r.track.kind);
-    // 收合時，連續幾條不顯示的同種類軌道合成一條摘要列
-    type Entry =
-      { type: 'track'; r: (typeof list)[number] } | { type: 'summary'; kind: TrackKind; tracks: Track[] };
-    const entries: Entry[] = [];
-    for (const r of list) {
-      if (shown(r)) entries.push({ type: 'track', r });
-      else {
-        const last = entries[entries.length - 1];
-        if (last?.type === 'summary' && last.kind === r.track.kind) last.tracks.push(r.track);
-        else entries.push({ type: 'summary', kind: r.track.kind, tracks: [r.track] });
-      }
-    }
     const slots: { edge: 'top' | 'bottom'; top: number }[] = [];
-    const summaries: { kind: TrackKind; tracks: Track[]; top: number }[] = [];
+    const heads: { kind: TrackKind; tracks: Track[]; top: number; open: boolean }[] = [];
     const rows: { track: Track; index: number; h: number; top: number }[] = [];
     let y = RULER_H + ROW_GAP;
-    entries.forEach((e, i) => {
-      const kind = e.type === 'track' ? e.r.track.kind : e.kind;
-      const z = ZONE[kind];
-      const prev = entries[i - 1];
-      const prevKind = prev ? (prev.type === 'track' ? prev.r.track.kind : prev.kind) : undefined;
-      const next = entries[i + 1];
-      const nextKind = next ? (next.type === 'track' ? next.r.track.kind : next.kind) : undefined;
-      if (i > 0 && kind === 'audio' && prevKind !== 'audio') y += ROW_GAP * 2;
-      if (e.type === 'summary') {
-        summaries.push({ kind: e.kind, tracks: e.tracks, top: y });
-        y += SUM_H + ROW_GAP;
-        return;
-      }
-      if (slotZone === z && (prevKind === undefined || ZONE[prevKind] !== z)) {
+    for (const kind of ORDER) {
+      const list = all.filter((r) => r.track.kind === kind);
+      if (list.length === 0) continue;
+      if (kind === 'audio') y += ROW_GAP * 2;
+      const open = showAll || !closed.includes(kind);
+      heads.push({ kind, tracks: list.map((r) => r.track), top: y, open });
+      y += HEAD_H + ROW_GAP;
+      if (!open) continue;
+      if (slotZone === ZONE[kind]) {
         slots.push({ edge: 'top', top: y });
         y += SLOT_H + ROW_GAP;
       }
-      const h = e.r.track.id === baseId ? BASE_H : ROW_H;
-      rows.push({ ...e.r, h, top: y });
-      y += h + ROW_GAP;
-      if (slotZone === z && (nextKind === undefined || ZONE[nextKind] !== z)) {
+      for (const r of list) {
+        const h = r.track.id === baseId ? BASE_H : ROW_H;
+        rows.push({ ...r, h, top: y });
+        y += h + ROW_GAP;
+      }
+      if (slotZone === ZONE[kind]) {
         slots.push({ edge: 'bottom', top: y });
         y += SLOT_H + ROW_GAP;
       }
-    });
-    return { rows, slots, summaries, end: y - ROW_GAP };
-  }, [project.tracks, baseId, slotZone, showAll, selectedTrackId, openZones]);
+    }
+    return { rows, slots, heads, end: y - ROW_GAP };
+  }, [project.tracks, baseId, slotZone, showAll, closed]);
   const rows = layout.rows;
   const layoutRef = useRef(layout);
   useLayoutEffect(() => {
@@ -384,9 +396,9 @@ export function Timeline({
 
   useLayoutEffect(() => {
     const el = scrollRef.current!;
-    const ro = new ResizeObserver(() => setHalf(el.clientWidth / 2));
+    const ro = new ResizeObserver(() => setVw(el.clientWidth));
     ro.observe(el);
-    setHalf(el.clientWidth / 2);
+    setVw(el.clientWidth);
     return () => ro.disconnect();
   }, []);
 
@@ -503,7 +515,12 @@ export function Timeline({
       return { trackId: null, newEdge: null };
     };
     const targetFor = (hover: Hover): DropTarget | null =>
-      dropTarget(useProjectStore.getState().project!.tracks, item, hover);
+      dropTarget(
+        useProjectStore.getState().project!.tracks,
+        item,
+        hover,
+        useProjectStore.getState().project!.assets,
+      );
     // 剛拖起來時版面會多出放置區、把列往下推：手指上下移動不到 12px 都當作還在原本的軌道上（只是左右移動時間）
     const resolveHover = (clientY: number): Hover =>
       Math.abs(clientY - startY) < 12 ? { trackId: track.id, newEdge: null } : hoverAt(clientY);
@@ -632,7 +649,7 @@ export function Timeline({
   /** 拖素材時，每一列的樣子：放得進去的亮起來、不同種類的變灰 */
   const dropClass = (track: Track): string => {
     if (!drag || !draggedItem) return '';
-    if (track.kind !== trackKindOf(draggedItem)) return ' drop-bad';
+    if (track.kind !== trackKindOf(draggedItem, project.assets)) return ' drop-bad';
     return drag.hover.trackId === track.id ? ' drop-ok' : '';
   };
 
@@ -664,17 +681,21 @@ export function Timeline({
         }}
         data-testid="timeline-scroll"
       >
-        <div className="tl-content" data-bg="1" style={{ width: half * 2 + total * pps, height: contentH }}>
+        <div
+          className="tl-content"
+          data-bg="1"
+          style={{ width: half + total * pps + Math.max(vw - half, 120), height: contentH }}
+        >
           <div className="ruler" style={{ height: RULER_H }}>
             <button
               className="layers-toggle"
               aria-label="圖層清單"
-              aria-expanded={expanded}
+              aria-expanded={closed.length === 0}
               data-testid="layers-toggle"
               onPointerDown={(e) => e.stopPropagation()}
-              onClick={toggleExpanded}
+              onClick={() => setClosedSave(closed.length === 0 ? layout.heads.map((h) => h.kind) : [])}
             >
-              {expanded ? '▴' : '▾'} 圖層（{project.tracks.length}）
+              {closed.length === 0 ? '▴' : '▾'} 圖層（{project.tracks.length}）
             </button>
             {ticks.map((t) => (
               <span key={t} className="tick" style={{ left: half + t * pps }}>
@@ -694,40 +715,51 @@ export function Timeline({
               ＋ 新增一軌
             </div>
           ))}
-          {layout.summaries.map((sm) => {
-            const hidden = sm.tracks.filter((t) => t.hidden).length;
-            const count = sm.tracks.reduce((n, t) => n + t.items.length, 0);
+          {layout.heads.map((hd) => {
+            const hidden = hd.tracks.filter((t) => t.hidden).length;
+            const count = hd.tracks.reduce((n, t) => n + t.items.length, 0);
             return (
               <div
-                key={`${sm.kind}-${sm.tracks[0]!.id}`}
-                className="track-summary"
-                data-testid="track-summary"
-                data-kind={sm.kind}
+                key={hd.kind}
+                className={`cat-head${hd.open ? ' open' : ''}`}
+                data-testid="cat-head"
+                data-kind={hd.kind}
+                data-open={hd.open}
                 data-bg="1"
-                style={{ top: sm.top, height: SUM_H }}
+                style={{ top: hd.top, height: HEAD_H }}
               >
-                {sm.tracks.flatMap((t) =>
-                  t.hidden
-                    ? []
-                    : t.items.map((it) => (
-                        <i
-                          key={it.id}
-                          className="sum-bar"
-                          style={{
-                            left: half + it.start * pps,
-                            width: Math.max(it.duration * pps, 3),
-                            background: KIND_BAR[sm.kind],
-                          }}
-                        />
-                      )),
-                )}
+                {!hd.open &&
+                  hd.tracks.flatMap((t) =>
+                    t.hidden
+                      ? []
+                      : t.items.map((it) => (
+                          <i
+                            key={it.id}
+                            className="sum-bar"
+                            style={{
+                              left: half + it.start * pps,
+                              width: Math.max(it.duration * pps, 3),
+                              background: KIND_BAR[hd.kind],
+                            }}
+                          />
+                        )),
+                  )}
                 <button
-                  className="sum-label"
-                  aria-label={`展開${KIND_NAME[sm.kind]}（${count} 個）`}
+                  className="cat-toggle"
+                  aria-expanded={hd.open}
+                  aria-label={`${hd.open ? '收合' : '展開'}${KIND_NAME[hd.kind]}（${count} 個）`}
+                  data-testid="cat-toggle"
+                  disabled={showAll}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => setOpenZones((z) => [...z, sm.kind])}
+                  onClick={() =>
+                    setClosedSave(
+                      hd.open
+                        ? [...closed.filter((k) => k !== hd.kind), hd.kind]
+                        : closed.filter((k) => k !== hd.kind),
+                    )
+                  }
                 >
-                  {KIND_NAME[sm.kind]}×{count}
+                  {hd.open ? '▾' : '▸'} {KIND_NAME[hd.kind]} {hd.tracks.length}
                   {hidden > 0 && `（${hidden} 條隱藏）`}
                 </button>
               </div>
@@ -879,10 +911,10 @@ export function Timeline({
                   );
                 })}
 
-                {track.kind === 'media' &&
+                {track.kind !== 'audio' &&
                   !track.groupRole &&
                   seamsOf(track.items).map(({ next }) => {
-                    const sel = next.id === selectedId;
+                    const sel = next.id === selectedId && fxFocus?.id === next.id && fxFocus.role === 'seam';
                     const tr = next.transitionIn;
                     return (
                       <button
@@ -896,14 +928,104 @@ export function Timeline({
                         onClick={(e) => {
                           e.stopPropagation();
                           useProjectStore.getState().select(next.id);
+                          useUI.setState({ requestTab: 'effect', fxFocus: { id: next.id, role: 'seam' } });
                           player?.seek(next.start + 0.02);
-                          useUI.setState({ requestTab: 'effect' });
                         }}
                       >
                         {tr ? transitionCode(tr.kind) : '＋'}
                       </button>
                     );
                   })}
+
+                {/* 單一素材的進場／出場特效：特效佔的那一段（淡色）＋代表字圓圈（跟接縫的轉場不同色）；版型看外框那一條 */}
+                {track.kind !== 'audio' &&
+                  track.groupRole !== 'cell' &&
+                  track.items.map((it) => {
+                    const styleFx = it.type === 'text' ? it.textFx : undefined;
+                    if (it.type === 'audio' || (!it.inEffect && !it.outEffect && !styleFx)) return null;
+                    const d = effectDurations(it);
+                    const x0 = half + it.start * pps;
+                    const x1 = x0 + it.duration * pps;
+                    const mk = (role: 'in' | 'out', kind: EffectKind, left: number, w: number) => {
+                      const sel = it.id === selectedId && fxFocus?.id === it.id && fxFocus.role === role;
+                      return (
+                        <span key={`${it.id}-${role}`}>
+                          <span
+                            className={`fx-span ${role}${sel ? ' sel' : ''}`}
+                            style={{ left: role === 'in' ? x0 : x1 - w, width: w }}
+                          />
+                          <button
+                            className={`fx-circle ${role}${sel ? ' sel' : ''}`}
+                            data-testid={`fx-circle-${role}`}
+                            data-item-id={it.id}
+                            aria-label={`${role === 'in' ? '進場' : '出場'}特效 ${transitionName(kind)}`}
+                            style={{ left }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              useProjectStore.getState().select(it.id);
+                              useUI.setState({
+                                requestTab: track.groupRole === 'frame' ? 'layout' : 'effect',
+                                fxFocus: { id: it.id, role },
+                              });
+                              player?.seek(it.start + (role === 'in' ? 0.02 : it.duration - 0.05));
+                            }}
+                          >
+                            {transitionCode(kind)}
+                          </button>
+                        </span>
+                      );
+                    };
+                    const styleSel =
+                      it.id === selectedId && fxFocus?.id === it.id && fxFocus.role === 'style';
+                    return (
+                      <span key={`fx-${it.id}`}>
+                        {styleFx && (
+                          <button
+                            className={`fx-circle style${styleSel ? ' sel' : ''}`}
+                            data-testid="fx-circle-style"
+                            data-item-id={it.id}
+                            aria-label={`文字特效 ${textFxName(styleFx.kind)}`}
+                            style={{ left: x0 + Math.max((x1 - x0) / 2 - 11, 13) }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              useProjectStore.getState().select(it.id);
+                              useUI.setState({ requestTab: 'effect', fxFocus: { id: it.id, role: 'style' } });
+                              player?.seek(it.start + 0.3);
+                            }}
+                          >
+                            {textFxCode(styleFx.kind)}
+                          </button>
+                        )}
+                        {it.inEffect && d.in > 0.01 && mk('in', it.inEffect.kind, x0 + 13, d.in * pps)}
+                        {it.outEffect &&
+                          d.out > 0.01 &&
+                          mk('out', it.outEffect.kind, Math.max(x1 - 35, x0 + 37), d.out * pps)}
+                      </span>
+                    );
+                  })}
+
+                {/* 定位（關鍵影格）：物件開始後 t 秒的位置放一個小菱形；點一下＝播放頭跳過去並選取 */}
+                {track.groupRole !== 'cell' &&
+                  track.items.flatMap((it) =>
+                    (it.keyframes ?? []).map((k, i) => (
+                      <button
+                        key={`kf-${it.id}-${i}`}
+                        className="kf-dot"
+                        data-testid="kf-dot"
+                        data-item-id={it.id}
+                        aria-label={`定位 ${(it.start + k.t).toFixed(1)} 秒`}
+                        style={{ left: half + (it.start + k.t) * pps, bottom: 3 }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          useProjectStore.getState().select(it.id);
+                          player?.seek(it.start + k.t);
+                        }}
+                      />
+                    )),
+                  )}
 
                 {track.id === baseId && (
                   <button

@@ -2,6 +2,7 @@ import {
   Application,
   BlurFilter,
   CanvasSource,
+  ColorMatrixFilter,
   Container,
   Graphics,
   ImageSource,
@@ -10,7 +11,8 @@ import {
   Texture,
 } from 'pixi.js';
 import 'pixi.js/advanced-blend-modes';
-import type { BlendMode, Crop, Outline } from '../model/types';
+import type { Adjust, BlendMode, Crop, Outline } from '../model/types';
+import { adjustMatrix } from './keyframes';
 import type { Box } from './geometry';
 import { uiScale } from './textRender';
 
@@ -61,6 +63,8 @@ export type SceneLayer = {
   clip?: { rects?: [number, number, number, number][]; circle?: { cx: number; cy: number; r: number } };
   /** 轉場：模糊程度（畫布像素） */
   blur?: number;
+  /** 色調（亮度、飽和度、色溫、色調）；沒有或全是 0＝不加濾鏡 */
+  adjust?: Partial<Adjust>;
 };
 
 type Obj = {
@@ -70,6 +74,7 @@ type Obj = {
   clip: Graphics | null;
   clipKey: string;
   blurF: BlurFilter | null;
+  colorF: ColorMatrixFilter | null;
   sprite: Sprite;
   texture: Texture | null;
   textureSource: CanvasSource | ImageSource | null;
@@ -174,6 +179,7 @@ export class Compositor {
       clip: null,
       clipKey: '',
       blurF: null,
+      colorF: null,
       container,
       sprite,
       texture: null,
@@ -460,15 +466,24 @@ export class Compositor {
       o.clip = null;
       o.clipKey = '';
     }
-    if (layer.blur && layer.blur > 0.5) {
-      if (!o.blurF) o.blurF = new BlurFilter({ strength: layer.blur, quality: 2 });
-      o.blurF.strength = layer.blur;
-      o.container.filters = [o.blurF];
+    const blur = layer.blur && layer.blur > 0.5 ? layer.blur : 0;
+    if (blur) {
+      if (!o.blurF) o.blurF = new BlurFilter({ strength: blur, quality: 1 });
+      o.blurF.strength = blur;
     } else if (o.blurF) {
-      o.container.filters = null;
       o.blurF.destroy();
       o.blurF = null;
     }
+    const cm = adjustMatrix(layer.adjust);
+    if (cm) {
+      if (!o.colorF) o.colorF = new ColorMatrixFilter();
+      o.colorF.matrix = cm as ColorMatrixFilter['matrix'];
+    } else if (o.colorF) {
+      o.colorF.destroy();
+      o.colorF = null;
+    }
+    const fl = [o.colorF, o.blurF].filter((x): x is ColorMatrixFilter | BlurFilter => !!x);
+    o.container.filters = fl.length ? fl : null;
   }
 
   private destroyObj(o: Obj) {

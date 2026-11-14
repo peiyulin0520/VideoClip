@@ -1,21 +1,46 @@
+import { useEffect, useState } from 'react';
+import type { Player } from '../../../engine/player';
 import { ArrowDown, ArrowUp, Eye, EyeOff, Layers, Lock, Type } from 'lucide-react';
 import { BLEND_LABELS } from '../../../engine/geometry';
+import { timeResolved } from '../../../engine/keyframes';
 import { findItem, isVideoItem, layersAt } from '../../../engine/timeline';
 import { editItem, patchTrack, resetTransform, setTransform, shiftTrackLayer } from '../../../store/actions';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
 import { TransformControls } from '../TransformControls';
+import { KeyframePanel } from './KeyframePanel';
 import { BLENDS, COLORS } from './shared';
+
+/**
+ * 播放頭的時間（暫停＝每次移動都更新；播放中每 0.5 秒更新一次，免得整個面板一直重畫）。
+ * 以前只在重畫時讀一次，播放頭移動後清單還是舊的那一秒（「這一秒沒有任何圖層」但其實有）。
+ */
+function usePlayerTime(player: Player | null): number {
+  const [t, setT] = useState(player?.time ?? 0);
+  useEffect(() => {
+    if (!player) return;
+    let last = 0;
+    queueMicrotask(() => setT(player.time));
+    return player.subscribe((time, playing) => {
+      const now = performance.now();
+      if (playing && now - last < 500) return;
+      last = now;
+      setT(time);
+    });
+  }, [player]);
+  return t;
+}
 
 export function LayersTab() {
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
-  const t = player?.time ?? 0;
+  const t = usePlayerTime(player);
   // 目前這一秒有哪些圖層（最上層在最上面）
   const layers = layersAt(project, t, true).slice().reverse();
-  const found = findItem(project, selectedId);
+  // 有定位（關鍵影格）的物件：滑桿顯示播放頭這個時間的樣子
+  const found = findItem(timeResolved(project, t), selectedId);
   const it = found && found.item.type !== 'audio' ? found.item : undefined;
 
   return (
@@ -96,6 +121,7 @@ export function LayersTab() {
             <span>選取的圖層</span>
           </div>
           <TransformControls item={it} />
+          <KeyframePanel item={it} project={project} />
           {it.type === 'text' && <p className="hint">文字本身的透明度在「文字」分頁。</p>}
           <Slider
             label="整個圖層透明度"

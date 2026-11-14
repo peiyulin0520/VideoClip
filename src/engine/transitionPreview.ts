@@ -1,5 +1,5 @@
-import type { TransitionKind } from '../model/types';
-import { transitionFrame, type ClipFrac, type Look } from './transitions';
+import type { EffectKind } from '../model/types';
+import { effectFrame, transitionFrame, type ClipFrac, type Look } from './transitions';
 
 // 轉場選單上的小示意動畫：用兩張自己畫的圖（A：暖橘色、B：藍綠色）走一遍跟正式畫面同一個 transitionFrame，
 // 畫在 2D canvas 上。不需要跟正式畫面一模一樣（模糊在 Safari 不支援 ctx.filter 時就省略），看得出是什麼效果就好。
@@ -53,13 +53,34 @@ export function drawTransitionDemo(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  kind: TransitionKind,
+  kind: EffectKind,
   p: number,
+  role?: 'in' | 'out',
 ) {
-  const f = transitionFrame(kind, p);
   ctx.save();
   ctx.fillStyle = '#111';
   ctx.fillRect(0, 0, w, h);
+  if (kind === 'typewriter') {
+    // 打字：一個字一個字出現（進場）／從後面刪掉（出場）
+    const text = '打字效果';
+    const n = Math.ceil((role === 'out' ? 1 - p : p) * text.length);
+    ctx.fillStyle = '#fff';
+    ctx.font = `700 ${Math.round(h * 0.22)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text.slice(0, n), w / 2, h / 2);
+    ctx.restore();
+    return;
+  }
+  if (role) {
+    // 單一素材：進場＝前面是空，只畫 B；出場＝後面是空，只畫 A
+    const e = effectFrame({ role, kind, p, duration: 1 });
+    drawLayer(ctx, w, h, e.look, role === 'in' ? 'B' : 'A');
+    drawCovers(ctx, w, h, e.covers);
+    ctx.restore();
+    return;
+  }
+  const f = transitionFrame(kind, p);
   if (f.bOnTop) {
     drawLayer(ctx, w, h, f.a, 'A');
     drawLayer(ctx, w, h, f.b, 'B');
@@ -67,7 +88,17 @@ export function drawTransitionDemo(
     drawLayer(ctx, w, h, f.b, 'B');
     drawLayer(ctx, w, h, f.a, 'A');
   }
-  for (const c of f.covers) {
+  drawCovers(ctx, w, h, f.covers);
+  ctx.restore();
+}
+
+function drawCovers(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  covers: ReturnType<typeof transitionFrame>['covers'],
+) {
+  for (const c of covers) {
     const r = c.rect ?? [0, 0, 1, 1];
     ctx.globalAlpha = Math.min(Math.max(c.alpha, 0), 1);
     if (c.kind === 'flash') {
@@ -79,5 +110,4 @@ export function drawTransitionDemo(
     } else ctx.fillStyle = c.color;
     ctx.fillRect(r[0] * w, r[1] * h, r[2] * w, r[3] * h);
   }
-  ctx.restore();
 }

@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { execSync } from 'node:child_process';
@@ -18,11 +18,24 @@ const sha = (
 const built = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16);
 
 // GitHub Pages 網址：https://peiyulin0520.github.io/VideoClip/
+// 把版本號另外寫成 version.json（不進預快取）：網頁開著或回到前景時，拿它跟自己的版本比對，不一樣就更新
+const versionJson = (): Plugin => ({
+  name: 'version-json',
+  generateBundle() {
+    this.emitFile({
+      type: 'asset',
+      fileName: 'version.json',
+      source: JSON.stringify({ version: `${built}（${sha}）` }),
+    });
+  },
+});
+
 export default defineConfig({
   base: '/VideoClip/',
   define: { __APP_VERSION__: JSON.stringify(`${built}（${sha}）`) },
   plugins: [
     react(),
+    versionJson(),
     VitePWA({
       registerType: 'autoUpdate',
       // 自己在 main.tsx 註冊：開網頁、回到前景時都檢查新版，新版接手後自動重新整理（不然 iPhone 會一直開到快取的舊版）

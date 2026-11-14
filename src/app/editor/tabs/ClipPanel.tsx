@@ -5,7 +5,7 @@ import { editItem } from '../../../store/actions';
 import { setTrackItems, useProjectStore } from '../../../store/projectStore';
 import { toast } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
-import { TrimPanel } from '../TrimPanel';
+import { TrimSheet } from '../TrimSheet';
 import { SPEEDS, type Found, type Panel } from './shared';
 
 /** 有面板要顯示嗎（選到的要是影片／照片／音樂） */
@@ -28,7 +28,7 @@ export function ClipPanel({
   if (panel === 'trim' && selected && isVideoItem(selected) && found) {
     const asset = project.assets.find((a) => a.id === selected.assetId);
     if (asset)
-      return <TrimPanel item={selected} asset={asset} track={found.track} onClose={() => setPanel(null)} />;
+      return <TrimSheet item={selected} asset={asset} track={found.track} onClose={() => setPanel(null)} />;
   }
 
   if (panel && selected && isVideoItem(selected)) {

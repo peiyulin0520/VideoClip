@@ -137,9 +137,9 @@ describe('軌道分區：影像 → 特效 → 字卡 → 音訊', () => {
     const text1 = t('text');
     const audio = t('audio');
     const media2 = t('media');
-    const effect = t('effect');
+    const effect = t('sticker');
     const mixed = [p.tracks[0]!, text1, audio, media2, effect];
-    expect(normalizeZones(mixed).map((x) => x.kind)).toEqual(['media', 'media', 'effect', 'text', 'audio']);
+    expect(normalizeZones(mixed).map((x) => x.kind)).toEqual(['media', 'media', 'sticker', 'text', 'audio']);
     expect(normalizeZones(mixed)[0]).toBe(p.tracks[0]);
     expect(normalizeZones(mixed)[1]).toBe(media2);
   });
@@ -149,10 +149,10 @@ describe('軌道分區：影像 → 特效 → 字卡 → 音訊', () => {
     p.tracks.push(t('text'), t('audio'));
     expect(insertIndexFor(p.tracks, 'media')).toBe(1); // 影像區只有 [0]，新的放它上面（字卡前面）
     expect(insertIndexFor(p.tracks, 'text')).toBe(2);
-    expect(insertIndexFor(p.tracks, 'effect')).toBe(1); // 特效區還沒有：接在影像區後面
+    expect(insertIndexFor(p.tracks, 'sticker')).toBe(1); // 特效區還沒有：接在影像區後面
     expect(insertIndexFor(p.tracks, 'audio')).toBe(3);
     expect(zoneRange(p.tracks, 'media')).toEqual([0, 0]);
-    expect(zoneRange(p.tracks, 'effect')).toBeNull();
+    expect(zoneRange(p.tracks, 'sticker')).toBeNull();
   });
 
   it('baseMediaTrack／mediaItems：最下面那條影像軌、所有影像物件依時間排好', () => {

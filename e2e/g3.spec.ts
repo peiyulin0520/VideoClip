@@ -41,7 +41,12 @@ async function drag(page: Page, testId: string, dx: number) {
   await page.mouse.up();
 }
 
-test('修剪面板：沒有兩側拉霸，上方有小旗標；沒選到的灰掉；拖旗標時小畫面顯示那一秒的畫面', async ({
+async function clickStrip(page: Page, frac: number) {
+  const b = (await page.getByTestId('trim-strip').boundingBox())!;
+  await page.mouse.click(b.x + b.width * frac, b.y + b.height / 2);
+}
+
+test('修剪面板：沒有兩側拉霸，上方有小旗標（1起／1迄）；沒選到的灰掉；拖旗標時預覽跟著、按「套用」才改片段', async ({
   page,
 }) => {
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
@@ -51,26 +56,23 @@ test('修剪面板：沒有兩側拉霸，上方有小旗標；沒選到的灰�
   await page.getByRole('button', { name: '修剪', exact: true }).tap();
   await expect(page.getByTestId('range-flag-start-0')).toBeVisible();
   await expect(page.getByTestId('range-flag-end-0')).toBeVisible();
+  await expect(page.getByTestId('range-flag-start-0')).toContainText('1起');
+  await expect(page.getByTestId('range-flag-end-0')).toContainText('1迄');
   await expect(page.getByTestId('trim-grip-left')).toHaveCount(0); // 舊的兩側拉霸沒有了
-  await expect(page.locator('.range-gray')).toHaveCount(0); // 全部都選了，沒有灰的
+  await expect(page.getByTestId('range-gray')).toHaveCount(0); // 全部都選了，沒有灰的
+  await expect(page.getByTestId('rm-video')).toBeVisible(); // 有預覽畫面
 
-  // 終點旗標往左拉 1/2：右半灰掉；片段變短；小畫面有畫面（紅色影片）
+  // 終點旗標往左拉 1/2：右半灰掉；按套用才改片段
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
   await drag(page, 'range-flag-end-0', -strip.width / 2);
-  await expect(page.locator('.range-gray')).toHaveCount(1);
+  await expect(page.getByTestId('range-gray')).toHaveCount(1);
+  await expect(page.getByTestId('rm-now')).toContainText('2.');
+  expect((await tracks(page))[0]!.items[0]!.duration).toBeCloseTo(4, 1); // 還沒套用
+  await page.screenshot({ path: `${SHOT}/flags.png` });
+  await page.getByTestId('rm-apply').tap();
   const it = (await tracks(page))[0]!.items[0]!;
   expect(it.duration).toBeGreaterThan(1.7);
   expect(it.duration).toBeLessThan(2.3);
-  await expect
-    .poll(async () =>
-      page.getByTestId('range-mini').evaluate((cv) => {
-        const c = cv as HTMLCanvasElement;
-        const d = c.getContext('2d')!.getImageData(c.width >> 1, c.height >> 1, 1, 1).data;
-        return d[0]! > 200 && d[1]! < 80 && d[2]! < 80;
-      }),
-    )
-    .toBe(true);
-  await page.screenshot({ path: `${SHOT}/flags.png` });
 });
 
 test('修剪面板：再加一段（多段）→ 完成後拆成兩個片段，各留在原本的時間位置、中間是空位；復原回到一段', async ({
@@ -83,12 +85,13 @@ test('修剪面板：再加一段（多段）→ 完成後拆成兩個片段，�
   await page.getByRole('button', { name: '修剪', exact: true }).tap();
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
   await drag(page, 'range-flag-end-0', -strip.width * 0.75); // 留 [0, 1]
-  await page.getByTestId('range-add').tap(); // 最大的空檔（1–4 秒）正中間放 1 秒 → [2, 3]
+  await clickStrip(page, 0.5); // 白線移到 2 秒
+  await page.getByTestId('range-add').tap(); // 白線位置放 1 秒 → [2, 3]
   await expect(page.getByTestId('range-flag-start-1')).toBeVisible();
-  await expect(page.getByTestId('trim-info')).toContainText('共 2 段');
-  await expect(page.getByTestId('range-remove')).toBeVisible();
+  await expect(page.getByTestId('trim-info')).toContainText('共 2 組');
+  await expect(page.getByTestId('range-remove-1')).toBeVisible();
   await page.screenshot({ path: `${SHOT}/two-ranges.png` });
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('rm-apply').tap();
   const items = (await tracks(page))[0]!.items.slice().sort((a, b) => a.start - b.start);
   expect(items).toHaveLength(2);
   expect(items[0]!.start).toBeCloseTo(0, 1);

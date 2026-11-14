@@ -12,9 +12,12 @@ import {
 import {
   TEXT_STYLE_KEYS,
   type Aspect,
+  type Adjust,
   type Asset,
+  type EffectKind,
   type Item,
   type Project,
+  type TextFxKind,
   type TextItem,
   type TextRun,
   type TextStyle,
@@ -48,9 +51,18 @@ import {
   trackEnd,
 } from '../engine/timeline';
 import { cellItem, type Rect } from '../engine/layouts';
-import { DEFAULT_TRANSITION_DURATION } from '../engine/transitions';
+import { DEFAULT_EFFECT_DURATION, DEFAULT_TRANSITION_DURATION, seamsOf } from '../engine/transitions';
 import { groupPatch, transformAbout } from '../engine/groupTransform';
+import {
+  hasKeyframes,
+  keyframeIndexAt,
+  removeKeyframe,
+  timeResolved,
+  upsertKeyframe,
+  withTime,
+} from '../engine/keyframes';
 import { useProjectStore } from './projectStore';
+import { toast, useUI } from './uiStore';
 
 const store = () => useProjectStore.getState();
 
@@ -91,6 +103,10 @@ export function separateAudio(id: string): string | null {
     delete audio.mask;
     delete audio.cell;
     delete audio.group;
+    delete audio.maskBitmap;
+    delete audio.transitionIn;
+    delete audio.inEffect;
+    delete audio.outEffect;
     v.volume = 0;
     const ti = trackIndexFor(d.tracks as Track[], 'audio', audio.start, audio.duration);
     d.tracks[ti]!.items.push(audio);
@@ -119,10 +135,12 @@ export function resetTransform(id: string): void {
     const frame = groupFrame(p, f.item.group);
     if (frame) return setTransform(frame.item.id, { x: 0.5, y: 0.5, scale: 1, rotation: 0 }, `reset:${id}`);
   }
+  const scale = f.item.type === 'text' || f.track.id === baseMediaTrack(p)?.id ? 1 : 0.5;
+  if (hasKeyframes(f.item)) return setTransform(id, { x: 0.5, y: 0.5, scale, rotation: 0 }, `reset:${id}`);
   editItem(id, (x) => {
     x.transform.x = 0.5;
     x.transform.y = 0.5;
-    x.transform.scale = x.type === 'text' || f.track.id === baseMediaTrack(p)?.id ? 1 : 0.5;
+    x.transform.scale = scale;
     x.transform.rotation = 0;
   });
 }
@@ -142,6 +160,12 @@ function groupItems(p: Project, group: string): VideoItem[] {
     .filter((i): i is VideoItem => i.type !== 'text' && i.group === group);
 }
 
+/** 播放頭在這個物件自己的時間裡的位置（夾在 0～長度之間）；定位（關鍵影格）用 */
+function localTime(it: Item): number {
+  const t = useUI.getState().player?.time ?? 0;
+  return Math.min(Math.max(t - it.start, 0), it.duration);
+}
+
 export function setTransform(id: string, patch: Partial<Transform>, coalesce = `tf:${id}`) {
   const p = store().project;
   const f = p && findItem(p, id);
@@ -149,6 +173,23 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   if (p && f && frame && f.item.type !== 'text') {
     // 版型裡的任何物件：移動、縮放、旋轉都變成「整組」一起動（格子不會單獨跑掉）
     const group = f.item.group!;
+    if (hasKeyframes(frame.item)) {
+      // 外框有定位：改的是播放頭這個時間的定位（整組一起動，各格由外框算出來，不用動）
+      const t = useUI.getState().player?.time ?? 0;
+      const pr = timeResolved(p, t);
+      const rf = groupFrame(pr, group);
+      const rm = findItem(pr, id);
+      if (!rf || !rm) return;
+      const T1 = groupPatch(rf.item.transform, rm.item.transform, patch);
+      editItem(
+        frame.item.id,
+        (it) => {
+          it.keyframes = upsertKeyframe(it, localTime(it), T1);
+        },
+        { coalesce },
+      );
+      return;
+    }
     const T0 = frame.item.transform;
     const T1 = groupPatch(T0, f.item.transform, patch);
     const W = p.width;
@@ -173,7 +214,84 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   editItem(
     id,
     (it) => {
-      Object.assign(it.transform, patch);
+      // 有定位：改的是播放頭這個時間的定位（沒有就自動新增一個）；沒有定位：改物件本身
+      if (hasKeyframes(it as Item)) it.keyframes = upsertKeyframe(it as Item, localTime(it as Item), patch);
+      else Object.assign(it.transform, patch);
+    },
+    { coalesce },
+  );
+}
+
+/** 定位（關鍵影格）作用的物件：版型裡的任何物件＝外框（整組一起動）；音樂沒有 */
+export function keyframeTarget(p: Project, id: string | null): Item | null {
+  const f = id ? findItem(p, id) : null;
+  if (!f || f.item.type === 'audio') return null;
+  if (f.item.type !== 'text' && f.item.group) return groupFrame(p, f.item.group)?.item ?? f.item;
+  return f.item;
+}
+
+/** 播放頭這個時間有沒有定位：沒有就新增（值＝目前畫面上的樣子），有就刪掉。回傳做了什麼 */
+export function toggleKeyframe(id: string): 'added' | 'removed' | null {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target) return null;
+  const local = localTime(target);
+  const idx = keyframeIndexAt(target, local);
+  const t = useUI.getState().player?.time ?? 0;
+  if (t < target.start || t > target.start + target.duration + 1e-6) {
+    toast('播放頭要在這個素材的時間範圍裡才能打定位');
+    return null;
+  }
+  editItem(target.id, (it) => {
+    if (idx >= 0) {
+      const next = removeKeyframe(it as Item, idx);
+      if (next.length) it.keyframes = next;
+      else delete it.keyframes;
+    } else it.keyframes = upsertKeyframe(it as Item, local, {});
+  });
+  return idx >= 0 ? 'removed' : 'added';
+}
+
+/** 清除全部定位：物件停在播放頭這個時間的樣子（畫面不跳）；一步復原 */
+export function clearKeyframes(id: string): void {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target || !hasKeyframes(target)) return;
+  const t = useUI.getState().player?.time ?? 0;
+  const now = withTime(target, t);
+  editItem(target.id, (it) => {
+    it.transform = { ...now.transform };
+    it.adjust = now.adjust ? { ...now.adjust } : undefined;
+    if (!it.adjust) delete it.adjust;
+    delete it.keyframes;
+  });
+}
+
+/**
+ * 色調（亮度、飽和度、色溫、色調）。有定位＝改播放頭這個時間的定位；沒有＝改物件本身（版型＝整組每個物件都改）。
+ */
+export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${id}`): void {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target) return;
+  if (hasKeyframes(target)) {
+    editItem(
+      target.id,
+      (it) => {
+        it.keyframes = upsertKeyframe(it as Item, localTime(it as Item), { adjust: patch });
+      },
+      { coalesce },
+    );
+    return;
+  }
+  const group = target.type !== 'text' && target.type !== 'audio' ? target.group : undefined;
+  store().apply(
+    (d) => {
+      for (const track of d.tracks)
+        for (const it of track.items) {
+          if (it.id !== target.id && !(group && it.type !== 'text' && it.group === group)) continue;
+          it.adjust = { ...it.adjust, ...patch };
+        }
     },
     { coalesce },
   );
@@ -181,16 +299,30 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
 
 /** 把一群疊加素材放在 t 秒：各自放進第一條有空位的疊加軌，沒有就新增一條（所以會疊在同一秒） */
 /** scale：預設大小（貼圖用比較小的 0.3）；整個加入是一步復原 */
-export function addOverlayClips(assets: Asset[], t: number, opts: { scale?: number } = {}): string | null {
+export function addOverlayClips(
+  assets: Asset[],
+  t: number,
+  opts: { scale?: number; sticker?: boolean } = {},
+): string | null {
   if (assets.length === 0) return null;
   let firstId: string | null = null;
   store().apply((d) => {
     // 素材和片段在同一步加入（一次復原就整個拿掉）；已經在專案裡的素材不重複加
-    for (const asset of assets) if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    for (const asset of assets) {
+      const have = d.assets.find((a) => a.id === asset.id);
+      if (!have) d.assets.push(opts.sticker ? { ...asset, origin: 'sticker' } : asset);
+      else if (opts.sticker) have.origin = 'sticker';
+    }
     for (const asset of assets) {
       const clip = createOverlayClip(asset, t);
       if (opts.scale) clip.transform.scale = opts.scale;
-      const ti = trackIndexFor(d.tracks as Track[], 'media', clip.start, clip.duration);
+      // 貼圖放貼圖軌（時間軸上自成一類「貼圖」），影片、照片放影像軌
+      const ti = trackIndexFor(
+        d.tracks as Track[],
+        opts.sticker ? 'sticker' : 'media',
+        clip.start,
+        clip.duration,
+      );
       d.tracks[ti]!.items.push(clip);
       firstId ??= clip.id;
     }
@@ -281,6 +413,9 @@ export function addLayout(o: {
   /** 外框看得到的範圍（px，畫面座標）：選取框、點選範圍用它 */
   frameVisible?: Rect;
   motion?: 'drift' | 'slide';
+  /** 整個版型的進場／出場特效（外框、各格、色塊一起） */
+  inEffect?: TransitionKind;
+  outEffect?: TransitionKind;
 }): string | null {
   const proj = store().project;
   if (!proj || o.cells.length === 0) return null;
@@ -309,6 +444,10 @@ export function addLayout(o: {
     frame.group = group;
     frame.label = o.frameName;
     if (o.motion) frame.motion = o.motion;
+    if (o.inEffect)
+      frame.inEffect = { kind: o.inEffect, duration: Math.min(DEFAULT_EFFECT_DURATION, o.duration) };
+    if (o.outEffect)
+      frame.outEffect = { kind: o.outEffect, duration: Math.min(DEFAULT_EFFECT_DURATION, o.duration) };
     if (o.frameVisible)
       frame.visible = {
         x: o.frameVisible.x / W,
@@ -388,50 +527,104 @@ export function removeGroup(group: string) {
   );
 }
 
+/** 轉場資料換成新的總長（前後的分配照原本的比例；沒分別設定就維持對稱） */
+function withDuration(
+  prev: { duration: number; before?: number; after?: number } | undefined,
+  duration: number,
+) {
+  if (!prev || (prev.before === undefined && prev.after === undefined)) return { duration };
+  const total = (prev.before ?? 0) + (prev.after ?? 0) || 1;
+  return {
+    duration,
+    before: ((prev.before ?? 0) / total) * duration,
+    after: ((prev.after ?? 0) / total) * duration,
+  };
+}
+
 /** 設定（或取消）一個片段的進場轉場；duration 沒給就沿用原本的 */
 export function setTransition(id: string, kind: TransitionKind | null, duration?: number, opts?: Opts): void {
   editItem(
     id,
     (it) => {
-      if (it.type === 'text' || it.type === 'audio') return;
+      if (it.type === 'audio') return;
       if (!kind) delete it.transitionIn;
       else
         it.transitionIn = {
           kind,
-          duration: duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+          ...withDuration(
+            it.transitionIn,
+            duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+          ),
         };
     },
     opts,
   );
 }
 
-/** 同一軌上所有「前面緊接著另一個片段」的片段都套用同一種轉場；回傳套用了幾個 */
+/** 字卡的文字樣式特效（閃爍、發光閃亮、方格字、震動）；null＝取消 */
+export function setTextFx(id: string, kind: TextFxKind | null, opts?: Opts): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type !== 'text') return;
+      if (!kind) delete it.textFx;
+      else it.textFx = { kind };
+    },
+    opts,
+  );
+}
+
+/** 轉場分配：佔前一段結尾 before 秒、佔這一段開頭 after 秒（總長＝兩者相加） */
+export function setTransitionSplit(id: string, before: number, after: number, opts?: Opts): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type === 'audio' || !it.transitionIn) return;
+      it.transitionIn = { ...it.transitionIn, before, after, duration: before + after };
+    },
+    opts,
+  );
+}
+
+/** 單一素材的進場（role in）／出場（role out）特效；kind 是 null＝取消；duration 沒給就沿用原本的（預設 0.8 秒） */
+export function setItemEffect(
+  id: string,
+  role: 'in' | 'out',
+  kind: EffectKind | null,
+  duration?: number,
+  opts?: Opts,
+): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type === 'audio') return;
+      const key = role === 'in' ? 'inEffect' : 'outEffect';
+      if (!kind) delete it[key];
+      else it[key] = { kind, duration: duration ?? it[key]?.duration ?? DEFAULT_EFFECT_DURATION };
+    },
+    opts,
+  );
+}
+
+/** 同一軌上所有「前面緊接著另一個同類片段」的片段都套用同一種轉場；回傳套用了幾個 */
 export function setTransitionAll(trackId: string, kind: TransitionKind | null, duration?: number): number {
   const p = store().project;
   const tr = p?.tracks.find((t) => t.id === trackId);
   if (!p || !tr) return 0;
-  const ids = tr.items
-    .filter((it) => it.type !== 'text' && it.type !== 'audio')
-    .filter((it) =>
-      tr.items.some(
-        (x) =>
-          x !== it &&
-          x.type !== 'text' &&
-          x.type !== 'audio' &&
-          Math.abs(x.start + x.duration - it.start) < 0.03,
-      ),
-    )
-    .map((it) => it.id);
+  const ids = seamsOf(tr.items).map((x) => x.next.id);
   if (ids.length === 0) return 0;
   store().apply((d) => {
     const t = d.tracks.find((x) => x.id === trackId);
     for (const it of t?.items ?? []) {
-      if (!ids.includes(it.id) || it.type === 'text' || it.type === 'audio') continue;
+      if (!ids.includes(it.id) || it.type === 'audio') continue;
       if (!kind) delete it.transitionIn;
       else
         it.transitionIn = {
           kind,
-          duration: duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+          ...withDuration(
+            it.transitionIn,
+            duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
+          ),
         };
     }
   });
@@ -667,7 +860,7 @@ export function removeTrack(trackId: string) {
 export function moveItemTo(id: string, target: DropTarget, start: number): boolean {
   const p = store().project;
   if (!p) return false;
-  const next = moveItemToTrack(p.tracks, id, target, start, createTrack);
+  const next = moveItemToTrack(p.tracks, id, target, start, createTrack, p.assets);
   if (!next) return false;
   store().apply((d) => {
     d.tracks = next as never;

@@ -1,8 +1,9 @@
 import { MAX_SPEED, MIN_CLIP_DURATION, MIN_SPEED, newId } from '../model/defaults';
 import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../model/types';
+import { shiftKeyframes, splitKeyframes } from './keyframes';
 
-/** 軌道種類的分區：影像 → 特效 → 字卡 → 音訊（陣列由前到後＝由下到上的圖層順序）。素材只能放進同種類的軌道。 */
-export const ZONE: Record<TrackKind, number> = { media: 0, effect: 1, text: 2, audio: 3 };
+/** 軌道種類的分區：影像 → 貼圖 → 字卡 → 音訊（陣列由前到後＝由下到上的圖層順序）。素材只能放進同種類的軌道。 */
+export const ZONE: Record<TrackKind, number> = { media: 0, sticker: 1, text: 2, audio: 3 };
 
 /** 依分區排好（同一區維持原本的相對順序） */
 export function normalizeZones(tracks: Track[]): Track[] {
@@ -242,6 +243,7 @@ export function splitFree(items: Item[], id: string, t: number): Item[] | null {
   const local = t - it.start;
   if (local < MIN_CLIP_DURATION || it.duration - local < MIN_CLIP_DURATION) return null;
   const a: Item = { ...it, duration: local };
+  delete a.outEffect; // 出場特效在結尾，前半段沒有
   const b: Item = isVideoItem(it)
     ? {
         ...it,
@@ -251,7 +253,14 @@ export function splitFree(items: Item[], id: string, t: number): Item[] | null {
         trimIn: it.trimIn + local * it.speed,
       }
     : { ...it, id: newId('i_'), start: t, duration: it.duration - local };
-  if (b.type !== 'text' && b.type !== 'audio') delete b.transitionIn; // 轉場在片段的開頭，後半段沒有
+  delete b.transitionIn; // 轉場、進場特效在片段的開頭，後半段沒有
+  delete b.inEffect;
+  if (it.keyframes?.length) {
+    // 定位依切點分到兩段（切點兩邊各補一個，兩段看起來接得起來）
+    const sp = splitKeyframes(it, local);
+    a.keyframes = sp.a;
+    b.keyframes = sp.b;
+  }
   return [...items.slice(0, i), a, b, ...items.slice(i + 1)];
 }
 
@@ -285,6 +294,7 @@ export function trimStartFree(items: Item[], id: string, delta: number): Item[] 
     const d = Math.min(Math.max(delta, lo), hi);
     const next = { ...it, start: it.start + d, duration: it.duration - d };
     if (isVideoItem(it) && it.type !== 'image') (next as VideoItem).trimIn = it.trimIn + d * it.speed;
+    if (it.keyframes) next.keyframes = shiftKeyframes(it.keyframes, d); // 定位的時間點不動（相對於新的起點往前挪）
     return next;
   });
 }
@@ -338,15 +348,17 @@ export function firstFreeTrack(p: Project, kind: Track['kind'], start: number, d
 
 // ---------- 長按拖移素材：拖到別的軌道、別的時間 ----------
 
-/** 物件屬於哪一種軌道（影片、照片、貼圖＝影像；字卡＝字卡；音樂＝音訊） */
-export function trackKindOf(item: Item): TrackKind {
-  return item.type === 'text' ? 'text' : item.type === 'audio' ? 'audio' : 'media';
+/** 物件屬於哪一種軌道（影片、照片＝影像；貼圖＝貼圖；字卡＝字卡；音樂＝音訊）。要傳素材清單才分得出貼圖 */
+export function trackKindOf(item: Item, assets?: Pick<Asset, 'id' | 'origin'>[]): TrackKind {
+  if (item.type === 'text') return 'text';
+  if (item.type === 'audio') return 'audio';
+  return assets?.find((a) => a.id === item.assetId)?.origin === 'sticker' ? 'sticker' : 'media';
 }
 
 /** 軌道種類的中文名（提示用） */
 export const KIND_LABEL: Record<TrackKind, string> = {
-  media: '影像（影片、照片、貼圖）',
-  effect: '特效',
+  media: '影像（影片、照片）',
+  sticker: '貼圖',
   text: '字卡',
   audio: '音樂和音效',
 };
@@ -365,8 +377,9 @@ export function dropTarget(
   tracks: Track[],
   item: Item,
   hover: { trackId: string | null; newEdge: 'top' | 'bottom' | null },
+  assets?: Pick<Asset, 'id' | 'origin'>[],
 ): DropTarget | null {
-  const kind = trackKindOf(item);
+  const kind = trackKindOf(item, assets);
   if (hover.newEdge) return { type: 'new', edge: hover.newEdge };
   if (!hover.trackId) return null;
   const tr = tracks.find((t) => t.id === hover.trackId);
@@ -386,11 +399,12 @@ export function moveItemToTrack(
   target: DropTarget,
   start: number,
   makeTrack: (kind: TrackKind, existing: Track[]) => Track,
+  assets?: Pick<Asset, 'id' | 'origin'>[],
 ): Track[] | null {
   const srcIdx = tracks.findIndex((t) => t.items.some((x) => x.id === itemId));
   if (srcIdx < 0 || target.type === 'invalid') return null;
   const item = tracks[srcIdx]!.items.find((x) => x.id === itemId)!;
-  const kind = trackKindOf(item);
+  const kind = trackKindOf(item, assets);
   const at = Math.max(start, 0);
   if (target.type === 'track') {
     const dstIdx = tracks.findIndex((t) => t.id === target.trackId);
@@ -446,7 +460,8 @@ export function mergeRanges(ranges: Range[], total: number, minLen: number): Ran
  */
 export function splitByRanges(item: VideoItem, ranges: Range[], assetDuration: number): VideoItem[] {
   const minSrc = MIN_CLIP_DURATION * item.speed;
-  return mergeRanges(ranges, assetDuration, minSrc).map(([a, b], i) => {
+  const arr = mergeRanges(ranges, assetDuration, minSrc);
+  return arr.map(([a, b], i) => {
     let start = item.start + (a - item.trimIn) / item.speed;
     let trimIn = a;
     let duration = (b - a) / item.speed;
@@ -457,11 +472,14 @@ export function splitByRanges(item: VideoItem, ranges: Range[], assetDuration: n
       start = 0;
     }
     const piece: VideoItem = { ...item, start, trimIn, duration };
+    if (item.keyframes) piece.keyframes = shiftKeyframes(item.keyframes, start - item.start);
     if (i > 0) {
       piece.id = newId('i_');
       delete piece.label; // 命名只留在第一段
-      delete piece.transitionIn; // 轉場只留在第一段
+      delete piece.transitionIn; // 轉場、進場特效只留在第一段
+      delete piece.inEffect;
     }
+    if (i < arr.length - 1) delete piece.outEffect; // 出場特效只留在最後一段
     return piece;
   });
 }

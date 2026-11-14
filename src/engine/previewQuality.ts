@@ -10,16 +10,16 @@ export const QUALITY_LABELS: Record<PreviewQuality, string> = { auto: '自動', 
 export function readQuality(): PreviewQuality {
   try {
     const v = localStorage.getItem(QUALITY_KEY);
-    return v === 'clear' || v === 'smooth' ? v : 'auto';
+    // 預設順暢（手機畫面小，肉眼差不多，播放順很多）；使用者可以在頂列或設定頁改成高清、自動
+    return v === 'clear' || v === 'auto' ? v : 'smooth';
   } catch {
-    return 'auto';
+    return 'smooth';
   }
 }
 
 export function writeQuality(q: PreviewQuality) {
   try {
-    if (q === 'auto') localStorage.removeItem(QUALITY_KEY);
-    else localStorage.setItem(QUALITY_KEY, q);
+    localStorage.setItem(QUALITY_KEY, q);
   } catch {
     /* 存不了就只換這一次 */
   }

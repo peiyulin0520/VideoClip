@@ -135,7 +135,7 @@ export async function addGiphySticker(s: GiphySticker): Promise<string | null> {
       return null;
     }
     await ensureUrls(pid, res.assets);
-    const id = addOverlayClips(res.assets, player?.time ?? 0, { scale: 0.3 });
+    const id = addOverlayClips(res.assets, player?.time ?? 0, { scale: 0.3, sticker: true });
     if (window.scrollY > 200) toast('已加入貼圖，往上滑看預覽');
     return id;
   } catch (e) {

@@ -13,10 +13,14 @@ import { startAutosave } from '../../store/autosave';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { ASPECTS } from '../../model/defaults';
+import { shortVersion } from '../pwa';
+import { QUALITY_LABELS } from '../../engine/previewQuality';
+import { useQuality } from '../../store/qualityStore';
 import type { Aspect } from '../../model/types';
 import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
 import { ExportSheet } from '../editor/ExportSheet';
+import { KeyframeButton } from '../editor/KeyframeButton';
 import { Preview } from '../editor/Preview';
 import { Timeline, MAX_PPS, MIN_PPS } from '../editor/Timeline';
 import { BottomBar } from '../editor/Toolbar';
@@ -117,6 +121,8 @@ function EditorBody() {
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [ratioOpen, setRatioOpen] = useState(false);
+  const quality = useQuality((s) => s.q);
+  const setQuality = useQuality((s) => s.set);
   const [exportOpen, setExportOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const total = totalDuration(project);
@@ -189,9 +195,20 @@ function EditorBody() {
           }}
         >
           {project.name}
+          <span className="proj-ver" data-testid="proj-ver">
+            {shortVersion()}
+          </span>
         </button>
         <button className="ratio-btn" aria-label="畫面比例" onClick={() => setRatioOpen(true)}>
           {project.aspect}
+        </button>
+        <button
+          className="ratio-btn"
+          aria-label={`預覽畫質 ${QUALITY_LABELS[quality]}（點一下切換）`}
+          data-testid="quality-btn"
+          onClick={() => setQuality(quality === 'smooth' ? 'clear' : 'smooth')}
+        >
+          {quality === 'clear' ? '高清' : quality === 'smooth' ? '順暢' : '自動'}
         </button>
         <button
           className="icon-btn"
@@ -244,6 +261,7 @@ function EditorBody() {
           {playing ? <Pause size={22} /> : <Play size={22} />}
         </button>
         <TimeText total={total} />
+        <KeyframeButton />
         <span className="spacer" />
         <button
           className="icon-btn"

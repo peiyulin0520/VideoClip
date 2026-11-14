@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { cropKeepingPlace, isNoCrop, NO_CROP, polygonCrop } from '../engine/crop';
 import { cellRect, cellTransform } from '../engine/layouts';
 import { composeWith } from '../engine/groupTransform';
+import { hasKeyframes, upsertKeyframe, withTime } from '../engine/keyframes';
 import { findItem, isVideoItem } from '../engine/timeline';
 import { geoCtx } from '../engine/scene';
 import { itemBox, aabb } from '../engine/geometry';
@@ -26,6 +27,8 @@ export type CropSession = {
   paint: 'brush' | 'erase' | null;
   /** 筆刷粗細（佔整張原始畫面寬的比例） */
   brush: number;
+  /** 焦點圓在手指圓上方幾 px（0＝直接畫在手指下面）；存在這台手機 */
+  reach: number;
   /** 筆刷／橡皮擦編輯中的遮罩（整張原始畫面座標，長邊 MASK_SIDE；不透明＝留下）；null＝還沒開始畫 */
   maskCanvas: HTMLCanvasElement | null;
   /** 這個物件原本就有點陣圖遮罩（沒被重設／重新圈選的話完成時保留） */
@@ -56,13 +59,16 @@ export function startCrop(itemId: string): boolean {
     toast('請先點選一個影片或照片');
     return false;
   }
-  const item = found.item;
-  const asset = project.assets.find((a) => a.id === item.assetId);
+  const raw = found.item;
+  const asset = project.assets.find((a) => a.id === raw.assetId);
   if (!asset || !player) return false;
   // 要看得到這個物件才能裁：播放頭移到物件的時間範圍內
   player.pause();
   window.scrollTo(0, 0); // 預覽在頁面最上面：從下面的工具列按進來要把預覽捲回來才拖得到
-  player.seek(Math.max(item.start, Math.min(player.time, item.start + item.duration - 0.01)));
+  const at = Math.max(raw.start, Math.min(player.time, raw.start + raw.duration - 0.01));
+  player.seek(at);
+  // 有定位（關鍵影格）的物件：以播放頭這個時間的位置、大小為準
+  const item = withTime(raw, at);
   // 整張原始畫面顯示在原本的位置（留下來的那塊不動）；如果這樣會超出預覽畫面（例如填滿的橫式影片），
   // 把手就按不到了，改成縮進預覽中央完整顯示
   const inPlace = cropKeepingPlace(item, asset, NO_CROP, project.width, project.height);
@@ -90,6 +96,7 @@ export function startCrop(itemId: string): boolean {
       mask: item.mask ?? null,
       paint: null,
       brush: 0.04,
+      reach: readReach(),
       maskCanvas: null,
       hasBitmap: !!item.maskBitmap,
       dropBitmap: false,
@@ -122,7 +129,8 @@ export function finishCrop() {
   const found = project && findItem(project, s.itemId);
   close();
   if (!project || !found || !isVideoItem(found.item)) return;
-  const item = found.item;
+  const tNow = useUI.getState().player?.time ?? 0;
+  const item = withTime(found.item, tNow); // 有定位的物件：這個時間的位置、大小
   const asset = project.assets.find((a) => a.id === item.assetId);
   if (!asset) return;
   // 筆刷／橡皮擦畫過：遮罩的範圍就是留下來的範圍（crop 自動框住有東西的地方）
@@ -170,6 +178,9 @@ export function finishCrop() {
         frame && frame.type !== 'text'
           ? composeWith(base, frame.transform, project.width, project.height)
           : base;
+    } else if (hasKeyframes(it)) {
+      // 有定位：裁完「留下來的那塊位置大小不變」寫進播放頭這個時間的定位
+      it.keyframes = upsertKeyframe(it, Math.min(Math.max(tNow - it.start, 0), it.duration), res.transform);
     } else it.transform = res.transform;
     if (bitmap) {
       it.maskBitmap = bitmap;
@@ -251,6 +262,27 @@ export function undoMaskStroke() {
 }
 
 /** 在遮罩上畫一小段（from→to 是原始畫面的比例；r 是半徑，佔畫面寬的比例）：筆刷＝留下，橡皮擦＝去掉 */
+const REACH_KEY = 'vc-brush-reach';
+export const DEFAULT_REACH = 70;
+export const MAX_REACH = 150;
+function readReach(): number {
+  try {
+    const v = Number(localStorage.getItem(REACH_KEY));
+    if (localStorage.getItem(REACH_KEY) !== null && Number.isFinite(v))
+      return Math.min(Math.max(v, 0), MAX_REACH);
+  } catch {
+    /* 沒有儲存空間就用預設 */
+  }
+  return DEFAULT_REACH;
+}
+export function saveReach(v: number) {
+  try {
+    localStorage.setItem(REACH_KEY, String(v));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function paintMask(from: Pt, to: Pt, tool: 'brush' | 'erase') {
   const s = useCrop.getState().s;
   const cv = s?.maskCanvas;

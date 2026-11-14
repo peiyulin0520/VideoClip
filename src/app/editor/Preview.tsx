@@ -14,12 +14,14 @@ import {
   type Box,
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
-import { readQuality, useSmooth, writeQuality } from '../../engine/previewQuality';
+import { useSmooth } from '../../engine/previewQuality';
+import { useQuality } from '../../store/qualityStore';
 import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
 import { CropOverlay } from './CropOverlay';
 import { useCrop } from '../../store/cropStore';
 import { geoCtx } from '../../engine/scene';
+import { hasKeyframes, timeResolved } from '../../engine/keyframes';
 import { findItem, visibleLayers } from '../../engine/timeline';
 import { setTransform } from '../../store/actions';
 import { setAssetThumbs, useProjectStore } from '../../store/projectStore';
@@ -73,6 +75,7 @@ export function Preview({
   const [dragging, setDragging] = useState(false); // 拖移/縮放中：安全區參考線暫時出現
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [selVisible, setSelVisible] = useState(true);
+  const [kfTime, setKfTime] = useState(0); // 專案裡有定位（關鍵影格）時，跟著播放頭更新選取框與觸控區的位置
   const [hitIds, setHitIds] = useState(''); // 這一秒可以拖的物件（逗號分隔），給觸控區用
   const [peek, setPeek] = useState(false); // 「查看圖層」清單
   const project = useProjectStore((s) => s.project)!;
@@ -81,7 +84,7 @@ export function Preview({
   const cropping = useCrop((s) => !!s.s);
   const previewFull = useUI((s) => s.previewFull);
   // 預覽畫質：自動／清楚／流暢（設定頁可改）；自動時同時 3 支以上影片、或偵測到播放太慢就用流暢
-  const [quality, setQuality] = useState(readQuality);
+  const quality = useQuality((s) => s.q);
   const [slow, setSlow] = useState(false);
   const smooth = useSmooth(quality, project, slow);
   const fontEpoch = useFonts((s) => s.epoch); // 字體載入完成：字卡大小可能變，選取框要重算
@@ -102,7 +105,7 @@ export function Preview({
       onAudioBlocked: () => toast('iPhone 擋住了聲音，請再按一次播放', 6000),
       smooth,
       onSlow: () => {
-        if (readQuality() === 'auto') {
+        if (useQuality.getState().q === 'auto') {
           setSlow(true);
           toast('播放有點吃力，預覽自動改成「流暢」（匯出不受影響）', 6000);
         }
@@ -158,6 +161,7 @@ export function Preview({
       const p = useProjectStore.getState().project;
       const id = useProjectStore.getState().selectedId;
       const f = p && findItem(p, id);
+      setKfTime(p && p.tracks.some((tr) => tr.items.some(hasKeyframes)) ? t : 0);
       setSelVisible(!!f && t >= f.item.start && t < f.item.start + f.item.duration);
       // 字串相同 React 不會重畫，播放時不會每一格都重畫
       setHitIds(
@@ -176,7 +180,9 @@ export function Preview({
   const k = cssW / width; // 專案座標 → CSS px
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const geo = useMemo(() => geoCtx(project, width, height), [project, width, height, fontEpoch]);
-  const sel = findItem(project, selectedId);
+  // 有定位的物件：選取框、觸控區用「播放頭這個時間」的位置
+  const rproject = useMemo(() => timeResolved(project, kfTime), [project, kfTime]);
+  const sel = findItem(rproject, selectedId);
   const box = sel && selVisible ? selectionBox(sel.item, geo) : null;
   const selLocked = !!sel?.track.locked || !!sel?.track.hidden;
 
@@ -189,8 +195,14 @@ export function Preview({
     return { x: ((e.clientX - r.left) / r.width) * width, y: ((e.clientY - r.top) / r.height) * height };
   };
 
+  /** 現在這個時間的物件（有定位的換成這個時間的位置、大小） */
+  const findNow = (id: string | null) => {
+    const t = useUI.getState().player?.time ?? 0;
+    return findItem(timeResolved(useProjectStore.getState().project!, t), id);
+  };
+
   const startMove = (id: string, at: Pt) => {
-    const f = findItem(useProjectStore.getState().project!, id);
+    const f = findNow(id);
     if (!f) return;
     gesture.current = {
       type: 'move',
@@ -206,7 +218,7 @@ export function Preview({
   const hitsAt = (pt: Pt) => {
     const st = useProjectStore.getState();
     const t = useUI.getState().player?.time ?? 0;
-    return hitTestAll(visibleLayers(st.project!, t), geo, pt.x, pt.y, 40 / k);
+    return hitTestAll(visibleLayers(timeResolved(st.project!, t), t), geo, pt.x, pt.y, 40 / k);
   };
 
   const onPointerDown = (e: RPointerEvent) => {
@@ -215,7 +227,7 @@ export function Preview({
     const pt = toProj(e);
     pointers.current.set(e.pointerId, pt);
     const st = useProjectStore.getState();
-    const cur = findItem(st.project!, st.selectedId);
+    const cur = findNow(st.selectedId);
 
     if (pointers.current.size === 2) {
       tap.current = null; // 第二根手指：不是輕點
@@ -288,7 +300,7 @@ export function Preview({
     }
     const g = gesture.current;
     if (!g) return;
-    const f = findItem(useProjectStore.getState().project!, g.id);
+    const f = findNow(g.id);
     if (!f) return;
 
     if (g.type === 'pinch' && pointers.current.size >= 2) {
@@ -361,7 +373,7 @@ export function Preview({
   const hitBoxes: { id: string; b: Box }[] = [];
   if (hitIds) {
     for (const id of hitIds.split(',')) {
-      const f = findItem(project, id);
+      const f = findItem(rproject, id);
       const b = f && selectionBox(f.item, geo);
       if (b) hitBoxes.push({ id, b });
     }
@@ -449,20 +461,6 @@ export function Preview({
       {emptyAction && (
         <button className="empty-import" onClick={emptyAction}>
           ＋ 匯入影片或照片
-        </button>
-      )}
-      {smooth && (
-        <button
-          className="quality-chip"
-          data-testid="quality-chip"
-          aria-label="流暢預覽（點一下改回清楚）"
-          onClick={() => {
-            writeQuality('clear');
-            setQuality('clear');
-            setSlow(false);
-          }}
-        >
-          流暢預覽
         </button>
       )}
       {!cropping && (

@@ -13,6 +13,8 @@ import { addLayout } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
+import type { TransitionKind } from '../../model/types';
+import { GroupFxSelect } from './GroupFxSelect';
 
 /** 版型縮圖：灰底上畫外框，格子的洞裡填淡淡的顏色，看得出哪裡放照片 */
 function LayoutThumb({ def, W, H }: { def: LayoutDef; W: number; H: number }) {
@@ -43,6 +45,8 @@ export function LayoutPicker() {
   const [def, setDef] = useState<LayoutDef | null>(null);
   const [colorId, setColorId] = useState('white');
   const [motion, setMotion] = useState<'' | 'drift' | 'slide'>('');
+  const [inFx, setInFx] = useState<TransitionKind | ''>('');
+  const [outFx, setOutFx] = useState<TransitionKind | ''>('');
   const input = useRef<HTMLInputElement>(null);
   const W = project.width;
   const H = project.height;
@@ -90,6 +94,8 @@ export function LayoutPicker() {
           h: Math.max(...rs.map((r) => r.y + r.h)) - tp,
         },
         motion: motion || undefined,
+        inEffect: inFx || undefined,
+        outEffect: outFx || undefined,
       });
       setDef(null);
       toast(
@@ -149,6 +155,13 @@ export function LayoutPicker() {
                   {c.name}
                 </button>
               ))}
+            </div>
+            <div className="panel-head">
+              <span>進場、出場特效（整個版型一起）</span>
+            </div>
+            <div className="group-fx-row">
+              <GroupFxSelect label="版型進場特效" value={inFx} onChange={setInFx} />
+              <GroupFxSelect label="版型出場特效" value={outFx} onChange={setOutFx} />
             </div>
             <div className="panel-head">
               <span>動畫</span>

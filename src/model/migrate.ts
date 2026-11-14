@@ -1,4 +1,4 @@
-import { TRACK_NAMES } from './defaults';
+import { newId, TRACK_NAMES } from './defaults';
 import type { Project, Track, TrackKind } from './types';
 import { normalizeZones } from '../engine/timeline';
 import { LEGACY_TRANSITIONS } from '../engine/transitions';
@@ -38,7 +38,65 @@ export function markLegacyGroups(p: Project): { project: Project; changed: boole
   });
   const marked = changed ? { ...p, tracks } : p;
   const fixed = repairGroups(marked);
-  return { project: fixed.project, changed: changed || fixed.changed };
+  const stk = migrateStickers(fixed.project);
+  return { project: stk.project, changed: changed || fixed.changed || stk.changed };
+}
+
+/**
+ * 貼圖自成一類（2026-11-14）：①舊專案裡的貼圖素材（檔名「貼圖-」「GIPHY-」開頭）補上 origin；
+ * ②影像軌裡的貼圖：整條都是貼圖就把那條軌道改成貼圖軌，混著影片、照片的把貼圖搬到貼圖軌（時間不變）。
+ * 至少留一條影像軌；版型的軌道不動。已經轉過的不會再動。
+ */
+export function migrateStickers(p: Project): { project: Project; changed: boolean } {
+  let changed = false;
+  const assets = (p.assets ?? []).map((a) => {
+    if (a.origin || !/^(貼圖-|GIPHY-)/.test(a.name)) return a;
+    changed = true;
+    return { ...a, origin: 'sticker' as const };
+  });
+  const isSticker = (it: Track['items'][number]) =>
+    it.type !== 'text' &&
+    it.type !== 'audio' &&
+    assets.find((a) => a.id === it.assetId)?.origin === 'sticker';
+  let tracks = p.tracks.map((t) => ({ ...t }));
+  const plain = (t: Track) => t.kind === 'media' && !t.groupRole;
+  const withStickers = tracks.filter((t) => plain(t) && t.items.some(isSticker));
+  if (withStickers.length === 0) return { project: changed ? { ...p, assets } : p, changed };
+  const keepMedia = () => tracks.filter((t) => t.kind === 'media').length;
+  const moved: Track['items'] = [];
+  for (const t of withStickers) {
+    const all = t.items.every(isSticker);
+    if (all && keepMedia() > 1) {
+      t.kind = 'sticker';
+      if (/^影像 \d+$/.test(t.name)) t.name = t.name.replace('影像', TRACK_NAMES.sticker);
+      changed = true;
+    } else if (!all) {
+      moved.push(...t.items.filter(isSticker));
+      t.items = t.items.filter((x) => !isSticker(x)) as never;
+      changed = true;
+    }
+  }
+  // 搬出來的貼圖：放進第一條放得下的貼圖軌，沒有就新增一條
+  for (const it of moved) {
+    const fits = (t: Track) =>
+      t.kind === 'sticker' &&
+      !t.items.some((o) => it.start < o.start + o.duration - 1e-6 && o.start < it.start + it.duration - 1e-6);
+    let dst = tracks.find(fits);
+    if (!dst) {
+      dst = {
+        id: newId('t_'),
+        kind: 'sticker',
+        name: `${TRACK_NAMES.sticker} ${tracks.filter((t) => t.kind === 'sticker').length + 1}`,
+        hidden: false,
+        locked: false,
+        items: [],
+      } as Track;
+      tracks.push(dst);
+    }
+    dst.items.push(it as never);
+  }
+  tracks = normalizeZones(tracks as Track[]);
+  return { project: { ...p, assets, tracks: tracks as Track[] }, changed };
 }
 
 /**

@@ -9,8 +9,7 @@ export async function createProjectWith(page: Page, files: string[]) {
   await page.addInitScript(() => {
     localStorage.setItem('vc-debug', '1');
     localStorage.setItem('vc-skip-onboarding', '1');
-    // 時間軸預設收合；舊測試要看到每一條軌道，所以沒設過就展開（收合的測試自己設成 '0'）
-    if (localStorage.getItem('vc-tl-expanded') === null) localStorage.setItem('vc-tl-expanded', '1');
+    // 時間軸每一類各自收合（記在 vc-tl-cats，預設全部展開）；要測收合的測試自己設定
   });
   await page.goto('./');
   await page.getByRole('button', { name: '新增專案' }).tap();
@@ -247,10 +246,11 @@ export async function showTimeline(page: Page) {
 
 /** 取消選取：點時間軸某一軌的空白處（預覽上點空白處不會取消選取了） */
 export async function deselect(page: Page) {
-  await page
-    .locator('[data-testid="track"]')
-    .first()
-    .click({ position: { x: 100, y: 4 } });
+  const track = page.locator('[data-testid="track"]').first();
+  const tb = (await track.boundingBox())!;
+  const view = (await page.getByTestId('timeline-scroll').boundingBox())!;
+  // 畫面最右邊那一小塊（不用捲動就點得到；左邊 0 秒就有片段，選取中的片段把手還會蓋住左邊一塊）
+  await track.click({ position: { x: view.x + view.width - 14 - tb.x, y: 4 } });
   await page.evaluate(() => window.scrollTo(0, 0)); // 點時間軸會把頁面捲下去，回到預覽
 }
 

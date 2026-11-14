@@ -23,6 +23,7 @@ import { fadeSpans } from './audio';
 import { Compositor } from './compositor';
 import { buildScene, sceneItems } from './scene';
 import { preloadMasks } from './maskBitmap';
+import { audioSpans } from './audioRanges';
 import { sourceTimeClamped, totalDuration } from './timeline';
 
 // 匯出整支影片（PLAN §2.4）：不播放，一格一格依時間走——
@@ -246,17 +247,19 @@ async function mixAudio(
         gain.gain.linearRampToValueAtTime(0, endAt);
       }
       const srcStart = item.trimIn;
-      const srcEnd = item.trimIn + item.duration * item.speed;
-      for await (const wb of sink.buffers(srcStart, srcEnd)) {
-        const from = Math.max(wb.timestamp, srcStart);
-        const to = Math.min(wb.timestamp + wb.buffer.duration, srcEnd);
-        if (to - from < 1e-4) continue;
-        const node = ctx.createBufferSource();
-        node.buffer = wb.buffer;
-        node.playbackRate.value = item.speed;
-        node.connect(gain);
-        node.start(item.start + (from - srcStart) / item.speed, from - wb.timestamp, to - from);
-        any = true;
+      // 靜音標記（audioRanges）：只把保留聲音的那幾段放進去，其他地方沒有聲音
+      for (const [spanA, spanB] of audioSpans(item)) {
+        for await (const wb of sink.buffers(spanA, spanB)) {
+          const from = Math.max(wb.timestamp, spanA);
+          const to = Math.min(wb.timestamp + wb.buffer.duration, spanB);
+          if (to - from < 1e-4) continue;
+          const node = ctx.createBufferSource();
+          node.buffer = wb.buffer;
+          node.playbackRate.value = item.speed;
+          node.connect(gain);
+          node.start(item.start + (from - srcStart) / item.speed, from - wb.timestamp, to - from);
+          any = true;
+        }
       }
     } finally {
       input.dispose();
