@@ -80,6 +80,7 @@
   - 規劃：X1 小修 → X2 視窗統一 → X3 裁切重做 → X4 畫面比例 → X5 版型格子視窗 → X6 輪流播放＋群組展開（Sonnet 實作）
   - 補充（同日）：「轉場過渡期會沒有聲音，應該可以自己選要不要，有些過渡期還是需要原音」→ X7 轉場聲音：預設交叉淡化、可選只要前一段／只要後一段／靜音、匯出一致、iPhone 不靠切換 muted（建議跟 X1 一起先做）
   - 補充（同日，錄影是 VideoClip 的「進階：聲音範圍」視窗）：①暫停圖示要配合主題、兩條直槓就好（現在是 emoji ⏸）→ X1-8；②播放時畫面一直跳動 → 逐格比對錄影：是播放鈕（flex:1）旁邊的秒數用比例字寬，每格變寬變窄把按鈕擠來擠去，不是重刷 → X1-9（等寬數字、按鈕固定大小）
+  - 補充（同日，3 張 VideoClip 截圖）：①轉場聲音再加「不淡化、自己決定哪個時間直接換成那一段的聲音」→ X7 加 `cut`＋切換點；②片段範圍視窗右上角復原鈕壓到預覽 → X1-10；字體大小除了註解、播放軸以外統一 → X1-11（16／13／12px，例外先列出來跟使用者討論）；③色調卡片「高反差黑白」折兩行 → X1-12 名稱縮短、一行；④畫畫加在素材分頁，可選直接顯示完成的畫或動畫重播畫的過程 → X8；⑤版型先參考 VideoClip_2 的 repo、但 22 點指出的問題要修正後做成 VideoClip 版本 → 讀了 VideoClip_2（TemplatePanel／TemplateCells／templateTiming），在 X5 寫明可參考與不要照抄的部分
 - 2026-11-14 feedback-11 W1–W5（Sonnet 實作，依 `docs/plans/2026-11-14-feedback-11.md`）
   - 做了什麼：W1 播放列重排（播放＋時間在左，定位／原色／縮小／放大靠右）；W2 播放列 👁 `GradePeekButton`（按一下看原色、再按回色調，整個專案、不進復原、匯出前自動關、沒調色時按鈕不能用；色調分頁的「按住看原圖」拿掉）；W3 `Keyframe.look`＋`usesKeyframeLook`／實際調色值內插（第一個定位原色、第二個定位選黑白會漸變）、色調分頁「套用到：整段素材／這個定位」（沒有定位＝整段素材；有定位預設「這個定位」，切回整段會清掉定位上的色調並可復原）、時間軸有調色的菱形中間一個小點；W4 播放線碰到菱形（8px）＝選到那個定位（白底稍大），位置／縮放／色調都只改它，很近的地方用「定位」按鈕另外新增，圖層分頁「刪除這個定位」；W5 定位小特效 震／彈／晃／跳（`engine/pulse.ts`，長度、力道可調，時間軸菱形旁代表字）；順暢度：GradeFilter 值沒變不重傳、面板播放中最多 2Hz、預覽定位選取框最多 15Hz。
   - 動了哪些檔：`engine/{keyframes,grade,gradeFilter,pulse,player}.ts`、`store/{actions,uiStore}.ts`、`app/editor/{GradePeekButton,KeyframeDot,usePlayheadTime,ColorPanel,Preview,Timeline,tabs/KeyframePanel}.tsx`、`app/pages/Editor.tsx`、`styles.css`
