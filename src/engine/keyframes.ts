@@ -73,7 +73,7 @@ export function timeResolved(project: Project, t: number): Project {
   const W = project.width;
   const H = project.height;
   const resolve = (it: Item): Item => {
-    const g = it.type !== 'text' && it.type !== 'audio' ? it.group : undefined;
+    const g = it.type !== 'audio' ? it.group : undefined;
     const f = g ? frames.get(g) : undefined;
     if (f && !hasKeyframes(it))
       return {
@@ -84,7 +84,7 @@ export function timeResolved(project: Project, t: number): Project {
     return withTime(it, t);
   };
   const touched = (it: Item) =>
-    hasKeyframes(it) || (it.type !== 'text' && it.type !== 'audio' && !!it.group && frames.has(it.group));
+    hasKeyframes(it) || (it.type !== 'audio' && !!it.group && frames.has(it.group));
   return {
     ...project,
     tracks: project.tracks.map((tr) =>

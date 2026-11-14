@@ -108,7 +108,7 @@ export function transitionSpan(items: Item[], it: Item): TransitionSpan | null {
 
 /** 一軌上緊接在一起的同類片段（接縫處）：可以在這裡加轉場 */
 export function seamsOf(items: Item[]): { prev: Item; next: Item }[] {
-  const vids = items.filter((x) => x.type !== 'audio' && !(x.type !== 'text' && x.group));
+  const vids = items.filter((x) => x.type !== 'audio' && !x.group);
   const out: { prev: Item; next: Item }[] = [];
   for (const next of vids) {
     const prev = vids.find(

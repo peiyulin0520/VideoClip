@@ -25,13 +25,18 @@ type It = {
 };
 type Tr = { kind: string; name: string; locked: boolean; groupRole?: string; items: It[] };
 const dims = async (page: Page) => (await project(page)) as unknown as { width: number; height: number };
-const tracks = async (page: Page) => (await project(page)).tracks as unknown as Tr[];
+// 版型現在會附文字（字卡軌）；這裡的檢查只看影像軌，版型文字另外在 v.spec.ts 測
+const tracks = async (page: Page) =>
+  ((await project(page)).tracks as unknown as Tr[]).filter((t) => t.kind !== 'text');
 
 async function addLayout(page: Page, name: string, color: string, files: string[]) {
   await openTab(page, '版型');
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
   await expect(page.getByTestId('layout-sheet')).toBeVisible();
-  await page.getByRole('radio', { name: `外框 ${color}` }).tap();
+  await page
+    .getByTestId('layout-sheet')
+    .getByRole('radio', { name: `外框 ${color}` })
+    .tap();
   await page.getByTestId('layout-input').setInputFiles(files.map(fixture));
   await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
 }

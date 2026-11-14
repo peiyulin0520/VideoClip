@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import { isVideoItem } from '../../../engine/timeline';
+import { useEffect, useRef, useState } from 'react';
 import type { Project, Track, VideoItem } from '../../../model/types';
 import {
   removeGroup,
@@ -8,6 +8,8 @@ import {
   setGroupMotion,
   setItemEffect,
 } from '../../../store/actions';
+import { FrameStyleControls } from '../FrameStyleControls';
+import { restyleFrame } from '../frameRestyle';
 import { GroupFxSelect } from '../GroupFxSelect';
 import { useProjectStore } from '../../../store/projectStore';
 import { LayoutPicker } from '../LayoutPicker';
@@ -18,6 +20,25 @@ const MOTIONS = [
   { id: 'drift', name: '捲動' },
   { id: 'slide', name: '滑入滑出' },
 ] as const;
+
+/** 外框顏色、透明度：換顏色立刻重畫；透明度滑桿停下來 0.4 秒才重畫（每次重畫都是一張新的外框圖） */
+function FrameStyleEditor({ group, color, opacity }: { group: string; color: string; opacity: number }) {
+  const [op, setOp] = useState(opacity);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  return (
+    <FrameStyleControls
+      color={color}
+      opacity={op}
+      onColor={(c) => void restyleFrame(group, { color: c })}
+      onOpacity={(v) => {
+        setOp(v);
+        window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => void restyleFrame(group, { opacity: v }), 400);
+      }}
+    />
+  );
+}
 
 /** 一個版型的整體設定：整組長度、動畫、每一格要用的片段與湊秒數的色塊 */
 function GroupPanel({ project, group }: { project: Project; group: string }) {
@@ -36,6 +57,14 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
       <p className="hint">
         在預覽上拖移、縮放整個版型（格子會一起動）；再點一下格子，可以到「剪輯」選那一格要用的片段。
       </p>
+      {frame.frameStyle && (
+        <FrameStyleEditor
+          key={frame.frameStyle.opacity}
+          group={group}
+          color={frame.frameStyle.color}
+          opacity={frame.frameStyle.opacity}
+        />
+      )}
       <div className="group-fx-row">
         <GroupFxSelect
           label="版型進場特效"
@@ -123,7 +152,7 @@ function CellRow({
 /** 版型分頁：多格版型（拍貼機、膠卷、拍立得…），之後的模板也放這裡 */
 export function LayoutTab({ found }: { found: Found }) {
   const project = useProjectStore((s) => s.project)!;
-  const group = found && isVideoItem(found.item) ? found.item.group : undefined;
+  const group = found && found.item.type !== 'audio' ? found.item.group : undefined;
   return (
     <>
       {group && (

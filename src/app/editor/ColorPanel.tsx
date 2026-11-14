@@ -137,11 +137,11 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
   const kf = !!target && hasKeyframes(target);
   const ids = useMemo(() => {
     // 按住看原圖：版型整組一起
-    const g = item.type !== 'text' && item.type !== 'audio' ? item.group : undefined;
+    const g = item.type !== 'audio' ? item.group : undefined;
     if (!g) return [item.id];
     return project.tracks
       .flatMap((tr) => tr.items)
-      .filter((x) => x.type !== 'text' && x.type !== 'audio' && x.group === g)
+      .filter((x) => x.type !== 'audio' && x.group === g)
       .map((x) => x.id);
   }, [project, item]);
   useEffect(() => () => player?.setGradeBypass(null), [player]);
