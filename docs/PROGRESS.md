@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-12：X1、X3 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X7 轉場聲音 → X2 視窗統一 → X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
+- **下一步**：feedback-12：X1、X3、X7 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X2 視窗統一 → X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -75,6 +75,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 feedback-12 X7 轉場時的聲音（Sonnet 實作）
+  - 做了什麼：轉場加「轉場時的聲音」六選一（特效分頁、轉場下面）：**交叉淡化**（預設，等功率）／**直接切換**（不淡化，自己選切換點）／**自訂起迄**（前段標「前迄」、後段標「後起」，可以等轉場結束之後才放後段的聲音，中間可以沒聲音或重疊）／只要前段／只要後段／靜音；切換點與起迄都在「聲音軸」上拖旗標（`TransitionAudio.tsx`，軸＝接縫前後各最多 4 秒、時間是相對接縫的秒數），有「試聽轉場」。資料：`transitionIn.audio／audioCut／audioOutA／audioInB`（沒寫＝交叉淡化）。引擎：`seamGains`／`transitionAudioGain`／`seamAudioExtent`（`engine/transitions.ts`）；預覽 `Player.syncVideo` 用「原本的物件＋轉場倍數」算每個影片的聲音（虛擬的提前 B、延長 A 不再是靜音）；匯出 `mixAudio` 讓 B 提早放、A 多放到接縫後，並用一個倍數節點在接縫前後逐 1/60 秒調音量，跟預覽一致。換轉場效果時聲音設定會留著。
+  - 動了哪些檔：`engine/transitions.ts`（＋test）、`engine/player.ts`、`engine/exporter.ts`、`engine/debug.ts`（`audioGains`）、`model/types.ts`、`store/actions.ts`（`setTransitionAudio`、換效果保留聲音設定）、新 `app/editor/TransitionAudio.tsx`、`tabs/EffectTab.tsx`、`styles.css`
+  - 驗證：✅ 單元（六種模式、custom 空隙／重疊／晚於轉場結束、extent）、新 `e2e/x7.spec.ts`（預覽聲音倍數、六種模式、自訂旗標拖移與套用／取消、匯出交叉淡化兩邊有聲音／靜音轉場那段是空的）、完整 e2e 255 個全過  🟡 Chromium 的 iPhone 模擬是 element 模式（只能開／關：倍數 ≥ 0.5 算開），真機有 `audioSession` 時是 webaudio 模式（真的交叉淡化）  🔴 iPhone 真機未測
+  - 跟規劃不同：①直接切換的 `audioCut` 存「相對接縫的秒數」不是轉場進度；②試聽直接播專案轉場那一段（先套用目前設定，取消會還原），沒有視窗內的小預覽；③沒做「舊 iPhone 在按播放那一下預先解鎖預載 B」與效能框的聲音數字——舊 iPhone（沒有 audioSession）只能在 ≥ 0.5 時開聲音
+  - 下一步：X2（其他彈出視窗統一 ❌、↩↪）→ X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫
 - 2026-11-15 X3 補充（Sonnet 實作）：裁切四個工具加單色圖示（一般＝四角有圓點的框、自由＝不規則形狀、筆刷＝毛筆、橡皮擦＝橡皮擦；`cropIcons.tsx`）、文字改短成「一般／自由／筆刷／橡皮擦」、工具與選項放進「裁切工具」卡片（分隔線＋不同底色＋小標題），跟 ▶ ↩ ↪ 檢查結果 套用裁切 分區；`e2e/x3.spec.ts` 加圖示／分區／320 與 390 寬一頁內不換行的測試
 - 2026-11-15 規劃 X3 補充（Opus，只規劃）：使用者要裁切四個工具加單色圖示（一般裁切＝四角有圓點的框、自由裁切＝不規則形狀、筆刷＝毛筆、橡皮擦＝橡皮擦），並跟播放／復原／套用那一列明顯分區 → 寫進 `docs/plans/2026-11-14-feedback-12.md` 的「X3 補充：工具圖示＋跟播放列分區」；工具文字改短成「一般／自由／筆刷／橡皮擦」
 - 2026-11-15 feedback-12 X3 裁切重做（Sonnet 實作）
