@@ -150,7 +150,7 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
     <div className="color-panel" data-testid="color-panel">
       <div className="panel-head">
         <span>
-          <Palette size={16} /> 調色
+          <Palette size={16} /> 色調
         </span>
       </div>
       <div className="look-row" role="radiogroup" aria-label="色調組合">

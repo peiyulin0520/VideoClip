@@ -100,8 +100,7 @@ test('定位：色調漸變——第二個定位的飽和度 −100，開頭還�
   await seekTo(page, 0.02);
   await page.getByTestId('kf-btn').tap();
   await seekTo(page, 3);
-  await openTab(page, '剪輯'); // 調色在 剪輯 › 調色
-  await page.getByRole('button', { name: '調色', exact: true }).tap();
+  await openTab(page, '色調'); // 調色在「色調」分頁
   await page.getByLabel('飽和度', { exact: true }).fill('-100');
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(2);
   const kfs = (await overlay(page)).keyframes!;

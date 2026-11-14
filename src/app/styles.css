@@ -2979,19 +2979,10 @@ button {
   font-weight: 700;
 }
 .fx-legend .lg.seam {
-  background: #eadbc8;
-  color: #5a3e2b;
-}
-.fx-legend .lg.seam-on {
   background: #b8553a;
   color: #fff;
 }
 .fx-legend .lg.single {
-  background: #d5dcc6;
-  color: #1e3b2f;
-  border: 1px solid #7f8c6a;
-}
-.fx-legend .lg.single-on {
   background: #1e3b2f;
   color: #eef2e6;
 }

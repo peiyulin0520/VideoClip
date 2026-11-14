@@ -11,6 +11,7 @@ import { LayoutTab } from './tabs/LayoutTab';
 import { EffectTab } from './tabs/EffectTab';
 import { OverlayTab } from './tabs/OverlayTab';
 import { TABS, type Panel, type Tab } from './tabs/shared';
+import { ColorTab } from './tabs/ColorTab';
 import { TextTab } from './tabs/TextTab';
 
 export type { Tab } from './tabs/shared';
@@ -20,6 +21,8 @@ export type { Tab } from './tabs/shared';
  * 其他分頁（疊加、素材、版型、圖層）保持原樣：在那裡加東西時會自動選取新的，不應該被帶走。
  */
 export function tabForSelection(current: Tab, kind: 'text' | 'audio' | 'media'): Tab {
+  // 色調分頁：選別的影片、照片、貼圖、字卡都留在色調分頁（音樂沒有色調，才切走）
+  if (current === 'color' && kind !== 'audio') return current;
   if (kind === 'text') return 'text';
   if (kind === 'audio') return 'audio';
   return current === 'text' || current === 'audio' ? 'edit' : current;
@@ -129,6 +132,7 @@ export function BottomBar({
       {!collapsed && tab === 'layers' && <LayersTab />}
       {!collapsed && tab === 'layout' && <LayoutTab found={found} />}
       {!collapsed && tab === 'effect' && <EffectTab found={found} />}
+      {!collapsed && tab === 'color' && <ColorTab found={found} />}
       {!collapsed && tab === 'assets' && <AssetsTab />}
       {!collapsed && tab === 'audio' && <AudioTab found={found} panel={panel} setPanel={setPanel} />}
     </div>

@@ -10,8 +10,7 @@ const isGray = (c: number[] | null) =>
 
 async function openColor(page: Page) {
   await clips(page).first().tap();
-  await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '調色', exact: true }).tap();
+  await openTab(page, '色調');
   await expect(page.getByTestId('color-panel')).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));
 }
@@ -105,14 +104,15 @@ test('套用到全部同類：兩個影片都套上同一組；一步復原；�
   const all = await items(page);
   expect(all.every((i) => i.look?.id === 'vintage')).toBe(true);
   expect(all.every((i) => (i.adjust?.exposure ?? 0) > 0.15)).toBe(true);
-  await page.getByRole('button', { name: '完成' }).tap();
   await expect(page.locator('[data-testid="clip"] .clip-label').filter({ hasText: '· 調' })).toHaveCount(2);
   await page.getByRole('button', { name: '復原' }).tap();
   const after = await items(page);
   expect(after.filter((i) => i.look).length).toBe(1); // 只剩原本選的那個
 });
 
-test('字卡也能調色：文字分頁的「調色」→ 選黑白，look 寫進字卡', async ({ page }) => {
+test('字卡也能調色：色調分頁選字卡 → 選黑白，look 寫進字卡；在色調分頁選別的素材不會被帶到別的分頁', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
@@ -120,9 +120,14 @@ test('字卡也能調色：文字分頁的「調色」→ 選黑白，look 寫�
     .getByRole('button', { name: /新增文字/ })
     .first()
     .tap();
-  await page.getByTestId('text-color-btn').tap();
+  await openTab(page, '色調');
   await expect(page.getByTestId('color-panel')).toBeVisible();
   await page.getByRole('radio', { name: '色調 黑白' }).tap();
   const text = (await items(page)).find((i) => i.type === 'text')!;
   expect(text.look).toEqual({ id: 'bw', amount: 1 });
+  // 在色調分頁點影片：留在色調分頁
+  await clips(page).first().tap();
+  await page.waitForTimeout(600);
+  await expect(page.getByRole('tab', { name: '色調', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('color-panel')).toBeVisible();
 });

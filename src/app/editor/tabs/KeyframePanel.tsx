@@ -5,7 +5,7 @@ import { useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
 
 /**
- * 定位細部調整：位置（X、Y，可以放到畫面外）。調色在「剪輯」›「調色」（有定位時也能漸變）。有定位時，這裡改的是「播放頭這個時間」的定位（沒有就自動新增一個），
+ * 定位細部調整：位置（X、Y，可以放到畫面外）。色調在「色調」分頁（有定位時也能漸變）。有定位時，這裡改的是「播放頭這個時間」的定位（沒有就自動新增一個），
  * 兩個定位之間線性漸變；沒有定位時改物件本身。item 是「這個時間」的樣子（已套用定位）。
  */
 export function KeyframePanel({ item, project }: { item: Item; project: Project }) {
@@ -43,9 +43,9 @@ export function KeyframePanel({ item, project }: { item: Item; project: Project 
         <button
           className="chip"
           data-testid="kf-to-color"
-          onClick={() => useUI.setState({ requestTab: 'edit' })}
+          onClick={() => useUI.setState({ requestTab: 'color' })}
         >
-          調色：到「剪輯」›「調色」
+          色調：到「色調」分頁
         </button>
         <button
           className="chip"

@@ -45,9 +45,7 @@ export function EffectTab({ found }: { found: Found }) {
     <div className="panel effect-panel" data-testid="effect-panel">
       <div className="fx-legend" aria-hidden="true">
         <span className="lg seam">雙影片銜接</span>
-        <span className="lg seam-on">選取中</span>
         <span className="lg single">單影片進出場</span>
-        <span className="lg single-on">選取中</span>
       </div>
       {!item || !track ? (
         <p className="hint">
