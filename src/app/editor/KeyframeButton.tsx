@@ -1,8 +1,10 @@
+import { Diamond } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { keyframeIndexAt } from '../../engine/keyframes';
 import { keyframeTarget, toggleKeyframe } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
+import { PlaybarButton } from './PlaybarButton';
 
 /**
  * 播放列的「定位」按鈕（◇）：選到素材時才亮。播放頭這個時間沒有定位 → 新增（值＝目前畫面上的樣子）；
@@ -27,11 +29,13 @@ export function KeyframeButton() {
   const target = keyframeTarget(project, selectedId);
   const has = !!target && keyframeIndexAt(target, time - target.start) >= 0;
   return (
-    <button
-      className={`icon-btn kf-btn${has ? ' on' : ''}`}
-      data-testid="kf-btn"
-      aria-label={has ? '刪除這個時間的定位' : '在這個時間新增定位'}
-      aria-pressed={has}
+    <PlaybarButton
+      icon={Diamond}
+      label="定位"
+      ariaLabel={has ? '刪除這個時間的定位' : '在這個時間新增定位'}
+      testId="kf-btn"
+      on={has}
+      fill={has}
       disabled={!target}
       onClick={() => {
         if (!selectedId) return;
@@ -39,11 +43,6 @@ export function KeyframeButton() {
         const r = toggleKeyframe(selectedId);
         if (r === 'added') toast('已新增定位。換個時間再拖或縮放，就會自動多一個定位', 3500);
       }}
-    >
-      <span className="kf-diamond" aria-hidden="true">
-        {has ? '◆' : '◇'}
-      </span>
-      <small>定位</small>
-    </button>
+    />
   );
 }
