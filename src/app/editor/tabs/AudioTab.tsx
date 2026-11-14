@@ -55,7 +55,7 @@ function MusicImport() {
         <span>背景音樂</span>
       </div>
       <button className="btn done" onClick={() => input.current?.click()}>
-        ＋ 加入背景音樂（從「檔案」選 mp3、m4a、wav…）
+        ＋ 加入背景音樂
       </button>
       <input
         ref={input}
@@ -67,8 +67,9 @@ function MusicImport() {
         onChange={(e) => void onFiles(e.target.files)}
       />
       <p className="hint music-note">
-        音樂會放在目前這一秒，最長到影片結束。點時間軸上的音樂可以分割、片段範圍、調音量和淡入淡出。發 Reels
-        時，也可以先匯出，再在 Instagram 裡加熱門音樂（比較不會有版權問題）。
+        可以選 mp3、m4a、wav
+        等檔案。音樂會放在目前這一秒，最長到影片結束。點時間軸上的音樂可以分割、片段範圍、調音量和淡入淡出。發
+        Reels 時，也可以先匯出，再在 Instagram 裡加熱門音樂（比較不會有版權問題）。
       </p>
     </>
   );

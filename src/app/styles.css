@@ -1284,8 +1284,8 @@ button {
 }
 
 .ratio-btn {
-  min-width: 56px;
-  padding: 0 10px;
+  min-width: clamp(44px, 14vw, 56px);
+  padding: 0 clamp(4px, 2.5vw, 10px);
   font-size: var(--fs-body);
   font-variant-numeric: tabular-nums;
 }
@@ -3338,4 +3338,19 @@ button:not(:disabled):active,
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 頂列：窄螢幕（320 寬）七個控制項要放得進一列，名稱欄位吃剩下的 */
+.ed-top .icon-btn,
+.ed-top button.icon-btn {
+  min-width: clamp(40px, 11vw, 44px);
+}
+
+/* 面板裡的小標題跟上面的說明、清單隔開一點（不要黏在一起） */
+.panel .panel-head:not(:first-child),
+.panel h3:not(:first-child) {
+  margin-top: 14px;
+}
+.music-note {
+  margin-bottom: 8px;
 }

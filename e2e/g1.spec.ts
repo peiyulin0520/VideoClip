@@ -91,7 +91,9 @@ test('字塊預設透明底＋棕色框線；形狀縮圖是線框；獨立圖�
 
   // 獨立圖形：透明底＋棕色框線
   await page.getByRole('button', { name: '＋ 另外新增一個獨立圖形' }).tap();
-  const shape = (await cards(page)).find((c) => c.card.runs[0]!.text === '')!;
+  const shape = (await cards(page)).find(
+    (c) => c.card.runs[0]!.text === '' && !(c as { placeholder?: boolean }).placeholder,
+  )!;
   expect(shape.card.box!.fillOn).toBe(false);
   expect(shape.card.box!.stroke?.color.toLowerCase()).toBe('#8b5a44');
 });

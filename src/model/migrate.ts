@@ -160,12 +160,12 @@ export function repairGroups(p: Project): { project: Project; changed: boolean }
 export function migratePlaceholders(p: Project): { project: Project; changed: boolean } {
   let changed = false;
   const tracks = p.tracks.map((t) => {
-    if (!t.items.some((x) => x.type === 'text' && x.card.runs[0]?.text === '點兩下編輯文字')) return t;
+    if (!t.items.some((x) => x.type === 'text' && x.card?.runs?.[0]?.text === '點兩下編輯文字')) return t;
     changed = true;
     return {
       ...t,
       items: t.items.map((x) =>
-        x.type === 'text' && x.card.runs[0]?.text === '點兩下編輯文字'
+        x.type === 'text' && x.card?.runs?.[0]?.text === '點兩下編輯文字'
           ? {
               ...x,
               placeholder: true,

@@ -291,3 +291,35 @@ describe('migrateStickers：貼圖自成一類', () => {
     expect(migrateStickers(p).project.tracks[0]!.kind).toBe('media');
   });
 });
+
+describe('migratePlaceholders：舊的「點兩下編輯文字」改成還沒輸入', () => {
+  const text = (t: string) => ({
+    id: 'a',
+    type: 'text',
+    start: 0,
+    duration: 3,
+    transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
+    card: { align: 'center', runs: [{ text: t, fontId: 'system', size: 96, color: '#fff' }] },
+  });
+  const proj = (t: string) =>
+    ({
+      version: 2,
+      assets: [],
+      tracks: [{ id: 't', kind: 'text', name: '字卡', items: [text(t)] }],
+    }) as never;
+  it('內容剛好是預設提示字 → 空內容＋placeholder', async () => {
+    const { migratePlaceholders } = await import('./migrate');
+    const r = migratePlaceholders(proj('點兩下編輯文字'));
+    const it = r.project.tracks[0]!.items[0] as { placeholder?: boolean; card: { runs: { text: string }[] } };
+    expect(r.changed).toBe(true);
+    expect(it.placeholder).toBe(true);
+    expect(it.card.runs[0]!.text).toBe('');
+  });
+  it('使用者自己寫的字不動', async () => {
+    const { migratePlaceholders } = await import('./migrate');
+    const p = proj('你好');
+    const r = migratePlaceholders(p);
+    expect(r.changed).toBe(false);
+    expect(r.project).toBe(p);
+  });
+});
