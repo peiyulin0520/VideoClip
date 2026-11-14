@@ -1,6 +1,7 @@
 import type { Asset, Item, Project, Track, VideoItem } from '../model/types';
 import type { SceneLayer } from './compositor';
 import { fittedSize, itemBox, type GeoCtx } from './geometry';
+import { effectiveAdjust } from './grade';
 import { timeResolved } from './keyframes';
 import { renderText, measureTextItem, uiScale } from './textRender';
 import { applyTextFx, typingCount } from './textFx';
@@ -122,7 +123,7 @@ export function buildScene(
   project.tracks.forEach((track, i) => {
     const l = live.get(i);
     const li = l?.item;
-    const group = li && li.type !== 'text' && li.type !== 'audio' ? li.group : track.group;
+    const group = li && li.type !== 'audio' ? li.group : track.group;
     const frame = group ? frameOf(project, group) : null;
     // 版型整組動畫（捲動、滑入滑出）：整組的位置一起偏移
     const off = frame
@@ -386,7 +387,7 @@ function toLayer(
     cornerRadius: item.cornerRadius ?? 0,
     outline: item.outline,
     crop: item.crop,
-    adjust: item.adjust,
+    adjust: effectiveAdjust(item, item.adjust),
   };
   if (item.type === 'text') {
     const sc = uiScale(ctx.canvasW, ctx.canvasH);

@@ -143,7 +143,8 @@ export function sourceTimeAt(item: VideoItem, t: number): number {
  * 同上，但不會超過素材的結尾（轉場延長片段時會超過；影片元件停在最後一格，不要一直重複 seek 一個不存在的時間）
  */
 export function sourceTimeClamped(item: VideoItem, t: number, asset?: Pick<Asset, 'duration'>): number {
-  const s = sourceTimeAt(item, t);
+  // 轉場提前出現的影片入點可能是負的（素材開頭之前沒有畫面）：停在第一格
+  const s = Math.max(sourceTimeAt(item, t), 0);
   return asset && asset.duration > 0.1 ? Math.min(s, asset.duration - 0.05) : s;
 }
 

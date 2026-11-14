@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VideoItem } from '../model/types';
-import { audioRetained, audioSpans, isFullRange } from './audioRanges';
+import { audioRetained, audioSpans, invertRanges, isFullRange } from './audioRanges';
 
 const it_ = (extra: Partial<VideoItem> = {}): VideoItem =>
   ({
@@ -69,5 +69,42 @@ describe('isFullRange', () => {
       ]),
     ).toBe(false);
     expect(isFullRange(it_(), [[1.5, 5]])).toBe(false);
+  });
+});
+
+describe('invertRanges：保留 ⇄ 靜音 互換', () => {
+  it('中間挖一段、頭尾、整段、空', () => {
+    expect(invertRanges([[1, 2]], [0, 4])).toEqual([
+      [0, 1],
+      [2, 4],
+    ]);
+    expect(
+      invertRanges(
+        [
+          [0, 1],
+          [3, 4],
+        ],
+        [0, 4],
+      ),
+    ).toEqual([[1, 3]]);
+    expect(invertRanges([[0, 4]], [0, 4])).toEqual([]);
+    expect(invertRanges([], [0, 4])).toEqual([[0, 4]]);
+  });
+  it('範圍超出、重疊、沒排序也行；互換兩次回到原樣', () => {
+    expect(
+      invertRanges(
+        [
+          [3, 9],
+          [-2, 1],
+          [0.5, 1.5],
+        ],
+        [0, 4],
+      ),
+    ).toEqual([[1.5, 3]]);
+    const keep: [number, number][] = [
+      [0, 1],
+      [2, 3.5],
+    ];
+    expect(invertRanges(invertRanges(keep, [0, 4]), [0, 4])).toEqual(keep);
   });
 });

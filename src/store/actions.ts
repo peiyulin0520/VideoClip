@@ -15,6 +15,7 @@ import {
   type Adjust,
   type Asset,
   type EffectKind,
+  type LookRef,
   type Item,
   type Project,
   type TextFxKind,
@@ -50,7 +51,7 @@ import {
   totalDuration,
   trackEnd,
 } from '../engine/timeline';
-import { cellItem, type Rect } from '../engine/layouts';
+import { cellItem, inkFor, type LayoutText, type Rect } from '../engine/layouts';
 import { DEFAULT_EFFECT_DURATION, DEFAULT_TRANSITION_DURATION, seamsOf } from '../engine/transitions';
 import { groupPatch, transformAbout } from '../engine/groupTransform';
 import {
@@ -131,7 +132,7 @@ export function resetTransform(id: string): void {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f) return;
-  if (f.item.type !== 'text' && f.item.type !== 'audio' && f.item.group) {
+  if (f.item.type !== 'audio' && f.item.group) {
     const frame = groupFrame(p, f.item.group);
     if (frame) return setTransform(frame.item.id, { x: 0.5, y: 0.5, scale: 1, rotation: 0 }, `reset:${id}`);
   }
@@ -169,8 +170,8 @@ function localTime(it: Item): number {
 export function setTransform(id: string, patch: Partial<Transform>, coalesce = `tf:${id}`) {
   const p = store().project;
   const f = p && findItem(p, id);
-  const frame = p && f && f.item.type !== 'text' && f.item.group ? groupFrame(p, f.item.group) : null;
-  if (p && f && frame && f.item.type !== 'text') {
+  const frame = p && f && f.item.type !== 'audio' && f.item.group ? groupFrame(p, f.item.group) : null;
+  if (p && f && frame && f.item.type !== 'audio') {
     // 版型裡的任何物件：移動、縮放、旋轉都變成「整組」一起動（格子不會單獨跑掉）
     const group = f.item.group!;
     if (hasKeyframes(frame.item)) {
@@ -198,7 +199,7 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
       (d) => {
         for (const track of d.tracks)
           for (const it of track.items) {
-            if (it.type === 'text' || it.group !== group) continue;
+            if (it.type === 'audio' || it.group !== group) continue;
             const op = patch.opacity ?? it.transform.opacity;
             it.transform =
               it.id === frame.item.id
@@ -226,7 +227,7 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
 export function keyframeTarget(p: Project, id: string | null): Item | null {
   const f = id ? findItem(p, id) : null;
   if (!f || f.item.type === 'audio') return null;
-  if (f.item.type !== 'text' && f.item.group) return groupFrame(p, f.item.group)?.item ?? f.item;
+  if (f.item.group) return groupFrame(p, f.item.group)?.item ?? f.item;
   return f.item;
 }
 
@@ -284,17 +285,87 @@ export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${
     );
     return;
   }
-  const group = target.type !== 'text' && target.type !== 'audio' ? target.group : undefined;
+  const group = target.type !== 'audio' ? target.group : undefined;
   store().apply(
     (d) => {
       for (const track of d.tracks)
         for (const it of track.items) {
-          if (it.id !== target.id && !(group && it.type !== 'text' && it.group === group)) continue;
+          if (it.id !== target.id && !(group && it.type !== 'audio' && it.group === group)) continue;
           it.adjust = { ...it.adjust, ...patch };
         }
     },
     { coalesce },
   );
+}
+
+/** 調色作用的物件：版型裡的任何物件＝整組（外框與各格）；其他是自己 */
+function colorTargetIds(p: Project, id: string): string[] {
+  const f = findItem(p, id);
+  if (!f) return [];
+  if (f.item.type !== 'audio' && f.item.group) {
+    const group = f.item.group;
+    return p.tracks
+      .flatMap((t) => t.items)
+      .filter((x) => x.type !== 'audio' && x.group === group)
+      .map((x) => x.id);
+  }
+  return [id];
+}
+
+/** 設定（或取消）色調組合；amount 沒給就沿用原本的（新選的預設 1）。一步復原，拖強度滑桿會合併成一步 */
+export function setLook(id: string, lookId: LookRef['id'] | null, amount?: number, coalesce?: string): void {
+  const p = store().project;
+  if (!p) return;
+  const ids = new Set(colorTargetIds(p, id));
+  store().apply(
+    (d) => {
+      for (const track of d.tracks)
+        for (const it of track.items) {
+          if (!ids.has(it.id) || it.type === 'audio') continue;
+          if (!lookId) delete it.look;
+          else it.look = { id: lookId, amount: amount ?? (it.look?.id === lookId ? it.look.amount : 1) };
+        }
+    },
+    coalesce ? { coalesce } : undefined,
+  );
+}
+
+/** 調色全部歸零：色調組合、手動調整、定位裡的調色都清掉（定位的位置大小不動）；一步復原 */
+export function resetGrade(id: string): void {
+  const p = store().project;
+  if (!p) return;
+  const ids = new Set(colorTargetIds(p, id));
+  store().apply((d) => {
+    for (const track of d.tracks)
+      for (const it of track.items) {
+        if (!ids.has(it.id)) continue;
+        delete it.look;
+        delete it.adjust;
+        for (const k of it.keyframes ?? []) delete k.adjust;
+      }
+  });
+}
+
+/** 把這個素材的調色（色調組合＋手動調整）套用到「同一類」的所有素材：字卡→所有字卡；影像、貼圖→所有影片、照片、貼圖。回傳套用了幾個 */
+export function applyGradeToAll(id: string): number {
+  const p = store().project;
+  const f = p && findItem(p, id);
+  if (!p || !f || f.item.type === 'audio') return 0;
+  const src = f.item;
+  const isText = src.type === 'text';
+  let n = 0;
+  store().apply((d) => {
+    for (const track of d.tracks)
+      for (const it of track.items) {
+        if (it.type === 'audio' || it.id === id || (it.type === 'text') !== isText) continue;
+        if (src.look) it.look = { ...src.look };
+        else delete it.look;
+        if (src.adjust) it.adjust = { ...src.adjust };
+        else delete it.adjust;
+        n++;
+      }
+  });
+  return n;
 }
 
 /** 把一群疊加素材放在 t 秒：各自放進第一條有空位的疊加軌，沒有就新增一條（所以會疊在同一秒） */
@@ -416,6 +487,10 @@ export function addLayout(o: {
   /** 整個版型的進場／出場特效（外框、各格、色塊一起） */
   inEffect?: TransitionKind;
   outEffect?: TransitionKind;
+  /** 外框的樣式（之後改顏色、透明度要用它重畫外框） */
+  frameStyle?: { layout: string; color: string; opacity: number };
+  /** 版型附的文字（拍貼機的 PHOTO BOOTH…）：跟著整個版型一起動 */
+  texts?: LayoutText[];
 }): string | null {
   const proj = store().project;
   if (!proj || o.cells.length === 0) return null;
@@ -443,6 +518,7 @@ export function addLayout(o: {
     frame.transform = { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 };
     frame.group = group;
     frame.label = o.frameName;
+    if (o.frameStyle) frame.frameStyle = o.frameStyle;
     if (o.motion) frame.motion = o.motion;
     if (o.inEffect)
       frame.inEffect = { kind: o.inEffect, duration: Math.min(DEFAULT_EFFECT_DURATION, o.duration) };
@@ -461,9 +537,57 @@ export function addLayout(o: {
     ft.groupRole = 'frame';
     ft.items.push(frame);
     d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, ft);
+    // 版型的文字：普通的字卡，但 group 跟版型一樣——跟著整個版型移動、縮放、進出場，一起刪除
+    const ink = inkFor(o.frameStyle?.color ?? '#ffffff');
+    for (const lt of o.texts ?? []) {
+      const ti = createTextItem(o.start, lt.text);
+      ti.duration = o.duration;
+      ti.group = group;
+      ti.transform = { x: lt.x / W, y: lt.y / H, scale: 1, rotation: 0, opacity: 1 };
+      const run = ti.card.runs[0]!;
+      run.size = lt.size;
+      run.fontId = lt.fontId;
+      run.weight = lt.bold ? 'bold' : 'normal';
+      run.letterSpacing = lt.letterSpacing;
+      run.color = ink;
+      run.lineHeight = 1.3;
+      delete run.shadow;
+      const ki = trackIndexFor(d.tracks as Track[], 'text', ti.start, ti.duration);
+      d.tracks[ki]!.items.push(ti);
+    }
   });
   if (firstId) store().select(firstId);
   return firstId;
+}
+
+/**
+ * 版型外框換顏色／透明度：新的外框圖（已經重畫好）換掉外框物件的素材，一步復原；
+ * 版型文字如果還是舊顏色的「自動深淺字」，跟著換成新外框配的深／淺字（自己改過顏色的不動）。
+ */
+export function applyFrameStyle(
+  group: string,
+  asset: Asset,
+  style: { layout: string; color: string; opacity: number },
+): void {
+  const p = store().project;
+  const frame = p && groupFrame(p, group);
+  if (!p || !frame) return;
+  const oldInk = inkFor(frame.item.frameStyle?.color ?? '#ffffff');
+  const newInk = inkFor(style.color);
+  store().apply((d) => {
+    if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    for (const track of d.tracks)
+      for (const it of track.items) {
+        if (it.type === 'audio' || it.group !== group) continue;
+        if (it.id === frame.item.id && it.type !== 'text') {
+          it.assetId = asset.id;
+          it.frameStyle = { ...style };
+        } else if (it.type === 'text') {
+          const run = it.card.runs[0];
+          if (run && run.color === oldInk) run.color = newInk;
+        }
+      }
+  });
 }
 
 /** 整個版型換位置：整組的開始時間往前或往後移（不能小於 0 秒），各格跟著一起 */

@@ -16,6 +16,11 @@ test('單一素材進場：選「捲簾放下」3 秒 → 開頭看不到、中�
   await openTab(page, '特效');
   await expect(page.locator('.fx-legend .lg.seam')).toHaveText('雙影片銜接');
   await expect(page.locator('.fx-legend .lg.single')).toHaveText('單影片進出場');
+  // 圖例用「選取中」的顏色：雙影片銜接＝橘棕底白字、單影片進出場＝深綠底淺字
+  const lg = (c: string) =>
+    page.locator(`.fx-legend .lg.${c}`).evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await lg('seam')).toBe('rgb(184, 85, 58)');
+  expect(await lg('single')).toBe('rgb(30, 59, 47)');
   await expect(page.getByTestId('fx-part-in')).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('radio', { name: '進場 捲簾放下' }).tap();
   await page.getByLabel('進場幾秒').fill('30'); // 3.0 秒
@@ -64,10 +69,14 @@ test('單一素材可以同時有進場與出場（不同特效）：出場「�
   await expect.poll(async () => dark(await samplePreview(page, 0.85, 0.5))).toBe(true);
   await expect(page.getByTestId('fx-circle-in')).toHaveText('溶');
   await expect(page.getByTestId('fx-circle-out')).toHaveText('左');
-  // 選取中＝#1E3B2F（出場這塊正在編輯），沒選的進場＝#7F8C6A
-  const bg = (id: string) => page.getByTestId(id).evaluate((el) => getComputedStyle(el).backgroundColor);
+  // 選取中（出場這塊正在編輯）＝深底 #1E3B2F＋淺字 #EEF2E6；沒選的進場＝淺底 #D5DCC6＋深字 #1E3B2F
+  const css = (id: string, prop: 'backgroundColor' | 'color') =>
+    page.getByTestId(id).evaluate((el, p) => getComputedStyle(el)[p as 'color'], prop);
+  const bg = (id: string) => css(id, 'backgroundColor');
   expect(await bg('fx-circle-out')).toBe('rgb(30, 59, 47)');
-  expect(await bg('fx-circle-in')).toBe('rgb(127, 140, 106)');
+  expect(await css('fx-circle-out', 'color')).toBe('rgb(238, 242, 230)');
+  expect(await bg('fx-circle-in')).toBe('rgb(213, 220, 198)');
+  expect(await css('fx-circle-in', 'color')).toBe('rgb(30, 59, 47)');
   await page.screenshot({ path: `${SHOT}/in-out.png` });
   // 點進場圓圈 → 切到進場、顏色對調
   await page.getByTestId('fx-circle-in').tap();
@@ -158,6 +167,10 @@ test('字卡文字特效：閃爍（亮光掃過，不同時間亮的地方不�
     );
   expect((await it()).textFx).toEqual({ kind: 'shimmer' });
   await expect(page.getByTestId('fx-circle-style')).toHaveText('爍');
+  // 文字特效圓圈：選取中（正在特效分頁的「文字特效」）＝深底淺字
+  expect(
+    await page.getByTestId('fx-circle-style').evaluate((el) => getComputedStyle(el).backgroundColor),
+  ).toBe('rgb(30, 59, 47)');
   await page.evaluate(() => window.scrollTo(0, 0));
   await seekTo(page, 0.02); // 亮光還在字的左邊：字是暗的
   const dim = await countColor(page, WHITE, 25, region);

@@ -15,7 +15,7 @@ import {
   transitionProgress,
   transitionSpan,
 } from './transitions';
-import { splitFree } from './timeline';
+import { sourceTimeClamped, splitFree } from './timeline';
 
 const clip = (id: string, start: number, duration: number, extra: Partial<VideoItem> = {}): VideoItem =>
   ({
@@ -168,10 +168,15 @@ describe('activeTransition：兩段真的重疊', () => {
     expect(v(at.a).duration).toBeCloseTo(3.5, 6);
     expect(v(at.a).volume).toBe(0);
   });
-  it('B 的入點是 0（前面沒有素材）：提前的部分縮短，更早的時候 B 還沒出現', () => {
+  it('B 的入點是 0（前面沒有素材）：轉場一開始 B 就在（入點是負的，素材時間夾在第一格），不會到接縫才突然跳出來', () => {
     const B0 = clip('B', 3, 3, { trimIn: 0.2, transitionIn: { kind: 'dissolve', duration: 1 } });
-    expect(activeTransition([A, B0] as Item[], 2.6)!.b).toBeNull(); // 只能提前 0.2 秒
-    expect(v(activeTransition([A, B0] as Item[], 2.9)!.b).trimIn).toBeCloseTo(0, 6);
+    const early = v(activeTransition([A, B0] as Item[], 2.6)!.b); // 轉場從 2.5 秒開始
+    expect(early.start).toBeCloseTo(2.5, 6);
+    expect(early.trimIn).toBeCloseTo(-0.3, 6);
+    expect(sourceTimeClamped(early, 2.6)).toBe(0); // 還沒到素材開頭：停在第一格
+    expect(sourceTimeClamped(early, 3)).toBeCloseTo(0.2, 6); // 到接縫：對到 B 自己的入點
+    // 同一個時間點對到的素材秒數，跟 B 自己播到那裡一樣
+    expect(sourceTimeClamped(v(activeTransition([A, B0] as Item[], 3.2)!.b), 3.2)).toBeCloseTo(0.4, 6);
   });
   it('不在轉場期間回傳 null', () => {
     expect(activeTransition(items, 1)).toBeNull();

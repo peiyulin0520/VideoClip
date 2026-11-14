@@ -180,10 +180,10 @@ export function AudioTab({
               <button
                 className={`chip sm${item.audioRanges ? ' active' : ''}`}
                 data-testid="audio-mute"
-                aria-label={`靜音標記 ${itemTitle(item, asset)}`}
+                aria-label={`進階 ${itemTitle(item, asset)}`}
                 onClick={() => setMuteFor(item.id)}
               >
-                靜音標記{item.audioRanges ? `（${item.audioRanges.length}）` : ''}
+                進階{item.audioRanges ? `（${item.audioRanges.length}）` : ''}
               </button>
               {item.type === 'audio' && (
                 <button

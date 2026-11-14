@@ -2,15 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 import { addOverlays, clips, createProjectWith, fixture, openTab, showTimeline } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-6/tabs';
-const NAMES = ['剪輯', '疊加', '文字', '圖層', '版型', '特效', '素材', '音訊'] as const;
+const NAMES = ['剪輯', '疊加', '文字', '圖層', '版型', '特效', '色調', '素材', '音訊'] as const;
 const expectTab = (page: Page, name: string) =>
   expect.poll(async () => activeTab(page), { message: `目前的分頁應該是 ${name}` }).toBe(name);
 const activeTab = async (page: Page) => page.getByRole('tab', { selected: true }).first().textContent();
 
-test('八個分頁都在、390 寬點得到每一個（放不下時分頁列可以左右滑）；每一頁有該有的內容', async ({ page }) => {
+test('九個分頁都在、390 寬點得到每一個（放不下時分頁列可以左右滑）；每一頁有該有的內容', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   const tabs = page.getByRole('tab');
-  await expect(tabs).toHaveCount(8);
+  await expect(tabs).toHaveCount(9);
   expect(await tabs.allTextContents()).toEqual([...NAMES]);
 
   const want: Record<(typeof NAMES)[number], string | RegExp> = {
@@ -20,6 +20,7 @@ test('八個分頁都在、390 寬點得到每一個（放不下時分頁列可�
     圖層: '這一秒的圖層',
     版型: '拍貼機直條',
     特效: /轉場/,
+    色調: /色調組合/,
     素材: '貼圖',
     音訊: /加入背景音樂/,
   };

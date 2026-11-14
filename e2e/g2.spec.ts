@@ -41,9 +41,9 @@ test('片段命名：剪輯分頁「命名」、時間軸顯示「序號 名稱�
   // 第一下選取並把播放頭移到片段開頭（時間軸跟著捲動，片段滑到播放頭位置）；第二下點在播放頭右邊一點＝還是同一個片段
   const box = (await clips(page).nth(1).boundingBox())!;
   const playhead = (await page.locator('.playhead').boundingBox())!;
-  await page.touchscreen.tap(box.x + 10, box.y + box.height / 2);
+  await page.touchscreen.tap(box.x + 14, box.y + box.height - 8);
   await page.waitForTimeout(120);
-  await page.touchscreen.tap(playhead.x + 30, box.y + box.height / 2);
+  await page.touchscreen.tap(playhead.x + 30, box.y + box.height - 8);
   await page.getByLabel('片段名稱').fill('蛋糕前');
   await page.getByRole('button', { name: '確定' }).tap();
   await expect(clips(page).nth(1)).toContainText('2 蛋糕前');

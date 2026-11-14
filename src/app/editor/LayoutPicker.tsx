@@ -2,20 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import { ensureUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { enqueueThumbs } from '../../engine/thumbs';
-import {
-  FRAME_COLORS,
-  LAYOUTS,
-  MAX_CELL_VIDEOS,
-  paintFrame,
-  renderFramePng,
-  type LayoutDef,
-} from '../../engine/layouts';
+import { LAYOUTS, MAX_CELL_VIDEOS, paintFrame, renderFramePng, type LayoutDef } from '../../engine/layouts';
 import { addLayout } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import type { TransitionKind } from '../../model/types';
+import { FrameStyleControls } from './FrameStyleControls';
 import { GroupFxSelect } from './GroupFxSelect';
+
+/** 版型文字裡的日期：今天，YYYY.MM.DD */
+const todayText = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
+};
 
 /** 版型縮圖：灰底上畫外框，格子的洞裡填淡淡的顏色，看得出哪裡放照片 */
 function LayoutThumb({ def, W, H }: { def: LayoutDef; W: number; H: number }) {
@@ -44,7 +45,9 @@ function LayoutThumb({ def, W, H }: { def: LayoutDef; W: number; H: number }) {
 export function LayoutPicker() {
   const project = useProjectStore((s) => s.project)!;
   const [def, setDef] = useState<LayoutDef | null>(null);
-  const [colorId, setColorId] = useState('white');
+  const [frameColor, setFrameColor] = useState('#ffffff');
+  const [frameOpacity, setFrameOpacity] = useState(1);
+  const [withText, setWithText] = useState(true);
   const [motion, setMotion] = useState<'' | 'drift' | 'slide'>('');
   const [inFx, setInFx] = useState<TransitionKind | ''>('');
   const [outFx, setOutFx] = useState<TransitionKind | ''>('');
@@ -56,7 +59,7 @@ export function LayoutPicker() {
     const files = list ? Array.from(list) : [];
     if (input.current) input.current.value = '';
     if (!files.length || !def) return;
-    const color = FRAME_COLORS.find((c) => c.id === colorId)!.color;
+    const color = frameColor;
     const { setBusy, player } = useUI.getState();
     const pid = useProjectStore.getState().project!.id;
     setBusy('做版型中…');
@@ -69,9 +72,13 @@ export function LayoutPicker() {
       const b = def.build(W, H);
       // 素材比格子少：輪流重複使用；比格子多：只用前面幾個
       const cells = b.windows.map((win, i) => ({ asset: media[i % media.length]!, win }));
-      const frameFile = new File([await renderFramePng(def, W, H, color)], `版型-${def.name}.png`, {
-        type: 'image/png',
-      });
+      const frameFile = new File(
+        [await renderFramePng(def, W, H, color, frameOpacity)],
+        `版型-${def.name}.png`,
+        {
+          type: 'image/png',
+        },
+      );
       const fr = await importFiles(pid, [frameFile]);
       const frame = fr.assets[0];
       if (!frame) return toast('外框做不出來', 6000);
@@ -98,6 +105,8 @@ export function LayoutPicker() {
         motion: motion || undefined,
         inEffect: inFx || undefined,
         outEffect: outFx || undefined,
+        frameStyle: { layout: def.id, color, opacity: frameOpacity },
+        texts: withText ? def.texts?.(b, W, todayText()) : undefined,
       });
       setDef(null);
       toast(
@@ -143,21 +152,23 @@ export function LayoutPicker() {
             <div className="panel-head">
               <span>外框顏色</span>
             </div>
-            <div className="chips" role="radiogroup" aria-label="外框顏色">
-              {FRAME_COLORS.map((c) => (
-                <button
-                  key={c.id}
-                  role="radio"
-                  aria-checked={colorId === c.id}
-                  aria-label={`外框 ${c.name}`}
-                  className={`chip${colorId === c.id ? ' active' : ''}`}
-                  onClick={() => setColorId(c.id)}
-                >
-                  <i className="frame-dot" style={{ background: c.color }} />
-                  {c.name}
-                </button>
-              ))}
-            </div>
+            <FrameStyleControls
+              color={frameColor}
+              opacity={frameOpacity}
+              onColor={setFrameColor}
+              onOpacity={setFrameOpacity}
+            />
+            {def.texts && (
+              <button
+                role="switch"
+                aria-checked={withText}
+                aria-label="附上版型文字"
+                className={`btn${withText ? ' primary' : ''}`}
+                onClick={() => setWithText((v) => !v)}
+              >
+                {withText ? '✓ 附上版型文字（可以改字、改字體）' : '不附版型文字'}
+              </button>
+            )}
             <div className="panel-head">
               <span>進場、出場特效（整個版型一起）</span>
             </div>

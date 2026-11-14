@@ -15,3 +15,6 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+// iPhone Safari 要有 touchstart 監聽，按鈕的 :active（按下去的顏色回饋）才會生效
+document.addEventListener('touchstart', () => {}, { passive: true });

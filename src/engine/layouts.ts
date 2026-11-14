@@ -19,11 +19,24 @@ export const FRAME_COLORS: FrameColor[] = [
   { id: 'cream', name: '奶茶', color: '#e8d3b8' },
 ];
 
+/** 版型附的文字（位置是畫面像素的中心點；字級以 1080 寬為基準）；建立版型時變成跟著版型走的字卡 */
+export type LayoutText = {
+  x: number;
+  y: number;
+  text: string;
+  size: number;
+  fontId: string;
+  bold: boolean;
+  letterSpacing: number;
+};
+
 export type LayoutDef = {
   id: LayoutId;
   name: string;
   hint: string;
   cells: number;
+  /** 預設要附的文字（拍貼機的 PHOTO BOOTH＋日期、膠卷的底片號碼…）；沒有就不附 */
+  texts?: (b: ReturnType<LayoutDef['build']>, W: number, today: string) => LayoutText[];
   /** 依畫面大小算出格子的位置（px）與外框要畫的形狀（panel：實心的外框範圍；holes：膠卷的齒孔） */
   build: (W: number, H: number) => { windows: Rect[]; panels: Rect[]; holes: Rect[]; radius: number };
 };
@@ -65,6 +78,22 @@ const RAW_LAYOUTS: LayoutDef[] = [
     name: '拍貼機直條',
     hint: '4 格直條，下面留白可以寫日期',
     cells: 4,
+    texts(b, W, today) {
+      const p = b.panels[0]!;
+      const bottom = b.windows[b.windows.length - 1]!;
+      const y = (bottom.y + bottom.h + p.y + p.h) / 2;
+      return [
+        {
+          x: p.x + p.w / 2,
+          y,
+          text: `PHOTO BOOTH\n${today}`,
+          size: Math.round((p.w / W) * 1080 * 0.085),
+          fontId: 'system',
+          bold: true,
+          letterSpacing: 0.08,
+        },
+      ];
+    },
     build(W, H) {
       const pw = Math.min(W * 0.56, H * 0.34);
       const ph = Math.min(H * 0.92, pw * 3.0);
@@ -83,6 +112,22 @@ const RAW_LAYOUTS: LayoutDef[] = [
     name: '拍貼機 2×2',
     hint: '4 格方形，下面留白',
     cells: 4,
+    texts(b, W, today) {
+      const p = b.panels[0]!;
+      const bottom = b.windows[b.windows.length - 1]!;
+      const y = (bottom.y + bottom.h + p.y + p.h) / 2;
+      return [
+        {
+          x: p.x + p.w / 2,
+          y,
+          text: `PHOTO BOOTH\n${today}`,
+          size: Math.round((p.w / W) * 1080 * 0.07),
+          fontId: 'system',
+          bold: true,
+          letterSpacing: 0.08,
+        },
+      ];
+    },
     build(W, H) {
       const pw = W * 0.86;
       const m = pw * 0.05;
@@ -102,6 +147,31 @@ const RAW_LAYOUTS: LayoutDef[] = [
     name: '膠卷橫向',
     hint: '黑色底片 3 格，上下有齒孔',
     cells: 3,
+    texts(b, W) {
+      const p = b.panels[0]!;
+      const band = (b.windows[0]!.y - p.y) / 1.2;
+      const size = Math.round((band / W) * 1080 * 0.42);
+      return [
+        {
+          x: p.x + p.w * 0.2,
+          y: p.y + band * 0.5,
+          text: 'FILM 400',
+          size,
+          fontId: 'system',
+          bold: true,
+          letterSpacing: 0.1,
+        },
+        {
+          x: p.x + p.w * 0.8,
+          y: p.y + p.h - band * 0.5,
+          text: '▶ 12A',
+          size,
+          fontId: 'system',
+          bold: true,
+          letterSpacing: 0.1,
+        },
+      ];
+    },
     build(W, H) {
       const m = W * 0.03;
       const band = W * 0.05;
@@ -122,6 +192,22 @@ const RAW_LAYOUTS: LayoutDef[] = [
     name: '膠卷直向',
     hint: '黑色底片 3 格，左右有齒孔',
     cells: 3,
+    texts(b, W) {
+      const p = b.panels[0]!;
+      const last = b.windows[b.windows.length - 1]!;
+      const y = (last.y + last.h + p.y + p.h) / 2;
+      return [
+        {
+          x: p.x + p.w / 2,
+          y,
+          text: 'FILM 400 ▶ 12A',
+          size: Math.round((p.w / W) * 1080 * 0.05),
+          fontId: 'system',
+          bold: true,
+          letterSpacing: 0.08,
+        },
+      ];
+    },
     build(W, H) {
       const band = W * 0.05;
       const m = W * 0.02;
@@ -147,6 +233,22 @@ const RAW_LAYOUTS: LayoutDef[] = [
     name: '拍立得',
     hint: '白框、下面寬邊，1 格',
     cells: 1,
+    texts(b, W, today) {
+      const p = b.panels[0]!;
+      const w = b.windows[0]!;
+      const y = (w.y + w.h + p.y + p.h) / 2;
+      return [
+        {
+          x: p.x + p.w / 2,
+          y,
+          text: `memories\n${today}`,
+          size: Math.round((p.w / W) * 1080 * 0.07),
+          fontId: 'system',
+          bold: false,
+          letterSpacing: 0.04,
+        },
+      ];
+    },
     build(W, H) {
       const pw = W * 0.8;
       const m = pw * 0.06;
@@ -250,6 +352,16 @@ export const LAYOUTS: LayoutDef[] = RAW_LAYOUTS.map((d) => ({
 
 export const layoutById = (id: LayoutId): LayoutDef => LAYOUTS.find((l) => l.id === id)!;
 
+/** 外框顏色（色碼）的亮度 0～1；版型文字用它挑深字或淺字 */
+export function colorLuma(hex: string): number {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return 1;
+  const n = parseInt(m[1]!, 16);
+  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+}
+/** 版型文字的顏色：淺色外框配深字、深色外框配淺字 */
+export const inkFor = (frameColor: string): string => (colorLuma(frameColor) > 0.55 ? '#3a2e2a' : '#f6f2ea');
+
 // ---------- 外框畫面 ----------
 
 /** 外框畫在 ctx 上（canvas 的大小要是 W×H）：實心外框，格子和齒孔是透明的洞（evenodd） */
@@ -260,6 +372,7 @@ export function paintFrame(
   H: number,
   color: string,
   windowFill?: string,
+  opacity = 1,
 ) {
   const b = def.build(W, H);
   const rr = (r: Rect, radius: number) => {
@@ -271,7 +384,9 @@ export function paintFrame(
   for (const w of b.windows) rr(w, b.radius);
   for (const h of b.holes) rr(h, Math.min(h.w, h.h) * 0.25);
   ctx.fillStyle = color;
+  ctx.globalAlpha = Math.min(Math.max(opacity, 0), 1);
   ctx.fill('evenodd');
+  ctx.globalAlpha = 1;
   if (windowFill) {
     // 縮圖用：格子裡畫淡淡的灰色，看得出哪裡放照片
     ctx.beginPath();
@@ -282,11 +397,17 @@ export function paintFrame(
 }
 
 /** 外框 PNG（輸出給 importFiles 當照片素材）。大小跟專案畫面一樣，這樣放在畫面中央、填滿就剛好對齊。 */
-export async function renderFramePng(def: LayoutDef, W: number, H: number, color: string): Promise<Blob> {
+export async function renderFramePng(
+  def: LayoutDef,
+  W: number,
+  H: number,
+  color: string,
+  opacity = 1,
+): Promise<Blob> {
   const c = document.createElement('canvas');
   c.width = Math.round(W);
   c.height = Math.round(H);
-  paintFrame(c.getContext('2d')!, def, c.width, c.height, color);
+  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity);
   return new Promise((ok, bad) =>
     c.toBlob((b) => (b ? ok(b) : bad(new Error('外框轉成圖片失敗'))), 'image/png'),
   );

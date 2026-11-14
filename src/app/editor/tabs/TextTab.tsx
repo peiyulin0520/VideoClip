@@ -10,7 +10,16 @@ export function TextTab({ found }: { found: Found }) {
   return (
     <div className="panel text-panel">
       {item ? (
-        <TextPanel item={item} onAdd={add} onAddShape={() => addText(player?.time ?? 0, true)} />
+        <>
+          <>
+            {item.group && (
+              <p className="hint" data-testid="group-text-hint">
+                這是版型的文字：內容、字體都可以改，位置、大小、進出場跟著整個版型。
+              </p>
+            )}
+            <TextPanel item={item} onAdd={add} onAddShape={() => addText(player?.time ?? 0, true)} />
+          </>
+        </>
       ) : (
         <>
           <button className="btn primary done" onClick={add}>

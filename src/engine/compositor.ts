@@ -2,7 +2,6 @@ import {
   Application,
   BlurFilter,
   CanvasSource,
-  ColorMatrixFilter,
   Container,
   Graphics,
   ImageSource,
@@ -12,7 +11,8 @@ import {
 } from 'pixi.js';
 import 'pixi.js/advanced-blend-modes';
 import type { Adjust, BlendMode, Crop, Outline } from '../model/types';
-import { adjustMatrix } from './keyframes';
+import { isNeutral } from './grade';
+import { GradeFilter } from './gradeFilter';
 import type { Box } from './geometry';
 import { uiScale } from './textRender';
 
@@ -74,7 +74,7 @@ type Obj = {
   clip: Graphics | null;
   clipKey: string;
   blurF: BlurFilter | null;
-  colorF: ColorMatrixFilter | null;
+  colorF: GradeFilter | null;
   sprite: Sprite;
   texture: Texture | null;
   textureSource: CanvasSource | ImageSource | null;
@@ -474,15 +474,15 @@ export class Compositor {
       o.blurF.destroy();
       o.blurF = null;
     }
-    const cm = adjustMatrix(layer.adjust);
-    if (cm) {
-      if (!o.colorF) o.colorF = new ColorMatrixFilter();
-      o.colorF.matrix = cm as ColorMatrixFilter['matrix'];
+    if (!isNeutral(layer.adjust)) {
+      // 調色濾鏡（跟 grade.ts 同一套算式）；沒有調色的圖層不掛，省效能
+      if (!o.colorF) o.colorF = new GradeFilter();
+      o.colorF.setAdjust(layer.adjust!);
     } else if (o.colorF) {
       o.colorF.destroy();
       o.colorF = null;
     }
-    const fl = [o.colorF, o.blurF].filter((x): x is ColorMatrixFilter | BlurFilter => !!x);
+    const fl = [o.colorF, o.blurF].filter((x): x is GradeFilter | BlurFilter => !!x);
     o.container.filters = fl.length ? fl : null;
   }
 

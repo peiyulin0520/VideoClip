@@ -103,3 +103,40 @@ test('標記軸：白線在已選範圍裡不能新增；取消不改任何東�
   await page.getByRole('button', { name: '取消' }).tap();
   expect((await audioItems(page))[0]!.audioRanges).toBeUndefined();
 });
+
+test('進階：切到「標記要靜音的聲音」→ 在 1–2 秒標一段靜音 → audioRanges 是 [0,1]＋[2,4]、匯出的 1–2 秒是靜音；切換標法標記互補、聲音結果不變', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await createProjectWith(page, ['solid-red.webm']); // 4 秒，沒聲音
+  await openTab(page, '音訊');
+  await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
+  await expect(page.getByTestId('audio-mute')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('audio-mute')).toContainText('進階');
+  await page.getByTestId('audio-mute').tap();
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId('audio-mode-keep')).toHaveAttribute('aria-checked', 'true'); // 預設：標記要保留的
+  await page.getByTestId('audio-mode-silence').tap();
+  await expect(page.getByTestId('audio-mode-silence')).toHaveAttribute('aria-checked', 'true');
+  // 靜音模式一開始沒有標記（整段都有聲音）；白線移到 1 秒、新增一組（預設 1 秒長 → 1–2 秒）
+  await expect(page.getByTestId('range-flag-start-0')).toHaveCount(0);
+  await clickStrip(page, 0.25);
+  await page.getByTestId('range-add').tap();
+  await expect(page.getByTestId('range-flag-start-0')).toBeVisible();
+  await page.screenshot({ path: 'docs/screenshots/feedback-10/audio-silence.png' });
+  // 切回「保留」：標記換算成互補（[0,1]＋[2,4]）
+  await page.getByTestId('audio-mode-keep').tap();
+  await expect(page.getByTestId('range-flag-start-1')).toBeVisible();
+  await page.getByTestId('audio-mode-silence').tap();
+  await expect(page.getByTestId('range-flag-start-1')).toHaveCount(0); // 再換回靜音：只剩那一段
+  await page.getByTestId('rm-apply').tap();
+  const items = await audioItems(page);
+  expect(items).toHaveLength(1);
+  expect(items[0]!.audioRanges).toHaveLength(2);
+  expect(items[0]!.audioRanges![0]![1]).toBeCloseTo(1, 1);
+  expect(items[0]!.audioRanges![1]![0]).toBeCloseTo(2, 1);
+  const out = await inspect(page);
+  expect(out.audioPeaks[0]!).toBeGreaterThan(0.05);
+  expect(out.audioPeaks[1]!).toBeLessThan(out.audioPeaks[0]! * 0.25);
+  expect(out.audioPeaks[2]!).toBeGreaterThan(0.02);
+});

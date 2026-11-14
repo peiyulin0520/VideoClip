@@ -48,7 +48,7 @@ import { tileLayout } from './tiles';
 import { effectDurations, seamsOf, transitionCode, transitionName } from '../../engine/transitions';
 import { renameItem } from '../../store/actions';
 
-const BASE_H = 44; // 最下面那條影像軌（主要影片）高一點，縮圖與兩行名稱看得清楚
+const BASE_H = 32; // 最下面那條影像軌：跟其他軌一樣高（2026-11-14 使用者：影像軌太高、縮圖太寬）
 const SLOT_H = 26; // 拖素材時，同一區上下各多出一條「＋ 新增一軌」的放置區
 const GAP_MIN = 0.1; // 小於這個秒數的空位不畫
 const ROW_H = 32; // 其他軌道：細一點（2026-11-12 使用者：拖拉軸再細一些）
@@ -85,7 +85,7 @@ function Tiles({
   const aspect = asset && asset.height ? asset.width / asset.height : 0.56;
   const widthPx = item.duration * pps;
   // 長影片：需要的格數超過上限時每格放寬，整個片段一定鋪滿（不會 1 分鐘之後變空白）
-  const { count, tileW } = tileLayout(widthPx, Math.min(Math.max(h * aspect, 30), 114));
+  const { count, tileW } = tileLayout(widthPx, Math.min(Math.max(h * aspect, 18), 114));
   return (
     <div className="tiles">
       {Array.from({ length: count }, (_, i) => {
@@ -99,6 +99,15 @@ function Tiles({
         return <span key={i} style={{ width: tileW, backgroundImage: `url(${url ?? thumbs[0]})` }} />;
       })}
     </div>
+  );
+}
+
+/** 有調色（色調組合、手動調整、定位裡的調色）嗎：時間軸片段名稱後面加個「調」 */
+function hasGrade(it: Item): boolean {
+  return (
+    !!it.look ||
+    (!!it.adjust && Object.values(it.adjust).some(Boolean)) ||
+    !!it.keyframes?.some((k) => k.adjust && Object.values(k.adjust).some(Boolean))
   );
 }
 
@@ -231,6 +240,7 @@ export function Timeline({
   const fxFocus = useUI((s) => s.fxFocus);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSet = useRef(-100);
+  const lastSeen = useRef(0); // 上一次看到的 scrollLeft（我們自己設的、或 scroll 事件處理過的）
   const [vw, setVw] = useState(360);
   const half = GUTTER;
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -405,14 +415,18 @@ export function Timeline({
   }, []);
 
   const syncScroll = useCallback(
-    (t: number) => {
+    (t: number, fromPlayer = false) => {
       const el = scrollRef.current;
       if (!el) return;
+      // 播放器通知時間變了：如果時間軸剛被捲動（使用者或程式）、scroll 事件還沒處理，不要用舊的播放時間把它蓋回去
+      // （背景補縮圖、預覽檔做好等重畫會通知播放器，剛好撞到就會把使用者的捲動吃掉）
+      if (fromPlayer && Math.abs(el.scrollLeft - lastSeen.current) >= 1) return;
       const target = t * pps;
       if (Math.abs(el.scrollLeft - target) >= 0.5) {
         lastSet.current = target;
         el.scrollLeft = target;
       }
+      lastSeen.current = el.scrollLeft;
     },
     [pps],
   );
@@ -423,11 +437,12 @@ export function Timeline({
 
   useEffect(() => {
     if (!player) return;
-    return player.subscribe((t) => syncScroll(t));
+    return player.subscribe((t) => syncScroll(t, true));
   }, [player, syncScroll]);
 
   const onScroll = () => {
     const el = scrollRef.current!;
+    lastSeen.current = el.scrollLeft;
     if (Math.abs(el.scrollLeft - lastSet.current) < 1.5) return;
     player?.seek(el.scrollLeft / pps);
   };
@@ -781,7 +796,7 @@ export function Timeline({
             return (
               <div
                 key={track.id}
-                className={`track${track.hidden ? ' off' : ''}${isDragged ? ' track-dragging' : ''}${h >= BASE_H ? ' tall' : ''}${dropClass(track)}`}
+                className={`track${track.hidden ? ' off' : ''}${isDragged ? ' track-dragging' : ''}${dropClass(track)}`}
                 data-testid="track"
                 data-kind={track.kind}
                 data-track-id={track.id}
@@ -886,6 +901,7 @@ export function Timeline({
                         {it.type !== 'text' && <span className="cl-dur"> {it.duration.toFixed(1)}s</span>}
                         {isVideoItem(it) && it.speed !== 1 && ` · ${it.speed}x`}
                         {isVideoItem(it) && it.type !== 'image' && it.volume === 0 && ' · 靜音'}
+                        {it.type !== 'audio' && hasGrade(it) && ' · 調'}
                         {asset && proxyProgress[asset.id] !== undefined && (
                           <span className="proxy-note" data-testid="proxy-note">
                             {' '}

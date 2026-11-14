@@ -11,6 +11,11 @@ async function rowCenter(page: Page, trackId: string) {
   const b = (await page.locator(`[data-testid="track"][data-track-id="${trackId}"]`).boundingBox())!;
   return b.y + b.height / 2;
 }
+/** 軌道上緣往下 offset px（軌道變矮之後，放置區把列推下來的位置離按下去的點不到 12px，所以點靠上緣一點） */
+async function rowTop(page: Page, trackId: string, offset: number) {
+  const b = (await page.locator(`[data-testid="track"][data-track-id="${trackId}"]`).boundingBox())!;
+  return b.y + offset;
+}
 async function clipCenter(page: Page, itemId: string) {
   const b = (await page.locator(`[data-testid="clip"][data-item-id="${itemId}"]`).boundingBox())!;
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
@@ -40,7 +45,7 @@ test('長按影像片段拖到另一條影像軌、時間往右：換軌道、�
   const clipA = base!.items[0]!.id;
   await showTimeline(page);
   // 影像 1 的片段往上拖到影像 2、再往右 5 秒（300px）
-  await longPressDrag(page, clipA, { dx: 300, y: () => rowCenter(page, over!.id) }, false);
+  await longPressDrag(page, clipA, { dx: 300, y: () => rowTop(page, over!.id, 6) }, false);
   await expect(page.locator(`[data-testid="track"][data-track-id="${over!.id}"]`)).toHaveClass(/drop-ok/);
   await page.screenshot({ path: `${SHOT}/dragging-to-other-track.png` });
   await page.mouse.up();

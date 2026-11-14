@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { Item, Project, VideoItem } from '../model/types';
 import {
   adjustAt,
-  adjustMatrix,
   keyframeIndexAt,
   removeKeyframe,
   shiftKeyframes,
@@ -191,29 +190,5 @@ describe('withTime／timeResolved', () => {
     const r = timeResolved(project([frame, cell]), 14); // 外框走到終點：x 0.5 → 0.8
     expect(r.tracks[0]!.items[0]!.transform.x).toBeCloseTo(0.8);
     expect(r.tracks[0]!.items[1]!.transform.x).toBeCloseTo(0.6);
-  });
-});
-
-describe('adjustMatrix：色調 → 顏色矩陣', () => {
-  it('全部是 0 → null（不加濾鏡）', () => {
-    expect(adjustMatrix(undefined)).toBeNull();
-    expect(adjustMatrix({ brightness: 0, saturation: 0 })).toBeNull();
-  });
-  it('亮度 +0.5：紅綠藍都乘 1.5；飽和度 −1：三個顏色相同（黑白）', () => {
-    const m = adjustMatrix({ brightness: 0.5 })!;
-    expect(m[0]).toBeCloseTo(1.5);
-    expect(m[6]).toBeCloseTo(1.5);
-    expect(m[12]).toBeCloseTo(1.5);
-    const g = adjustMatrix({ saturation: -1 })!;
-    // 每一列（紅、綠、藍的輸出）用同樣的係數＝黑白
-    expect(g[0]).toBeCloseTo(g[5]!);
-    expect(g[5]).toBeCloseTo(g[10]!);
-    expect(g[1]).toBeCloseTo(g[6]!);
-    expect(g[6]).toBeCloseTo(g[11]!);
-  });
-  it('色溫 +：紅變多、藍變少', () => {
-    const m = adjustMatrix({ temperature: 0.5 })!;
-    expect(m[0]).toBeGreaterThan(1);
-    expect(m[12]).toBeLessThan(1);
   });
 });

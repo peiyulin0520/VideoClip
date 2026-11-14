@@ -21,6 +21,7 @@ import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
 import { ExportSheet } from '../editor/ExportSheet';
 import { KeyframeButton } from '../editor/KeyframeButton';
+import { PlaybarButton } from '../editor/PlaybarButton';
 import { Preview } from '../editor/Preview';
 import { Timeline, MAX_PPS, MIN_PPS } from '../editor/Timeline';
 import { BottomBar } from '../editor/Toolbar';
@@ -250,33 +251,30 @@ function EditorBody() {
       />
 
       <div className="playbar">
-        <button
-          className="icon-btn"
-          aria-label={playing ? '暫停' : '播放'}
+        <PlaybarButton
+          icon={playing ? Pause : Play}
+          ariaLabel={playing ? '暫停' : '播放'}
+          fill
           onClick={() => {
             if (total <= 0) return toast('先匯入影片或照片');
             player?.toggle();
           }}
-        >
-          {playing ? <Pause size={22} /> : <Play size={22} />}
-        </button>
+        />
         <TimeText total={total} />
         <KeyframeButton />
         <span className="spacer" />
-        <button
-          className="icon-btn"
-          aria-label="縮小時間軸"
+        <PlaybarButton
+          icon={ZoomOut}
+          label="縮小"
+          ariaLabel="縮小時間軸"
           onClick={() => setPps(Math.max(pps / 1.5, MIN_PPS))}
-        >
-          <ZoomOut size={22} />
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="放大時間軸"
+        />
+        <PlaybarButton
+          icon={ZoomIn}
+          label="放大"
+          ariaLabel="放大時間軸"
           onClick={() => setPps(Math.min(pps * 1.5, MAX_PPS))}
-        >
-          <ZoomIn size={22} />
-        </button>
+        />
       </div>
 
       <Timeline pps={pps} setPps={setPps} onAdd={() => pick('main')} />
