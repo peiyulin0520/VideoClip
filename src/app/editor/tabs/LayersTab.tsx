@@ -39,7 +39,7 @@ export function LayersTab() {
   const t = usePlayerTime(player);
   // 目前這一秒有哪些圖層（最上層在最上面）
   const layers = layersAt(project, t, true).slice().reverse();
-  // 有定位（關鍵影格）的物件：滑桿顯示播放頭這個時間的樣子
+  // 有定格（關鍵影格）的物件：滑桿顯示播放頭這個時間的樣子
   const found = findItem(timeResolved(project, t), selectedId);
   const it = found && found.item.type !== 'audio' ? found.item : undefined;
 

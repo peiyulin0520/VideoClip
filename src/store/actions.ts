@@ -165,17 +165,17 @@ function groupItems(p: Project, group: string): VideoItem[] {
     .filter((i): i is VideoItem => i.type !== 'text' && i.group === group);
 }
 
-/** 播放頭在這個物件自己的時間裡的位置（夾在 0～長度之間）；定位（關鍵影格）用 */
+/** 播放頭在這個物件自己的時間裡的位置（夾在 0～長度之間）；定格（關鍵影格）用 */
 function localTime(it: Item): number {
   const t = useUI.getState().player?.time ?? 0;
   return Math.min(Math.max(t - it.start, 0), it.duration);
 }
 
-/** 播放線碰到定位菱形的範圍（CSS px，菱形的一半寬） */
+/** 播放線碰到定格菱形的範圍（CSS px，菱形的一半寬） */
 const KF_HIT_PX = 8;
 
 /**
- * 定位要改的時間（物件自己的秒）：播放線碰到某個定位的菱形 → 那個定位的時間；沒碰到 → 播放線的位置（會新增一個）。
+ * 定格要改的時間（物件自己的秒）：播放線碰到某個定格的菱形 → 那個定格的時間；沒碰到 → 播放線的位置（會新增一個）。
  */
 export function keyframeLocal(it: Item): number {
   const local = localTime(it);
@@ -184,7 +184,7 @@ export function keyframeLocal(it: Item): number {
   return i >= 0 ? it.keyframes![i]!.t : local;
 }
 
-/** 色調分頁的「套用到」：沒有定位＝整段素材；有定位＝預設「這個定位」，使用者可以改成「整段素材」 */
+/** 色調分頁的「套用到」：沒有定格＝整段素材；有定格＝預設「這個定格」，使用者可以改成「整段素材」 */
 export function gradeScopeOf(target: Item): 'item' | 'key' {
   if (!hasKeyframes(target)) return 'item';
   const o = useUI.getState().gradeScope;
@@ -199,7 +199,7 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
     // 版型裡的任何物件：移動、縮放、旋轉都變成「整組」一起動（格子不會單獨跑掉）
     const group = f.item.group!;
     if (hasKeyframes(frame.item)) {
-      // 外框有定位：改的是播放頭這個時間的定位（整組一起動，各格由外框算出來，不用動）
+      // 外框有定格：改的是播放頭這個時間的定格（整組一起動，各格由外框算出來，不用動）
       const t = useUI.getState().player?.time ?? 0;
       const pr = timeResolved(p, t);
       const rf = groupFrame(pr, group);
@@ -239,7 +239,7 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   editItem(
     id,
     (it) => {
-      // 有定位：改的是播放頭這個時間的定位（沒有就自動新增一個）；沒有定位：改物件本身
+      // 有定格：改的是播放頭這個時間的定格（沒有就自動新增一個）；沒有定格：改物件本身
       if (hasKeyframes(it as Item))
         it.keyframes = upsertKeyframe(it as Item, keyframeLocal(it as Item), patch);
       else Object.assign(it.transform, patch);
@@ -248,7 +248,7 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   );
 }
 
-/** 定位（關鍵影格）作用的物件：版型裡的任何物件＝外框（整組一起動）；音樂沒有 */
+/** 定格（關鍵影格）作用的物件：版型裡的任何物件＝外框（整組一起動）；音樂沒有 */
 export function keyframeTarget(p: Project, id: string | null): Item | null {
   const f = id ? findItem(p, id) : null;
   if (!f || f.item.type === 'audio') return null;
@@ -256,7 +256,7 @@ export function keyframeTarget(p: Project, id: string | null): Item | null {
   return f.item;
 }
 
-/** 播放頭這個時間有沒有定位：沒有就新增（值＝目前畫面上的樣子），有就刪掉。回傳做了什麼 */
+/** 播放頭這個時間有沒有定格：沒有就新增（值＝目前畫面上的樣子），有就刪掉。回傳做了什麼 */
 export function toggleKeyframe(id: string): 'added' | 'removed' | null {
   const p = store().project;
   const target = p && keyframeTarget(p, id);
@@ -265,7 +265,7 @@ export function toggleKeyframe(id: string): 'added' | 'removed' | null {
   const idx = keyframeIndexAt(target, local);
   const t = useUI.getState().player?.time ?? 0;
   if (t < target.start || t > target.start + target.duration + 1e-6) {
-    toast('播放頭要在這個素材的時間範圍裡才能打定位');
+    toast('播放頭要在這個素材的時間範圍裡才能打定格');
     return null;
   }
   editItem(target.id, (it) => {
@@ -278,7 +278,7 @@ export function toggleKeyframe(id: string): 'added' | 'removed' | null {
   return idx >= 0 ? 'removed' : 'added';
 }
 
-/** 刪除播放線碰到的那個定位（沒碰到什麼都不做）。回傳有沒有刪 */
+/** 刪除播放線碰到的那個定格（沒碰到什麼都不做）。回傳有沒有刪 */
 export function deleteNearKeyframe(id: string): boolean {
   const p = store().project;
   const target = p && keyframeTarget(p, id);
@@ -294,14 +294,14 @@ export function deleteNearKeyframe(id: string): boolean {
 }
 
 /**
- * 設定（或取消）播放線碰到的那個定位的小特效（震／彈／晃／跳）。回傳設定到的定位時間（物件自己的秒），沒碰到定位回傳 null。
+ * 設定（或取消）播放線碰到的那個定格的小特效（震／彈／晃／跳）。回傳設定到的定格時間（物件自己的秒），沒碰到定格回傳 null。
  * patch 只改指定的欄位（沒有小特效時用預設值補齊）；null＝取消。
  */
 export function setKeyframePulse(
   id: string,
   patch: Partial<Pulse> | null,
   coalesce?: string,
-  /** 指定第幾個定位（試播中播放線不在定位上時用）；沒給就用播放線碰到的 */
+  /** 指定第幾個定格（試播中播放線不在定格上時用）；沒給就用播放線碰到的 */
   index?: number,
 ): number | null {
   const p = store().project;
@@ -323,7 +323,7 @@ export function setKeyframePulse(
   return at;
 }
 
-/** 清除全部定位：物件停在播放頭這個時間的樣子（畫面不跳）；一步復原 */
+/** 清除全部定格：物件停在播放頭這個時間的樣子（畫面不跳）；一步復原 */
 export function clearKeyframes(id: string): void {
   const p = store().project;
   const target = p && keyframeTarget(p, id);
@@ -340,7 +340,7 @@ export function clearKeyframes(id: string): void {
 }
 
 /**
- * 色調（亮度、飽和度、色溫、色調）。有定位＝改播放頭這個時間的定位；沒有＝改物件本身（版型＝整組每個物件都改）。
+ * 色調（亮度、飽和度、色溫、色調）。有定格＝改播放頭這個時間的定格；沒有＝改物件本身（版型＝整組每個物件都改）。
  */
 export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${id}`): void {
   const p = store().project;
@@ -389,7 +389,7 @@ export function setLook(id: string, lookId: LookRef['id'] | null, amount?: numbe
   if (!p) return;
   const target = keyframeTarget(p, id);
   if (target && hasKeyframes(target) && gradeScopeOf(target) === 'key') {
-    // 有定位：改的是播放線碰到（或這個時間新增）的定位；null＝這個定位明確用原色
+    // 有定格：改的是播放線碰到（或這個時間新增）的定格；null＝這個定格明確用原色
     editItem(
       target.id,
       (it) => {
@@ -419,7 +419,7 @@ export function setLook(id: string, lookId: LookRef['id'] | null, amount?: numbe
   );
 }
 
-/** 調色全部歸零：色調組合、手動調整、定位裡的調色都清掉（定位的位置大小不動）；一步復原 */
+/** 調色全部歸零：色調組合、手動調整、定格裡的調色都清掉（定格的位置大小不動）；一步復原 */
 export function resetGrade(id: string): void {
   const p = store().project;
   if (!p) return;
@@ -438,7 +438,7 @@ export function resetGrade(id: string): void {
   });
 }
 
-/** 清掉定位上的調色（色調組合、手動調整），位置大小不動；從「這個定位」改成「整段素材」時用；一步復原 */
+/** 清掉定格上的調色（色調組合、手動調整），位置大小不動；從「這個定格」改成「整段素材」時用；一步復原 */
 export function clearKeyframeGrade(id: string): void {
   const p = store().project;
   const target = p && keyframeTarget(p, id);
@@ -451,7 +451,7 @@ export function clearKeyframeGrade(id: string): void {
   });
 }
 
-/** 定位上有沒有調色（色調組合或手動調整） */
+/** 定格上有沒有調色（色調組合或手動調整） */
 export function keyframeHasGrade(it: Item): boolean {
   return !!it.keyframes?.some((k) => k.look !== undefined || (k.adjust && Object.keys(k.adjust).length > 0));
 }

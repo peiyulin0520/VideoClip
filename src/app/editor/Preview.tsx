@@ -75,7 +75,7 @@ export function Preview({
   const [dragging, setDragging] = useState(false); // 拖移/縮放中：安全區參考線暫時出現
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [selVisible, setSelVisible] = useState(true);
-  const [kfTime, setKfTime] = useState(0); // 專案裡有定位（關鍵影格）時，跟著播放頭更新選取框與觸控區的位置
+  const [kfTime, setKfTime] = useState(0); // 專案裡有定格（關鍵影格）時，跟著播放頭更新選取框與觸控區的位置
   const [hitIds, setHitIds] = useState(''); // 這一秒可以拖的物件（逗號分隔），給觸控區用
   const [peek, setPeek] = useState(false); // 「查看圖層」清單
   const project = useProjectStore((s) => s.project)!;
@@ -163,7 +163,7 @@ export function Preview({
       const p = useProjectStore.getState().project;
       const id = useProjectStore.getState().selectedId;
       const f = p && findItem(p, id);
-      // 播放中，有定位時選取框最多每秒更新約 15 次（每一格都重畫會拖慢預覽）
+      // 播放中，有定格時選取框最多每秒更新約 15 次（每一格都重畫會拖慢預覽）
       const now = performance.now();
       if (!playing || now - lastKf >= 66) {
         lastKf = now;
@@ -187,7 +187,7 @@ export function Preview({
   const k = cssW / width; // 專案座標 → CSS px
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const geo = useMemo(() => geoCtx(project, width, height), [project, width, height, fontEpoch]);
-  // 有定位的物件：選取框、觸控區用「播放頭這個時間」的位置
+  // 有定格的物件：選取框、觸控區用「播放頭這個時間」的位置
   const rproject = useMemo(() => timeResolved(project, kfTime), [project, kfTime]);
   const sel = findItem(rproject, selectedId);
   const box = sel && selVisible ? selectionBox(sel.item, geo) : null;
@@ -202,7 +202,7 @@ export function Preview({
     return { x: ((e.clientX - r.left) / r.width) * width, y: ((e.clientY - r.top) / r.height) * height };
   };
 
-  /** 現在這個時間的物件（有定位的換成這個時間的位置、大小） */
+  /** 現在這個時間的物件（有定格的換成這個時間的位置、大小） */
   const findNow = (id: string | null) => {
     const t = useUI.getState().player?.time ?? 0;
     return findItem(timeResolved(useProjectStore.getState().project!, t), id);

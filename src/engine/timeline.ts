@@ -257,7 +257,7 @@ export function splitFree(items: Item[], id: string, t: number): Item[] | null {
   delete b.transitionIn; // 轉場、進場特效在片段的開頭，後半段沒有
   delete b.inEffect;
   if (it.keyframes?.length) {
-    // 定位依切點分到兩段（切點兩邊各補一個，兩段看起來接得起來）
+    // 定格依切點分到兩段（切點兩邊各補一個，兩段看起來接得起來）
     const sp = splitKeyframes(it, local);
     a.keyframes = sp.a;
     b.keyframes = sp.b;
@@ -295,7 +295,7 @@ export function trimStartFree(items: Item[], id: string, delta: number): Item[] 
     const d = Math.min(Math.max(delta, lo), hi);
     const next = { ...it, start: it.start + d, duration: it.duration - d };
     if (isVideoItem(it) && it.type !== 'image') (next as VideoItem).trimIn = it.trimIn + d * it.speed;
-    if (it.keyframes) next.keyframes = shiftKeyframes(it.keyframes, d); // 定位的時間點不動（相對於新的起點往前挪）
+    if (it.keyframes) next.keyframes = shiftKeyframes(it.keyframes, d); // 定格的時間點不動（相對於新的起點往前挪）
     return next;
   });
 }

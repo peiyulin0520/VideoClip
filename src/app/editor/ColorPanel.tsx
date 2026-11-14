@@ -19,7 +19,7 @@ import { Slider } from '../../ui/Slider';
 import { usePlayheadTime } from './usePlayheadTime';
 
 // 調色面板：上面是色調組合卡片（用這個素材自己的畫面示範），下面是 11 條調整滑桿。
-// 有定位（關鍵影格）時，滑桿改的是播放頭這個時間的定位（兩個定位之間漸變）；沒有定位改物件本身。
+// 有定格（關鍵影格）時，滑桿改的是播放頭這個時間的定格（兩個定格之間漸變）；沒有定格改物件本身。
 
 const SIZE = 48;
 const FALLBACK = 'linear-gradient(135deg,#e8a87c,#6aa6c9)';
@@ -141,10 +141,10 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
   const hasKf = !!target && hasKeyframes(target);
   const scope = target ? gradeScopeOf(target) : 'item';
   const keyMode = hasKf && scope === 'key';
-  // 播放線碰到的定位（沒有＝在兩個定位中間或定位之外）
+  // 播放線碰到的定格（沒有＝在兩個定格中間或定格之外）
   const kfIdx = keyMode ? keyframeNear(target!, t - target!.start, 8 / pps) : -1;
   const kfNow = kfIdx >= 0 ? target!.keyframes![kfIdx]! : null;
-  // 目前顯示的色調組合：整段素材＝物件本身的；定位＝播放線碰到的定位的（沒寫就沿用物件的；null＝原色）
+  // 目前顯示的色調組合：整段素材＝物件本身的；定格＝播放線碰到的定格的（沒寫就沿用物件的；null＝原色）
   const shownLook = !keyMode
     ? item.look
     : kfNow
@@ -158,7 +158,7 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
     if (!target) return;
     if (next === 'item' && keyframeHasGrade(target)) {
       clearKeyframeGrade(item.id);
-      toast('已清掉各定位上的色調，改成整段素材同一個色調（可以按復原）', 3500);
+      toast('已清掉各定格上的色調，改成整段素材同一個色調（可以按復原）', 3500);
     }
     useUI.setState({ gradeScope: { id: target.id, scope: next } });
   };
@@ -189,15 +189,15 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
             data-testid="scope-key"
             onClick={() => chooseScope('key')}
           >
-            這個定位（漸變）
+            這個定格（漸變）
           </button>
         </div>
       )}
       {keyMode && (
         <p className="hint" data-testid="scope-hint">
           {between
-            ? '播放線沒有碰到任何定位：選一個色調會在這裡新增一個定位。'
-            : '改的是播放線碰到的這個定位，兩個定位之間的色調會漸漸變過去。'}
+            ? '播放線沒有碰到任何定格：選一個色調會在這裡新增一個定格。'
+            : '改的是播放線碰到的這個定格，兩個定格之間的色調會漸漸變過去。'}
         </p>
       )}
       <div className="look-row" role="radiogroup" aria-label="色調組合">
@@ -229,7 +229,7 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
         />
       )}
       <p className="hint">在播放列按 👁 可以切換看原色／色調。</p>
-      <div className="slider-label">調整{keyMode ? '（定位：改的是播放線碰到的定位）' : ''}</div>
+      <div className="slider-label">調整{keyMode ? '（定格：改的是播放線碰到的定格）' : ''}</div>
       {ADJUST_KEYS.map((k) => (
         <Slider
           key={k}

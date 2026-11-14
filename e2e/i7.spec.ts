@@ -13,7 +13,7 @@ import {
 
 const SHOT = 'docs/screenshots/feedback-9/i7';
 
-/** 跳到某一秒，並等播放頭真的到了（機器忙時捲動事件會晚一點，定位會打在舊的時間） */
+/** 跳到某一秒，並等播放頭真的到了（機器忙時捲動事件會晚一點，定格會打在舊的時間） */
 async function seekTo(page: Page, sec: number) {
   await rawSeekTo(page, sec);
   await expect
@@ -49,7 +49,7 @@ async function setup(page: Page) {
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
 }
 
-test('定位：開頭按「◇ 定位」→ 換時間用 X 位置滑桿（自動多一個定位）→ 時間軸有 2 個菱形；中間時間位置在兩者之間（線性），預覽與單格輸出一致', async ({
+test('定格：開頭按「◇ 定格」→ 換時間用 X 位置滑桿（自動多一個定格）→ 時間軸有 2 個菱形；中間時間位置在兩者之間（線性），預覽與單格輸出一致', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -61,7 +61,7 @@ test('定位：開頭按「◇ 定位」→ 換時間用 X 位置滑桿（自動
   await expect(page.getByTestId('kf-btn')).toHaveAttribute('aria-pressed', 'true');
   expect((await overlay(page)).keyframes![0]!.x).toBeCloseTo(0.5, 2);
 
-  // 換到 3 秒、用圖層分頁的「X 位置」往右拉到 90%：沒有再按定位，自動新增第二個
+  // 換到 3 秒、用圖層分頁的「X 位置」往右拉到 90%：沒有再按定格，自動新增第二個
   await seekTo(page, 3);
   await openTab(page, '圖層');
   await expect(page.getByTestId('kf-panel')).toBeVisible();
@@ -92,7 +92,7 @@ test('定位：開頭按「◇ 定位」→ 換時間用 X 位置滑桿（自動
   expect(isRed(out.samples[1] as [number, number, number, number])).toBe(true);
 });
 
-test('定位：色調漸變——第二個定位的飽和度 −100，開頭還是綠色、結尾變灰；色調滑桿也自動新增定位', async ({
+test('定格：色調漸變——第二個定格的飽和度 −100，開頭還是綠色、結尾變灰；色調滑桿也自動新增定格', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -108,7 +108,7 @@ test('定位：色調漸變——第二個定位的飽和度 −100，開頭還�
   await page.evaluate(() => window.scrollTo(0, 0));
   await seekTo(page, 0.02);
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
-  await seekTo(page, 3.2); // 最後一個定位之後：灰色（紅綠藍差不多）
+  await seekTo(page, 3.2); // 最後一個定格之後：灰色（紅綠藍差不多）
   await expect
     .poll(async () => {
       const c = await samplePreview(page, 0.5, 0.5);
@@ -118,7 +118,7 @@ test('定位：色調漸變——第二個定位的飽和度 −100，開頭還�
   await page.screenshot({ path: `${SHOT}/tone-gray.png` });
 });
 
-test('定位：預覽上拖物件（有定位時換時間拖，自動多一個定位）；「清除全部定位」停在這個時間的樣子；一步復原', async ({
+test('定格：預覽上拖物件（有定格時換時間拖，自動多一個定格）；「清除全部定格」停在這個時間的樣子；一步復原', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -130,7 +130,7 @@ test('定位：預覽上拖物件（有定位時換時間拖，自動多一個�
   await page.getByLabel('Y 位置').fill('80');
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(2);
   await expect(page.getByTestId('kf-dot')).toHaveCount(2);
-  // 清除全部：定位沒了，物件停在播放頭這個時間（Y 80%）的樣子
+  // 清除全部：定格沒了，物件停在播放頭這個時間（Y 80%）的樣子
   await page.getByTestId('kf-clear').tap();
   const o = await overlay(page);
   expect(o.keyframes).toBeUndefined();
@@ -140,7 +140,7 @@ test('定位：預覽上拖物件（有定位時換時間拖，自動多一個�
   expect((await overlay(page)).keyframes?.length).toBe(2);
 });
 
-test('定位：分割後兩段的定位接得起來；在定位的時間再按一次「◆ 定位」就刪除它', async ({ page }) => {
+test('定格：分割後兩段的定格接得起來；在定格的時間再按一次「◆ 定格」就刪除它', async ({ page }) => {
   test.setTimeout(120_000);
   await setup(page);
   await seekTo(page, 0.02);
@@ -149,14 +149,14 @@ test('定位：分割後兩段的定位接得起來；在定位的時間再按�
   await openTab(page, '圖層');
   await page.getByLabel('X 位置').fill('90');
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(2);
-  // 刪除第二個：把播放頭放到那個定位上（點菱形），按 ◆
+  // 刪除第二個：把播放頭放到那個定格上（點菱形），按 ◆
   await page.getByTestId('kf-dot').nth(1).tap();
   await expect(page.getByTestId('kf-btn')).toHaveAttribute('aria-pressed', 'true');
   await page.getByTestId('kf-btn').tap();
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(1);
 });
 
-test('版型：定位打在外框＝整組一起動（各格不用單獨打）；時間軸只有外框那一條有菱形', async ({ page }) => {
+test('版型：定格打在外框＝整組一起動（各格不用單獨打）；時間軸只有外框那一條有菱形', async ({ page }) => {
   test.setTimeout(150_000);
   const { fixture } = await import('./helpers');
   await createProjectWith(page, ['solid-red.webm']);
@@ -184,7 +184,7 @@ test('版型：定位打在外框＝整組一起動（各格不用單獨打）�
   expect(await cellsX()).toEqual(before); // 各格本身的位置沒動（由外框算出來）
   await expect(page.getByTestId('kf-dot')).toHaveCount(2);
   await page.evaluate(() => window.scrollTo(0, 0));
-  // 第二個定位之後整組往右移了 0.4：左邊露出底下的紅色；開頭左邊還是格子
+  // 第二個定格之後整組往右移了 0.4：左邊露出底下的紅色；開頭左邊還是格子
   await seekTo(page, 2.5);
   await expect.poll(async () => isRed(await samplePreview(page, 0.08, 0.5))).toBe(true);
   await seekTo(page, 0.02);

@@ -1,6 +1,6 @@
 import type { Item, Keyframe, Transform } from '../model/types';
 
-// 定位小特效：在某個定位的時間「原地動一下」，不會讓素材出現／消失，也不加濾鏡，只動位置、大小、旋轉。
+// 定格小特效：在某個定格的時間「原地動一下」，不會讓素材出現／消失，也不加濾鏡，只動位置、大小、旋轉。
 // 進場、離場、轉場（溶接、閃、滑…）不在這裡。純數學，預覽、單格輸出、整支匯出都走同一個 withTime。
 
 export type Pulse = NonNullable<Keyframe['pulse']>;
@@ -55,7 +55,7 @@ export function pulseOffset(p: Pulse, elapsed: number): PulseOffset {
   }
 }
 
-/** 物件開始後 local 秒，所有定位的小特效疊起來的偏移（通常只有 0 或 1 個在播） */
+/** 物件開始後 local 秒，所有定格的小特效疊起來的偏移（通常只有 0 或 1 個在播） */
 export function pulseAt(item: Item, local: number): PulseOffset | null {
   const kfs = item.keyframes;
   if (!kfs) return null;

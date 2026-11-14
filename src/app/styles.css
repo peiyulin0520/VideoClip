@@ -3113,7 +3113,7 @@ button {
   font-size: 16px;
 }
 
-/* 播放列的「定位」按鈕 */
+/* 播放列的「定格」按鈕 */
 .kf-btn {
   display: flex;
   align-items: center;
@@ -3135,7 +3135,7 @@ button {
 .kf-btn:disabled {
   opacity: 0.4;
 }
-/* 時間軸片段上的定位小菱形 */
+/* 時間軸片段上的定格小菱形 */
 .kf-dot {
   position: absolute;
   z-index: 7;

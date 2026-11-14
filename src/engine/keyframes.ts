@@ -5,17 +5,17 @@ import { applyPulse, pulseAt } from './pulse';
 
 export { ADJUST_KEYS, fullAdjust, ZERO_ADJUST };
 
-// 定位（關鍵影格）：位置、大小、旋轉、透明度、色調，兩個定位之間線性漸變。
+// 定格（關鍵影格）：位置、大小、旋轉、透明度、色調，兩個定格之間線性漸變。
 // 所有「這個時間點物件長什麼樣」的地方（預覽、單格輸出、整支匯出、選取框）都走 withTime / timeResolved。
 
-/** 同一個時間（±1/60 秒）的定位視為同一個 */
+/** 同一個時間（±1/60 秒）的定格視為同一個 */
 export const KEYFRAME_EPS = 1 / 60;
 
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 
 export const hasKeyframes = (it: Item): boolean => (it.keyframes?.length ?? 0) > 0;
 
-/** 找「前一個、後一個」定位與兩者之間的比例 */
+/** 找「前一個、後一個」定格與兩者之間的比例 */
 function around(kfs: Keyframe[], local: number): { a: Keyframe; b: Keyframe; k: number } {
   if (local <= kfs[0]!.t) return { a: kfs[0]!, b: kfs[0]!, k: 0 };
   const last = kfs[kfs.length - 1]!;
@@ -27,7 +27,7 @@ function around(kfs: Keyframe[], local: number): { a: Keyframe; b: Keyframe; k: 
   return { a, b, k: b.t - a.t > 1e-9 ? (local - a.t) / (b.t - a.t) : 0 };
 }
 
-/** 這個時間（專案秒）的 transform：沒有定位＝物件本身的；有＝依前後定位線性內插 */
+/** 這個時間（專案秒）的 transform：沒有定格＝物件本身的；有＝依前後定格線性內插 */
 export function transformAt(item: Item, t: number): Transform {
   const kfs = item.keyframes;
   if (!kfs || kfs.length === 0) return item.transform;
@@ -41,14 +41,14 @@ export function transformAt(item: Item, t: number): Transform {
   };
 }
 
-/** transformAt＋定位小特效的偏移（畫面上真正看到的位置；新增定位用的底值不含小特效，請用 transformAt） */
+/** transformAt＋定格小特效的偏移（畫面上真正看到的位置；新增定格用的底值不含小特效，請用 transformAt） */
 export const pulsedTransformAt = (item: Item, t: number): Transform =>
   applyPulse(transformAt(item, t), pulseAt(item, t - item.start));
 
-/** 有任何定位自己指定了色調組合（含 null＝原色）嗎：有的話調色走「實際調色值內插」 */
+/** 有任何定格自己指定了色調組合（含 null＝原色）嗎：有的話調色走「實際調色值內插」 */
 export const usesKeyframeLook = (it: Item): boolean => !!it.keyframes?.some((k) => k.look !== undefined);
 
-/** 一個定位的實際調色值（完整 11 項）＝（定位的色調組合，沒寫用物件的）×強度＋（定位的手動調整，沒寫的項目用物件的） */
+/** 一個定格的實際調色值（完整 11 項）＝（定格的色調組合，沒寫用物件的）×強度＋（定格的手動調整，沒寫的項目用物件的） */
 function keyframeEffective(item: Item, k: Keyframe): Adjust {
   return effectiveFull(k.look === undefined ? item.look : k.look, {
     ...fullAdjust(item.adjust),
@@ -73,8 +73,8 @@ export function manualAdjustAt(item: Item, t: number): Adjust | undefined {
 
 /**
  * 這個時間要送進濾鏡的色調（完整 11 項）；全部是 0 就是 undefined（合成器不用加濾鏡）。
- * 沒有定位指定色調組合：只有手動調整的內插（物件本身的色調組合由 scene 再加上去）。
- * 有定位指定色調組合：兩邊定位的「實際調色值」逐項內插（已經包含色調組合，withTime 會把 look 清掉）。
+ * 沒有定格指定色調組合：只有手動調整的內插（物件本身的色調組合由 scene 再加上去）。
+ * 有定格指定色調組合：兩邊定格的「實際調色值」逐項內插（已經包含色調組合，withTime 會把 look 清掉）。
  */
 export function adjustAt(item: Item, t: number): Adjust | undefined {
   const kfs = item.keyframes;
@@ -87,7 +87,7 @@ export function adjustAt(item: Item, t: number): Adjust | undefined {
   return isZeroAdjust(out) ? undefined : out;
 }
 
-/** 這個時間的物件（transform、色調換成內插後的值）；沒有定位時原樣回傳 */
+/** 這個時間的物件（transform、色調換成內插後的值）；沒有定格時原樣回傳 */
 export function withTime<T extends Item>(item: T, t: number): T {
   if (!hasKeyframes(item)) return item;
   const adj = adjustAt(item, t);
@@ -97,8 +97,8 @@ export function withTime<T extends Item>(item: T, t: number): T {
 }
 
 /**
- * 整個專案換成「這個時間」的樣子（沒有任何定位就原樣回傳，不複製）。
- * 版型：定位打在外框上＝整組一起動——外框換成這個時間的位置，各格用「從外框原本的位置到這個時間的位置」的相對變化跟著動。
+ * 整個專案換成「這個時間」的樣子（沒有任何定格就原樣回傳，不複製）。
+ * 版型：定格打在外框上＝整組一起動——外框換成這個時間的位置，各格用「從外框原本的位置到這個時間的位置」的相對變化跟著動。
  */
 export function timeResolved(project: Project, t: number): Project {
   if (!project.tracks.some((tr) => tr.items.some(hasKeyframes))) return project;
@@ -136,12 +136,12 @@ export function timeResolved(project: Project, t: number): Project {
   };
 }
 
-/** 物件開始後 local 秒有沒有定位（±1/60 秒）；回傳第幾個，沒有 -1 */
+/** 物件開始後 local 秒有沒有定格（±1/60 秒）；回傳第幾個，沒有 -1 */
 export function keyframeIndexAt(item: Item, local: number): number {
   return (item.keyframes ?? []).findIndex((k) => Math.abs(k.t - local) <= KEYFRAME_EPS);
 }
 
-/** 播放線碰到的定位（菱形）：local 秒前後 tolSec 內最近的那個，回傳第幾個；沒有 -1 */
+/** 播放線碰到的定格（菱形）：local 秒前後 tolSec 內最近的那個，回傳第幾個；沒有 -1 */
 export function keyframeNear(item: Item, local: number, tolSec: number): number {
   let best = -1;
   let bestD = Infinity;
@@ -158,9 +158,9 @@ export function keyframeNear(item: Item, local: number, tolSec: number): number 
 export type KeyframeValues = Partial<Omit<Keyframe, 't' | 'adjust'>> & { adjust?: Partial<Adjust> };
 
 /**
- * 在物件開始後 local 秒新增或更新一個定位：同一時間（±1/60 秒）就更新、不然插入並排序。
- * 新增的定位先用「這一刻的內插值」當底，再蓋上 values；已經有色調定位時，新增的也補上這一刻的色調（不會打斷漸變）。
- * 如果有定位指定了色調組合：新增的定位把這一刻的「實際調色值」直接存進 adjust、look 設成 null（不再加一次組合）。
+ * 在物件開始後 local 秒新增或更新一個定格：同一時間（±1/60 秒）就更新、不然插入並排序。
+ * 新增的定格先用「這一刻的內插值」當底，再蓋上 values；已經有色調定格時，新增的也補上這一刻的色調（不會打斷漸變）。
+ * 如果有定格指定了色調組合：新增的定格把這一刻的「實際調色值」直接存進 adjust、look 設成 null（不再加一次組合）。
  */
 export function upsertKeyframe(item: Item, local: number, values: KeyframeValues): Keyframe[] {
   const kfs = (item.keyframes ?? []).map((k) => ({ ...k, adjust: k.adjust ? { ...k.adjust } : undefined }));
@@ -179,7 +179,7 @@ export function upsertKeyframe(item: Item, local: number, values: KeyframeValues
   const baked = usesKeyframeLook(item);
   const hadAdjust = kfs.some((k) => k.adjust) || !!vAdjust;
   if (baked) {
-    // 這一刻的實際調色值（含兩邊定位的色調組合）存進 adjust；要設定新色調組合時，底是手動調整
+    // 這一刻的實際調色值（含兩邊定格的色調組合）存進 adjust；要設定新色調組合時，底是手動調整
     if (vLook !== undefined) {
       kf.look = vLook;
       kf.adjust = { ...(manualAdjustAt(item, item.start + local) ?? {}), ...vAdjust };
@@ -200,7 +200,7 @@ export function removeKeyframe(item: Item, index: number): Keyframe[] {
   return (item.keyframes ?? []).filter((_, i) => i !== index);
 }
 
-/** 頭端被修剪（片段開始時間往後 delta 秒、內容不動）：定位的時間跟著往前挪 */
+/** 頭端被修剪（片段開始時間往後 delta 秒、內容不動）：定格的時間跟著往前挪 */
 export function shiftKeyframes(kfs: Keyframe[] | undefined, delta: number): Keyframe[] | undefined {
   return kfs && kfs.length > 0 ? kfs.map((k) => ({ ...k, t: k.t - delta })) : kfs;
 }

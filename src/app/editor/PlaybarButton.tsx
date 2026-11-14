@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 
 /**
  * 播放列的按鈕：圖示在上、中文在下（播放鍵不加字，不傳 label）。
- * on＝這個功能目前是開著的（例如這個時間有定位）：主題色底、白字；按下去的瞬間也有顏色回饋（全站的 :active）。
+ * on＝這個功能目前是開著的（例如這個時間有定格）：主題色底、白字；按下去的瞬間也有顏色回饋（全站的 :active）。
  */
 export function PlaybarButton({
   icon: Icon,
@@ -21,7 +21,7 @@ export function PlaybarButton({
   on?: boolean;
   disabled?: boolean;
   testId?: string;
-  /** 圖示實心（例如有定位時的菱形） */
+  /** 圖示實心（例如有定格時的菱形） */
   fill?: boolean;
 }) {
   return (

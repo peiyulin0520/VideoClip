@@ -6,8 +6,8 @@ import { useProjectStore } from '../../store/projectStore';
 import { useUI } from '../../store/uiStore';
 
 /**
- * 時間軸片段上的定位小菱形。沒選到＝橘色；播放線碰到它（而且這個素材是選取中的）＝白底、橘邊、稍大。
- * 播放中不顯示「選到」（一直閃很亂）。有調色（色調組合或手動調整）的定位，菱形中間多一個小點。
+ * 時間軸片段上的定格小菱形。沒選到＝橘色；播放線碰到它（而且這個素材是選取中的）＝白底、橘邊、稍大。
+ * 播放中不顯示「選到」（一直閃很亂）。有調色（色調組合或手動調整）的定格，菱形中間多一個小點。
  */
 export function KeyframeDot({
   item,
@@ -56,7 +56,7 @@ export function KeyframeDot({
         data-testid="kf-dot"
         data-item-id={item.id}
         data-here={here ? '1' : '0'}
-        aria-label={`定位 ${(item.start + k.t).toFixed(1)} 秒`}
+        aria-label={`定格 ${(item.start + k.t).toFixed(1)} 秒`}
         style={{ left, bottom: 3 }}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {

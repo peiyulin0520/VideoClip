@@ -20,7 +20,7 @@ type UI = {
   gradePeek: boolean;
   /** 時間軸目前每秒幾 px：決定「播放線碰到菱形」的範圍 */
   timelinePps: number;
-  /** 色調分頁的「套用到」：整段素材／這個定位（只記使用者手動選的，沒選就由有沒有定位決定） */
+  /** 色調分頁的「套用到」：整段素材／這個定格（只記使用者手動選的，沒選就由有沒有定格決定） */
   gradeScope: { id: string; scope: 'item' | 'key' } | null;
 };
 

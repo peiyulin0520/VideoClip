@@ -169,7 +169,7 @@ describe('圖層與軌道', () => {
     expect(layers.slice(1)).toEqual(['o2', 'o1']);
   });
 
-  it('reorderTrack：直接搬到指定位置，夾在同一種類的範圍內，不能跨種類', () => {
+  it('reorderTrack：直接搬到指定格置，夾在同一種類的範圍內，不能跨種類', () => {
     const p = proj();
     const ids = p.tracks.map((t) => t.id); // [影像 a, 影像 b, 影像 c, 文字]
     expect(reorderTrack(p.tracks, ids[0]!, 2).map((t) => t.id)).toEqual([ids[1], ids[2], ids[0], ids[3]]);

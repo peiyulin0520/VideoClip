@@ -62,9 +62,9 @@ export type ItemBase = {
   /** 單一素材的進場特效（這個素材當 B，一定從開頭開始）與出場特效（這個素材當 A，一定在結尾結束）；duration＝特效幾秒 */
   inEffect?: { kind: EffectKind; duration: number };
   outEffect?: { kind: EffectKind; duration: number };
-  /** 定位（關鍵影格），照時間排序；沒有＝照 transform */
+  /** 定格（關鍵影格），照時間排序；沒有＝照 transform */
   keyframes?: Keyframe[];
-  /** 物件本身的手動調色（沒有定位時用它；有定位時是沒寫的項目的底） */
+  /** 物件本身的手動調色（沒有定格時用它；有定格時是沒寫的項目的底） */
   adjust?: Partial<Adjust>;
   /** 色調組合（黑白、復古、清新…）＋強度；實際調色＝組合×強度＋手動調整 */
   look?: LookRef;
@@ -106,8 +106,8 @@ export type LookRef = {
 };
 
 /**
- * 定位（關鍵影格）：這個物件在「開始後 t 秒」的位置、大小、旋轉、透明度與色調；
- * 兩個定位之間全部線性漸變；第一個之前、最後一個之後維持那一個的樣子。
+ * 定格（關鍵影格）：這個物件在「開始後 t 秒」的位置、大小、旋轉、透明度與色調；
+ * 兩個定格之間全部線性漸變；第一個之前、最後一個之後維持那一個的樣子。
  * adjust 沒寫的項目沿用物件本身的色調。
  */
 export type Keyframe = {
@@ -119,11 +119,11 @@ export type Keyframe = {
   opacity: number;
   adjust?: Partial<Adjust>;
   /**
-   * 這個定位的色調組合：沒寫＝沿用物件本身的；null＝這個定位明確不用色調組合（原色）。
-   * 兩個定位之間用「實際調色值」（組合×強度＋手動）逐項內插，所以可以從原色漸漸變成黑白。
+   * 這個定格的色調組合：沒寫＝沿用物件本身的；null＝這個定格明確不用色調組合（原色）。
+   * 兩個定格之間用「實際調色值」（組合×強度＋手動）逐項內插，所以可以從原色漸漸變成黑白。
    */
   look?: LookRef | null;
-  /** 在這個定位的時間「原地動一下」（震／彈／晃／跳）；不是進場、離場或轉場 */
+  /** 在這個定格的時間「原地動一下」（震／彈／晃／跳）；不是進場、離場或轉場 */
   pulse?: { kind: 'shake' | 'pop' | 'wobble' | 'jump'; duration: number; strength: number };
 };
 

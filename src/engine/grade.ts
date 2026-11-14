@@ -230,7 +230,7 @@ export function effectiveFull(
 
 /**
  * 實際要用的調色值＝色調組合 × 強度＋手動調整。
- * adjustNow：這個時間的手動調整（有定位時是內插後的值）。全部是 0 回傳 undefined（不用加濾鏡）。
+ * adjustNow：這個時間的手動調整（有定格時是內插後的值）。全部是 0 回傳 undefined（不用加濾鏡）。
  */
 export function effectiveAdjust(
   item: Pick<Item, 'look'>,
@@ -240,7 +240,7 @@ export function effectiveAdjust(
   return isNeutral(out) ? undefined : out;
 }
 
-/** 有調色（色調組合、手動調整、定位裡的調色）嗎 */
+/** 有調色（色調組合、手動調整、定格裡的調色）嗎 */
 export function itemHasGrade(it: Item): boolean {
   return (
     !!it.look ||

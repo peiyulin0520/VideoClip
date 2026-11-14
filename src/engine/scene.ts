@@ -112,7 +112,7 @@ export function buildScene(
   provide: SourceProvider,
   opts: { guardCells?: boolean } = {},
 ): SceneLayer[] {
-  // 有定位（關鍵影格）的物件換成「這個時間」的位置、大小、色調；預覽、單格輸出、整支匯出都走這裡所以一致
+  // 有定格（關鍵影格）的物件換成「這個時間」的位置、大小、色調；預覽、單格輸出、整支匯出都走這裡所以一致
   const project = timeResolved(projectIn, t);
   const ctx = geoCtx(project, canvasW, canvasH);
   const out: SceneLayer[] = [];

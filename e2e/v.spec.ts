@@ -10,7 +10,7 @@ import {
   seekTo,
 } from './helpers';
 
-test('播放列：播放鍵只有圖示；定位、縮小、放大是圖示加中文；按住時有顏色回饋；定位開著時是主題色', async ({
+test('播放列：播放鍵只有圖示；定格、縮小、放大是圖示加中文；按住時有顏色回饋；定格開著時是主題色', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -19,7 +19,7 @@ test('播放列：播放鍵只有圖示；定位、縮小、放大是圖示加�
   expect(((await play.innerText()) ?? '').trim()).toBe('');
   await expect(page.getByRole('button', { name: '縮小時間軸' })).toContainText('縮小');
   await expect(page.getByRole('button', { name: '放大時間軸' })).toContainText('放大');
-  await expect(page.getByTestId('kf-btn')).toContainText('定位');
+  await expect(page.getByTestId('kf-btn')).toContainText('定格');
   // 按住：底色疊一層主題色（box-shadow 跟沒按時不同）
   const zoom = page.getByRole('button', { name: '放大時間軸' });
   const shadow = () => zoom.evaluate((el) => getComputedStyle(el).boxShadow);
@@ -31,7 +31,7 @@ test('播放列：播放鍵只有圖示；定位、縮小、放大是圖示加�
   await page.mouse.up();
   await expect.poll(shadow).toBe(rest);
   await page.screenshot({ path: 'docs/screenshots/feedback-10/playbar.png' });
-  // 定位：選到素材、新增定位後，按鈕變主題色底（aria-pressed）
+  // 定格：選到素材、新增定格後，按鈕變主題色底（aria-pressed）
   await clips(page).first().tap();
   const kf = page.getByTestId('kf-btn');
   const bg = () => kf.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -168,7 +168,7 @@ test('版型可以選「不附版型文字」', async ({ page }) => {
   expect((await allItems(page)).filter((i) => i.type === 'text')).toHaveLength(0);
 });
 
-test('播放列：播放鍵與時間在最左；定位、色調(👁)、縮小、放大靠在最右、彼此間距 ≤ 8px', async ({ page }) => {
+test('播放列：播放鍵與時間在最左；定格、色調(👁)、縮小、放大靠在最右、彼此間距 ≤ 8px', async ({ page }) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm']);
   const box = async (loc: ReturnType<typeof page.getByRole>) => (await loc.boundingBox())!;

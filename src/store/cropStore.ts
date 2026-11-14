@@ -67,7 +67,7 @@ export function startCrop(itemId: string): boolean {
   window.scrollTo(0, 0); // 預覽在頁面最上面：從下面的工具列按進來要把預覽捲回來才拖得到
   const at = Math.max(raw.start, Math.min(player.time, raw.start + raw.duration - 0.01));
   player.seek(at);
-  // 有定位（關鍵影格）的物件：以播放頭這個時間的位置、大小為準
+  // 有定格（關鍵影格）的物件：以播放頭這個時間的位置、大小為準
   const item = withTime(raw, at);
   // 整張原始畫面顯示在原本的位置（留下來的那塊不動）；如果這樣會超出預覽畫面（例如填滿的橫式影片），
   // 把手就按不到了，改成縮進預覽中央完整顯示
@@ -130,7 +130,7 @@ export function finishCrop() {
   close();
   if (!project || !found || !isVideoItem(found.item)) return;
   const tNow = useUI.getState().player?.time ?? 0;
-  const item = withTime(found.item, tNow); // 有定位的物件：這個時間的位置、大小
+  const item = withTime(found.item, tNow); // 有定格的物件：這個時間的位置、大小
   const asset = project.assets.find((a) => a.id === item.assetId);
   if (!asset) return;
   // 筆刷／橡皮擦畫過：遮罩的範圍就是留下來的範圍（crop 自動框住有東西的地方）
@@ -179,7 +179,7 @@ export function finishCrop() {
           ? composeWith(base, frame.transform, project.width, project.height)
           : base;
     } else if (hasKeyframes(it)) {
-      // 有定位：裁完「留下來的那塊位置大小不變」寫進播放頭這個時間的定位
+      // 有定格：裁完「留下來的那塊位置大小不變」寫進播放頭這個時間的定格
       it.keyframes = upsertKeyframe(it, Math.min(Math.max(tNow - it.start, 0), it.duration), res.transform);
     } else it.transform = res.transform;
     if (bitmap) {
