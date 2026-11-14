@@ -42,6 +42,8 @@ import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemHasGrade } from '../../engine/grade';
+import { keyframeTarget } from '../../store/actions';
+import { KeyframeDot } from './KeyframeDot';
 import { itemTitle, ordinalIn } from '../../engine/labels';
 import { textFxCode, textFxName } from '../../engine/textFx';
 import { thumbFor } from '../../engine/thumbs';
@@ -228,6 +230,7 @@ export function Timeline({
 }) {
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
+  const kfTargetId = keyframeTarget(project, selectedId)?.id ?? null;
   const player = useUI((s) => s.player);
   const fxFocus = useUI((s) => s.fxFocus);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1020,19 +1023,14 @@ export function Timeline({
                 {track.groupRole !== 'cell' &&
                   track.items.flatMap((it) =>
                     (it.keyframes ?? []).map((k, i) => (
-                      <button
+                      <KeyframeDot
                         key={`kf-${it.id}-${i}`}
-                        className="kf-dot"
-                        data-testid="kf-dot"
-                        data-item-id={it.id}
-                        aria-label={`定位 ${(it.start + k.t).toFixed(1)} 秒`}
-                        style={{ left: half + (it.start + k.t) * pps, bottom: 3 }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          useProjectStore.getState().select(it.id);
-                          player?.seek(it.start + k.t);
-                        }}
+                        item={it}
+                        index={i}
+                        k={k}
+                        left={half + (it.start + k.t) * pps}
+                        active={kfTargetId === it.id}
+                        pps={pps}
                       />
                     )),
                   )}

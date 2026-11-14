@@ -3153,10 +3153,26 @@ button {
 }
 .kf-dot.here {
   background: #fff;
-  border-color: #f5a623;
+  border: 2px solid #f5a623;
+  transform: translateX(-50%) rotate(45deg) scale(0.95);
+  z-index: 9;
+}
+.kf-dot.graded::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #1e3b2f;
 }
 
 /* 調色面板 */
+.color-panel .grade-scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 13px;
+}
 .color-panel .look-row {
   display: flex;
   gap: 8px;

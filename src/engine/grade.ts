@@ -214,20 +214,29 @@ export const lookName = (id: LookId): string => LOOKS.find((l) => l.id === id)?.
 
 const clampKey = (k: AdjustKey, v: number) => Math.min(Math.max(v, k === 'fade' ? 0 : -1), 1);
 
+/** 實際調色值（完整 11 項）＝色調組合 × 強度＋手動調整（各項相加後夾住） */
+export function effectiveFull(
+  look: { id: LookId; amount: number } | null | undefined,
+  adjust: Partial<Adjust> | undefined,
+): Adjust {
+  const base = fullAdjust(adjust);
+  const def = look ? LOOKS.find((l) => l.id === look.id) : undefined;
+  if (!def) return base;
+  const amount = Math.min(Math.max(look!.amount, 0), 1);
+  const out = { ...ZERO_ADJUST };
+  for (const k of ADJUST_KEYS) out[k] = clampKey(k, base[k] + (def.adjust[k] ?? 0) * amount);
+  return out;
+}
+
 /**
- * 實際要用的調色值＝色調組合 × 強度＋手動調整（各項相加後夾住）。
+ * 實際要用的調色值＝色調組合 × 強度＋手動調整。
  * adjustNow：這個時間的手動調整（有定位時是內插後的值）。全部是 0 回傳 undefined（不用加濾鏡）。
  */
 export function effectiveAdjust(
   item: Pick<Item, 'look'>,
   adjustNow: Partial<Adjust> | undefined,
 ): Adjust | undefined {
-  const base = fullAdjust(adjustNow);
-  const def = item.look ? LOOKS.find((l) => l.id === item.look!.id) : undefined;
-  if (!def) return isNeutral(base) ? undefined : base;
-  const amount = Math.min(Math.max(item.look!.amount, 0), 1);
-  const out = { ...ZERO_ADJUST };
-  for (const k of ADJUST_KEYS) out[k] = clampKey(k, base[k] + (def.adjust[k] ?? 0) * amount);
+  const out = effectiveFull(item.look, adjustNow);
   return isNeutral(out) ? undefined : out;
 }
 
@@ -236,6 +245,6 @@ export function itemHasGrade(it: Item): boolean {
   return (
     !!it.look ||
     (!!it.adjust && Object.values(it.adjust).some(Boolean)) ||
-    !!it.keyframes?.some((k) => k.adjust && Object.values(k.adjust).some(Boolean))
+    !!it.keyframes?.some((k) => !!k.look || (k.adjust && Object.values(k.adjust).some(Boolean)))
   );
 }

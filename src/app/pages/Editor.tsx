@@ -120,6 +120,9 @@ function EditorBody() {
   const previewFull = useUI((s) => s.previewFull);
   const fileInput = useRef<HTMLInputElement>(null);
   const [pps, setPps] = useState(60);
+  useEffect(() => {
+    useUI.setState({ timelinePps: pps });
+  }, [pps]);
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [ratioOpen, setRatioOpen] = useState(false);

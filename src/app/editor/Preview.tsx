@@ -158,11 +158,17 @@ export function Preview({
   // 選取的物件目前在不在畫面上（不在就不顯示選取框）
   useEffect(() => {
     if (!player) return;
-    const check = (t: number) => {
+    let lastKf = 0;
+    const check = (t: number, playing?: boolean) => {
       const p = useProjectStore.getState().project;
       const id = useProjectStore.getState().selectedId;
       const f = p && findItem(p, id);
-      setKfTime(p && p.tracks.some((tr) => tr.items.some(hasKeyframes)) ? t : 0);
+      // 播放中，有定位時選取框最多每秒更新約 15 次（每一格都重畫會拖慢預覽）
+      const now = performance.now();
+      if (!playing || now - lastKf >= 66) {
+        lastKf = now;
+        setKfTime(p && p.tracks.some((tr) => tr.items.some(hasKeyframes)) ? t : 0);
+      }
       setSelVisible(!!f && t >= f.item.start && t < f.item.start + f.item.duration);
       // 字串相同 React 不會重畫，播放時不會每一格都重畫
       setHitIds(

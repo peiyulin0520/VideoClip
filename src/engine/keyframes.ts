@@ -1,5 +1,5 @@
 import type { Adjust, Item, Keyframe, Project, Transform } from '../model/types';
-import { ADJUST_KEYS, fullAdjust, isNeutral as isZeroAdjust, ZERO_ADJUST } from './grade';
+import { ADJUST_KEYS, effectiveFull, fullAdjust, isNeutral as isZeroAdjust, ZERO_ADJUST } from './grade';
 import { transformAbout } from './groupTransform';
 
 export { ADJUST_KEYS, fullAdjust, ZERO_ADJUST };
@@ -40,8 +40,22 @@ export function transformAt(item: Item, t: number): Transform {
   };
 }
 
-/** 這個時間的色調（完整四項）；全部是 0 就是 undefined（合成器不用加濾鏡） */
-export function adjustAt(item: Item, t: number): Adjust | undefined {
+/** 有任何定位自己指定了色調組合（含 null＝原色）嗎：有的話調色走「實際調色值內插」 */
+export const usesKeyframeLook = (it: Item): boolean => !!it.keyframes?.some((k) => k.look !== undefined);
+
+/** 一個定位的實際調色值（完整 11 項）＝（定位的色調組合，沒寫用物件的）×強度＋（定位的手動調整，沒寫的項目用物件的） */
+function keyframeEffective(item: Item, k: Keyframe): Adjust {
+  return effectiveFull(k.look === undefined ? item.look : k.look, {
+    ...fullAdjust(item.adjust),
+    ...k.adjust,
+  });
+}
+
+/**
+ * 這個時間的「手動調整」（完整 11 項，不含色調組合）；全部是 0 就是 undefined。
+ * 色調面板的滑桿顯示的是這個。
+ */
+export function manualAdjustAt(item: Item, t: number): Adjust | undefined {
   const base = fullAdjust(item.adjust);
   const kfs = item.keyframes;
   if (!kfs || kfs.length === 0 || kfs.every((x) => !x.adjust)) return isZeroAdjust(base) ? undefined : base;
@@ -52,11 +66,29 @@ export function adjustAt(item: Item, t: number): Adjust | undefined {
   return isZeroAdjust(out) ? undefined : out;
 }
 
-/** 這個時間的物件（transform、色調換成內插後的值）；沒有定位也沒有色調時原樣回傳 */
+/**
+ * 這個時間要送進濾鏡的色調（完整 11 項）；全部是 0 就是 undefined（合成器不用加濾鏡）。
+ * 沒有定位指定色調組合：只有手動調整的內插（物件本身的色調組合由 scene 再加上去）。
+ * 有定位指定色調組合：兩邊定位的「實際調色值」逐項內插（已經包含色調組合，withTime 會把 look 清掉）。
+ */
+export function adjustAt(item: Item, t: number): Adjust | undefined {
+  const kfs = item.keyframes;
+  if (!kfs || kfs.length === 0 || !usesKeyframeLook(item)) return manualAdjustAt(item, t);
+  const { a, b, k } = around(kfs, t - item.start);
+  const ea = keyframeEffective(item, a);
+  const eb = a === b ? ea : keyframeEffective(item, b);
+  const out = { ...ZERO_ADJUST };
+  for (const key of ADJUST_KEYS) out[key] = lerp(ea[key], eb[key], k);
+  return isZeroAdjust(out) ? undefined : out;
+}
+
+/** 這個時間的物件（transform、色調換成內插後的值）；沒有定位時原樣回傳 */
 export function withTime<T extends Item>(item: T, t: number): T {
   if (!hasKeyframes(item)) return item;
   const adj = adjustAt(item, t);
-  return { ...item, transform: transformAt(item, t), adjust: adj };
+  const out = { ...item, transform: transformAt(item, t), adjust: adj };
+  if (usesKeyframeLook(item)) out.look = undefined; // 色調組合已經算進 adjust
+  return out;
 }
 
 /**
@@ -65,11 +97,16 @@ export function withTime<T extends Item>(item: T, t: number): T {
  */
 export function timeResolved(project: Project, t: number): Project {
   if (!project.tracks.some((tr) => tr.items.some(hasKeyframes))) return project;
-  const frames = new Map<string, { base: Transform; now: Transform; adj?: Adjust }>();
+  const frames = new Map<string, { base: Transform; now: Transform; adj?: Adjust; clearLook: boolean }>();
   for (const tr of project.tracks)
     for (const it of tr.items)
       if (it.type !== 'text' && it.type !== 'audio' && it.group && hasKeyframes(it) && !it.cell)
-        frames.set(it.group, { base: it.transform, now: transformAt(it, t), adj: adjustAt(it, t) });
+        frames.set(it.group, {
+          base: it.transform,
+          now: transformAt(it, t),
+          adj: adjustAt(it, t),
+          clearLook: usesKeyframeLook(it),
+        });
   const W = project.width;
   const H = project.height;
   const resolve = (it: Item): Item => {
@@ -80,6 +117,7 @@ export function timeResolved(project: Project, t: number): Project {
         ...it,
         transform: { ...transformAbout(it.transform, f.base, f.now, W, H), opacity: f.now.opacity },
         adjust: f.adj,
+        ...(f.clearLook ? { look: undefined } : {}),
       };
     return withTime(it, t);
   };
@@ -98,11 +136,26 @@ export function keyframeIndexAt(item: Item, local: number): number {
   return (item.keyframes ?? []).findIndex((k) => Math.abs(k.t - local) <= KEYFRAME_EPS);
 }
 
+/** 播放線碰到的定位（菱形）：local 秒前後 tolSec 內最近的那個，回傳第幾個；沒有 -1 */
+export function keyframeNear(item: Item, local: number, tolSec: number): number {
+  let best = -1;
+  let bestD = Infinity;
+  (item.keyframes ?? []).forEach((k, i) => {
+    const d = Math.abs(k.t - local);
+    if (d <= Math.max(tolSec, KEYFRAME_EPS) && d < bestD) {
+      best = i;
+      bestD = d;
+    }
+  });
+  return best;
+}
+
 export type KeyframeValues = Partial<Omit<Keyframe, 't' | 'adjust'>> & { adjust?: Partial<Adjust> };
 
 /**
  * 在物件開始後 local 秒新增或更新一個定位：同一時間（±1/60 秒）就更新、不然插入並排序。
  * 新增的定位先用「這一刻的內插值」當底，再蓋上 values；已經有色調定位時，新增的也補上這一刻的色調（不會打斷漸變）。
+ * 如果有定位指定了色調組合：新增的定位把這一刻的「實際調色值」直接存進 adjust、look 設成 null（不再加一次組合）。
  */
 export function upsertKeyframe(item: Item, local: number, values: KeyframeValues): Keyframe[] {
   const kfs = (item.keyframes ?? []).map((k) => ({ ...k, adjust: k.adjust ? { ...k.adjust } : undefined }));
@@ -112,14 +165,29 @@ export function upsertKeyframe(item: Item, local: number, values: KeyframeValues
     const { adjust, ...rest } = values;
     Object.assign(cur, rest);
     if (adjust) cur.adjust = { ...cur.adjust, ...adjust };
+    if (!cur.adjust) delete cur.adjust;
     return kfs;
   }
   const now = transformAt(item, item.start + local);
-  const kf: Keyframe = { t: Math.max(local, 0), ...now, ...values, adjust: undefined };
-  const hadAdjust = kfs.some((k) => k.adjust) || !!values.adjust;
-  if (hadAdjust)
-    kf.adjust = { ...(adjustAt(item, item.start + local) ?? fullAdjust(item.adjust)), ...values.adjust };
-  if (!kf.adjust) delete kf.adjust;
+  const { adjust: vAdjust, look: vLook, ...vRest } = values;
+  const kf: Keyframe = { t: Math.max(local, 0), ...now, ...vRest };
+  const baked = usesKeyframeLook(item);
+  const hadAdjust = kfs.some((k) => k.adjust) || !!vAdjust;
+  if (baked) {
+    // 這一刻的實際調色值（含兩邊定位的色調組合）存進 adjust；要設定新色調組合時，底是手動調整
+    if (vLook !== undefined) {
+      kf.look = vLook;
+      kf.adjust = { ...(manualAdjustAt(item, item.start + local) ?? {}), ...vAdjust };
+    } else {
+      kf.look = null;
+      kf.adjust = { ...(adjustAt(item, item.start + local) ?? {}), ...vAdjust };
+    }
+  } else {
+    if (vLook !== undefined) kf.look = vLook;
+    if (hadAdjust)
+      kf.adjust = { ...(manualAdjustAt(item, item.start + local) ?? fullAdjust(item.adjust)), ...vAdjust };
+  }
+  if (!kf.adjust || Object.keys(kf.adjust).length === 0) delete kf.adjust;
   return [...kfs, kf].sort((a, b) => a.t - b.t);
 }
 
@@ -140,10 +208,12 @@ export function splitKeyframes(
   const kfs = item.keyframes;
   if (!kfs || kfs.length === 0) return { a: undefined, b: undefined };
   const at = withTime(item, item.start + local);
+  const baked = usesKeyframeLook(item);
   const mid: Keyframe = {
     t: local,
     ...at.transform,
-    adjust: kfs.some((k) => k.adjust) ? fullAdjust(at.adjust) : undefined,
+    adjust: baked || kfs.some((k) => k.adjust) ? fullAdjust(at.adjust) : undefined,
+    ...(baked ? { look: null } : {}),
   };
   if (!mid.adjust) delete mid.adjust;
   const a = [...kfs.filter((k) => k.t < local - KEYFRAME_EPS), mid];

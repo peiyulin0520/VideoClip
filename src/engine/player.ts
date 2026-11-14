@@ -632,7 +632,7 @@ export class Player {
                   void _a;
                   return {
                     ...rest,
-                    keyframes: x.keyframes?.map(({ adjust: _k, ...k }) => (void _k, k)),
+                    keyframes: x.keyframes?.map(({ adjust: _k, look: _l2, ...k }) => (void _k, void _l2, k)),
                   } as typeof x;
                 }),
               }
