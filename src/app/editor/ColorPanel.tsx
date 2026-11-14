@@ -135,17 +135,6 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
   const adj = fullAdjust(now.adjust);
   const target = keyframeTarget(project, item.id);
   const kf = !!target && hasKeyframes(target);
-  const ids = useMemo(() => {
-    // 按住看原圖：版型整組一起
-    const g = item.type !== 'audio' ? item.group : undefined;
-    if (!g) return [item.id];
-    return project.tracks
-      .flatMap((tr) => tr.items)
-      .filter((x) => x.type !== 'audio' && x.group === g)
-      .map((x) => x.id);
-  }, [project, item]);
-  useEffect(() => () => player?.setGradeBypass(null), [player]);
-
   return (
     <div className="color-panel" data-testid="color-panel">
       <div className="panel-head">
@@ -176,6 +165,7 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
           onChange={(v) => setLook(item.id, item.look!.id, v / 100, `look:${item.id}`)}
         />
       )}
+      <p className="hint">在播放列按 👁 可以切換看原色／色調。</p>
       <div className="slider-label">調整{kf ? '（定位：改的是播放頭這個時間）' : ''}</div>
       {ADJUST_KEYS.map((k) => (
         <Slider
@@ -190,19 +180,6 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
         />
       ))}
       <div className="chips">
-        <button
-          className="btn"
-          data-testid="grade-peek"
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            player?.setGradeBypass(ids);
-          }}
-          onPointerUp={() => player?.setGradeBypass(null)}
-          onPointerCancel={() => player?.setGradeBypass(null)}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          按住看原圖
-        </button>
         <button className="btn" data-testid="grade-reset" onClick={() => resetGrade(item.id)}>
           全部歸零
         </button>

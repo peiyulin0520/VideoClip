@@ -16,6 +16,8 @@ type UI = {
   requestTab: string | null;
   /** 特效分頁／時間軸上目前選的是哪一塊（進場、出場、跟前一段的轉場）：時間軸的圓圈用它顯示「選取中」的顏色 */
   fxFocus: { id: string; role: 'in' | 'out' | 'seam' | 'style' } | null;
+  /** 播放列的 👁：暫時看原色（整個專案不套調色；不改專案資料） */
+  gradePeek: boolean;
 };
 
 export const useUI = create<UI>((set, get) => ({
@@ -31,6 +33,7 @@ export const useUI = create<UI>((set, get) => ({
   previewFull: false,
   requestTab: null,
   fxFocus: null,
+  gradePeek: false,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

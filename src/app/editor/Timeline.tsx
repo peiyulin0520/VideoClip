@@ -41,6 +41,7 @@ import { setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
+import { itemHasGrade } from '../../engine/grade';
 import { itemTitle, ordinalIn } from '../../engine/labels';
 import { textFxCode, textFxName } from '../../engine/textFx';
 import { thumbFor } from '../../engine/thumbs';
@@ -99,15 +100,6 @@ function Tiles({
         return <span key={i} style={{ width: tileW, backgroundImage: `url(${url ?? thumbs[0]})` }} />;
       })}
     </div>
-  );
-}
-
-/** 有調色（色調組合、手動調整、定位裡的調色）嗎：時間軸片段名稱後面加個「調」 */
-function hasGrade(it: Item): boolean {
-  return (
-    !!it.look ||
-    (!!it.adjust && Object.values(it.adjust).some(Boolean)) ||
-    !!it.keyframes?.some((k) => k.adjust && Object.values(k.adjust).some(Boolean))
   );
 }
 
@@ -901,7 +893,7 @@ export function Timeline({
                         {it.type !== 'text' && <span className="cl-dur"> {it.duration.toFixed(1)}s</span>}
                         {isVideoItem(it) && it.speed !== 1 && ` · ${it.speed}x`}
                         {isVideoItem(it) && it.type !== 'image' && it.volume === 0 && ' · 靜音'}
-                        {it.type !== 'audio' && hasGrade(it) && ' · 調'}
+                        {it.type !== 'audio' && itemHasGrade(it) && ' · 調'}
                         {asset && proxyProgress[asset.id] !== undefined && (
                           <span className="proxy-note" data-testid="proxy-note">
                             {' '}

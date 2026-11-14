@@ -230,3 +230,12 @@ export function effectiveAdjust(
   for (const k of ADJUST_KEYS) out[k] = clampKey(k, base[k] + (def.adjust[k] ?? 0) * amount);
   return isNeutral(out) ? undefined : out;
 }
+
+/** 有調色（色調組合、手動調整、定位裡的調色）嗎 */
+export function itemHasGrade(it: Item): boolean {
+  return (
+    !!it.look ||
+    (!!it.adjust && Object.values(it.adjust).some(Boolean)) ||
+    !!it.keyframes?.some((k) => k.adjust && Object.values(k.adjust).some(Boolean))
+  );
+}

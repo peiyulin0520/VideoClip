@@ -60,9 +60,7 @@ test('選「黑白」→ 預覽變灰、look 寫進專案；強度 0 回到原�
   await page.screenshot({ path: `${SHOT}/amount.png` });
 });
 
-test('調整滑桿疊在色調組合之上；曝光預覽與單格輸出一樣；「按住看原圖」暫時不調色；全部歸零', async ({
-  page,
-}) => {
+test('調整滑桿疊在色調組合之上；曝光預覽與單格輸出一樣；播放列 👁 暫時看原色；全部歸零', async ({ page }) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm']);
   await openColor(page);
@@ -79,12 +77,13 @@ test('調整滑桿疊在色調組合之上；曝光預覽與單格輸出一樣�
   const prev = await samplePreview(page, 0.5, 0.5);
   const out = await exportFrame(page, 0.5, [[0.5, 0.5]]);
   expect(Math.abs(prev![0]! - out.samples[0]![0]!)).toBeLessThan(12);
-  // 按住看原圖：回到紅色；放開恢復
-  const peek = (await page.getByTestId('grade-peek').boundingBox())!;
-  await page.mouse.move(peek.x + peek.width / 2, peek.y + peek.height / 2);
-  await page.mouse.down();
+  // 播放列 👁：按一下看原色（紅色）、再按一下回到色調
+  await page.getByTestId('grade-peek').tap();
+  await expect(page.getByTestId('grade-peek')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('peek-tag')).toBeVisible();
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(true);
-  await page.mouse.up();
+  await page.getByTestId('grade-peek').tap();
+  await expect(page.getByTestId('peek-tag')).toHaveCount(0);
   await expect.poll(async () => isGray(await samplePreview(page, 0.5, 0.5))).toBe(true);
   // 全部歸零：look、adjust 都沒了、回到紅色
   await page.getByTestId('grade-reset').tap();

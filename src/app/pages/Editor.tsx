@@ -20,6 +20,7 @@ import type { Aspect } from '../../model/types';
 import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
 import { ExportSheet } from '../editor/ExportSheet';
+import { GradePeekButton } from '../editor/GradePeekButton';
 import { KeyframeButton } from '../editor/KeyframeButton';
 import { PlaybarButton } from '../editor/PlaybarButton';
 import { Preview } from '../editor/Preview';
@@ -236,6 +237,7 @@ function EditorBody() {
           aria-label="匯出影片"
           onClick={() => {
             useUI.getState().player?.pause();
+            useUI.setState({ gradePeek: false });
             setExportOpen(true);
           }}
         >
@@ -261,8 +263,9 @@ function EditorBody() {
           }}
         />
         <TimeText total={total} />
-        <KeyframeButton />
         <span className="spacer" />
+        <KeyframeButton />
+        <GradePeekButton />
         <PlaybarButton
           icon={ZoomOut}
           label="縮小"

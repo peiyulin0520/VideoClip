@@ -91,8 +91,8 @@ export class Player {
   private thumbImgs = new Map<string, HTMLImageElement>();
   private slowSecs = 0;
   private slowTold = false;
-  /** 「按住看原圖」：這些物件暫時不調色（不改專案資料） */
-  private bypass: Set<string> | null = null;
+  /** 「看原色」：這些物件（或 'all'＝整個專案）暫時不調色（不改專案資料、不進復原紀錄） */
+  private bypass: Set<string> | 'all' | null = null;
   /** 裁切模式：暫時把某個物件換成「完整畫面」來畫（不改專案資料） */
   private patch: { itemId: string; apply: (it: VideoItem) => VideoItem } | null = null;
 
@@ -601,23 +601,28 @@ export class Player {
     if (!this.playing) this.render(this.t);
   }
 
-  /** 按住看原圖：這些物件暫時不套調色（null＝還原）；會馬上重畫 */
-  setGradeBypass(ids: string[] | null) {
-    this.bypass = ids && ids.length ? new Set(ids) : null;
+  /** 看原色：這些物件暫時不套調色（'all'＝整個專案；null＝還原）；暫停時會馬上重畫 */
+  setGradeBypass(ids: string[] | 'all' | null) {
+    this.bypass = ids === 'all' ? 'all' : ids && ids.length ? new Set(ids) : null;
     if (!this.playing) this.render(this.t);
+  }
+
+  get gradeBypassed(): boolean {
+    return this.bypass !== null;
   }
 
   private effectiveProject(p: Project): Project {
     const bypass = this.bypass;
     if (bypass) {
+      const hit = (id: string) => bypass === 'all' || bypass.has(id);
       p = {
         ...p,
         tracks: p.tracks.map((tr) =>
-          tr.items.some((x) => bypass.has(x.id))
+          tr.items.some((x) => hit(x.id))
             ? {
                 ...tr,
                 items: tr.items.map((x) => {
-                  if (!bypass.has(x.id)) return x;
+                  if (!hit(x.id)) return x;
                   const {
                     look: _l,
                     adjust: _a,

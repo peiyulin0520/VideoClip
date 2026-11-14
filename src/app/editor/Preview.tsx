@@ -83,6 +83,7 @@ export function Preview({
   const player = useUI((s) => s.player);
   const cropping = useCrop((s) => !!s.s);
   const previewFull = useUI((s) => s.previewFull);
+  const gradePeek = useUI((s) => s.gradePeek);
   // 預覽畫質：自動／清楚／流暢（設定頁可改）；自動時同時 3 支以上影片、或偵測到播放太慢就用流暢
   const quality = useQuality((s) => s.q);
   const [slow, setSlow] = useState(false);
@@ -404,6 +405,11 @@ export function Preview({
         />
         <div ref={poolRef} className="pool" aria-hidden="true" />
         <PerfOverlay player={player} />
+        {gradePeek && (
+          <div className="peek-tag" data-testid="peek-tag" aria-hidden="true">
+            原色預覽中
+          </div>
+        )}
 
         {(safe || dragging) && (
           <div className="safe" aria-hidden="true" data-testid="safe-zone">
