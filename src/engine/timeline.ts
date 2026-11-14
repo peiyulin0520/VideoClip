@@ -1,5 +1,6 @@
 import { MAX_SPEED, MIN_CLIP_DURATION, MIN_SPEED, newId } from '../model/defaults';
 import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../model/types';
+import { shiftKeyframes, splitKeyframes } from './keyframes';
 
 /** 軌道種類的分區：影像 → 貼圖 → 字卡 → 音訊（陣列由前到後＝由下到上的圖層順序）。素材只能放進同種類的軌道。 */
 export const ZONE: Record<TrackKind, number> = { media: 0, sticker: 1, text: 2, audio: 3 };
@@ -254,6 +255,12 @@ export function splitFree(items: Item[], id: string, t: number): Item[] | null {
     : { ...it, id: newId('i_'), start: t, duration: it.duration - local };
   delete b.transitionIn; // 轉場、進場特效在片段的開頭，後半段沒有
   delete b.inEffect;
+  if (it.keyframes?.length) {
+    // 定位依切點分到兩段（切點兩邊各補一個，兩段看起來接得起來）
+    const sp = splitKeyframes(it, local);
+    a.keyframes = sp.a;
+    b.keyframes = sp.b;
+  }
   return [...items.slice(0, i), a, b, ...items.slice(i + 1)];
 }
 
@@ -287,6 +294,7 @@ export function trimStartFree(items: Item[], id: string, delta: number): Item[] 
     const d = Math.min(Math.max(delta, lo), hi);
     const next = { ...it, start: it.start + d, duration: it.duration - d };
     if (isVideoItem(it) && it.type !== 'image') (next as VideoItem).trimIn = it.trimIn + d * it.speed;
+    if (it.keyframes) next.keyframes = shiftKeyframes(it.keyframes, d); // 定位的時間點不動（相對於新的起點往前挪）
     return next;
   });
 }
@@ -464,6 +472,7 @@ export function splitByRanges(item: VideoItem, ranges: Range[], assetDuration: n
       start = 0;
     }
     const piece: VideoItem = { ...item, start, trimIn, duration };
+    if (item.keyframes) piece.keyframes = shiftKeyframes(item.keyframes, start - item.start);
     if (i > 0) {
       piece.id = newId('i_');
       delete piece.label; // 命名只留在第一段

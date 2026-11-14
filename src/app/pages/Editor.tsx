@@ -20,6 +20,7 @@ import type { Aspect } from '../../model/types';
 import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
 import { ExportSheet } from '../editor/ExportSheet';
+import { KeyframeButton } from '../editor/KeyframeButton';
 import { Preview } from '../editor/Preview';
 import { Timeline, MAX_PPS, MIN_PPS } from '../editor/Timeline';
 import { BottomBar } from '../editor/Toolbar';
@@ -260,6 +261,7 @@ function EditorBody() {
           {playing ? <Pause size={22} /> : <Play size={22} />}
         </button>
         <TimeText total={total} />
+        <KeyframeButton />
         <span className="spacer" />
         <button
           className="icon-btn"

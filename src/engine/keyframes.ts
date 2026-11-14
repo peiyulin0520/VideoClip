@@ -1,4 +1,5 @@
 import type { Adjust, Item, Keyframe, Project, Transform } from '../model/types';
+import { transformAbout } from './groupTransform';
 
 // 定位（關鍵影格）：位置、大小、旋轉、透明度、色調，兩個定位之間線性漸變。
 // 所有「這個時間點物件長什麼樣」的地方（預覽、單格輸出、整支匯出、選取框）都走 withTime / timeResolved。
@@ -61,13 +62,36 @@ export function withTime<T extends Item>(item: T, t: number): T {
   return { ...item, transform: transformAt(item, t), adjust: adj };
 }
 
-/** 整個專案換成「這個時間」的樣子（沒有任何定位就原樣回傳，不複製） */
+/**
+ * 整個專案換成「這個時間」的樣子（沒有任何定位就原樣回傳，不複製）。
+ * 版型：定位打在外框上＝整組一起動——外框換成這個時間的位置，各格用「從外框原本的位置到這個時間的位置」的相對變化跟著動。
+ */
 export function timeResolved(project: Project, t: number): Project {
   if (!project.tracks.some((tr) => tr.items.some(hasKeyframes))) return project;
+  const frames = new Map<string, { base: Transform; now: Transform; adj?: Adjust }>();
+  for (const tr of project.tracks)
+    for (const it of tr.items)
+      if (it.type !== 'text' && it.type !== 'audio' && it.group && hasKeyframes(it) && !it.cell)
+        frames.set(it.group, { base: it.transform, now: transformAt(it, t), adj: adjustAt(it, t) });
+  const W = project.width;
+  const H = project.height;
+  const resolve = (it: Item): Item => {
+    const g = it.type !== 'text' && it.type !== 'audio' ? it.group : undefined;
+    const f = g ? frames.get(g) : undefined;
+    if (f && !hasKeyframes(it))
+      return {
+        ...it,
+        transform: { ...transformAbout(it.transform, f.base, f.now, W, H), opacity: f.now.opacity },
+        adjust: f.adj,
+      };
+    return withTime(it, t);
+  };
+  const touched = (it: Item) =>
+    hasKeyframes(it) || (it.type !== 'text' && it.type !== 'audio' && !!it.group && frames.has(it.group));
   return {
     ...project,
     tracks: project.tracks.map((tr) =>
-      tr.items.some(hasKeyframes) ? { ...tr, items: tr.items.map((it) => withTime(it, t)) } : tr,
+      tr.items.some(touched) ? { ...tr, items: tr.items.map((it) => (touched(it) ? resolve(it) : it)) } : tr,
     ),
   };
 }

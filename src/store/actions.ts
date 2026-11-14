@@ -12,6 +12,7 @@ import {
 import {
   TEXT_STYLE_KEYS,
   type Aspect,
+  type Adjust,
   type Asset,
   type EffectKind,
   type Item,
@@ -52,7 +53,16 @@ import {
 import { cellItem, type Rect } from '../engine/layouts';
 import { DEFAULT_EFFECT_DURATION, DEFAULT_TRANSITION_DURATION, seamsOf } from '../engine/transitions';
 import { groupPatch, transformAbout } from '../engine/groupTransform';
+import {
+  hasKeyframes,
+  keyframeIndexAt,
+  removeKeyframe,
+  timeResolved,
+  upsertKeyframe,
+  withTime,
+} from '../engine/keyframes';
 import { useProjectStore } from './projectStore';
+import { toast, useUI } from './uiStore';
 
 const store = () => useProjectStore.getState();
 
@@ -125,10 +135,12 @@ export function resetTransform(id: string): void {
     const frame = groupFrame(p, f.item.group);
     if (frame) return setTransform(frame.item.id, { x: 0.5, y: 0.5, scale: 1, rotation: 0 }, `reset:${id}`);
   }
+  const scale = f.item.type === 'text' || f.track.id === baseMediaTrack(p)?.id ? 1 : 0.5;
+  if (hasKeyframes(f.item)) return setTransform(id, { x: 0.5, y: 0.5, scale, rotation: 0 }, `reset:${id}`);
   editItem(id, (x) => {
     x.transform.x = 0.5;
     x.transform.y = 0.5;
-    x.transform.scale = x.type === 'text' || f.track.id === baseMediaTrack(p)?.id ? 1 : 0.5;
+    x.transform.scale = scale;
     x.transform.rotation = 0;
   });
 }
@@ -148,6 +160,12 @@ function groupItems(p: Project, group: string): VideoItem[] {
     .filter((i): i is VideoItem => i.type !== 'text' && i.group === group);
 }
 
+/** 播放頭在這個物件自己的時間裡的位置（夾在 0～長度之間）；定位（關鍵影格）用 */
+function localTime(it: Item): number {
+  const t = useUI.getState().player?.time ?? 0;
+  return Math.min(Math.max(t - it.start, 0), it.duration);
+}
+
 export function setTransform(id: string, patch: Partial<Transform>, coalesce = `tf:${id}`) {
   const p = store().project;
   const f = p && findItem(p, id);
@@ -155,6 +173,23 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   if (p && f && frame && f.item.type !== 'text') {
     // 版型裡的任何物件：移動、縮放、旋轉都變成「整組」一起動（格子不會單獨跑掉）
     const group = f.item.group!;
+    if (hasKeyframes(frame.item)) {
+      // 外框有定位：改的是播放頭這個時間的定位（整組一起動，各格由外框算出來，不用動）
+      const t = useUI.getState().player?.time ?? 0;
+      const pr = timeResolved(p, t);
+      const rf = groupFrame(pr, group);
+      const rm = findItem(pr, id);
+      if (!rf || !rm) return;
+      const T1 = groupPatch(rf.item.transform, rm.item.transform, patch);
+      editItem(
+        frame.item.id,
+        (it) => {
+          it.keyframes = upsertKeyframe(it, localTime(it), T1);
+        },
+        { coalesce },
+      );
+      return;
+    }
     const T0 = frame.item.transform;
     const T1 = groupPatch(T0, f.item.transform, patch);
     const W = p.width;
@@ -179,7 +214,84 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   editItem(
     id,
     (it) => {
-      Object.assign(it.transform, patch);
+      // 有定位：改的是播放頭這個時間的定位（沒有就自動新增一個）；沒有定位：改物件本身
+      if (hasKeyframes(it as Item)) it.keyframes = upsertKeyframe(it as Item, localTime(it as Item), patch);
+      else Object.assign(it.transform, patch);
+    },
+    { coalesce },
+  );
+}
+
+/** 定位（關鍵影格）作用的物件：版型裡的任何物件＝外框（整組一起動）；音樂沒有 */
+export function keyframeTarget(p: Project, id: string | null): Item | null {
+  const f = id ? findItem(p, id) : null;
+  if (!f || f.item.type === 'audio') return null;
+  if (f.item.type !== 'text' && f.item.group) return groupFrame(p, f.item.group)?.item ?? f.item;
+  return f.item;
+}
+
+/** 播放頭這個時間有沒有定位：沒有就新增（值＝目前畫面上的樣子），有就刪掉。回傳做了什麼 */
+export function toggleKeyframe(id: string): 'added' | 'removed' | null {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target) return null;
+  const local = localTime(target);
+  const idx = keyframeIndexAt(target, local);
+  const t = useUI.getState().player?.time ?? 0;
+  if (t < target.start || t > target.start + target.duration + 1e-6) {
+    toast('播放頭要在這個素材的時間範圍裡才能打定位');
+    return null;
+  }
+  editItem(target.id, (it) => {
+    if (idx >= 0) {
+      const next = removeKeyframe(it as Item, idx);
+      if (next.length) it.keyframes = next;
+      else delete it.keyframes;
+    } else it.keyframes = upsertKeyframe(it as Item, local, {});
+  });
+  return idx >= 0 ? 'removed' : 'added';
+}
+
+/** 清除全部定位：物件停在播放頭這個時間的樣子（畫面不跳）；一步復原 */
+export function clearKeyframes(id: string): void {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target || !hasKeyframes(target)) return;
+  const t = useUI.getState().player?.time ?? 0;
+  const now = withTime(target, t);
+  editItem(target.id, (it) => {
+    it.transform = { ...now.transform };
+    it.adjust = now.adjust ? { ...now.adjust } : undefined;
+    if (!it.adjust) delete it.adjust;
+    delete it.keyframes;
+  });
+}
+
+/**
+ * 色調（亮度、飽和度、色溫、色調）。有定位＝改播放頭這個時間的定位；沒有＝改物件本身（版型＝整組每個物件都改）。
+ */
+export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${id}`): void {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target) return;
+  if (hasKeyframes(target)) {
+    editItem(
+      target.id,
+      (it) => {
+        it.keyframes = upsertKeyframe(it as Item, localTime(it as Item), { adjust: patch });
+      },
+      { coalesce },
+    );
+    return;
+  }
+  const group = target.type !== 'text' && target.type !== 'audio' ? target.group : undefined;
+  store().apply(
+    (d) => {
+      for (const track of d.tracks)
+        for (const it of track.items) {
+          if (it.id !== target.id && !(group && it.type !== 'text' && it.group === group)) continue;
+          it.adjust = { ...it.adjust, ...patch };
+        }
     },
     { coalesce },
   );

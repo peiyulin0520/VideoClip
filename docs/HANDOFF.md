@@ -203,3 +203,5 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **文字特效**：`engine/textFx.ts`（`TextItem.textFx`：閃爍／發光閃亮／方格字／震動，時間量化成「步」＋id 當種子，預覽與匯出一致）；`renderText(card, scale, visible)` 的 `visible` 是打字露出幾個字（進場往後打、出場像 delete 從後往前刪）
 - **特效分頁**：`EffectTab`（進場／出場／轉場／文字特效；音訊只有淡入淡出滑桿）、`EffectTimingSheet`（預覽左軸右的細調面板：進場只有「迄」、出場只有「起」、轉場「起／迄」＋欄位連動）、`GroupFxSelect`（版型整體進出場）；時間軸圓圈用 `useUI.fxFocus` 判斷「選取中」顏色（4 個顏色固定，不隨主題換）
 - **坑**：e2e 裡面板（Sheet）剛開會滑上來，量 `boundingBox` 前先 `waitForTimeout(500)`；旗標的 `boundingBox` 是 44px 寬的按鈕，拖曳要從中心算（`x + width/2`），不是左邊
+- **定位（I7）**：`engine/keyframes.ts`（`timeResolved` 在 `buildScene` 一開頭、`Preview` 的選取框／觸控區也用；有定位的物件 `setTransform` 改的是播放頭那個時間的定位；版型外框有定位時各格由外框算出來）、`KeyframeButton`（播放列 ◇）、`tabs/KeyframePanel`（X／Y 位置、色調）、時間軸 `kf-dot`；合成器 `SceneLayer.adjust`＋`ColorMatrixFilter`（沒有色調就不加濾鏡）
+

@@ -3115,3 +3115,46 @@ button {
   min-height: 44px;
   font-size: 16px;
 }
+
+/* 播放列的「定位」按鈕 */
+.kf-btn {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: auto;
+  min-width: 44px;
+  padding: 0 8px;
+}
+.kf-btn .kf-diamond {
+  font-size: 20px;
+  line-height: 1;
+}
+.kf-btn small {
+  font-size: 12px;
+}
+.kf-btn.on {
+  color: var(--accent);
+}
+.kf-btn:disabled {
+  opacity: 0.4;
+}
+/* 時間軸片段上的定位小菱形 */
+.kf-dot {
+  position: absolute;
+  z-index: 7;
+  bottom: -1px;
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  transform: translateX(-50%) rotate(45deg) scale(0.75);
+  border: 1.5px solid #fff;
+  border-radius: 2px;
+  background: #f5a623;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+.kf-dot.here {
+  background: #fff;
+  border-color: #f5a623;
+}

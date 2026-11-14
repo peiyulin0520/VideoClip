@@ -21,6 +21,7 @@ import { PerfOverlay } from './PerfOverlay';
 import { CropOverlay } from './CropOverlay';
 import { useCrop } from '../../store/cropStore';
 import { geoCtx } from '../../engine/scene';
+import { hasKeyframes, timeResolved } from '../../engine/keyframes';
 import { findItem, visibleLayers } from '../../engine/timeline';
 import { setTransform } from '../../store/actions';
 import { setAssetThumbs, useProjectStore } from '../../store/projectStore';
@@ -74,6 +75,7 @@ export function Preview({
   const [dragging, setDragging] = useState(false); // 拖移/縮放中：安全區參考線暫時出現
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [selVisible, setSelVisible] = useState(true);
+  const [kfTime, setKfTime] = useState(0); // 專案裡有定位（關鍵影格）時，跟著播放頭更新選取框與觸控區的位置
   const [hitIds, setHitIds] = useState(''); // 這一秒可以拖的物件（逗號分隔），給觸控區用
   const [peek, setPeek] = useState(false); // 「查看圖層」清單
   const project = useProjectStore((s) => s.project)!;
@@ -159,6 +161,7 @@ export function Preview({
       const p = useProjectStore.getState().project;
       const id = useProjectStore.getState().selectedId;
       const f = p && findItem(p, id);
+      setKfTime(p && p.tracks.some((tr) => tr.items.some(hasKeyframes)) ? t : 0);
       setSelVisible(!!f && t >= f.item.start && t < f.item.start + f.item.duration);
       // 字串相同 React 不會重畫，播放時不會每一格都重畫
       setHitIds(
@@ -177,7 +180,9 @@ export function Preview({
   const k = cssW / width; // 專案座標 → CSS px
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const geo = useMemo(() => geoCtx(project, width, height), [project, width, height, fontEpoch]);
-  const sel = findItem(project, selectedId);
+  // 有定位的物件：選取框、觸控區用「播放頭這個時間」的位置
+  const rproject = useMemo(() => timeResolved(project, kfTime), [project, kfTime]);
+  const sel = findItem(rproject, selectedId);
   const box = sel && selVisible ? selectionBox(sel.item, geo) : null;
   const selLocked = !!sel?.track.locked || !!sel?.track.hidden;
 
@@ -190,8 +195,14 @@ export function Preview({
     return { x: ((e.clientX - r.left) / r.width) * width, y: ((e.clientY - r.top) / r.height) * height };
   };
 
+  /** 現在這個時間的物件（有定位的換成這個時間的位置、大小） */
+  const findNow = (id: string | null) => {
+    const t = useUI.getState().player?.time ?? 0;
+    return findItem(timeResolved(useProjectStore.getState().project!, t), id);
+  };
+
   const startMove = (id: string, at: Pt) => {
-    const f = findItem(useProjectStore.getState().project!, id);
+    const f = findNow(id);
     if (!f) return;
     gesture.current = {
       type: 'move',
@@ -207,7 +218,7 @@ export function Preview({
   const hitsAt = (pt: Pt) => {
     const st = useProjectStore.getState();
     const t = useUI.getState().player?.time ?? 0;
-    return hitTestAll(visibleLayers(st.project!, t), geo, pt.x, pt.y, 40 / k);
+    return hitTestAll(visibleLayers(timeResolved(st.project!, t), t), geo, pt.x, pt.y, 40 / k);
   };
 
   const onPointerDown = (e: RPointerEvent) => {
@@ -216,7 +227,7 @@ export function Preview({
     const pt = toProj(e);
     pointers.current.set(e.pointerId, pt);
     const st = useProjectStore.getState();
-    const cur = findItem(st.project!, st.selectedId);
+    const cur = findNow(st.selectedId);
 
     if (pointers.current.size === 2) {
       tap.current = null; // 第二根手指：不是輕點
@@ -289,7 +300,7 @@ export function Preview({
     }
     const g = gesture.current;
     if (!g) return;
-    const f = findItem(useProjectStore.getState().project!, g.id);
+    const f = findNow(g.id);
     if (!f) return;
 
     if (g.type === 'pinch' && pointers.current.size >= 2) {
@@ -362,7 +373,7 @@ export function Preview({
   const hitBoxes: { id: string; b: Box }[] = [];
   if (hitIds) {
     for (const id of hitIds.split(',')) {
-      const f = findItem(project, id);
+      const f = findItem(rproject, id);
       const b = f && selectionBox(f.item, geo);
       if (b) hitBoxes.push({ id, b });
     }

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import type { Player } from '../../../engine/player';
 import { ArrowDown, ArrowUp, Eye, EyeOff, Layers, Lock, Type } from 'lucide-react';
 import { BLEND_LABELS } from '../../../engine/geometry';
+import { timeResolved } from '../../../engine/keyframes';
 import { findItem, isVideoItem, layersAt } from '../../../engine/timeline';
 import { editItem, patchTrack, resetTransform, setTransform, shiftTrackLayer } from '../../../store/actions';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
 import { TransformControls } from '../TransformControls';
+import { KeyframePanel } from './KeyframePanel';
 import { BLENDS, COLORS } from './shared';
 
 /**
@@ -37,7 +39,8 @@ export function LayersTab() {
   const t = usePlayerTime(player);
   // 目前這一秒有哪些圖層（最上層在最上面）
   const layers = layersAt(project, t, true).slice().reverse();
-  const found = findItem(project, selectedId);
+  // 有定位（關鍵影格）的物件：滑桿顯示播放頭這個時間的樣子
+  const found = findItem(timeResolved(project, t), selectedId);
   const it = found && found.item.type !== 'audio' ? found.item : undefined;
 
   return (
@@ -118,6 +121,7 @@ export function LayersTab() {
             <span>選取的圖層</span>
           </div>
           <TransformControls item={it} />
+          <KeyframePanel item={it} project={project} />
           {it.type === 'text' && <p className="hint">文字本身的透明度在「文字」分頁。</p>}
           <Slider
             label="整個圖層透明度"

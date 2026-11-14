@@ -43,6 +43,7 @@ import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemTitle, ordinalIn } from '../../engine/labels';
 import { textFxCode, textFxName } from '../../engine/textFx';
+import { tileLayout } from './tiles';
 import { effectDurations, seamsOf, transitionCode, transitionName } from '../../engine/transitions';
 import { renameItem } from '../../store/actions';
 
@@ -81,9 +82,9 @@ function Tiles({
       </div>
     );
   const aspect = asset && asset.height ? asset.width / asset.height : 0.56;
-  const tileW = Math.min(Math.max(h * aspect, 30), 114);
   const widthPx = item.duration * pps;
-  const count = Math.min(Math.ceil(widthPx / tileW), 120);
+  // 長影片：需要的格數超過上限時每格放寬，整個片段一定鋪滿（不會 1 分鐘之後變空白）
+  const { count, tileW } = tileLayout(widthPx, Math.min(Math.max(h * aspect, 30), 114));
   return (
     <div className="tiles">
       {Array.from({ length: count }, (_, i) => {
@@ -1004,6 +1005,27 @@ export function Timeline({
                       </span>
                     );
                   })}
+
+                {/* 定位（關鍵影格）：物件開始後 t 秒的位置放一個小菱形；點一下＝播放頭跳過去並選取 */}
+                {track.groupRole !== 'cell' &&
+                  track.items.flatMap((it) =>
+                    (it.keyframes ?? []).map((k, i) => (
+                      <button
+                        key={`kf-${it.id}-${i}`}
+                        className="kf-dot"
+                        data-testid="kf-dot"
+                        data-item-id={it.id}
+                        aria-label={`定位 ${(it.start + k.t).toFixed(1)} 秒`}
+                        style={{ left: half + (it.start + k.t) * pps, bottom: 3 }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          useProjectStore.getState().select(it.id);
+                          player?.seek(it.start + k.t);
+                        }}
+                      />
+                    )),
+                  )}
 
                 {track.id === baseId && (
                   <button
