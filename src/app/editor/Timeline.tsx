@@ -102,6 +102,15 @@ function Tiles({
   );
 }
 
+/** 有調色（色調組合、手動調整、定位裡的調色）嗎：時間軸片段名稱後面加個「調」 */
+function hasGrade(it: Item): boolean {
+  return (
+    !!it.look ||
+    (!!it.adjust && Object.values(it.adjust).some(Boolean)) ||
+    !!it.keyframes?.some((k) => k.adjust && Object.values(k.adjust).some(Boolean))
+  );
+}
+
 /** 同一軌物件之間的空位（時間軸上畫虛線框）；最下面那條影像軌連「開頭」的空位也算（開場留白） */
 function gapsOf(items: Item[], includeLeading: boolean): { start: number; len: number }[] {
   const sorted = [...items].sort((a, b) => a.start - b.start);
@@ -892,6 +901,7 @@ export function Timeline({
                         {it.type !== 'text' && <span className="cl-dur"> {it.duration.toFixed(1)}s</span>}
                         {isVideoItem(it) && it.speed !== 1 && ` · ${it.speed}x`}
                         {isVideoItem(it) && it.type !== 'image' && it.volume === 0 && ' · 靜音'}
+                        {it.type !== 'audio' && hasGrade(it) && ' · 調'}
                         {asset && proxyProgress[asset.id] !== undefined && (
                           <span className="proxy-note" data-testid="proxy-note">
                             {' '}

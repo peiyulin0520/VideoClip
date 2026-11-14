@@ -15,6 +15,7 @@ import {
   type Adjust,
   type Asset,
   type EffectKind,
+  type LookRef,
   type Item,
   type Project,
   type TextFxKind,
@@ -295,6 +296,73 @@ export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${
     },
     { coalesce },
   );
+}
+
+/** 調色作用的物件：版型裡的任何物件＝整組（外框與各格）；其他是自己 */
+function colorTargetIds(p: Project, id: string): string[] {
+  const f = findItem(p, id);
+  if (!f) return [];
+  if (f.item.type !== 'text' && f.item.type !== 'audio' && f.item.group) {
+    const group = f.item.group;
+    return groupItems(p, group).map((x) => x.id);
+  }
+  return [id];
+}
+
+/** 設定（或取消）色調組合；amount 沒給就沿用原本的（新選的預設 1）。一步復原，拖強度滑桿會合併成一步 */
+export function setLook(id: string, lookId: LookRef['id'] | null, amount?: number, coalesce?: string): void {
+  const p = store().project;
+  if (!p) return;
+  const ids = new Set(colorTargetIds(p, id));
+  store().apply(
+    (d) => {
+      for (const track of d.tracks)
+        for (const it of track.items) {
+          if (!ids.has(it.id) || it.type === 'audio') continue;
+          if (!lookId) delete it.look;
+          else it.look = { id: lookId, amount: amount ?? (it.look?.id === lookId ? it.look.amount : 1) };
+        }
+    },
+    coalesce ? { coalesce } : undefined,
+  );
+}
+
+/** 調色全部歸零：色調組合、手動調整、定位裡的調色都清掉（定位的位置大小不動）；一步復原 */
+export function resetGrade(id: string): void {
+  const p = store().project;
+  if (!p) return;
+  const ids = new Set(colorTargetIds(p, id));
+  store().apply((d) => {
+    for (const track of d.tracks)
+      for (const it of track.items) {
+        if (!ids.has(it.id)) continue;
+        delete it.look;
+        delete it.adjust;
+        for (const k of it.keyframes ?? []) delete k.adjust;
+      }
+  });
+}
+
+/** 把這個素材的調色（色調組合＋手動調整）套用到「同一類」的所有素材：字卡→所有字卡；影像、貼圖→所有影片、照片、貼圖。回傳套用了幾個 */
+export function applyGradeToAll(id: string): number {
+  const p = store().project;
+  const f = p && findItem(p, id);
+  if (!p || !f || f.item.type === 'audio') return 0;
+  const src = f.item;
+  const isText = src.type === 'text';
+  let n = 0;
+  store().apply((d) => {
+    for (const track of d.tracks)
+      for (const it of track.items) {
+        if (it.type === 'audio' || it.id === id || (it.type === 'text') !== isText) continue;
+        if (src.look) it.look = { ...src.look };
+        else delete it.look;
+        if (src.adjust) it.adjust = { ...src.adjust };
+        else delete it.adjust;
+        n++;
+      }
+  });
+  return n;
 }
 
 /** 把一群疊加素材放在 t 秒：各自放進第一條有空位的疊加軌，沒有就新增一條（所以會疊在同一秒） */

@@ -5,6 +5,7 @@ import { editItem } from '../../../store/actions';
 import { setTrackItems, useProjectStore } from '../../../store/projectStore';
 import { toast } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
+import { ColorPanel } from '../ColorPanel';
 import { TrimSheet } from '../TrimSheet';
 import { SPEEDS, type Found, type Panel } from './shared';
 
@@ -30,6 +31,16 @@ export function ClipPanel({
     if (asset)
       return <TrimSheet item={selected} asset={asset} track={found.track} onClose={() => setPanel(null)} />;
   }
+
+  if (panel === 'color' && selected && isVideoItem(selected))
+    return (
+      <div className="panel" role="group" aria-label="調色">
+        <ColorPanel item={selected} project={project} />
+        <button className="btn primary done" onClick={() => setPanel(null)}>
+          完成
+        </button>
+      </div>
+    );
 
   if (panel && selected && isVideoItem(selected)) {
     const asset = project.assets.find((a) => a.id === selected.assetId);

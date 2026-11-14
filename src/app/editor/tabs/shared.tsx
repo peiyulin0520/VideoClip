@@ -4,7 +4,7 @@ import { BLEND_LABELS } from '../../../engine/geometry';
 import type { BlendMode } from '../../../model/types';
 
 export type Tab = 'edit' | 'overlay' | 'text' | 'layers' | 'layout' | 'effect' | 'assets' | 'audio';
-export type Panel = 'speed' | 'volume' | 'trim' | null;
+export type Panel = 'speed' | 'volume' | 'trim' | 'color' | null;
 export type Found = ReturnType<typeof findItem>;
 
 export const TABS: { id: Tab; label: string }[] = [

@@ -11,6 +11,7 @@ import {
   Scissors,
   Trash2,
   Volume2,
+  Palette,
 } from 'lucide-react';
 import { isVideoItem, visibleLayers } from '../../../engine/timeline';
 import type { Item } from '../../../model/types';
@@ -99,6 +100,7 @@ export function EditTab({
     if (p === 'speed' && s.type === 'image') return toast('照片不能變速');
     if (p === 'speed' && s.type === 'audio') return toast('音樂不能變速');
     if (p === 'volume' && s.type === 'image') return toast('照片沒有聲音');
+    if (p === 'color' && s.type === 'audio') return toast('音樂沒有畫面，不能調色');
     if (p === 'trim' && s.type === 'image') return toast('照片沒有素材區段，請拖時間軸上的把手調長度');
     setPanel(p);
   };
@@ -125,6 +127,7 @@ export function EditTab({
           startCrop(s.id);
         }}
       />
+      <ToolButton icon={Palette} label="調色" onClick={() => openPanel('color')} />
       <ToolButton icon={Gauge} label="變速" onClick={() => openPanel('speed')} />
       <ToolButton icon={Volume2} label="音量" onClick={() => openPanel('volume')} />
       <ToolButton
