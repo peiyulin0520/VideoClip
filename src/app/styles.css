@@ -2922,7 +2922,10 @@ button {
   color: #5a3e2b;
   opacity: 1;
 }
-/* 單一素材的進場／出場：沒選取＝#7F8C6A、選取中＝#1E3B2F */
+/*
+ * 單一素材的進場／出場、文字特效的圓圈：
+ * 沒選取＝淺底（#D5DCC6）深字（#1E3B2F）；選取中（正在特效分頁改這一個）＝深底（#1E3B2F）淺字（#EEF2E6）＋淺色外圈
+ */
 .fx-circle {
   position: absolute;
   z-index: 6;
@@ -2933,9 +2936,9 @@ button {
   min-height: 0;
   padding: 0;
   border-radius: 50%;
-  border: 1.5px solid #5f6c4c;
-  background: #7f8c6a;
-  color: #fff;
+  border: 1.5px solid #7f8c6a;
+  background: #d5dcc6;
+  color: #1e3b2f;
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
@@ -2945,7 +2948,9 @@ button {
 }
 .fx-circle.sel {
   background: #1e3b2f;
-  border-color: #1e3b2f;
+  border: 2px solid #eef2e6;
+  color: #eef2e6;
+  box-shadow: 0 0 0 1.5px #1e3b2f;
 }
 .fx-span {
   position: absolute;
@@ -2953,17 +2958,18 @@ button {
   top: 0;
   height: 6px;
   min-width: 3px;
-  background: repeating-linear-gradient(135deg, #7f8c6a 0 4px, rgba(127, 140, 106, 0.35) 4px 8px);
+  background: repeating-linear-gradient(135deg, #7f8c6a 0 4px, rgba(213, 220, 198, 0.9) 4px 8px);
   pointer-events: none;
 }
 .fx-span.sel {
-  background: repeating-linear-gradient(135deg, #1e3b2f 0 4px, rgba(30, 59, 47, 0.45) 4px 8px);
+  background: repeating-linear-gradient(135deg, #1e3b2f 0 4px, rgba(127, 140, 106, 0.9) 4px 8px);
 }
 
-/* 特效分頁最上面的圖例：兩種圓圈的意思（字寫在色塊裡） */
+/* 特效分頁最上面的圖例：兩種圓圈各有「沒選取」「選取中」的顏色（字寫在色塊裡） */
 .fx-legend {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 8px;
 }
 .fx-legend .lg {
@@ -2976,9 +2982,18 @@ button {
   background: #eadbc8;
   color: #5a3e2b;
 }
-.fx-legend .lg.single {
-  background: #7f8c6a;
+.fx-legend .lg.seam-on {
+  background: #b8553a;
   color: #fff;
+}
+.fx-legend .lg.single {
+  background: #d5dcc6;
+  color: #1e3b2f;
+  border: 1px solid #7f8c6a;
+}
+.fx-legend .lg.single-on {
+  background: #1e3b2f;
+  color: #eef2e6;
 }
 
 /* 特效時間細調：預覽在左、拖拉軸在右 */
