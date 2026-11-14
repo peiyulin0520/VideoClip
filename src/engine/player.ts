@@ -3,6 +3,7 @@ import { frameIndexAt, loadAnim, peekAnim } from './animImage';
 import { AudioOut, fadeGain, isIOSDevice } from './audio';
 import { Compositor } from './compositor';
 import { VideoPool } from './mediaPool';
+import { expandThumbs, thumbCount, thumbIndex } from './thumbs';
 import { captureThumb } from './probe';
 import { buildScene } from './scene';
 import { previewSizeFor } from './previewQuality';
@@ -69,7 +70,9 @@ export class Player {
   private tStart = 0;
   private listeners = new Set<Listener>();
   private images = new Map<string, HTMLImageElement>();
-  private thumbTried = new Set<string>();
+  /** 播放時逐格補縮圖：每個素材補過哪幾格、上次補的時間 */
+  private thumbSlots = new Map<string, Set<number>>();
+  private thumbAt = new Map<string, number>();
   /** 除錯／測試用：播放時每秒畫了幾格、每格畫面合成花多久 */
   private statFrames = 0;
   private statSince = 0;
@@ -468,14 +471,29 @@ export class Player {
     this.seg = { build: t1 - t0, comp: t2 - t1, upload: comp.takeUploadMs() };
   }
 
+  /**
+   * 縮圖還沒補滿時（例如 iPhone 的大檔匯入時拿不到縮圖，輕量影片也還沒做好），播到哪裡就把那一格補上；
+   * 每格只補一次、同一個素材最多每 0.5 秒補一張。其他格先用最近的舊縮圖頂著。
+   */
   private maybeCaptureThumb(el: HTMLVideoElement, asset: Asset) {
-    if (!this.deps.onThumb || asset.thumbs.length > 0 || this.thumbTried.has(asset.id)) return;
+    if (!this.deps.onThumb || asset.thumbsFull || asset.duration <= 0) return;
     if (el.seeking || el.readyState < 2) return;
+    const n = thumbCount(asset.duration);
+    const slot = thumbIndex(n, el.currentTime, asset.duration);
+    const done = this.thumbSlots.get(asset.id) ?? new Set<number>();
+    if (done.has(slot)) return;
+    const now = performance.now();
+    if (now - (this.thumbAt.get(asset.id) ?? -1e9) < 500) return;
     const url = captureThumb(el);
     if (!url) return;
-    this.thumbTried.add(asset.id);
+    done.add(slot);
+    this.thumbSlots.set(asset.id, done);
+    this.thumbAt.set(asset.id, now);
+    const next =
+      asset.thumbs.length > 0 ? expandThumbs(asset.thumbs, n) : Array.from({ length: n }, () => url);
+    next[slot] = url;
     // render() 進行中不要改 store，等這一輪結束
-    queueMicrotask(() => this.deps.onThumb?.(asset.id, [url]));
+    queueMicrotask(() => this.deps.onThumb?.(asset.id, next));
   }
 
   private upcoming(p: Project, t: number): { item: VideoItem; asset: Asset }[] {

@@ -8,10 +8,33 @@ import {
   openTab,
   project,
   samplePreview,
-  seekTo,
+  seekTo as rawSeekTo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-9/i7';
+
+/** 跳到某一秒，並等播放頭真的到了（機器忙時捲動事件會晚一點，定位會打在舊的時間） */
+async function seekTo(page: Page, sec: number) {
+  await rawSeekTo(page, sec);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (window as unknown as { __videoclip: { time: () => number } }).__videoclip.time(),
+        ),
+      { timeout: 5000 },
+    )
+    .toBeGreaterThan(sec - 0.15);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (window as unknown as { __videoclip: { time: () => number } }).__videoclip.time(),
+        ),
+      { timeout: 5000 },
+    )
+    .toBeLessThan(sec + 0.15);
+}
 type Kf = { t: number; x: number; y: number; scale: number; adjust?: Record<string, number> };
 type Ov = {
   keyframes?: Kf[];

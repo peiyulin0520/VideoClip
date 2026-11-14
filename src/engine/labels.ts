@@ -1,3 +1,4 @@
+import { thumbFor } from './thumbs';
 import type { Asset, Item } from '../model/types';
 
 /** 物件沒有自己命名時的預設名稱 */
@@ -21,8 +22,7 @@ export function itemTitle(item: Item, asset?: Asset): string {
 export function thumbOf(item: Item, asset?: Asset): string | undefined {
   if (item.type === 'text' || !asset || asset.thumbs.length === 0) return undefined;
   if (item.type === 'image' || asset.duration <= 0) return asset.thumbs[0];
-  const i = Math.floor((item.trimIn / asset.duration) * asset.thumbs.length);
-  return asset.thumbs[Math.min(Math.max(i, 0), asset.thumbs.length - 1)];
+  return thumbFor(asset.thumbs, item.trimIn, asset.duration);
 }
 
 /** 同一條軌道上依開始時間排的第幾個（1 起算）；時間軸上片段名稱前面的序號，自動算、不存 */

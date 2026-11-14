@@ -17,6 +17,8 @@ export type Asset = {
   origin?: 'sticker';
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
+  /** 縮圖已經補滿（每 2 秒一張）；沒有這個欄位的舊素材會在背景補（見 engine/thumbs.ts） */
+  thumbsFull?: boolean;
   /** 音樂素材：音量波形，每 0.1 秒一個值（0–100），給時間軸畫波形用 */
   wave?: number[];
   /** 會動的圖片（GIF／動態 WebP，例如 GIPHY 貼圖）：格數與一圈的長度（秒）；沒有＝一般照片 */

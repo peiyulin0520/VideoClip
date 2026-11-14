@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ensureUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
+import { enqueueThumbs } from '../../engine/thumbs';
 import {
   FRAME_COLORS,
   LAYOUTS,
@@ -75,6 +76,7 @@ export function LayoutPicker() {
       const frame = fr.assets[0];
       if (!frame) return toast('外框做不出來', 6000);
       await ensureUrls(pid, [...media, frame]);
+      enqueueThumbs(pid, media); // 版型裡的影片：背景補滿時間軸縮圖
       const videoCells = cells.filter((c) => c.asset.kind === 'video').length;
       const maxVideo = Math.max(0, ...media.filter((a) => a.kind === 'video').map((a) => a.duration));
       const duration = maxVideo > 0 ? Math.min(Math.max(maxVideo, 1), 15) : 3;

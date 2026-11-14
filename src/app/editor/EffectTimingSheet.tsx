@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 
 import { urlFor } from '../../engine/assetUrls';
 import { MIN_EFFECT } from '../../engine/transitions';
 import type { Item } from '../../model/types';
+import { thumbFor, thumbStrip } from '../../engine/thumbs';
 import { useProjectStore } from '../../store/projectStore';
 import { Sheet } from '../../ui/Sheet';
 import { itemTitle } from '../../engine/labels';
@@ -48,15 +49,12 @@ function MiniPreview({ item, t }: { item: Item; t: number }) {
         />
       ) : item.type === 'text' ? (
         <div className="et-text">{item.card.runs.map((r) => r.text).join('')}</div>
-      ) : asset?.thumbs[0] ? (
+      ) : asset?.thumbs[0] && item.type !== 'audio' ? (
         <img
           src={
-            asset.thumbs[
-              Math.min(
-                Math.floor((t / Math.max(item.duration, 0.1)) * asset.thumbs.length),
-                asset.thumbs.length - 1,
-              )
-            ]
+            item.type === 'image'
+              ? asset.thumbs[0]
+              : (thumbFor(asset.thumbs, item.trimIn + t * item.speed, asset.duration) ?? asset.thumbs[0])
           }
           alt=""
         />
@@ -182,9 +180,13 @@ export function EffectTimingSheet({
     el.addEventListener('pointercancel', up);
   };
 
-  const thumbsOf = (it: Item): string[] => {
+  /** 這個素材自己的時間 l0～l1 秒的縮圖帶（挑 k 張） */
+  const stripOf = (it: Item, l0: number, l1: number, k: number): string[] => {
     if (it.type === 'text' || it.type === 'audio') return [];
-    return project.assets.find((a) => a.id === it.assetId)?.thumbs ?? [];
+    const a = project.assets.find((x) => x.id === it.assetId);
+    if (!a) return [];
+    if (it.type === 'image') return a.thumbs.slice(0, 1);
+    return thumbStrip(a.thumbs, a.duration, it.trimIn + l0 * it.speed, it.trimIn + l1 * it.speed, k);
   };
   const title = mode === 'in' ? '調整進場時間' : mode === 'out' ? '調整出場時間' : '調整轉場分配';
   const hl: [number, number] = mode === 'in' ? [0, d] : mode === 'out' ? [len - d, len] : [ta - bf, ta + af];
@@ -244,22 +246,18 @@ export function EffectTimingSheet({
                 {mode === 'seam' ? (
                   <>
                     <div className="et-half" style={{ flex: ta || 1 }}>
-                      {thumbsOf(prevItem)
-                        .slice(-3)
-                        .map((t, i) => (
-                          <img key={i} src={t} alt="" draggable={false} />
-                        ))}
+                      {stripOf(prevItem, prevItem.duration - ta, prevItem.duration, 4).map((t, i) => (
+                        <img key={i} src={t} alt="" draggable={false} />
+                      ))}
                     </div>
                     <div className="et-half" style={{ flex: tb || 1 }}>
-                      {thumbsOf(item)
-                        .slice(0, 3)
-                        .map((t, i) => (
-                          <img key={i} src={t} alt="" draggable={false} />
-                        ))}
+                      {stripOf(item, 0, tb, 4).map((t, i) => (
+                        <img key={i} src={t} alt="" draggable={false} />
+                      ))}
                     </div>
                   </>
                 ) : (
-                  thumbsOf(item).map((t, i) => <img key={i} src={t} alt="" draggable={false} />)
+                  stripOf(item, 0, len, 8).map((t, i) => <img key={i} src={t} alt="" draggable={false} />)
                 )}
               </div>
               <div className="rm-gray" style={{ left: 0, width: pct(hl[0]) }} />
