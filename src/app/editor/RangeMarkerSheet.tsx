@@ -1,5 +1,5 @@
 import { Undo2 } from 'lucide-react';
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type { Range } from '../../engine/timeline';
 import { toast } from '../../store/uiStore';
 import { thumbStrip } from '../../engine/thumbs';
@@ -14,7 +14,8 @@ import { Wave } from './Wave';
 const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi);
 const fmt2 = (n: number) => n.toFixed(2);
 
-export type MarkerMode = 'keep' | 'mute' | 'timing';
+/** keep＝標起來的是留下的；mute＝標起來的是保留聲音的；silence＝標起來的是靜音的；timing＝特效時間 */
+export type MarkerMode = 'keep' | 'mute' | 'silence' | 'timing';
 
 export function RangeMarkerSheet({
   title,
@@ -35,6 +36,9 @@ export function RangeMarkerSheet({
   summary,
   onApply,
   onClose,
+  extra,
+  allowEmpty,
+  onRangesChange,
 }: {
   title: string;
   /** 整條軸的長度（秒） */
@@ -59,6 +63,12 @@ export function RangeMarkerSheet({
   summary?: (ranges: Range[]) => string;
   onApply: (ranges: Range[]) => void;
   onClose: () => void;
+  /** 標題下面多放的東西（例：進階的「保留／靜音」切換） */
+  extra?: ReactNode;
+  /** 一組標記都沒有也可以套用（靜音模式＝沒有要靜音的地方） */
+  allowEmpty?: boolean;
+  /** 標記有變動時通知呼叫端（切換模式時要換算） */
+  onRangesChange?: (ranges: Range[]) => void;
 }) {
   const dur = Math.max(duration, 0.1);
   const [ranges, setRanges] = useState<Range[]>(initial.map((r): Range => [r[0], r[1]]));
@@ -72,7 +82,9 @@ export function RangeMarkerSheet({
   const rangesRef = useRef(ranges);
   useEffect(() => {
     rangesRef.current = ranges;
-  });
+    onRangesChange?.(ranges);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ranges]);
 
   const snapshot = () => {
     undo.current = [...undo.current.slice(-19), rangesRef.current.map((r): Range => [r[0], r[1]])];
@@ -120,7 +132,10 @@ export function RangeMarkerSheet({
       if (m) {
         const t = (m.currentTime - srcOffset) / srcSpeed;
         setCursor(clamp(t, 0, dur));
-        if (mode !== 'timing') m.volume = rangesRef.current.some(([a, b]) => t >= a && t < b) ? 1 : 0;
+        if (mode !== 'timing') {
+          const inside = rangesRef.current.some(([a, b]) => t >= a && t < b);
+          m.volume = (mode === 'silence' ? !inside : inside) ? 1 : 0;
+        }
         if (m.ended || t >= dur - 0.02) {
           m.pause();
           setPlaying(false);
@@ -231,6 +246,7 @@ export function RangeMarkerSheet({
       >
         <Undo2 size={22} />
       </button>
+      {extra}
       <div className="rm-preview" data-testid="rm-preview">
         {mediaKind === 'video' && mediaUrl && (
           <video
@@ -314,7 +330,7 @@ export function RangeMarkerSheet({
               thumbStrip(thumbs, 1, 0, 1, 8).map((t, i) => <img key={i} src={t} alt="" draggable={false} />)
             ) : null}
           </div>
-          {gaps.map(([a, b], i) => (
+          {(mode === 'silence' ? [] : gaps).map(([a, b], i) => (
             <div
               key={i}
               className="rm-gray"
@@ -325,7 +341,7 @@ export function RangeMarkerSheet({
           {ranges.map(([a, b], i) => (
             <div
               key={i}
-              className="rm-body"
+              className={`rm-body${mode === 'silence' ? ' silence' : ''}`}
               data-testid={`range-body-${i}`}
               style={{ left: pct(a), width: `${((b - a) / dur) * 100}%` }}
             />
@@ -362,7 +378,7 @@ export function RangeMarkerSheet({
         <button
           className="btn primary"
           data-testid="rm-apply"
-          disabled={ranges.length === 0}
+          disabled={ranges.length === 0 && !allowEmpty}
           onClick={() => onApply(ranges)}
         >
           {applyLabel}

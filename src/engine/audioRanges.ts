@@ -32,3 +32,22 @@ export function isFullRange(item: VideoItem, ranges: R[]): boolean {
   }
   return at >= srcEnd - 1e-3;
 }
+
+/**
+ * 互補的範圍：在 [from, to] 裡，ranges 沒蓋到的地方（保留 ⇄ 靜音 互換用）。
+ * 先排序合併、夾在 [from, to] 裡；比 1ms 短的空隙不算。
+ */
+export function invertRanges(ranges: R[], [from, to]: R): R[] {
+  const sorted = ranges
+    .map(([a, b]): R => [Math.max(a, from), Math.min(b, to)])
+    .filter(([a, b]) => b - a > 1e-6)
+    .sort((x, y) => x[0] - y[0]);
+  const out: R[] = [];
+  let at = from;
+  for (const [a, b] of sorted) {
+    if (a - at > 1e-3) out.push([at, a]);
+    at = Math.max(at, b);
+  }
+  if (to - at > 1e-3) out.push([at, to]);
+  return out;
+}

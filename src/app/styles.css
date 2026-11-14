@@ -3244,3 +3244,8 @@ button:not(:disabled):active,
 .layout-card:active {
   transform: scale(0.96);
 }
+
+/* 進階：標記要靜音的聲音——標起來的地方畫成灰色斜線 */
+.rm-body.silence {
+  background: repeating-linear-gradient(135deg, rgba(60, 60, 60, 0.7) 0 5px, rgba(60, 60, 60, 0.45) 5px 10px);
+}
