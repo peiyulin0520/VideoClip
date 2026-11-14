@@ -278,3 +278,67 @@ test('離開：選到別的片段、片段不見會結束裁切；沒有改就�
   await expect(page.getByTestId('crop-layer')).toHaveCount(0);
   expect((await overlay(page)).crop).toBeUndefined();
 });
+
+test('工具有圖示（文字在圖示右邊、同一個顏色）、文字是「一般／自由／筆刷／橡皮擦」；工具卡跟動作列分區', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await setup(page);
+  const names: Record<string, string> = { rect: '一般', lasso: '自由', brush: '筆刷', erase: '橡皮擦' };
+  for (const [id, name] of Object.entries(names)) {
+    const b = page.getByTestId(`crop-tool-${id}`);
+    await expect(b).toContainText(name);
+    expect(((await b.innerText()) ?? '').trim()).toBe(name);
+    await expect(b.locator('svg')).toHaveCount(1);
+    const m = await b.evaluate((el) => {
+      const svg = el.querySelector('svg')!.getBoundingClientRect();
+      const span = el.querySelector('span')!.getBoundingClientRect();
+      return {
+        iconRight: svg.right,
+        textLeft: span.left,
+        svgColor: getComputedStyle(el.querySelector('svg')!).color,
+        btnColor: getComputedStyle(el).color,
+      };
+    });
+    expect(m.iconRight).toBeLessThanOrEqual(m.textLeft + 1);
+    expect(m.svgColor).toBe(m.btnColor);
+  }
+  // 一般裁切的圖示：外框＋四個角的實心圓點
+  await expect(page.getByTestId('crop-tool-rect').locator('svg circle')).toHaveCount(4);
+  // 分區：工具卡有「裁切工具」小標題、底色跟動作列不同、中間有分隔
+  const card = page.getByRole('region', { name: '裁切工具' });
+  await expect(card).toContainText('裁切工具');
+  const bar = (await page.getByTestId('crop-bar').boundingBox())!;
+  const cb = (await card.boundingBox())!;
+  expect(cb.y - (bar.y + bar.height)).toBeGreaterThanOrEqual(6);
+  const bgs = await page.evaluate(() => ({
+    card: getComputedStyle(document.querySelector('.ce-toolcard')!).backgroundColor,
+    editor: getComputedStyle(document.querySelector('.crop-editor')!).backgroundColor,
+  }));
+  expect(bgs.card).not.toBe(bgs.editor);
+  await page.screenshot({ path: `${SHOT}/crop-toolcard.png` });
+});
+
+for (const w of [320, 390]) {
+  test(`${w} 寬：裁切畫面仍在一頁內、四個工具不換行`, async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: w, height: w === 320 ? 568 : 664 });
+    await setup(page);
+    const vh = page.viewportSize()!.height;
+    const ed = (await page.getByTestId('crop-layer').boundingBox())!;
+    expect(ed.y + ed.height).toBeLessThanOrEqual(vh + 1);
+    const opt = (await page.getByTestId('crop-options').boundingBox())!;
+    expect(opt.y + opt.height).toBeLessThanOrEqual(vh + 1);
+    for (const t of ['rect', 'lasso', 'brush', 'erase']) {
+      const lines = await page.getByTestId(`crop-tool-${t}`).evaluate((el) => {
+        const rg = document.createRange();
+        rg.selectNodeContents(el.querySelector('span')!);
+        return new Set(Array.from(rg.getClientRects()).map((r) => Math.round(r.top / 3))).size;
+      });
+      expect(lines).toBe(1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(
+      true,
+    );
+  });
+}

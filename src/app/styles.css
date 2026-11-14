@@ -3389,6 +3389,10 @@ button:not(:disabled):active,
   flex: 1 1 0;
   min-width: 0;
   min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   padding: 0 2px;
   font-size: var(--fs-body);
   white-space: nowrap;
@@ -3457,4 +3461,33 @@ button:not(:disabled):active,
   flex: none;
   min-width: 2.6em;
   text-align: right;
+}
+
+/* 裁切工具卡：跟上面的播放／復原／套用分開（分隔線＋不同底色＋小標題） */
+.ce-divider {
+  flex: none;
+  height: 1px;
+  margin: 2px 0;
+  background: var(--line);
+}
+.ce-toolcard {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ctl);
+}
+.ce-toolcard-title {
+  font-size: var(--fs-note);
+  color: var(--muted);
+  line-height: 1.2;
+}
+.ce-toolcard .ce-tools {
+  background: var(--btn);
+}
+.ce-toolcard .ce-ctx {
+  min-height: 48px;
 }

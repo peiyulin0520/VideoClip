@@ -1,4 +1,4 @@
-import { Minus, Pause, Play, Plus, Redo2, Undo2, X } from 'lucide-react';
+import { Brush, Eraser, Minus, Pause, Play, Plus, Redo2, Undo2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { urlFor } from '../../engine/assetUrls';
 import { applyRatio, dragCrop, keepSize, smoothPolygon, type Handle } from '../../engine/crop';
@@ -24,6 +24,7 @@ import {
 import { useProjectStore } from '../../store/projectStore';
 import { toast } from '../../store/uiStore';
 import { Slider } from '../../ui/Slider';
+import { CropFreeIcon, CropRectIcon } from './cropIcons';
 
 // 裁切編輯畫面（獨立的全螢幕，一頁放得下、不用捲動）：上面是畫面（可以放大縮小），下面三列——
 // ▶ ↩ ↪ 檢查結果 套用裁切；一般裁切｜自由裁切｜筆刷｜橡皮擦；目前工具的選項（比例、粗細／距離）。
@@ -40,11 +41,11 @@ const NAMES: Record<Handle, string> = {
   bl: '左下角',
   br: '右下角',
 };
-const TOOLS: { id: CropTool; label: string }[] = [
-  { id: 'rect', label: '一般裁切' },
-  { id: 'lasso', label: '自由裁切' },
-  { id: 'brush', label: '筆刷' },
-  { id: 'erase', label: '橡皮擦' },
+const TOOLS: { id: CropTool; label: string; icon: React.ReactNode }[] = [
+  { id: 'rect', label: '一般', icon: <CropRectIcon /> },
+  { id: 'lasso', label: '自由', icon: <CropFreeIcon /> },
+  { id: 'brush', label: '筆刷', icon: <Brush size={18} aria-hidden="true" /> },
+  { id: 'erase', label: '橡皮擦', icon: <Eraser size={18} aria-hidden="true" /> },
 ];
 const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi);
 const MAX_ZOOM = 4;
@@ -661,84 +662,89 @@ function Editor() {
         </button>
       </div>
 
-      <div className="ce-tools" role="radiogroup" aria-label="裁切工具" data-testid="crop-tools">
-        {TOOLS.map((t) => (
-          <button
-            key={t.id}
-            role="radio"
-            aria-checked={s.tool === t.id}
-            className={`ce-tool${s.tool === t.id ? ' on' : ''}`}
-            data-testid={`crop-tool-${t.id}`}
-            onClick={() => updateCrop({ tool: t.id, checking: false })}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <div className="ce-divider" aria-hidden="true" />
+      <section className="ce-toolcard" aria-label="裁切工具">
+        <div className="ce-toolcard-title">裁切工具</div>
+        <div className="ce-tools" role="radiogroup" aria-label="選擇裁切工具" data-testid="crop-tools">
+          {TOOLS.map((t) => (
+            <button
+              key={t.id}
+              role="radio"
+              aria-checked={s.tool === t.id}
+              className={`ce-tool${s.tool === t.id ? ' on' : ''}`}
+              data-testid={`crop-tool-${t.id}`}
+              onClick={() => updateCrop({ tool: t.id, checking: false })}
+            >
+              {t.icon}
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
 
-      <div className="ce-ctx" data-testid="crop-options">
-        {s.tool === 'rect' && (
-          <div className="ce-chips" role="radiogroup" aria-label="裁切比例">
-            {PRESETS.map((p) => (
-              <button
-                key={p.key}
-                role="radio"
-                aria-checked={isActive(p.ratio)}
-                className={`chip${isActive(p.ratio) ? ' active' : ''}`}
-                onClick={() => {
-                  const before: CropSnap = { crop: { ...s.crop }, mask: s.mask, strokes: s.strokes };
-                  if (p.ratio === null) updateCrop({ lock: null });
-                  else {
-                    updateCrop({ lock: p.ratio });
-                    commitCrop(before, { crop: applyRatio(s.crop, p.ratio, A) });
-                  }
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        )}
-        {s.tool === 'lasso' && (
-          <div className="ce-lasso">
-            <span className="hint">用手指沿著要留下的範圍畫一整圈，放開就裁好。</span>
-            {s.mask && (
-              <button className="chip" onClick={() => setLassoMask(null)}>
-                清除形狀
-              </button>
-            )}
-          </div>
-        )}
-        {(s.tool === 'brush' || s.tool === 'erase') && (
-          <div className="ce-paint" data-testid="paint-bar">
-            <div className="paint-size">
-              <Slider
-                label="粗細"
-                value={Math.round(s.brush * 100)}
-                min={1}
-                max={15}
-                step={1}
-                format={(v) => `${v}%`}
-                onChange={(v) => updateCrop({ brush: v / 100 })}
-              />
+        <div className="ce-ctx" data-testid="crop-options">
+          {s.tool === 'rect' && (
+            <div className="ce-chips" role="radiogroup" aria-label="裁切比例">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  role="radio"
+                  aria-checked={isActive(p.ratio)}
+                  className={`chip${isActive(p.ratio) ? ' active' : ''}`}
+                  onClick={() => {
+                    const before: CropSnap = { crop: { ...s.crop }, mask: s.mask, strokes: s.strokes };
+                    if (p.ratio === null) updateCrop({ lock: null });
+                    else {
+                      updateCrop({ lock: p.ratio });
+                      commitCrop(before, { crop: applyRatio(s.crop, p.ratio, A) });
+                    }
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
-            <div className="paint-size">
-              <Slider
-                label="距離"
-                value={s.reach}
-                min={0}
-                max={MAX_REACH}
-                step={5}
-                format={(v) => `${v}px`}
-                onChange={(v) => {
-                  saveReach(v);
-                  updateCrop({ reach: v });
-                }}
-              />
+          )}
+          {s.tool === 'lasso' && (
+            <div className="ce-lasso">
+              <span className="hint">用手指沿著要留下的範圍畫一整圈，放開就裁好。</span>
+              {s.mask && (
+                <button className="chip" onClick={() => setLassoMask(null)}>
+                  清除形狀
+                </button>
+              )}
             </div>
-          </div>
-        )}
-      </div>
+          )}
+          {(s.tool === 'brush' || s.tool === 'erase') && (
+            <div className="ce-paint" data-testid="paint-bar">
+              <div className="paint-size">
+                <Slider
+                  label="粗細"
+                  value={Math.round(s.brush * 100)}
+                  min={1}
+                  max={15}
+                  step={1}
+                  format={(v) => `${v}%`}
+                  onChange={(v) => updateCrop({ brush: v / 100 })}
+                />
+              </div>
+              <div className="paint-size">
+                <Slider
+                  label="距離"
+                  value={s.reach}
+                  min={0}
+                  max={MAX_REACH}
+                  step={5}
+                  format={(v) => `${v}px`}
+                  onChange={(v) => {
+                    saveReach(v);
+                    updateCrop({ reach: v });
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
