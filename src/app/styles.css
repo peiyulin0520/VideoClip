@@ -1815,24 +1815,10 @@ button {
 }
 
 /* 裁切模式（預覽上） */
-.crop-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 8;
-}
 .crop-frame {
-  position: absolute;
+  position: relative;
+  flex: none;
   touch-action: none;
-}
-.crop-dim-clip {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.crop-rect-shadow {
-  position: absolute;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
 }
 .crop-rect {
   position: absolute;
@@ -1955,31 +1941,6 @@ button {
 .crop-h.br i {
   border-width: 0 5px 5px 0;
   transform: translate(6px, 6px);
-}
-
-.crop-bar {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
-  z-index: 3;
-  display: flex;
-  gap: 6px;
-}
-.crop-bar .btn {
-  min-height: 44px;
-  padding: 0 9px;
-  font-size: var(--fs-body);
-  white-space: nowrap;
-  background: rgba(20, 20, 20, 0.85);
-  color: #fff; /* 固定白字：底色固定是深色，不跟著淺色主題變成深色字 */
-}
-.crop-bar .btn:disabled {
-  color: rgba(255, 255, 255, 0.45);
-}
-.crop-bar .btn.primary {
-  background: var(--accent, #ff4d8d);
-  color: #fff;
 }
 
 /* 匯出面板 */
@@ -2680,49 +2641,6 @@ button {
   box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.45);
   pointer-events: none;
 }
-.crop-bar.paint-bar {
-  top: 60px;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 12px;
-  background: rgba(20, 20, 20, 0.85);
-  color: #fff;
-}
-.crop-bar.paint-bar {
-  right: 8px;
-}
-.crop-bar.paint-bar {
-  flex-wrap: wrap;
-}
-.crop-bar.paint-bar .paint-size {
-  flex: 1 1 100%;
-  min-width: 0;
-  color: #fff;
-}
-.crop-bar.paint-bar .slider-row input[type='range'] {
-  height: 34px;
-}
-.crop-bar.paint-bar .slider-label {
-  min-width: 44px;
-  white-space: nowrap;
-  color: #ddd;
-}
-.crop-bar.paint-bar .slider-val {
-  color: #fff;
-}
-.crop-bar.paint-bar .slider-row {
-  min-width: 0;
-}
-.crop-bar.paint-bar .slider-label {
-  min-width: 0;
-  color: #ddd;
-}
-.crop-bar.paint-bar .btn {
-  flex: none;
-}
-.crop-bar.paint-bar .btn {
-  background: rgba(255, 255, 255, 0.12);
-}
 
 /* 有新版本的橫幅（蓋在畫面最底下） */
 .update-banner {
@@ -3353,4 +3271,190 @@ button:not(:disabled):active,
 }
 .music-note {
   margin-bottom: 8px;
+}
+
+/* ---- 裁切編輯畫面（全螢幕、一頁放得下）---- */
+.crop-editor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: calc(var(--safe-top) + 6px) 8px calc(var(--safe-bottom) + 6px);
+  background: var(--bg);
+  color: var(--fg);
+  box-sizing: border-box;
+}
+.ce-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.ce-size {
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ce-zoomctl {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.rm-icon-btn.sm {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+.ce-zoomval {
+  min-width: 3.4em;
+  min-height: 36px;
+  padding: 0 4px;
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+}
+.sheet-close {
+  flex: none;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--btn);
+}
+.ce-stage {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+  border-radius: 10px;
+  touch-action: none;
+}
+.ce-zoom {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 0 0;
+}
+.ce-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+.ce-nomedia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.ce-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+}
+.ce-bar .btn {
+  flex: none;
+  min-height: 44px;
+}
+.ce-bar .btn.grow {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.ce-tools {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--btn);
+  border-radius: var(--radius-ctl);
+}
+.ce-tool {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 2px;
+  font-size: var(--fs-body);
+  white-space: nowrap;
+  background: transparent;
+  border-radius: calc(var(--radius-ctl) - 3px);
+}
+.ce-tool.on {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.ce-ctx {
+  flex: none;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+}
+.ce-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: max(6px, 0.55em);
+  overflow-x: auto;
+  scrollbar-width: none;
+  width: 100%;
+}
+.ce-chips .chip {
+  flex: none;
+}
+.ce-lasso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.ce-lasso .hint {
+  flex: 1;
+  margin: 0;
+}
+.ce-paint {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.ce-paint .paint-size {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.ce-paint .slider-row {
+  gap: 6px;
+}
+.ce-paint .slider-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+.ce-paint .slider-row input[type='range'] {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+.ce-paint .slider-label {
+  flex: none;
+  min-width: 0;
+}
+.ce-paint .slider-val {
+  flex: none;
+  min-width: 2.6em;
+  text-align: right;
 }

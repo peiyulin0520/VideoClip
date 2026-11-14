@@ -24,10 +24,9 @@ import {
 } from '../../../store/actions';
 import { PromptSheet } from '../../../ui/PromptSheet';
 import { useState } from 'react';
-import { startCrop, useCrop } from '../../../store/cropStore';
+import { startCrop } from '../../../store/cropStore';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
-import { CropPanel } from '../CropPanel';
 import { ClipPanel, panelActive } from './ClipPanel';
 import { ToolButton, type Found, type Panel } from './shared';
 
@@ -46,7 +45,6 @@ export function EditTab({
   const project = useProjectStore((s) => s.project)!;
   const player = useUI((s) => s.player);
   const [naming, setNaming] = useState(false);
-  const cropping = useCrop((s) => !!s.s);
   const selected = found?.item;
 
   const need = (): Item | undefined => {
@@ -103,7 +101,6 @@ export function EditTab({
     setPanel(p);
   };
 
-  if (cropping) return <CropPanel />;
   if (panelActive(panel, found)) return <ClipPanel panel={panel} setPanel={setPanel} found={found} />;
 
   return (

@@ -41,6 +41,8 @@ export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'add';
 export type Outline = { color: string; width: number }; // width：以 1080 寬畫面為基準的 px
 /** 裁切：各邊切掉的比例 0–0.9 */
 export type Crop = { l: number; t: number; r: number; b: number };
+/** 裁切的一筆筆刷（keep＝留下）或橡皮擦（erase＝去掉）；座標、粗細都是「整張原始畫面」的比例 0–1（w 佔畫面寬） */
+export type CropStroke = { mode: 'keep' | 'erase'; w: number; pts: [number, number][] };
 
 export type ItemBase = {
   id: string;
@@ -148,6 +150,11 @@ export type VideoItem = ItemBase & {
    * 有它時優先於 mask（多邊形）。
    */
   maskBitmap?: string;
+  /**
+   * 裁切模式的編輯內容（一般裁切的四邊、自由裁切的多邊形、筆刷／橡皮擦的筆畫），讓下次進裁切可以接著改。
+   * 有筆畫時才存（沒有筆畫時 crop／mask 本身就是全部）。maskBitmap 是它畫出來的結果。
+   */
+  cropEdit?: { crop: Crop; mask: [number, number][] | null; strokes: CropStroke[] };
   /** 多格版型：這個物件所在的格子（佔畫面寬、高的比例）。裁切模式完成時，畫面會填滿這個格子 */
   cell?: { x: number; y: number; w: number; h: number };
   /** 同一個版型的物件（外框與各格）共用的 id：一起縮放、移動、同一段時間，也用來「刪除整個版型」 */

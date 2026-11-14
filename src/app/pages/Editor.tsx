@@ -19,6 +19,7 @@ import { useQuality } from '../../store/qualityStore';
 import type { Aspect } from '../../model/types';
 import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
+import { CropEditor } from '../editor/CropEditor';
 import { ExportSheet } from '../editor/ExportSheet';
 import { GradePeekButton } from '../editor/GradePeekButton';
 import { KeyframeButton } from '../editor/KeyframeButton';
@@ -297,6 +298,7 @@ function EditorBody() {
       />
 
       <ExportSheet project={project} open={exportOpen} onClose={() => setExportOpen(false)} />
+      <CropEditor />
 
       <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
         <p className="hint">改了之後，影片和文字的位置、大小會跟著新的畫面。可以按「復原」改回來。</p>

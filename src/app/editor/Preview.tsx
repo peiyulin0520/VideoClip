@@ -19,7 +19,6 @@ import { useSmooth } from '../../engine/previewQuality';
 import { useQuality } from '../../store/qualityStore';
 import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
-import { CropOverlay } from './CropOverlay';
 import { useCrop } from '../../store/cropStore';
 import { geoCtx } from '../../engine/scene';
 import { hasKeyframes, timeResolved } from '../../engine/keyframes';
@@ -470,7 +469,6 @@ export function Preview({
               />
             );
           })}
-        {cropping && <CropOverlay project={project} k={k} width={width} height={height} />}
       </div>
       {emptyAction && (
         <button className="empty-import" onClick={emptyAction}>

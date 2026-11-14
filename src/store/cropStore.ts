@@ -1,46 +1,41 @@
 import { create } from 'zustand';
 import { cropKeepingPlace, isNoCrop, NO_CROP, polygonCrop } from '../engine/crop';
+import { composeKeep } from '../engine/cropCompose';
 import { cellRect, cellTransform } from '../engine/layouts';
 import { composeWith } from '../engine/groupTransform';
 import { hasKeyframes, upsertKeyframe, withTime } from '../engine/keyframes';
 import { findItem, isVideoItem } from '../engine/timeline';
-import { geoCtx } from '../engine/scene';
-import { itemBox, aabb } from '../engine/geometry';
-import type { Crop, Transform } from '../model/types';
+import type { Crop, CropStroke } from '../model/types';
 import { useProjectStore } from './projectStore';
 import { toast, useUI } from './uiStore';
-import { loadMask, maskBounds } from '../engine/maskBitmap';
+import { loadMask, maskBounds, maskCanvasFor } from '../engine/maskBitmap';
 
-// 裁切模式的暫存狀態。預覽顯示「整張原始畫面」（留下的那塊位置大小不變），使用者拖四邊／四角／畫一圈，
-// 按「完成」才一次寫進專案（一步復原）；「取消」什麼都不改。
+// 裁切模式的暫存狀態（獨立的全螢幕編輯畫面 CropEditor）。四個工具互相獨立、可以一起用：
+// 一般裁切（crop 四邊）、自由裁切（mask 多邊形）、筆刷／橡皮擦（strokes 向量筆畫，座標是整張原始畫面的比例）。
+// 按「套用裁切」才一次寫進專案（一步復原）；按 ❌ 什麼都不改。每一步（拉完四邊、圈完一圈、畫完一筆）都能 ↩ 復原、↪ 重做。
 
 export type Pt = [number, number];
-export type CropSession = {
+export type CropTool = 'rect' | 'lasso' | 'brush' | 'erase';
+export type CropSnap = { crop: Crop; mask: Pt[] | null; strokes: CropStroke[] };
+export type CropSession = CropSnap & {
   itemId: string;
-  crop: Crop;
-  mask: Pt[] | null;
+  /** 舊版存的點陣圖遮罩（解碼後）：當成底；新版有 cropEdit 就不用它 */
+  base: HTMLCanvasElement | null;
   /** 鎖定的比例（保留區域的像素寬 ÷ 高）；null＝自由 */
   lock: number | null;
-  /** 自由形狀：用手指畫一圈 */
-  lasso: boolean;
-  /** 筆刷（補回要留的）／橡皮擦（擦掉多的）；null＝不在畫 */
-  paint: 'brush' | 'erase' | null;
+  tool: CropTool;
   /** 筆刷粗細（佔整張原始畫面寬的比例） */
   brush: number;
   /** 焦點圓在手指圓上方幾 px（0＝直接畫在手指下面）；存在這台手機 */
   reach: number;
-  /** 筆刷／橡皮擦編輯中的遮罩（整張原始畫面座標，長邊 MASK_SIDE；不透明＝留下）；null＝還沒開始畫 */
-  maskCanvas: HTMLCanvasElement | null;
-  /** 這個物件原本就有點陣圖遮罩（沒被重設／重新圈選的話完成時保留） */
-  hasBitmap: boolean;
-  /** 要把原本的點陣圖遮罩拿掉（重設、重新圈選） */
-  dropBitmap: boolean;
-  /** 每畫一筆加 1：讓預覽上的紅色提示重畫 */
-  maskVer: number;
-  /** 復原用：每一筆之前的遮罩 */
-  undo: ImageData[];
-  /** 裁切模式裡顯示整張畫面用的位置、大小、填滿方式（只影響編輯時看到的，完成時另外算「切完不跳」） */
-  view: { transform: Transform; fit: 'cover' | 'contain' };
+  history: CropSnap[];
+  redo: CropSnap[];
+  /** 「檢查結果」：只顯示留下來的部分 */
+  checking: boolean;
+  /** 開始時的內容（沒改就不寫、不多一筆復原紀錄） */
+  initial: string;
+  /** 影片的來源時間（秒）：編輯畫面顯示這一格 */
+  srcT: number;
 };
 
 export const useCrop = create<{ s: CropSession | null }>(() => ({ s: null }));
@@ -49,6 +44,9 @@ export function updateCrop(patch: Partial<Omit<CropSession, 'itemId'>>) {
   const { s } = useCrop.getState();
   if (s) useCrop.setState({ s: { ...s, ...patch } });
 }
+
+const snapOf = (s: CropSnap): CropSnap => ({ crop: { ...s.crop }, mask: s.mask, strokes: s.strokes });
+const keyOf = (s: CropSnap) => JSON.stringify([s.crop, s.mask, s.strokes]);
 
 /** 進入裁切模式。選到的必須是影片或照片。 */
 export function startCrop(itemId: string): boolean {
@@ -64,55 +62,41 @@ export function startCrop(itemId: string): boolean {
   if (!asset || !player) return false;
   // 要看得到這個物件才能裁：播放頭移到物件的時間範圍內
   player.pause();
-  window.scrollTo(0, 0); // 預覽在頁面最上面：從下面的工具列按進來要把預覽捲回來才拖得到
   const at = Math.max(raw.start, Math.min(player.time, raw.start + raw.duration - 0.01));
   player.seek(at);
-  // 有定格（關鍵影格）的物件：以播放頭這個時間的位置、大小為準
-  const item = withTime(raw, at);
-  // 整張原始畫面顯示在原本的位置（留下來的那塊不動）；如果這樣會超出預覽畫面（例如填滿的橫式影片），
-  // 把手就按不到了，改成縮進預覽中央完整顯示
-  const inPlace = cropKeepingPlace(item, asset, NO_CROP, project.width, project.height);
-  let view: CropSession['view'] = { transform: inPlace.transform, fit: item.fit };
-  const ctx = geoCtx(project, project.width, project.height);
-  const bb = aabb(itemBox({ ...item, crop: undefined, fit: view.fit, transform: view.transform }, ctx)!);
-  const m = 2;
-  if (bb.l < -m || bb.t < -m || bb.r > project.width + m || bb.b > project.height + m)
-    view = { transform: { ...item.transform, x: 0.5, y: 0.5, scale: 1, rotation: 0 }, fit: 'contain' };
-  player.setPreviewPatch({
-    itemId,
-    apply: (it) => ({
-      ...it,
-      crop: undefined,
-      mask: undefined,
-      maskBitmap: undefined,
-      fit: view.fit,
-      transform: view.transform,
-    }),
-  });
+  const srcT = raw.type === 'image' ? 0 : raw.trimIn + Math.max(at - raw.start, 0) * raw.speed;
+  const edit = raw.cropEdit;
+  const first: CropSnap = edit
+    ? { crop: { ...edit.crop }, mask: edit.mask, strokes: edit.strokes }
+    : { crop: raw.crop ? { ...raw.crop } : NO_CROP, mask: raw.mask ?? null, strokes: [] };
+  const url = !edit && raw.maskBitmap ? raw.maskBitmap : null;
   useCrop.setState({
     s: {
       itemId,
-      crop: item.crop ?? NO_CROP,
-      mask: item.mask ?? null,
-      paint: null,
+      ...first,
+      base: url ? (maskCanvasFor(url) ?? null) : null,
       brush: 0.04,
       reach: readReach(),
-      maskCanvas: null,
-      hasBitmap: !!item.maskBitmap,
-      dropBitmap: false,
-      maskVer: 0,
-      undo: [],
+      history: [],
+      redo: [],
+      checking: false,
+      initial: keyOf(first),
+      srcT: Math.min(srcT, Math.max(asset.duration - 0.05, 0)),
       // 版型的格子：預設鎖住格子的比例，拖動只是換「露出哪一塊」，畫面還是填滿格子
-      lock: item.cell ? (item.cell.w * project.width) / (item.cell.h * project.height) : null,
-      lasso: false,
-      view,
+      lock: raw.cell ? (raw.cell.w * project.width) / (raw.cell.h * project.height) : null,
+      tool: 'rect',
     },
   });
+  // 舊版的點陣圖遮罩還沒解好：解好之後補上
+  if (url && !maskCanvasFor(url))
+    void loadMask(url).then((c) => {
+      const cur = useCrop.getState().s;
+      if (c && cur && cur.itemId === itemId) updateCrop({ base: c });
+    });
   return true;
 }
 
 function close() {
-  useUI.getState().player?.setPreviewPatch(null);
   useCrop.setState({ s: null });
 }
 
@@ -120,44 +104,90 @@ export function cancelCrop() {
   if (useCrop.getState().s) close();
 }
 
-/** 完成：把裁切（和自由形狀）寫進專案，切完畫面不跳 */
+/** 一步操作完成：把「操作前」的內容放進復原紀錄（內容沒變就不放）；重做紀錄清空 */
+export function commitCrop(before: CropSnap, patch: Partial<CropSnap> = {}) {
+  const s = useCrop.getState().s;
+  if (!s) return;
+  const next = { ...s, ...patch };
+  if (keyOf(before) === keyOf(next)) return useCrop.setState({ s: next });
+  useCrop.setState({ s: { ...next, history: [...s.history.slice(-49), snapOf(before)], redo: [] } });
+}
+
+export function undoCrop() {
+  const s = useCrop.getState().s;
+  const prev = s?.history[s.history.length - 1];
+  if (!s || !prev) return;
+  useCrop.setState({
+    s: { ...s, ...snapOf(prev), history: s.history.slice(0, -1), redo: [...s.redo, snapOf(s)] },
+  });
+}
+
+export function redoCrop() {
+  const s = useCrop.getState().s;
+  const next = s?.redo[s.redo.length - 1];
+  if (!s || !next) return;
+  useCrop.setState({
+    s: { ...s, ...snapOf(next), redo: s.redo.slice(0, -1), history: [...s.history, snapOf(s)] },
+  });
+}
+
+/** 畫完一圈：保留區域自動框住多邊形 */
+export function setLassoMask(points: Pt[] | null) {
+  const s = useCrop.getState().s;
+  if (!s) return;
+  const before = snapOf(s);
+  if (!points) return commitCrop(before, { mask: null, crop: NO_CROP });
+  commitCrop(before, { mask: points, crop: polygonCrop(points) });
+  updateCrop({ lock: null });
+}
+
+/** 遮罩長邊的像素（太大手機吃不消，太小邊緣會糊） */
+export const MASK_SIDE = 1024;
+
+/** 套用：把裁切（形狀、筆畫）寫進專案，切完畫面不跳 */
 export function finishCrop() {
   const s = useCrop.getState().s;
   if (!s) return;
   const store = useProjectStore.getState();
   const project = store.project;
   const found = project && findItem(project, s.itemId);
-  close();
-  if (!project || !found || !isVideoItem(found.item)) return;
+  if (!project || !found || !isVideoItem(found.item)) return close();
   const tNow = useUI.getState().player?.time ?? 0;
   const item = withTime(found.item, tNow); // 有定格的物件：這個時間的位置、大小
   const asset = project.assets.find((a) => a.id === item.assetId);
-  if (!asset) return;
-  // 筆刷／橡皮擦畫過：遮罩的範圍就是留下來的範圍（crop 自動框住有東西的地方）
+  if (!asset) return close();
+  if (keyOf(s) === s.initial) return close(); // 沒改，不要多一筆復原紀錄
+
+  let crop = s.crop;
+  let mask = s.mask;
   let bitmap: string | null = null;
-  if (s.maskCanvas) {
-    const mc = s.maskCanvas;
-    const data = mc.getContext('2d')!.getImageData(0, 0, mc.width, mc.height);
-    const b = maskBounds(data.data, mc.width, mc.height);
+  const bitmapPath = s.strokes.length > 0 || !!s.base;
+  if (bitmapPath) {
+    // 有筆畫（或舊版的點陣圖遮罩）：畫成點陣圖，crop 自動框住有東西的地方
+    const k = MASK_SIDE / Math.max(asset.width, asset.height, 1);
+    const w = Math.max(Math.round(asset.width * k), 8);
+    const h = Math.max(Math.round(asset.height * k), 8);
+    const cv = document.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext('2d')!;
+    composeKeep(ctx, w, h, s.crop, s.mask, s.strokes, s.base);
+    const b = maskBounds(ctx.getImageData(0, 0, w, h).data, w, h);
     if (!b) return toast('整個畫面都被擦掉了，沒有套用');
-    s.crop = {
+    crop = {
       l: Math.min(b.l, 0.98),
       t: Math.min(b.t, 0.98),
       r: Math.min(b.r, 0.98),
       b: Math.min(b.b, 0.98),
     };
-    s.mask = null;
-    bitmap = mc.toDataURL('image/png');
+    mask = null;
+    bitmap = cv.toDataURL('image/png');
   }
-  const same = (a: Crop, b: Crop) =>
-    Math.abs(a.l - b.l) + Math.abs(a.t - b.t) + Math.abs(a.r - b.r) + Math.abs(a.b - b.b) < 1e-6;
-  const sameMask = JSON.stringify(item.mask ?? null) === JSON.stringify(s.mask);
-  const bitmapSame = !bitmap && !(s.dropBitmap && item.maskBitmap);
-  if (same(item.crop ?? NO_CROP, s.crop) && sameMask && bitmapSame) return; // 沒改，不要多一筆復原紀錄
+  close();
   store.apply((d) => {
     const f = findItem(d as never, s.itemId);
     if (!f || !isVideoItem(f.item)) return;
-    const res = cropKeepingPlace(item, asset, s.crop, project.width, project.height);
+    const res = cropKeepingPlace(item, asset, crop, project.width, project.height);
     const it = f.item;
     if (isNoCrop(res.crop)) delete it.crop;
     else it.crop = res.crop;
@@ -185,83 +215,22 @@ export function finishCrop() {
     if (bitmap) {
       it.maskBitmap = bitmap;
       delete it.mask;
+      it.cropEdit = {
+        crop: s.crop,
+        mask: s.mask,
+        strokes: s.strokes,
+      };
+      if (s.strokes.length === 0) delete it.cropEdit; // 只有舊版遮罩被再裁小：沒有向量筆畫可以存
     } else {
-      if (s.dropBitmap) delete it.maskBitmap;
-      if (s.mask && s.mask.length >= 3) it.mask = s.mask;
+      delete it.maskBitmap;
+      delete it.cropEdit;
+      if (mask && mask.length >= 3) it.mask = mask;
       else delete it.mask;
     }
   });
   useUI.getState().player?.refresh();
 }
 
-/** 畫完一圈：保留區域自動框住多邊形 */
-export function setLassoMask(points: Pt[] | null) {
-  // 重新圈選：筆刷畫的東西和原本的點陣圖遮罩都作廢
-  const reset = { maskCanvas: null, dropBitmap: true, undo: [] as ImageData[], paint: null } as const;
-  if (!points) return updateCrop({ mask: null, ...reset });
-  updateCrop({ mask: points, crop: polygonCrop(points), lock: null, ...reset });
-}
-
-/** 遮罩長邊的像素（太大手機吃不消，太小邊緣會糊） */
-export const MASK_SIDE = 1024;
-
-/** 筆刷／橡皮擦開始前先備好遮罩：原本的點陣圖遮罩 → 圈的多邊形 → 目前留下來的矩形（照這個順序） */
-export async function ensureMaskCanvas(): Promise<HTMLCanvasElement | null> {
-  const s0 = useCrop.getState().s;
-  if (!s0) return null;
-  if (s0.maskCanvas) return s0.maskCanvas;
-  const project = useProjectStore.getState().project;
-  const found = project && findItem(project, s0.itemId);
-  const item = found && isVideoItem(found.item) ? found.item : null;
-  const asset = item && project?.assets.find((a) => a.id === item.assetId);
-  if (!item || !asset) return null;
-  const k = MASK_SIDE / Math.max(asset.width, asset.height, 1);
-  const w = Math.max(Math.round(asset.width * k), 8);
-  const h = Math.max(Math.round(asset.height * k), 8);
-  const cv = document.createElement('canvas');
-  cv.width = w;
-  cv.height = h;
-  const ctx = cv.getContext('2d')!;
-  ctx.fillStyle = '#fff';
-  if (s0.hasBitmap && !s0.dropBitmap && item.maskBitmap) {
-    const src = await loadMask(item.maskBitmap);
-    if (src) ctx.drawImage(src, 0, 0, w, h);
-  } else if (s0.mask && s0.mask.length >= 3) {
-    ctx.beginPath();
-    s0.mask.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * h) : ctx.moveTo(x * w, y * h)));
-    ctx.closePath();
-    ctx.fill();
-  } else {
-    const c = s0.crop;
-    ctx.fillRect(c.l * w, c.t * h, (1 - c.l - c.r) * w, (1 - c.t - c.b) * h);
-  }
-  const s = useCrop.getState().s;
-  if (!s || s.itemId !== s0.itemId) return null;
-  if (s.maskCanvas) return s.maskCanvas; // 等的時候別處已經建好了
-  useCrop.setState({ s: { ...s, maskCanvas: cv, maskVer: s.maskVer + 1 } });
-  return cv;
-}
-
-/** 每一筆畫之前呼叫：存一份遮罩給「復原筆畫」（最多 12 步） */
-export function pushMaskUndo() {
-  const s = useCrop.getState().s;
-  const cv = s?.maskCanvas;
-  if (!s || !cv) return;
-  const snap = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height);
-  useCrop.setState({ s: { ...s, undo: [...s.undo.slice(-11), snap] } });
-}
-
-/** 復原上一筆 */
-export function undoMaskStroke() {
-  const s = useCrop.getState().s;
-  const cv = s?.maskCanvas;
-  const last = s?.undo[s.undo.length - 1];
-  if (!s || !cv || !last) return;
-  cv.getContext('2d')!.putImageData(last, 0, 0);
-  useCrop.setState({ s: { ...s, undo: s.undo.slice(0, -1), maskVer: s.maskVer + 1 } });
-}
-
-/** 在遮罩上畫一小段（from→to 是原始畫面的比例；r 是半徑，佔畫面寬的比例）：筆刷＝留下，橡皮擦＝去掉 */
 const REACH_KEY = 'vc-brush-reach';
 export const DEFAULT_REACH = 70;
 export const MAX_REACH = 150;
@@ -281,35 +250,4 @@ export function saveReach(v: number) {
   } catch {
     /* ignore */
   }
-}
-
-export function paintMask(from: Pt, to: Pt, tool: 'brush' | 'erase') {
-  const s = useCrop.getState().s;
-  const cv = s?.maskCanvas;
-  if (!s || !cv) return;
-  const ctx = cv.getContext('2d')!;
-  const w = cv.width;
-  const h = cv.height;
-  const r = (s.brush * w) / 2;
-  ctx.save();
-  ctx.globalCompositeOperation = tool === 'brush' ? 'source-over' : 'destination-out';
-  ctx.fillStyle = '#fff';
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = r * 2;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(from[0] * w, from[1] * h);
-  ctx.lineTo(to[0] * w, to[1] * h);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(to[0] * w, to[1] * h, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-/** 一筆畫完：讓預覽上的紅色提示重畫 */
-export function bumpMask() {
-  const s = useCrop.getState().s;
-  if (s) useCrop.setState({ s: { ...s, maskVer: s.maskVer + 1 } });
 }
