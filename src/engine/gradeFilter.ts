@@ -69,6 +69,8 @@ void main() {
 /** 調色濾鏡：每個圖層一個；沒有調色（全是 0）就不要掛 */
 export class GradeFilter extends Filter {
   private group: UniformGroup;
+  /** 上一次送出的值：沒變就不重傳（播放時每格都會呼叫） */
+  private last: number[] | null = null;
   constructor() {
     const uniforms: Record<string, { value: number; type: 'f32' }> = {};
     for (const k of ADJUST_KEYS) uniforms[uName(k)] = { value: 0, type: 'f32' };
@@ -83,7 +85,11 @@ export class GradeFilter extends Filter {
   /** 設定調色值（沒寫的項目是 0） */
   setAdjust(adj: Partial<Adjust>) {
     const a = fullAdjust(adj);
+    const vals = ADJUST_KEYS.map((k) => a[k]);
+    const last = this.last;
+    if (last && vals.every((v, i) => v === last[i])) return;
+    this.last = vals;
     const u = this.group.uniforms as Record<string, number>;
-    for (const k of ADJUST_KEYS) u[uName(k)] = a[k];
+    ADJUST_KEYS.forEach((k, i) => (u[uName(k)] = vals[i]!));
   }
 }

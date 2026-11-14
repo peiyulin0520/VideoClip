@@ -118,6 +118,13 @@ export type Keyframe = {
   rotation: number;
   opacity: number;
   adjust?: Partial<Adjust>;
+  /**
+   * 這個定位的色調組合：沒寫＝沿用物件本身的；null＝這個定位明確不用色調組合（原色）。
+   * 兩個定位之間用「實際調色值」（組合×強度＋手動）逐項內插，所以可以從原色漸漸變成黑白。
+   */
+  look?: LookRef | null;
+  /** 在這個定位的時間「原地動一下」（震／彈／晃／跳）；不是進場、離場或轉場 */
+  pulse?: { kind: 'shake' | 'pop' | 'wobble' | 'jump'; duration: number; strength: number };
 };
 
 /** 單一素材的特效：32 種轉場，字卡另外有「打字」 */

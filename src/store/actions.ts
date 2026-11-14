@@ -54,12 +54,16 @@ import {
 import { cellItem, inkFor, type LayoutText, type Rect } from '../engine/layouts';
 import { DEFAULT_EFFECT_DURATION, DEFAULT_TRANSITION_DURATION, seamsOf } from '../engine/transitions';
 import { groupPatch, transformAbout } from '../engine/groupTransform';
+import { DEFAULT_PULSE, type Pulse } from '../engine/pulse';
 import {
   hasKeyframes,
+  KEYFRAME_EPS,
   keyframeIndexAt,
+  keyframeNear,
   removeKeyframe,
   timeResolved,
   upsertKeyframe,
+  usesKeyframeLook,
   withTime,
 } from '../engine/keyframes';
 import { useProjectStore } from './projectStore';
@@ -167,6 +171,26 @@ function localTime(it: Item): number {
   return Math.min(Math.max(t - it.start, 0), it.duration);
 }
 
+/** 播放線碰到定位菱形的範圍（CSS px，菱形的一半寬） */
+const KF_HIT_PX = 8;
+
+/**
+ * 定位要改的時間（物件自己的秒）：播放線碰到某個定位的菱形 → 那個定位的時間；沒碰到 → 播放線的位置（會新增一個）。
+ */
+export function keyframeLocal(it: Item): number {
+  const local = localTime(it);
+  const pps = useUI.getState().timelinePps || 40;
+  const i = keyframeNear(it, local, KF_HIT_PX / pps);
+  return i >= 0 ? it.keyframes![i]!.t : local;
+}
+
+/** 色調分頁的「套用到」：沒有定位＝整段素材；有定位＝預設「這個定位」，使用者可以改成「整段素材」 */
+export function gradeScopeOf(target: Item): 'item' | 'key' {
+  if (!hasKeyframes(target)) return 'item';
+  const o = useUI.getState().gradeScope;
+  return o && o.id === target.id ? o.scope : 'key';
+}
+
 export function setTransform(id: string, patch: Partial<Transform>, coalesce = `tf:${id}`) {
   const p = store().project;
   const f = p && findItem(p, id);
@@ -185,7 +209,7 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
       editItem(
         frame.item.id,
         (it) => {
-          it.keyframes = upsertKeyframe(it, localTime(it), T1);
+          it.keyframes = upsertKeyframe(it, keyframeLocal(it), T1);
         },
         { coalesce },
       );
@@ -216,7 +240,8 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
     id,
     (it) => {
       // 有定位：改的是播放頭這個時間的定位（沒有就自動新增一個）；沒有定位：改物件本身
-      if (hasKeyframes(it as Item)) it.keyframes = upsertKeyframe(it as Item, localTime(it as Item), patch);
+      if (hasKeyframes(it as Item))
+        it.keyframes = upsertKeyframe(it as Item, keyframeLocal(it as Item), patch);
       else Object.assign(it.transform, patch);
     },
     { coalesce },
@@ -253,6 +278,51 @@ export function toggleKeyframe(id: string): 'added' | 'removed' | null {
   return idx >= 0 ? 'removed' : 'added';
 }
 
+/** 刪除播放線碰到的那個定位（沒碰到什麼都不做）。回傳有沒有刪 */
+export function deleteNearKeyframe(id: string): boolean {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target || !hasKeyframes(target)) return false;
+  const idx = keyframeNear(target, localTime(target), KF_HIT_PX / (useUI.getState().timelinePps || 40));
+  if (idx < 0) return false;
+  editItem(target.id, (it) => {
+    const next = removeKeyframe(it as Item, idx);
+    if (next.length) it.keyframes = next;
+    else delete it.keyframes;
+  });
+  return true;
+}
+
+/**
+ * 設定（或取消）播放線碰到的那個定位的小特效（震／彈／晃／跳）。回傳設定到的定位時間（物件自己的秒），沒碰到定位回傳 null。
+ * patch 只改指定的欄位（沒有小特效時用預設值補齊）；null＝取消。
+ */
+export function setKeyframePulse(
+  id: string,
+  patch: Partial<Pulse> | null,
+  coalesce?: string,
+  /** 指定第幾個定位（試播中播放線不在定位上時用）；沒給就用播放線碰到的 */
+  index?: number,
+): number | null {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target || !hasKeyframes(target)) return null;
+  const idx =
+    index ?? keyframeNear(target, localTime(target), KF_HIT_PX / (useUI.getState().timelinePps || 40));
+  if (idx < 0 || !target.keyframes![idx]) return null;
+  const at = target.keyframes![idx]!.t;
+  editItem(
+    target.id,
+    (it) => {
+      const k = it.keyframes![idx]!;
+      if (patch === null) delete k.pulse;
+      else k.pulse = { ...DEFAULT_PULSE, ...k.pulse, ...patch };
+    },
+    coalesce ? { coalesce } : undefined,
+  );
+  return at;
+}
+
 /** 清除全部定位：物件停在播放頭這個時間的樣子（畫面不跳）；一步復原 */
 export function clearKeyframes(id: string): void {
   const p = store().project;
@@ -264,6 +334,7 @@ export function clearKeyframes(id: string): void {
     it.transform = { ...now.transform };
     it.adjust = now.adjust ? { ...now.adjust } : undefined;
     if (!it.adjust) delete it.adjust;
+    if (usesKeyframeLook(target)) delete it.look; // 色調組合已經算進 adjust
     delete it.keyframes;
   });
 }
@@ -275,11 +346,11 @@ export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${
   const p = store().project;
   const target = p && keyframeTarget(p, id);
   if (!p || !target) return;
-  if (hasKeyframes(target)) {
+  if (hasKeyframes(target) && gradeScopeOf(target) === 'key') {
     editItem(
       target.id,
       (it) => {
-        it.keyframes = upsertKeyframe(it as Item, localTime(it as Item), { adjust: patch });
+        it.keyframes = upsertKeyframe(it as Item, keyframeLocal(it as Item), { adjust: patch });
       },
       { coalesce },
     );
@@ -316,6 +387,24 @@ function colorTargetIds(p: Project, id: string): string[] {
 export function setLook(id: string, lookId: LookRef['id'] | null, amount?: number, coalesce?: string): void {
   const p = store().project;
   if (!p) return;
+  const target = keyframeTarget(p, id);
+  if (target && hasKeyframes(target) && gradeScopeOf(target) === 'key') {
+    // 有定位：改的是播放線碰到（或這個時間新增）的定位；null＝這個定位明確用原色
+    editItem(
+      target.id,
+      (it) => {
+        const local = keyframeLocal(it as Item);
+        const cur = (it.keyframes ?? []).find((k) => Math.abs(k.t - local) <= KEYFRAME_EPS);
+        const prev = cur?.look === undefined ? it.look : cur.look;
+        const look: LookRef | null = lookId
+          ? { id: lookId, amount: amount ?? (prev?.id === lookId ? prev.amount : 1) }
+          : null;
+        it.keyframes = upsertKeyframe(it as Item, local, { look });
+      },
+      coalesce ? { coalesce } : undefined,
+    );
+    return;
+  }
   const ids = new Set(colorTargetIds(p, id));
   store().apply(
     (d) => {
@@ -341,9 +430,30 @@ export function resetGrade(id: string): void {
         if (!ids.has(it.id)) continue;
         delete it.look;
         delete it.adjust;
-        for (const k of it.keyframes ?? []) delete k.adjust;
+        for (const k of it.keyframes ?? []) {
+          delete k.adjust;
+          delete k.look;
+        }
       }
   });
+}
+
+/** 清掉定位上的調色（色調組合、手動調整），位置大小不動；從「這個定位」改成「整段素材」時用；一步復原 */
+export function clearKeyframeGrade(id: string): void {
+  const p = store().project;
+  const target = p && keyframeTarget(p, id);
+  if (!p || !target) return;
+  editItem(target.id, (it) => {
+    for (const k of it.keyframes ?? []) {
+      delete k.adjust;
+      delete k.look;
+    }
+  });
+}
+
+/** 定位上有沒有調色（色調組合或手動調整） */
+export function keyframeHasGrade(it: Item): boolean {
+  return !!it.keyframes?.some((k) => k.look !== undefined || (k.adjust && Object.keys(k.adjust).length > 0));
 }
 
 /** 把這個素材的調色（色調組合＋手動調整）套用到「同一類」的所有素材：字卡→所有字卡；影像、貼圖→所有影片、照片、貼圖。回傳套用了幾個 */

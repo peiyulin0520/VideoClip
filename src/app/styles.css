@@ -3153,10 +3153,46 @@ button {
 }
 .kf-dot.here {
   background: #fff;
-  border-color: #f5a623;
+  border: 2px solid #f5a623;
+  transform: translateX(-50%) rotate(45deg) scale(0.95);
+  z-index: 9;
+}
+.kf-pulse {
+  position: absolute;
+  z-index: 8;
+  bottom: 14px;
+  transform: translateX(-50%);
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 15px;
+  pointer-events: none;
+  /* 沒選到：淺底深字 */
+  background: #f3e9d2;
+  color: #5a3b1a;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.kf-pulse.here {
+  /* 選到：深底淺字 */
+  background: #1e3b2f;
+  color: #f3e9d2;
+}
+.kf-dot.graded::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #1e3b2f;
 }
 
 /* 調色面板 */
+.color-panel .grade-scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 13px;
+}
 .color-panel .look-row {
   display: flex;
   gap: 8px;
@@ -3195,6 +3231,24 @@ button {
   white-space: nowrap;
   padding: 0 8px;
   font-size: 13px;
+}
+
+.peek-tag {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 8;
+}
+.playbar .pb-btn {
+  min-width: 46px;
+  padding: 0 4px;
 }
 
 /* ---- 播放列：播放鍵只有圖示；其他按鈕圖示在上、中文在下 ---- */

@@ -1,12 +1,22 @@
 import { Palette } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ADJUST_KEYS, ADJUST_LABELS, fullAdjust, gradeRGB, LOOKS, type LookDef } from '../../engine/grade';
-import { hasKeyframes, timeResolved } from '../../engine/keyframes';
+import { hasKeyframes, keyframeNear, manualAdjustAt } from '../../engine/keyframes';
 import { thumbOf } from '../../engine/labels';
 import type { Item, Project } from '../../model/types';
-import { applyGradeToAll, keyframeTarget, resetGrade, setAdjust, setLook } from '../../store/actions';
+import {
+  applyGradeToAll,
+  clearKeyframeGrade,
+  gradeScopeOf,
+  keyframeHasGrade,
+  keyframeTarget,
+  resetGrade,
+  setAdjust,
+  setLook,
+} from '../../store/actions';
 import { toast, useUI } from '../../store/uiStore';
 import { Slider } from '../../ui/Slider';
+import { usePlayheadTime } from './usePlayheadTime';
 
 // 調色面板：上面是色調組合卡片（用這個素材自己的畫面示範），下面是 11 條調整滑桿。
 // 有定位（關鍵影格）時，滑桿改的是播放頭這個時間的定位（兩個定位之間漸變）；沒有定位改物件本身。
@@ -123,28 +133,35 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
     };
   }, [url]);
 
-  // 這個時間的樣子（有定位的滑桿顯示播放頭那一刻的值）
-  const t = player?.time ?? 0;
-  const now = useMemo(
-    () =>
-      timeResolved(project, t)
-        .tracks.flatMap((tr) => tr.items)
-        .find((x) => x.id === item.id) ?? item,
-    [project, t, item],
-  );
-  const adj = fullAdjust(now.adjust);
+  // 播放頭的時間：播放中最多每 0.5 秒更新一次，不讓面板拖慢預覽
+  const t = usePlayheadTime(player, 2);
+  const pps = useUI((s) => s.timelinePps);
+  useUI((s) => s.gradeScope); // 使用者改了「套用到」要重畫
   const target = keyframeTarget(project, item.id);
-  const kf = !!target && hasKeyframes(target);
-  const ids = useMemo(() => {
-    // 按住看原圖：版型整組一起
-    const g = item.type !== 'audio' ? item.group : undefined;
-    if (!g) return [item.id];
-    return project.tracks
-      .flatMap((tr) => tr.items)
-      .filter((x) => x.type !== 'audio' && x.group === g)
-      .map((x) => x.id);
-  }, [project, item]);
-  useEffect(() => () => player?.setGradeBypass(null), [player]);
+  const hasKf = !!target && hasKeyframes(target);
+  const scope = target ? gradeScopeOf(target) : 'item';
+  const keyMode = hasKf && scope === 'key';
+  // 播放線碰到的定位（沒有＝在兩個定位中間或定位之外）
+  const kfIdx = keyMode ? keyframeNear(target!, t - target!.start, 8 / pps) : -1;
+  const kfNow = kfIdx >= 0 ? target!.keyframes![kfIdx]! : null;
+  // 目前顯示的色調組合：整段素材＝物件本身的；定位＝播放線碰到的定位的（沒寫就沿用物件的；null＝原色）
+  const shownLook = !keyMode
+    ? item.look
+    : kfNow
+      ? kfNow.look === undefined
+        ? target!.look
+        : kfNow.look
+      : null;
+  const between = keyMode && !kfNow;
+  const adj = fullAdjust(keyMode ? manualAdjustAt(target!, t) : item.adjust);
+  const chooseScope = (next: 'item' | 'key') => {
+    if (!target) return;
+    if (next === 'item' && keyframeHasGrade(target)) {
+      clearKeyframeGrade(item.id);
+      toast('已清掉各定位上的色調，改成整段素材同一個色調（可以按復原）', 3500);
+    }
+    useUI.setState({ gradeScope: { id: target.id, scope: next } });
+  };
 
   return (
     <div className="color-panel" data-testid="color-panel">
@@ -153,30 +170,66 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
           <Palette size={16} /> 色調
         </span>
       </div>
+      {hasKf && (
+        <div className="grade-scope" role="radiogroup" aria-label="套用到">
+          <span>套用到</span>
+          <button
+            role="radio"
+            aria-checked={scope === 'item'}
+            className={`chip${scope === 'item' ? ' active' : ''}`}
+            data-testid="scope-item"
+            onClick={() => chooseScope('item')}
+          >
+            整段素材
+          </button>
+          <button
+            role="radio"
+            aria-checked={scope === 'key'}
+            className={`chip${scope === 'key' ? ' active' : ''}`}
+            data-testid="scope-key"
+            onClick={() => chooseScope('key')}
+          >
+            這個定位（漸變）
+          </button>
+        </div>
+      )}
+      {keyMode && (
+        <p className="hint" data-testid="scope-hint">
+          {between
+            ? '播放線沒有碰到任何定位：選一個色調會在這裡新增一個定位。'
+            : '改的是播放線碰到的這個定位，兩個定位之間的色調會漸漸變過去。'}
+        </p>
+      )}
       <div className="look-row" role="radiogroup" aria-label="色調組合">
-        <LookCard look={null} src={src} active={!item.look} onPick={() => setLook(item.id, null)} />
+        <LookCard
+          look={null}
+          src={src}
+          active={!between && !shownLook}
+          onPick={() => setLook(item.id, null)}
+        />
         {LOOKS.map((l) => (
           <LookCard
             key={l.id}
             look={l}
             src={src}
-            active={item.look?.id === l.id}
+            active={!between && shownLook?.id === l.id}
             onPick={() => setLook(item.id, l.id)}
           />
         ))}
       </div>
-      {item.look && (
+      {shownLook && !between && (
         <Slider
           label="強度"
-          value={Math.round(item.look.amount * 100)}
+          value={Math.round(shownLook.amount * 100)}
           min={0}
           max={100}
           step={1}
           format={(v) => `${v}%`}
-          onChange={(v) => setLook(item.id, item.look!.id, v / 100, `look:${item.id}`)}
+          onChange={(v) => setLook(item.id, shownLook.id, v / 100, `look:${item.id}`)}
         />
       )}
-      <div className="slider-label">調整{kf ? '（定位：改的是播放頭這個時間）' : ''}</div>
+      <p className="hint">在播放列按 👁 可以切換看原色／色調。</p>
+      <div className="slider-label">調整{keyMode ? '（定位：改的是播放線碰到的定位）' : ''}</div>
       {ADJUST_KEYS.map((k) => (
         <Slider
           key={k}
@@ -190,19 +243,6 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
         />
       ))}
       <div className="chips">
-        <button
-          className="btn"
-          data-testid="grade-peek"
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            player?.setGradeBypass(ids);
-          }}
-          onPointerUp={() => player?.setGradeBypass(null)}
-          onPointerCancel={() => player?.setGradeBypass(null)}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          按住看原圖
-        </button>
         <button className="btn" data-testid="grade-reset" onClick={() => resetGrade(item.id)}>
           全部歸零
         </button>

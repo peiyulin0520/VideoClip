@@ -41,7 +41,8 @@ export function KeyframeButton() {
         if (!selectedId) return;
         player?.pause();
         const r = toggleKeyframe(selectedId);
-        if (r === 'added') toast('已新增定位。換個時間再拖或縮放，就會自動多一個定位', 3500);
+        if (r === 'added')
+          toast('已新增定位。換個時間再拖或縮放會自動多一個；播放線碰到菱形時，只會改那一個', 3500);
       }}
     />
   );

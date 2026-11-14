@@ -192,3 +192,111 @@ describe('withTime／timeResolved', () => {
     expect(r.tracks[0]!.items[1]!.transform.x).toBeCloseTo(0.6);
   });
 });
+
+describe('定位上的色調組合（色調漂移）', () => {
+  const kf = (
+    t: number,
+    extra: Partial<VideoItem['keyframes'] extends (infer K)[] | undefined ? K : never> = {},
+  ) => ({
+    t,
+    ...base,
+    ...extra,
+  });
+  const drift = clip({
+    keyframes: [kf(0), kf(4, { look: { id: 'bw', amount: 1 } })],
+  });
+
+  it('第一個定位原色、第二個「黑白」：中間飽和度走到一半', () => {
+    expect(adjustAt(drift, 10)).toBeUndefined(); // 第一個定位：原色
+    const mid = adjustAt(drift, 12)!; // 中間
+    const end = adjustAt(drift, 14)!;
+    expect(end.saturation).toBeCloseTo(-1, 3);
+    expect(mid.saturation).toBeCloseTo(end.saturation / 2, 3);
+    expect(mid.contrast).toBeCloseTo(end.contrast / 2, 3);
+    expect(adjustAt(drift, 20)!.saturation).toBeCloseTo(-1, 3); // 最後一個定位之後維持
+  });
+
+  it('兩個定位的色調組合不同（復古→冷色調）：中間色溫＝兩邊實際值的平均', () => {
+    const it2 = clip({
+      keyframes: [kf(0, { look: { id: 'vintage', amount: 1 } }), kf(4, { look: { id: 'cool', amount: 1 } })],
+    });
+    const a = adjustAt(it2, 10)!;
+    const b = adjustAt(it2, 14)!;
+    const m = adjustAt(it2, 12)!;
+    expect(m.temperature).toBeCloseTo((a.temperature + b.temperature) / 2, 3);
+  });
+
+  it('強度 50% 只算一半；null＝這個定位明確用原色（不吃物件本身的色調組合）', () => {
+    const half = clip({ keyframes: [kf(0), kf(4, { look: { id: 'bw', amount: 0.5 } })] });
+    expect(adjustAt(half, 14)!.saturation).toBeCloseTo(-0.5, 3);
+    const own = clip({
+      look: { id: 'bw', amount: 1 },
+      keyframes: [kf(0, { look: null }), kf(4)], // 第一個原色、第二個沿用物件的黑白
+    });
+    expect(adjustAt(own, 10)).toBeUndefined();
+    expect(adjustAt(own, 14)!.saturation).toBeCloseTo(-1, 3);
+  });
+
+  it('沒有定位指定色調組合：維持舊算法（手動調整內插，物件本身的色調組合不在這裡算）', () => {
+    const it2 = clip({
+      look: { id: 'bw', amount: 1 },
+      keyframes: [kf(0), kf(4, { adjust: { exposure: 0.4 } })],
+    });
+    expect(adjustAt(it2, 12)!.exposure).toBeCloseTo(0.2, 3);
+    expect(adjustAt(it2, 12)!.saturation).toBe(0);
+    expect(withTime(it2, 12).look).toEqual({ id: 'bw', amount: 1 });
+  });
+
+  it('withTime：有定位指定色調組合時，色調組合算進 adjust、look 清掉（不會被加兩次）', () => {
+    const it2 = withTime(drift, 14);
+    expect(it2.look).toBeUndefined();
+    expect(it2.adjust!.saturation).toBeCloseTo(-1, 3);
+  });
+
+  it('upsertKeyframe：更新既有定位的 look；插在兩個色調定位中間＝存這一刻的實際調色值、look＝null', () => {
+    const set = upsertKeyframe(drift, 4, { look: { id: 'warm', amount: 1 } });
+    expect(set[1]!.look!.id).toBe('warm');
+    expect(set).toHaveLength(2);
+    const mid = upsertKeyframe(drift, 2, {});
+    expect(mid).toHaveLength(3);
+    expect(mid[1]!.look).toBeNull();
+    expect(mid[1]!.adjust!.saturation).toBeCloseTo(-0.5, 3);
+    // 插進去之後整條漸變不變
+    const after = { ...drift, keyframes: mid };
+    expect(adjustAt(after, 12)!.saturation).toBeCloseTo(adjustAt(drift, 12)!.saturation, 3);
+    expect(adjustAt(after, 13)!.saturation).toBeCloseTo(adjustAt(drift, 13)!.saturation, 3);
+  });
+
+  it('splitKeyframes：切點補的定位存實際調色值，前後兩段在切點的色調一樣', () => {
+    const { a, b } = splitKeyframes(drift, 2);
+    expect(a!.at(-1)!.look).toBeNull();
+    expect(a!.at(-1)!.adjust!.saturation).toBeCloseTo(-0.5, 3);
+    expect(b![0]!.adjust!.saturation).toBeCloseTo(-0.5, 3);
+  });
+
+  it('版型：外框的色調定位讓各格一起漸變（各格 look 清掉、adjust＝外框當時的值）', () => {
+    const frame = clip({
+      id: 'f',
+      group: 'g1',
+      keyframes: [kf(0), kf(4, { look: { id: 'bw', amount: 1 } })],
+    } as Partial<VideoItem>);
+    const cell = clip({
+      id: 'c',
+      group: 'g1',
+      cell: { x: 0, y: 0, w: 1, h: 1 },
+      look: { id: 'bw', amount: 1 },
+    } as Partial<VideoItem>);
+    const p = {
+      width: 1080,
+      height: 1920,
+      tracks: [
+        { id: 't1', items: [frame], groupRole: 'frame' },
+        { id: 't2', items: [cell], groupRole: 'cell' },
+      ],
+    } as unknown as Project;
+    const out = timeResolved(p, 12);
+    const rc = out.tracks[1]!.items[0] as VideoItem;
+    expect(rc.look).toBeUndefined();
+    expect(rc.adjust!.saturation).toBeCloseTo(-0.5, 3);
+  });
+});

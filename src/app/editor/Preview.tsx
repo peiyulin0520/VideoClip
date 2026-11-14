@@ -83,6 +83,7 @@ export function Preview({
   const player = useUI((s) => s.player);
   const cropping = useCrop((s) => !!s.s);
   const previewFull = useUI((s) => s.previewFull);
+  const gradePeek = useUI((s) => s.gradePeek);
   // 預覽畫質：自動／清楚／流暢（設定頁可改）；自動時同時 3 支以上影片、或偵測到播放太慢就用流暢
   const quality = useQuality((s) => s.q);
   const [slow, setSlow] = useState(false);
@@ -157,11 +158,17 @@ export function Preview({
   // 選取的物件目前在不在畫面上（不在就不顯示選取框）
   useEffect(() => {
     if (!player) return;
-    const check = (t: number) => {
+    let lastKf = 0;
+    const check = (t: number, playing?: boolean) => {
       const p = useProjectStore.getState().project;
       const id = useProjectStore.getState().selectedId;
       const f = p && findItem(p, id);
-      setKfTime(p && p.tracks.some((tr) => tr.items.some(hasKeyframes)) ? t : 0);
+      // 播放中，有定位時選取框最多每秒更新約 15 次（每一格都重畫會拖慢預覽）
+      const now = performance.now();
+      if (!playing || now - lastKf >= 66) {
+        lastKf = now;
+        setKfTime(p && p.tracks.some((tr) => tr.items.some(hasKeyframes)) ? t : 0);
+      }
       setSelVisible(!!f && t >= f.item.start && t < f.item.start + f.item.duration);
       // 字串相同 React 不會重畫，播放時不會每一格都重畫
       setHitIds(
@@ -404,6 +411,11 @@ export function Preview({
         />
         <div ref={poolRef} className="pool" aria-hidden="true" />
         <PerfOverlay player={player} />
+        {gradePeek && (
+          <div className="peek-tag" data-testid="peek-tag" aria-hidden="true">
+            原色預覽中
+          </div>
+        )}
 
         {(safe || dragging) && (
           <div className="safe" aria-hidden="true" data-testid="safe-zone">

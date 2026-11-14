@@ -167,3 +167,42 @@ test('版型可以選「不附版型文字」', async ({ page }) => {
   await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
   expect((await allItems(page)).filter((i) => i.type === 'text')).toHaveLength(0);
 });
+
+test('播放列：播放鍵與時間在最左；定位、色調(👁)、縮小、放大靠在最右、彼此間距 ≤ 8px', async ({ page }) => {
+  test.setTimeout(90_000);
+  await createProjectWith(page, ['solid-red.webm']);
+  const box = async (loc: ReturnType<typeof page.getByRole>) => (await loc.boundingBox())!;
+  const play = await box(page.getByRole('button', { name: '播放', exact: true }));
+  const kf = await box(page.getByTestId('kf-btn'));
+  const peek = await box(page.getByTestId('grade-peek'));
+  const out = await box(page.getByRole('button', { name: '縮小時間軸' }));
+  const inn = await box(page.getByRole('button', { name: '放大時間軸' }));
+  expect(play.x).toBeLessThan(20);
+  expect(kf.x).toBeGreaterThan(play.x + 100);
+  for (const [a, b] of [
+    [kf, peek],
+    [peek, out],
+    [out, inn],
+  ] as const) {
+    expect(b.x - (a.x + a.width)).toBeLessThanOrEqual(8);
+    expect(b.x - (a.x + a.width)).toBeGreaterThanOrEqual(0);
+  }
+  const vw = page.viewportSize()!.width;
+  expect(vw - (inn.x + inn.width)).toBeLessThanOrEqual(12);
+});
+
+test('👁 看原色：沒調色時按鈕不能用；調色後按一下變原色（紅）、再按回灰；匯出時自動關', async ({ page }) => {
+  test.setTimeout(90_000);
+  await createProjectWith(page, ['solid-red.webm']);
+  await clips(page).first().tap();
+  await openTab(page, '色調');
+  const peek = page.getByTestId('grade-peek');
+  await peek.tap();
+  await expect(peek).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('radio', { name: '色調 黑白' }).tap();
+  await peek.tap();
+  await expect(peek).toHaveAttribute('aria-pressed', 'true');
+  await expect(peek).toContainText('原色');
+  await page.getByRole('button', { name: '匯出影片' }).tap();
+  await expect(peek).toHaveAttribute('aria-pressed', 'false');
+});
