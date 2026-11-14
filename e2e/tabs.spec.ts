@@ -44,7 +44,7 @@ test('剪輯分頁只留跟剪輯影片有關的（含刪除並補齊）；沒�
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  for (const n of ['匯入', '分割', '刪除', '刪除並補齊', '複製', '修剪', '裁切', '變速', '音量'])
+  for (const n of ['匯入', '分割', '刪除', '刪除並補齊', '複製', '片段範圍', '裁切', '變速', '音量'])
     await expect(page.getByRole('button', { name: n, exact: true })).toBeVisible();
   for (const n of ['前移', '後移', '全部影片靜音', '移除版型'])
     await expect(page.getByRole('button', { name: n })).toHaveCount(0);

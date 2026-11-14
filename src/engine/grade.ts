@@ -145,7 +145,7 @@ export const LOOKS: LookDef[] = [
   { id: 'bw', name: '黑白', adjust: { contrast: 0.15, saturation: -1 } },
   {
     id: 'bwHigh',
-    name: '高反差黑白',
+    name: '高反差',
     adjust: { contrast: 0.45, highlights: 0.1, shadows: -0.15, blacks: -0.3, saturation: -1 },
   },
   {
@@ -178,17 +178,17 @@ export const LOOKS: LookDef[] = [
   },
   {
     id: 'cool',
-    name: '冷色調',
+    name: '冷調',
     adjust: { contrast: 0.1, saturation: -0.1, temperature: -0.45, tint: -0.05 },
   },
   {
     id: 'warm',
-    name: '暖色調',
+    name: '暖調',
     adjust: { exposure: 0.05, shadows: 0.05, vibrance: 0.15, temperature: 0.4, tint: 0.05 },
   },
   {
     id: 'cinema',
-    name: '電影感',
+    name: '電影',
     adjust: { contrast: 0.25, highlights: -0.3, blacks: -0.15, saturation: -0.15, temperature: 0.05 },
   },
   {

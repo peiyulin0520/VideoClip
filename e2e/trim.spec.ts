@@ -82,7 +82,7 @@ test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖�
 }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '修剪' }).tap();
+  await page.getByRole('button', { name: '片段範圍' }).tap();
   const info = page.getByTestId('trim-info');
   await expect(info).toContainText('來源 0.00 秒 → 2.00 秒');
   await expect(info).toContainText('選取 2.0 秒');
@@ -103,7 +103,7 @@ test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖�
   expect((await main(page))[0]!.duration).toBeCloseTo(2, 2);
 
   // 再開一次，拖完按套用
-  await page.getByRole('button', { name: '修剪' }).tap();
+  await page.getByRole('button', { name: '片段範圍' }).tap();
   await page.waitForTimeout(500);
   await drag(page, 'range-flag-start-0', strip.width / 4);
   await drag(page, 'range-flag-end-0', -strip.width / 4);
@@ -124,7 +124,7 @@ test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖�
 test('照片沒有修剪面板（提示用時間軸把手）；疊加影片的修剪面板不會壓到後面的物件', async ({ page }) => {
   await createProjectWith(page, ['photo.png']);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '修剪' }).tap();
+  await page.getByRole('button', { name: '片段範圍' }).tap();
   await expect(page.getByTestId('trim-strip')).toHaveCount(0);
   await expect(page.locator('.toast').filter({ hasText: '照片沒有素材區段' })).toBeVisible();
 });

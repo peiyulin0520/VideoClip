@@ -114,7 +114,7 @@ export function EditTab({
       <ToolButton icon={ArrowLeftToLine} label="刪除並補齊" onClick={removeAndClose} />
       <ToolButton icon={Copy} label="複製" onClick={() => need() && duplicateAny(selected!.id)} />
       <ToolButton icon={Pencil} label="命名" onClick={() => need() && setNaming(true)} />
-      <ToolButton icon={MoveHorizontal} label="修剪" onClick={() => openPanel('trim')} />
+      <ToolButton icon={MoveHorizontal} label="片段範圍" onClick={() => openPanel('trim')} />
       <ToolButton
         icon={CropIcon}
         label="裁切"

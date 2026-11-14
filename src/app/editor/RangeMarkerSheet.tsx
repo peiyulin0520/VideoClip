@@ -1,4 +1,4 @@
-import { Undo2 } from 'lucide-react';
+import { Pause, Play, Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type { Range } from '../../engine/timeline';
 import { toast } from '../../store/uiStore';
@@ -237,15 +237,6 @@ export function RangeMarkerSheet({
 
   return (
     <Sheet open title={title} onClose={onClose} tall>
-      <button
-        className="rm-undo"
-        aria-label="復原上一步"
-        data-testid="rm-undo"
-        disabled={undoCount === 0}
-        onClick={doUndo}
-      >
-        <Undo2 size={22} />
-      </button>
       {extra}
       <div className="rm-preview" data-testid="rm-preview">
         {mediaKind === 'video' && mediaUrl && (
@@ -277,12 +268,30 @@ export function RangeMarkerSheet({
       </div>
       <div className="rm-play-row">
         {mediaKind !== 'none' && (
-          <button className="btn" data-testid="rm-play" onClick={togglePlay}>
-            {playing ? '⏸ 暫停' : '▶ 播放'}
+          <button
+            className="rm-icon-btn"
+            data-testid="rm-play"
+            aria-label={playing ? '暫停' : '播放'}
+            onClick={togglePlay}
+          >
+            {playing ? (
+              <Pause size={20} fill="currentColor" aria-hidden="true" />
+            ) : (
+              <Play size={20} fill="currentColor" aria-hidden="true" />
+            )}
           </button>
         )}
+        <button
+          className="rm-icon-btn"
+          aria-label="復原上一步"
+          data-testid="rm-undo"
+          disabled={undoCount === 0}
+          onClick={doUndo}
+        >
+          <Undo2 size={20} aria-hidden="true" />
+        </button>
         <span className="rm-now" data-testid="rm-now">
-          目前白線：{fmt2(cursor)} 秒
+          目前 {fmt2(cursor)} 秒
         </span>
       </div>
       <div className="rm-ruler" aria-hidden="true">

@@ -1,5 +1,10 @@
 :root {
   color-scheme: dark;
+  /* 字級：全站只有這三個（跟著螢幕寬等比縮小，390 寬＝14px） */
+  --fs-body: clamp(12px, 3.59vw, 14px);
+  --fs-note: calc(var(--fs-body) * 0.86);
+  --fs-pb: calc(var(--fs-body) * 0.79);
+  --radius-ctl: 12px;
   --bg: #111;
   --fg: #f4f4f4;
   --muted: #9a9a9a;
@@ -208,8 +213,9 @@ button {
 }
 .btn {
   min-height: 48px;
-  padding: 0 18px;
-  font-size: 16px;
+  padding: 0 max(8px, 1.1em);
+  white-space: nowrap;
+  font-size: var(--fs-body);
   flex: 1;
 }
 .btn.primary {
@@ -226,14 +232,15 @@ button {
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: max(6px, 0.55em);
   margin: 8px 0;
 }
 .chip {
   min-height: 44px;
-  padding: 0 16px;
-  border-radius: 22px;
-  font-size: 15px;
+  padding: 0 max(8px, 1.1em);
+  white-space: nowrap;
+  border-radius: var(--radius-ctl);
+  font-size: var(--fs-body);
 }
 .chip.active {
   background: var(--accent);
@@ -243,7 +250,7 @@ button {
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
-  font-size: 16px;
+  font-size: var(--fs-body);
   color: var(--fg);
   background: var(--field);
   border: 1px solid var(--border);
@@ -265,7 +272,7 @@ button {
 }
 .sheet-title {
   margin-bottom: 8px;
-  font-size: 17px;
+  font-size: var(--fs-body);
   font-weight: 600;
 }
 .sheet-msg {
@@ -284,7 +291,7 @@ button {
   min-height: 52px;
   padding: 0 8px;
   justify-content: flex-start;
-  font-size: 17px;
+  font-size: var(--fs-body);
   background: transparent;
   border-radius: 8px;
 }
@@ -303,7 +310,7 @@ button {
 .toast {
   max-width: 100%;
   padding: 10px 16px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1.4;
   background: var(--panel);
   border: 1px solid var(--border);
@@ -344,7 +351,7 @@ button {
   gap: 8px;
   padding: 10px 12px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.5;
   background: var(--note-bg);
   border-radius: 12px;
@@ -382,7 +389,7 @@ button {
   right: 8px;
   bottom: 8px;
   padding: 2px 8px;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: #fff;
   background: rgba(0, 0, 0, 0.6);
   border-radius: 8px;
@@ -390,12 +397,12 @@ button {
 .card-name {
   margin-top: 6px;
   overflow: hidden;
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .card-sub {
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .card-menu {
@@ -511,7 +518,7 @@ button {
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.85);
-  font-size: 11px;
+  font-size: var(--fs-note);
   line-height: 1.2;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   overflow: hidden;
@@ -594,7 +601,7 @@ button {
   align-items: center;
   gap: 4px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   position: absolute;
   right: 6px;
   bottom: 6px;
@@ -615,7 +622,7 @@ button {
   font-size: 17px;
   color: #fff;
   background: var(--accent);
-  border-radius: 26px;
+  border-radius: var(--radius-ctl);
   transform: translate(-50%, -50%);
 }
 .playbar {
@@ -798,9 +805,11 @@ button {
   flex: none;
   flex-direction: column;
   gap: 2px;
-  min-width: 62px;
+  min-width: 4.6em;
+  padding: 0 max(6px, 0.4em);
+  white-space: nowrap;
   height: 56px;
-  font-size: 11px;
+  font-size: var(--fs-body);
   background: transparent;
 }
 .tool.active {
@@ -813,7 +822,7 @@ button {
 .panel-head {
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
+  font-size: var(--fs-body);
 }
 .panel input[type='range'] {
   width: 100%;
@@ -883,10 +892,11 @@ button {
   display: none;
 }
 .tab {
-  flex: 1 0 52px;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 44px;
-  padding: 0 4px;
-  font-size: 14px;
+  padding: 0 0.2em;
+  font-size: var(--fs-body);
   white-space: nowrap;
   color: var(--muted);
   background: transparent;
@@ -901,7 +911,7 @@ button {
 }
 .hint {
   margin: 6px 0;
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.5;
   color: var(--muted);
 }
@@ -924,7 +934,7 @@ button {
 }
 .slider-label {
   min-width: 56px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .slider-row input[type='range'] {
@@ -934,7 +944,7 @@ button {
 }
 .slider-val {
   min-width: 44px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   text-align: right;
 }
 .swatch {
@@ -969,7 +979,7 @@ button {
   gap: 8px;
   justify-content: flex-start;
   min-width: 0;
-  font-size: 14px;
+  font-size: var(--fs-body);
   background: transparent;
 }
 .layer-text {
@@ -1036,7 +1046,7 @@ button {
 .btn.sm {
   min-height: 44px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   gap: 4px;
   flex: none;
 }
@@ -1055,14 +1065,14 @@ button {
   align-items: flex-start;
   gap: 4px;
   padding: 14px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-align: left;
   background: var(--panel);
   border: 2px solid transparent;
   border-radius: 14px;
 }
 .radio-card span {
-  font-size: 13px;
+  font-size: var(--fs-body);
   line-height: 1.5;
   color: var(--muted);
 }
@@ -1074,7 +1084,7 @@ button {
   flex-direction: column;
   gap: 6px;
   margin: 6px 0;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .ok {
@@ -1105,11 +1115,11 @@ button {
 .pack-name {
   display: flex;
   flex-direction: column;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .pack-name small,
 .pack-head small {
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .progress {
@@ -1145,12 +1155,12 @@ button {
   min-height: 44px;
   padding: 0;
   margin-top: 8px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
   background: transparent;
 }
 .licenses {
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.5;
 }
 .licenses small {
@@ -1173,7 +1183,7 @@ button {
   justify-content: space-between;
   gap: 8px;
   padding: 0 12px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   background: var(--field);
   border: 1px solid var(--border);
 }
@@ -1193,7 +1203,7 @@ button {
   top: 0;
   z-index: 1;
   padding: 8px 4px 4px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--muted);
   background: var(--panel);
 }
@@ -1217,7 +1227,7 @@ button {
   justify-content: flex-start;
   gap: 8px;
   margin-top: 8px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .font-prev {
@@ -1241,7 +1251,7 @@ button {
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  font-size: 11px;
+  font-size: var(--fs-note);
   white-space: nowrap;
 }
 .font-tags em {
@@ -1263,7 +1273,7 @@ button {
   gap: 8px;
   padding: 10px 12px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.5;
   background: var(--info-bg);
   border-radius: 12px;
@@ -1276,7 +1286,7 @@ button {
 .ratio-btn {
   min-width: 56px;
   padding: 0 10px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1292,7 +1302,7 @@ button {
 .chip.sm {
   min-height: 36px;
   padding: 0 12px;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .chip.sm.add {
   color: #fff;
@@ -1306,7 +1316,7 @@ button {
 .panel.text-panel .chip {
   min-height: 38px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: var(--fs-body);
 }
 .panel.text-panel .swatch {
   flex: none;
@@ -1337,7 +1347,7 @@ button {
   align-items: center;
   gap: 2px;
   padding: 6px 4px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   background: #f4f1ec;
   color: #333;
   border: 2px solid transparent;
@@ -1368,7 +1378,7 @@ button {
   gap: 2px;
   min-height: 64px;
   padding: 4px 2px;
-  font-size: 11px;
+  font-size: var(--fs-body);
   background: var(--btn2);
   border: 2px solid transparent;
   border-radius: 10px;
@@ -1405,7 +1415,7 @@ button {
 .color-tag {
   display: block;
   margin: 2px 0 0;
-  font-size: 11px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .color-row {
@@ -1504,7 +1514,7 @@ button {
   display: flex;
   align-items: flex-end;
   padding: 4px 8px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   border: 1px solid var(--border);
   border-radius: 10px;
 }
@@ -1517,7 +1527,7 @@ button {
 .cp-hex {
   align-self: center;
   min-width: 76px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .cp-channel {
@@ -1589,14 +1599,14 @@ button {
   pointer-events: none;
 }
 .hint.small {
-  font-size: 11px;
+  font-size: var(--fs-note);
 }
 
 /* GIPHY */
 .giphy-steps {
   margin: 4px 0 8px;
   padding-left: 22px;
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.6;
   color: var(--fg);
 }
@@ -1641,7 +1651,7 @@ button {
   justify-content: center;
   width: 26px;
   height: 26px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: #fff;
   background: #e5484d;
   border-radius: 50%;
@@ -1668,7 +1678,7 @@ button {
   align-items: center;
   gap: 10px;
   min-height: 44px;
-  font-size: 16px;
+  font-size: var(--fs-body);
 }
 .check-row input {
   width: 24px;
@@ -1718,7 +1728,7 @@ button {
 }
 .trim-nothumb {
   padding: 8px;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .trim-dim {
@@ -1772,7 +1782,7 @@ button {
 }
 .trim-info {
   margin: 4px 0 8px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .trim-info b {
@@ -1959,7 +1969,7 @@ button {
 .crop-bar .btn {
   min-height: 44px;
   padding: 0 9px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   white-space: nowrap;
   background: rgba(20, 20, 20, 0.85);
   color: #fff; /* 固定白字：底色固定是深色，不跟著淺色主題變成深色字 */
@@ -2036,7 +2046,7 @@ button {
   gap: 8px;
   height: auto;
   padding: 10px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-align: left;
   background: var(--btn);
   border: 2px solid transparent;
@@ -2071,7 +2081,7 @@ button {
   height: auto;
   min-width: 0;
   padding: 6px 2px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   background: var(--btn);
   border-radius: 10px;
 }
@@ -2099,7 +2109,7 @@ button {
   align-items: center;
   gap: 4px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: #fff;
   background: rgba(0, 0, 0, 0.5);
 }
@@ -2126,7 +2136,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .peek ul {
   padding: 0;
@@ -2159,7 +2169,7 @@ button {
   justify-content: center;
   width: 44px;
   height: 44px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   background: var(--btn2) center / cover;
   border-radius: 8px;
 }
@@ -2196,7 +2206,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--muted);
   border: 1.5px dashed var(--border);
   border-radius: 8px;
@@ -2231,7 +2241,7 @@ button {
   flex: none;
   min-height: 38px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
   white-space: nowrap;
   background: transparent;
@@ -2257,11 +2267,11 @@ button {
 .chip3 {
   min-height: 38px;
   padding: 0 14px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--fg);
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 19px;
+  border-radius: var(--radius-ctl);
 }
 .chip3.on {
   font-weight: 600;
@@ -2397,12 +2407,12 @@ button {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--fs-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .audio-text small {
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .audio-vol {
@@ -2429,14 +2439,14 @@ button {
 .cell-row .grow {
   flex: 1;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 .chip-static {
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 /* 轉場小圓圈：兩個緊接的片段之間。有轉場＝白底、代號；沒有＝虛線灰圈「＋」；目前選的＝實心 */
@@ -2524,7 +2534,7 @@ button {
   min-height: 0;
   height: 24px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: #fff;
   background: rgba(0, 0, 0, 0.5);
   border-radius: 12px;
@@ -2549,7 +2559,7 @@ button {
 .multi-count {
   flex: none;
   margin-right: 4px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   font-weight: 700;
   color: var(--accent);
   white-space: nowrap;
@@ -2589,7 +2599,7 @@ button {
   width: 72px;
   min-height: 0;
   padding: 4px 4px 2px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--fg);
   background: transparent;
   border: 2px solid transparent;
@@ -2726,7 +2736,7 @@ button {
   justify-content: space-between;
   gap: 10px;
   padding: 8px 8px 8px 14px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--fg);
   background: var(--panel);
   border: 1px solid var(--accent);
@@ -2748,18 +2758,19 @@ button {
   max-height: 94dvh;
   overflow-y: auto;
 }
-.rm-undo {
-  position: absolute;
-  top: 10px;
-  right: 14px;
-  width: 48px;
-  min-width: 48px;
-  height: 48px;
+.rm-icon-btn {
+  flex: none;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
-  background: var(--btn);
-  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-ctl, 12px);
 }
-.rm-undo:disabled {
+.rm-icon-btn:disabled {
   opacity: 0.4;
 }
 .rm-preview {
@@ -2781,23 +2792,27 @@ button {
 .rm-nopreview {
   padding: 24px;
   color: #888;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .rm-play-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin: 4px 0;
 }
 .rm-now {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 7.5em;
+  text-align: left;
+  white-space: nowrap;
 }
 .rm-ruler {
   display: flex;
   justify-content: space-between;
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .rm-wrap {
@@ -2836,7 +2851,7 @@ button {
 }
 .rm-flag small {
   margin-top: 1px;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--fg);
 }
 .rm-strip {
@@ -2904,11 +2919,11 @@ button {
   flex-wrap: wrap;
   gap: 8px;
   margin: 4px 0;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .rm-summary {
   margin: 10px 0 4px;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 
 /* 兩個影片銜接的轉場圓圈：沒選取＝米色、選取中＝橘棕（不隨主題換，才認得出來） */
@@ -2935,7 +2950,7 @@ button {
   border: 1.5px solid #7f8c6a;
   background: #d5dcc6;
   color: #1e3b2f;
-  font-size: 12px;
+  font-size: var(--fs-note);
   font-weight: 700;
   line-height: 1;
   display: flex;
@@ -2970,7 +2985,7 @@ button {
 }
 .fx-legend .lg {
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-ctl);
   font-size: 12px;
   font-weight: 700;
 }
@@ -3013,7 +3028,7 @@ button {
 .et-text {
   padding: 8px;
   color: #fff;
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-align: center;
   word-break: break-all;
 }
@@ -3097,7 +3112,7 @@ button {
   width: 64px;
   min-height: 44px;
   text-align: center;
-  font-size: 16px;
+  font-size: var(--fs-body);
 }
 
 .group-fx-row {
@@ -3110,12 +3125,12 @@ button {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .group-fx select {
   min-height: 44px;
-  font-size: 16px;
+  font-size: var(--fs-body);
 }
 
 /* 播放列的「定格」按鈕 */
@@ -3132,7 +3147,7 @@ button {
   line-height: 1;
 }
 .kf-btn small {
-  font-size: 12px;
+  font-size: var(--fs-pb);
 }
 .kf-btn.on {
   color: var(--accent);
@@ -3196,7 +3211,7 @@ button {
   align-items: center;
   gap: 6px;
   padding: 4px 0;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .color-panel .look-row {
   display: flex;
@@ -3217,7 +3232,7 @@ button {
   border: 2px solid transparent;
   border-radius: 10px;
   background: var(--btn);
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 .look-card canvas {
   width: 52px;
@@ -3235,7 +3250,7 @@ button {
   flex: 1;
   white-space: nowrap;
   padding: 0 8px;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 .peek-tag {
@@ -3244,10 +3259,10 @@ button {
   left: 50%;
   transform: translateX(-50%);
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-ctl);
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
-  font-size: 12px;
+  font-size: var(--fs-note);
   pointer-events: none;
   z-index: 8;
 }
@@ -3260,13 +3275,13 @@ button {
 .pb-btn {
   flex-direction: column;
   gap: 1px;
-  min-width: 48px;
+  min-width: calc(var(--fs-body) * 3.3);
   height: 52px;
   padding: 0 6px;
-  font-size: 12px;
+  font-size: var(--fs-pb);
 }
 .pb-btn small {
-  font-size: 11px;
+  font-size: var(--fs-pb);
   line-height: 1;
   white-space: nowrap;
 }
@@ -3307,4 +3322,20 @@ button:not(:disabled):active,
 /* 進階：標記要靜音的聲音——標起來的地方畫成灰色斜線 */
 .rm-body.silence {
   background: repeating-linear-gradient(135deg, rgba(60, 60, 60, 0.7) 0 5px, rgba(60, 60, 60, 0.45) 5px 10px);
+}
+
+/* 卡片名稱一律一行（放不下就縮在框內，不換行）；卡片的字跟全站一樣大 */
+.look-card span,
+.tr-card,
+.layout-card,
+.look-card,
+.card-name {
+  white-space: nowrap;
+}
+.look-card span,
+.card-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

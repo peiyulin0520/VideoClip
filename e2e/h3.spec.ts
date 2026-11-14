@@ -84,7 +84,7 @@ test('修剪面板：拖旗標時預覽的白線跟著（顯示那一秒）；�
   await showTimeline(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '修剪', exact: true }).tap();
+  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
   await expect(page.getByTestId('rm-video')).toBeVisible();
   const flag = (await page.getByTestId('range-flag-end-0').boundingBox())!;
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;

@@ -228,7 +228,7 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
           onChange={(v) => setLook(item.id, shownLook.id, v / 100, `look:${item.id}`)}
         />
       )}
-      <p className="hint">在播放列按 👁 可以切換看原色／色調。</p>
+      <p className="hint">在播放列按眼睛圖示，可以切換看原色／色調。</p>
       <div className="slider-label">調整{keyMode ? '（定格：改的是播放線碰到的定格）' : ''}</div>
       {ADJUST_KEYS.map((k) => (
         <Slider
