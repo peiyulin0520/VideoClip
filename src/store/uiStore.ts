@@ -24,6 +24,8 @@ type UI = {
   gradeScope: { id: string; scope: 'item' | 'key' } | null;
   /** 自訂比例：預覽上正在拖版面的框（fx、fy＝框占 9:16 底的寬、高比例）；沒有＝沒在調 */
   frameEdit: { fx: number; fy: number; fill: boolean } | null;
+  /** 選到版型（或版型裡的東西）時，新增文字／貼圖／音效預設加進那個版型；使用者在各分頁關掉＝這個旗標 true */
+  addToGroupOff: boolean;
 };
 
 export const useUI = create<UI>((set, get) => ({
@@ -43,6 +45,7 @@ export const useUI = create<UI>((set, get) => ({
   timelinePps: 40,
   gradeScope: null,
   frameEdit: null,
+  addToGroupOff: false,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

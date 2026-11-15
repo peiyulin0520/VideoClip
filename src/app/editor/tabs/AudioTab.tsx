@@ -1,3 +1,4 @@
+import { AddToGroupToggle } from '../AddToGroupToggle';
 import { Copy, Film, MoveHorizontal, Scissors, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ensureUrls } from '../../../engine/assetUrls';
@@ -51,6 +52,7 @@ function MusicImport() {
   };
   return (
     <>
+      <AddToGroupToggle what="新增的音樂／音效" />
       <div className="panel-head">
         <span>背景音樂</span>
       </div>

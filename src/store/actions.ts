@@ -503,6 +503,25 @@ export function addOverlayClips(
   opts: { scale?: number; sticker?: boolean } = {},
 ): string | null {
   if (assets.length === 0) return null;
+  // 貼圖：選到版型時加進版型裡（版型中的任何位置、可以疊在外框上；不是填進格子）
+  const target = opts.sticker ? addTargetGroup() : null;
+  if (target) {
+    store().apply((d) => {
+      for (const asset of assets) {
+        const have = d.assets.find((a) => a.id === asset.id);
+        if (!have) d.assets.push({ ...asset, origin: 'sticker' });
+        else have.origin = 'sticker';
+      }
+    });
+    let first: string | null = null;
+    for (const asset of assets) {
+      const clip = createOverlayClip(asset, t);
+      if (opts.scale) clip.transform.scale = opts.scale;
+      const id = addGroupMember(target, clip);
+      first ??= id;
+    }
+    return first;
+  }
   let firstId: string | null = null;
   store().apply((d) => {
     // 素材和片段在同一步加入（一次復原就整個拿掉）；已經在專案裡的素材不重複加
@@ -567,6 +586,16 @@ export function importToBase(assets: Asset[], clips: VideoItem[]): number {
 /** 背景音樂：放在播放頭這一秒（最長到專案結束），放在音樂軌；同一時間有別的音樂就開新的音樂軌 */
 export function addMusic(assets: Asset[], t: number): string | null {
   if (assets.length === 0) return null;
+  const target = addTargetGroup();
+  if (target) {
+    // 加進版型的音效：時間夾在版型範圍內
+    store().apply((d) => {
+      for (const asset of assets) if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    });
+    let first: string | null = null;
+    for (const asset of assets) first ??= addGroupMember(target, createAudioClip(asset, t));
+    return first;
+  }
   const total = totalDuration(store().project!);
   let firstId: string | null = null;
   store().apply((d) => {
@@ -1210,8 +1239,28 @@ export function setCellTrim(itemId: string, trimIn: number) {
   });
 }
 
+/**
+ * 現在選到的東西屬於哪個版型（外框、格子、版型裡的文字貼圖都算），而且使用者沒有在分頁裡關掉「加到版型裡」：
+ * 新增文字、貼圖、音效就加進這個版型（成員軌、時間夾在版型範圍內）。沒有就是 null（照一般流程）。
+ */
+export function addTargetGroup(): string | null {
+  if (useUI.getState().addToGroupOff) return null;
+  const p = store().project;
+  const id = store().selectedId;
+  const f = p && id ? findItem(p, id) : null;
+  const g = f?.item.group;
+  return g && p && groupFrame(p, g) ? g : null;
+}
+
 export function addText(t: number, shape = false): string {
   const item = shape ? createShapeItem(t) : createTextItem(t);
+  const target = addTargetGroup();
+  if (target) {
+    // 加進版型：樣式一樣沿用上一次的
+    const last = store().project?.lastTextStyle;
+    if (!shape && last) Object.assign(item.card.runs[0]!, JSON.parse(JSON.stringify(last)) as TextStyle);
+    return addGroupMember(target, item) ?? item.id;
+  }
   store().apply((d) => {
     // 新文字沿用上一次的樣式（字體、大小、顏色、透明度、描邊、陰影…），內容與位置照預設
     if (!shape && d.lastTextStyle)

@@ -81,6 +81,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 版型 v2 · L4 從各分頁新增時加進版型（Sonnet 實作）
+  - 做了什麼：選到版型（外框、格子、版型裡的東西都算）時，**文字分頁、素材分頁（貼圖：內建／GIPHY／我的貼圖）、音訊分頁**最上面多一塊淡底的「新增的○○加到版型「三格」裡」切換（`AddToGroupToggle`，預設開）：開著＝新增的文字／貼圖／音效變成版型的成員（成員軌、時間夾在版型範圍內、貼圖可以放版型任何位置、可以疊在外框上，**不是填進格子**）；關掉＝照一般方式加在專案裡。邏輯集中在 `addTargetGroup()`（`addText`、`addOverlayClips(sticker)`、`addMusic` 都先問它），旗標 `useUI.addToGroupOff`。時間軸版型尾端「加入」選單也提示貼圖到素材分頁加
+  - 動了哪些檔：新 `app/editor/AddToGroupToggle.tsx`；`store/{actions,uiStore}.ts`、`app/editor/tabs/{TextTab,AssetsTab,AudioTab}.tsx`、`app/editor/Timeline.tsx`；`e2e/l3.spec.ts` 加 L4 測試
+  - 驗證：✅ e2e（選到版型→文字分頁新增→成員文字軌；素材分頁加貼圖→成員貼圖軌、標 member、不是外框；展開後出現「貼圖」「文字」分類；關掉切換→一般字卡軌）、全部 e2e 274 個、`npm run check`  🟡 沒在真 iPhone 驗
+  - 已知限制（L5 會做）：現在拖版型裡的貼圖／文字，移動、縮放仍是整個版型一起動；要單獨動它得等 L5 的「素材層」；貼圖超出版型範圍的部分也還沒遮罩
+  - 下一步：L5 定格與移動分兩層（整組 vs 版型裡的素材、素材只露出版型範圍內）→ L7 → L8；L6 穿插
 - 2026-11-15 版型 v2 · L3 播放軸展開版型（Sonnet 實作）
   - 做了什麼：①**版型可以在播放軸展開**：版型片段左上有 ▸／▾ 小鈕（`clip-group-toggle`），展開後它所在那一列下面多一塊（左邊主題色線圈起來）：「▾ 版型：三格 · 3 格（3 格空）」標題列＋「＋ 加入」→ 分類標題列「文字／貼圖／影像／音效」（有東西才出現、各自可收合）→ 各分類的列；影像分類每一格一列，空格子是虛線「＋ 匯入 第 N 格」（`EmptyCellSlot`，選相簿檔案直接放進那一格；`cellImport.ts`），點格子軌的圖示開「這一格」視窗；新加的版型預設展開，展開／收合與分類收合記在這台手機（`store/groupOpenStore.ts`）；②**版型裡的文字／貼圖／音效有自己的成員軌**（`groupRole:'member'`，貼圖與音效的物件標 `member:true` 才不會被當成外框）：不再混在一般「字卡」類，舊專案的版型文字載入時搬進去（`migrateLayoutTracks`）；版型尾端「＋ 加入」→ 文字／音效（`addGroupMember`：開始＝播放線、夾在版型範圍內、長度最多到版型結束）；③**版型裡的東西時間不能超出版型**：拖移（`placeItem`／`moveItemTo` 用 `clampToGroup`）與拉兩端修剪都夾住；它們只能待在自己版型的軌道（`dropTarget`：版型成員不能拖出去、一般素材不能拖進版型軌道，版型外框跟一般片段一樣可以換列）；`firstFreeTrack` 跳過版型軌道；移動版型時間／改長度／刪版型連音效成員一起處理；④點展開裡的任何片段＝選到那個素材，文字分頁等照一般素材用
   - 動了哪些檔：新 `store/groupOpenStore.ts`、`app/editor/{EmptyCellSlot.tsx,cellImport.ts}`；`engine/{layoutTracks,timeline}.ts`、`model/{types,migrate}.ts`、`store/actions.ts`、`app/editor/{Timeline,CellSheet,LayoutPicker}.tsx`、`styles.css`；測試新 `e2e/l3.spec.ts`、`store/layoutEmpty.test.ts` 加成員案例，改 g4／h1／x5
