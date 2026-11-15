@@ -170,7 +170,7 @@ test('自訂起迄：聲音軸上拖「前迄」「後起」；後段起可以�
   // 取消不改
   await page.getByTestId('tr-audio-edit').tap();
   await drag('ta-flag-in', -sec * 2);
-  await page.getByRole('button', { name: '取消', exact: true }).tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
   expect((await items(page))[1]!.transitionIn!.audioInB!).toBeGreaterThan(1.2);
   await page.screenshot({ path: `${SHOT}/transition-audio-custom.png` });
 });

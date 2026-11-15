@@ -60,9 +60,6 @@ function PromptBody({
         autoFocus
       />
       <div className="sheet-row">
-        <button className="btn" onClick={onClose}>
-          取消
-        </button>
         <button
           className="btn primary"
           onClick={() => {

@@ -98,7 +98,7 @@ test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖�
   let m = await main(page);
   expect(m[0]!.trimIn).toBe(0); // 還沒套用
   // 取消：完全不改
-  await page.getByRole('button', { name: '取消' }).tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
   await expect(page.getByTestId('trim-strip')).toHaveCount(0);
   expect((await main(page))[0]!.duration).toBeCloseTo(2, 2);
 

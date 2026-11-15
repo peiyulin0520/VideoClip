@@ -203,9 +203,6 @@ export function LayoutPicker() {
               選的照片、影片比格子少會輪流重複使用；同時播放的影片太多手機會卡，格子多的版型（例如九宮格）建議放照片。
             </p>
             <div className="sheet-row">
-              <button className="btn" onClick={() => setDef(null)}>
-                取消
-              </button>
               <button className="btn primary" onClick={() => input.current?.click()}>
                 選照片或影片
               </button>

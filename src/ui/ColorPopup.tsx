@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { hexToRgb, hsvFromRgbKeepHue, hsvToRgb, rgbToHex, rgbToHsv, type HSV, type RGB } from './colorMath';
@@ -78,7 +79,12 @@ export function ColorPopup({
           if (e.key === 'Escape') onCancel();
         }}
       >
-        <div className="sheet-title">自訂顏色</div>
+        <div className="sheet-head">
+          <div className="sheet-title">自訂顏色</div>
+          <button className="sheet-close" aria-label="關閉" data-testid="sheet-close" onClick={onCancel}>
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
 
         <div
           {...sv}
@@ -151,9 +157,6 @@ export function ColorPopup({
         ))}
 
         <div className="sheet-row">
-          <button className="btn" onClick={onCancel}>
-            取消
-          </button>
           <button className="btn primary" onClick={() => onConfirm(hex)}>
             確定
           </button>

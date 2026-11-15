@@ -364,9 +364,6 @@ export function Home() {
           autoFocus
         />
         <div className="sheet-row">
-          <button className="btn" onClick={() => setRenameFor(null)}>
-            取消
-          </button>
           <button
             className="btn primary"
             onClick={async () => {

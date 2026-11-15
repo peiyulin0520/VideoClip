@@ -264,7 +264,7 @@ test('調整出場時間：只有一個「起」旗標；起＝長度−特效�
   await page.getByLabel('特效幾秒', { exact: true }).fill('1');
   await page.getByLabel('特效幾秒', { exact: true }).blur();
   await expect(page.getByLabel('起（秒）', { exact: true })).toHaveValue('3');
-  await page.getByRole('button', { name: '取消' }).tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
   expect((await first(page)).outEffect!.duration).toBeCloseTo(before, 2);
   await page.getByTestId('fx-adjust').tap();
   await page.waitForTimeout(500);

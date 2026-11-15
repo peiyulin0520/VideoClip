@@ -127,7 +127,7 @@ test('自訂顏色：跳出彈窗，拖拉選色、色相條、RGB 細調、原�
   expect(await hexOf(page)).toBe(rgbHex(c));
 
   // 取消：什麼都不變、也不進「最近用過」
-  await page.getByRole('button', { name: '取消' }).tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
   await expect(dlg).toHaveCount(0);
   expect((await card(page)).runs[0]!.color).toBe(was);
 

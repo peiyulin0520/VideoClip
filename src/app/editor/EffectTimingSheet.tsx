@@ -341,9 +341,6 @@ export function EffectTimingSheet({
             : `轉場：接縫前 ${fmt(bf)} 秒＋接縫後 ${fmt(af)} 秒（共 ${fmt(sumTotal)} 秒）`}
       </p>
       <div className="sheet-row">
-        <button className="btn" onClick={onClose}>
-          取消
-        </button>
         <button
           className="btn primary"
           data-testid="et-apply"

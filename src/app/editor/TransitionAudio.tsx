@@ -245,9 +245,6 @@ function TransitionAudioSheet({
         <button className="btn" data-testid="ta-listen" onClick={listen}>
           試聽轉場
         </button>
-        <button className="btn" onClick={cancel}>
-          取消
-        </button>
         <button
           className="btn primary"
           data-testid="ta-apply"

@@ -270,10 +270,39 @@ button {
   background: var(--panel);
   border-radius: 20px 20px 0 0;
 }
-.sheet-title {
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 8px;
+}
+.sheet-title {
+  margin: 0;
   font-size: var(--fs-body);
   font-weight: 600;
+}
+.sheet-row .btn.grow {
+  flex: 1 1 auto;
+}
+.rm-preview {
+  position: relative;
+}
+.rm-state {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-note);
+  pointer-events: none;
+}
+.rm-state.off {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
 }
 .sheet-msg {
   margin: 4px 0 12px;
