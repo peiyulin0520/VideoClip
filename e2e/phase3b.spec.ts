@@ -127,6 +127,7 @@ test('字卡換字體：選單每個字體用自己的字形；沒下載過的�
   await expect(list.locator('[data-font-key="pop-gothic"]')).toHaveClass(/active/, { timeout: 30_000 });
   expect((await project(page)).tracks[1]!.items[0]!.card!.runs[0]!.fontId).not.toBe('pop-gothic');
   await page.getByTestId('font-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await expect(page.getByRole('dialog', { name: '選擇字體' })).toBeHidden({ timeout: 30_000 });
   const run = (await project(page)).tracks[1]!.items[0]!.card!.runs[0]!;
   expect(run.fontId).toBe('pop-gothic');
@@ -160,6 +161,7 @@ test('匯入自己的字體：選了檔案就能用，存在這台裝置，重�
       .first(),
   ).toBeVisible();
   await page.getByTestId('font-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   const p = await project(page);
   const fontId = p.tracks[1]!.items[0]!.card!.runs[0]!.fontId;
   expect(fontId.startsWith('u:')).toBe(true);

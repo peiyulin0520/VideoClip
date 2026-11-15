@@ -135,7 +135,7 @@ export function FontSelect({ value, onChange }: { value: string; onChange: (font
             data-testid="font-apply"
             onClick={() => {
               if (draft !== value) onChange(draft);
-              setOpen(false);
+              toast('已套用');
             }}
           >
             套用

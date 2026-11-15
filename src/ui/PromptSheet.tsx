@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from '../store/uiStore';
 import { Sheet } from './Sheet';
 
 /** 輸入一行文字的小面板（改名、命名用）。開著的時候才會建立，所以每次打開都從 initial 開始。 */
@@ -21,15 +22,7 @@ export function PromptSheet({
 }) {
   return (
     <Sheet open={open} title={title} onClose={onClose}>
-      {open && (
-        <PromptBody
-          label={label}
-          initial={initial}
-          placeholder={placeholder}
-          onSubmit={onSubmit}
-          onClose={onClose}
-        />
-      )}
+      {open && <PromptBody label={label} initial={initial} placeholder={placeholder} onSubmit={onSubmit} />}
     </Sheet>
   );
 }
@@ -39,13 +32,11 @@ function PromptBody({
   initial,
   placeholder,
   onSubmit,
-  onClose,
 }: {
   label: string;
   initial: string;
   placeholder?: string;
   onSubmit: (v: string) => void;
-  onClose: () => void;
 }) {
   const [draft, setDraft] = useState(initial);
   return (
@@ -64,7 +55,7 @@ function PromptBody({
           className="btn primary"
           onClick={() => {
             onSubmit(draft.trim());
-            onClose();
+            toast('已儲存');
           }}
         >
           儲存

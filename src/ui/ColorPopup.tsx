@@ -1,3 +1,4 @@
+import { toast } from '../store/uiStore';
 import { X } from 'lucide-react';
 import { useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -157,7 +158,13 @@ export function ColorPopup({
         ))}
 
         <div className="sheet-row">
-          <button className="btn primary" onClick={() => onConfirm(hex)}>
+          <button
+            className="btn primary"
+            onClick={() => {
+              onConfirm(hex);
+              toast('已套用');
+            }}
+          >
             套用
           </button>
         </div>

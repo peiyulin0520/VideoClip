@@ -117,6 +117,7 @@ test('編輯器「畫面比例」按鈕：改比例、預覽形狀改變、復�
   await btn.tap();
   await page.getByRole('radio', { name: /1:1/ }).tap();
   await page.getByTestId('ratio-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await expect(btn).toHaveText('1:1');
   await expect.poll(() => canvasRatio(page)).toBeCloseTo(1, 1);
   const manual = await info(page);
@@ -134,10 +135,12 @@ test('編輯器「畫面比例」按鈕：改比例、預覽形狀改變、復�
   await btn.tap();
   await page.getByRole('radio', { name: /9:16/ }).tap();
   await page.getByTestId('ratio-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await expect(btn).toHaveText('9:16');
   await btn.tap();
   await page.getByRole('radio', { name: /自動/ }).tap();
   await page.getByTestId('ratio-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await expect(btn).toHaveText('16:9');
   expect((await info(page)).aspectAuto).toBe(true);
   expect(errors).toEqual([]);

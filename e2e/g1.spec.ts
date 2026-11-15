@@ -172,6 +172,7 @@ test('專案封面：首頁「更換封面」從相簿選照片、恢復預設�
   await page.getByTestId('cover-file').setInputFiles(fixture('photo.png'));
   await page.getByTestId('cover-apply').tap();
   await expect(page.locator('.toast').filter({ hasText: '封面已更換' })).toBeVisible();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   const changed = await cardCover();
   expect(changed).not.toBe(original);
   expect(changed).toContain('data:image/jpeg');
@@ -184,6 +185,7 @@ test('專案封面：首頁「更換封面」從相簿選照片、恢復預設�
   await page.getByRole('button', { name: '更換封面' }).tap();
   await page.getByRole('button', { name: /恢復預設/ }).tap();
   await page.getByTestId('cover-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await expect.poll(cardCover).not.toBe(changed);
   const [r, g, b] = (await colorOf(await cardCover())) as number[];
   expect(r!).toBeGreaterThan(200);
@@ -196,7 +198,8 @@ test('專案封面：首頁「更換封面」從相簿選照片、恢復預設�
   await page.getByRole('button', { name: '專案名稱', exact: true }).tap();
   await page.getByRole('switch', { name: '用目前預覽畫面當封面' }).tap();
   await page.getByRole('button', { name: '儲存', exact: true }).tap();
-  await expect(page.locator('.toast').filter({ hasText: '已用目前預覽畫面當封面' })).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: '用目前預覽畫面當封面' })).toBeVisible();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 儲存後視窗不會自動關，按 ✕ 關
   await page.waitForTimeout(1300);
   await page.getByRole('link', { name: '回首頁' }).tap();
   const fromPreview = await cardCover();

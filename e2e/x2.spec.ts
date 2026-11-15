@@ -152,6 +152,10 @@ test('設定型彈出視窗都有「套用」或「儲存」；沒按就按 ❌ 
   await page.getByRole('radio', { name: /1:1/ }).tap();
   await page.getByTestId('ratio-apply').tap();
   expect((await meta(page)).aspect).toBe('1:1');
+  await expect(dialog(page)).toBeVisible(); // 套用後視窗還開著
+  await page.getByRole('radio', { name: /16:9/ }).tap();
+  await closeX(); // 套用後才選的 16:9 不算；已套用的 1:1 還在
+  expect((await meta(page)).aspect).toBe('1:1');
 
   // 專案名稱：打了新名字 → ❌ → 沒變；按儲存 → 變
   const nameBtn = page.getByRole('button', { name: '專案名稱', exact: true });
@@ -164,6 +168,11 @@ test('設定型彈出視窗都有「套用」或「儲存」；沒按就按 ❌ 
   await nameBtn.tap();
   await page.getByLabel('專案名稱輸入').fill('會存的名字');
   await page.getByRole('button', { name: '儲存', exact: true }).tap();
+  expect((await meta(page)).name).toBe('會存的名字');
+  // 儲存後視窗不會自動關；之後改了又按 ✕ → 只放棄「儲存之後」的改動，已儲存的還在
+  await expect(dialog(page)).toBeVisible();
+  await page.getByLabel('專案名稱輸入').fill('儲存後又改的');
+  await closeX();
   expect((await meta(page)).name).toBe('會存的名字');
 
   // 片段命名

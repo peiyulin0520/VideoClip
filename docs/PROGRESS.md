@@ -75,6 +75,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 feedback-12 X2c 按「套用／儲存」後視窗不自動關（Sonnet 實作）
+  - 做了什麼：使用者補充——按套用／儲存後視窗**留著**（跳「已套用／已儲存」提示），之後再按 ✕ **不會撤銷**已套用的，只放棄「套用之後」又改的。改了：畫面比例、專案名稱（含用預覽當封面開關）、字體選擇、首頁更換封面、首頁改名、片段／軌道命名（`PromptSheet`）、選色彈窗、特效時間（`EffectTimingSheet`）、轉場聲音（`TransitionAudio`，✕ 還原到最後一次套用）。**維持套用後關閉**：自訂比例（要回預覽拖框）、裁切編輯器、片段範圍視窗（套用會改變片段結構，視窗內容會失效）、版型挑素材（接著開相簿）
+  - 動了哪些檔：`ui/{PromptSheet,ColorPopup,ColorPicker}.tsx`、`app/pages/{Editor,Home}.tsx`、`app/fonts/FontSelect.tsx`、`app/editor/{TransitionAudio}.tsx`、`app/editor/tabs/EffectTab.tsx`；測試改 `e2e/{x2,x1,x3,x4,x7,g1,g2,i5,phase1,phase3b,fix-aspect,fix-colors}.spec.ts`（套用後要再按 ✕ 關），x2 新增「儲存後視窗還在、改了又按 ✕ 已儲存的不變」
+  - 驗證：✅ 全部 e2e、`npm run check`  🟡 沒在真 iPhone 驗
+  - 下一步：X5 版型格子 → X6 輪流播放 → X8 畫畫
 - 2026-11-15 feedback-12 X4 畫面比例（Sonnet 實作）
   - 做了什麼：①**預覽的底固定 9:16**（`.stage-wrap` 高度不再跟專案比例走、`.stage-base`），改比例時預覽、播放列、時間軸位置都不動；②**版面（輸出範圍）在底裡面置中**，外面蓋灰黑斜線（`.out-hatch`，半透明可看到框外的東西）＋左上小字「框內是影片輸出範圍 · 4:3」；③**框外也畫、也能拖**：Compositor 的 canvas 比版面大（`canvasWidth/Height`、`offsetX/Y`），圖層放在 `world` 容器裡整個位移；`samplePixel/readRegion/toCanvas` 加上位移所以座標仍以版面為準；匯出照舊只畫專案寬高；④預覽的 `.stage`（`data-testid=stage`）現在就是**版面框**（透明、`pointer-events:none`），選取框／觸控區／參考線都在它裡面，手勢收在 `.stage-base`；⑤比例視窗加「改了之後：**保持原樣**（預設，每個東西在預覽上的位置大小不變，超出的在斜線區）／**影片填滿畫面**（座標照新畫面）」，`setProjectAspect(choice, mode)`，換算在 `engine/aspectRemap.ts`（物件與定格都換算，來回不失真）；⑥**自訂比例**：比例視窗「自訂」→ 套用 → 預覽上出現白框＋四邊四角把手（框永遠置中，拖一邊＝兩邊一起動），中央小卡顯示「寬:高 ≈ 1.40（7:5）」、右上 ✕ 放棄、「套用」才改專案（`Project.aspect: 'custom'`，長邊 1920、寬高取偶數、比例限制 0.4～2.5；首頁卡片、頂列顯示 `aspectLabel／ratioText`）
   - 動了哪些檔：新 `engine/{stage,aspectRemap}.ts`（＋test）、`app/editor/AspectOverlay.tsx`；`engine/{compositor,player}.ts`、`app/editor/{Preview,TrimSheet,MuteSheet}.tsx`、`app/pages/{Editor,Home}.tsx`、`store/{actions,uiStore}.ts`、`model/{types,defaults}.ts`、`storage/projects.ts`、`styles.css`；測試新 `e2e/x4.spec.ts`（固定底、置中、斜線；拖到框外＋輸出不含；保持原樣／填滿；自訂拖把手＋✕＋復原）、改 `fix-aspect`、`theme`

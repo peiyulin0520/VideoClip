@@ -244,6 +244,7 @@ test('調整進場時間：預覽在左、拖拉軸在右同一列；只有一�
   expect(v).toBeGreaterThan(2.3);
   expect(v).toBeLessThan(2.7);
   await page.getByTestId('et-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await expect(sheet(page)).toHaveCount(0);
   expect((await first(page)).inEffect!.duration).toBeCloseTo(v, 1);
 });
@@ -272,6 +273,7 @@ test('調整出場時間：只有一個「起」旗標；起＝長度−特效�
   await page.getByLabel('起（秒）', { exact: true }).blur();
   await expect(page.getByLabel('特效幾秒', { exact: true })).toHaveValue('1.5');
   await page.getByTestId('et-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   expect((await first(page)).outEffect!.duration).toBeCloseTo(1.5, 2);
 });
 
@@ -293,6 +295,7 @@ test('轉場分配：起（A 結尾前幾秒）、迄（B 開頭後幾秒）各�
   await expect(page.getByLabel('特效幾秒', { exact: true })).toHaveValue('1.5');
   await page.screenshot({ path: `${SHOT}/timing-seam.png` });
   await page.getByTestId('et-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   const items = ((await project(page)).tracks[0] as unknown as { items: It[] & { start: number }[] }).items;
   const tr = items[1]!.transitionIn as unknown as { before: number; after: number; duration: number };
   expect(tr.before).toBeCloseTo(1.2, 2);

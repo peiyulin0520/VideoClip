@@ -5,7 +5,7 @@ import { TRANSITION_AUDIO, transitionSpan, type TransitionAudioMode } from '../.
 import type { Item } from '../../model/types';
 import { setTransitionAudio } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
-import { useUI } from '../../store/uiStore';
+import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 
 // 轉場時的聲音：特效分頁「轉場」下面的一塊。六種：交叉淡化（預設）／直接切換／自訂起迄／只要前段／只要後段／靜音。
@@ -126,7 +126,9 @@ function TransitionAudioSheet({
   };
 
   const write = () => setTransitionAudio(item.id, mode === 'cut' ? { audioCut: v.audioCut } : v);
-  const restore = () => setTransitionAudio(item.id, initial);
+  // 按過「套用」就以那一次的值為準：之後按 ✕ 只放棄套用之後的變動
+  const baseline = useRef<Vals>(initial);
+  const restore = () => setTransitionAudio(item.id, baseline.current);
   const cancel = () => {
     if (touched) restore();
     onClose();
@@ -250,7 +252,9 @@ function TransitionAudioSheet({
           data-testid="ta-apply"
           onClick={() => {
             write();
-            onClose();
+            baseline.current = { ...v };
+            setTouched(false);
+            toast('已套用');
           }}
         >
           套用

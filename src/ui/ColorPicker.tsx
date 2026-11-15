@@ -135,10 +135,7 @@ export function ColorPicker({
           initial={normalizeHex(value) ?? '#ffffff'}
           label={label}
           onCancel={() => setPopup(false)}
-          onConfirm={(c) => {
-            pick(c);
-            setPopup(false);
-          }}
+          onConfirm={(c) => pick(c)}
         />
       )}
     </div>

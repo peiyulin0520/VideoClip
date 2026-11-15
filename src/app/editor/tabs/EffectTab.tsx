@@ -231,7 +231,7 @@ function SingleBlock({
           onApply={(v) => {
             setItemEffect(item.id, role, cur.kind, v.d);
             focus();
-            setAdjust(false);
+            toast('已套用');
           }}
         />
       )}
@@ -326,7 +326,7 @@ function SeamBlock({
           onApply={(v) => {
             setTransitionSplit(item.id, v.before, v.after);
             focus();
-            setAdjust(false);
+            toast('已套用');
           }}
         />
       )}

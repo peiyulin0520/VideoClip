@@ -110,6 +110,7 @@ test('六種模式：只要前段／只要後段／靜音／直接切換，聲�
   // 直接切換（預設切換點＝接縫 2 秒）：2 秒前只有前段、2 秒後只有後段，不淡化
   await pick(page, '直接切換');
   await page.getByTestId('ta-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await seekTo(page, 1.8);
   await expect.poll(async () => (await gains(page)).a).toBe(1);
   expect((await gains(page)).b).toBe(0);
@@ -150,6 +151,7 @@ test('自訂起迄：聲音軸上拖「前迄」「後起」；後段起可以�
   await drag('ta-flag-in', sec * 1.5); // 後段起：接縫後約 1.5 秒（轉場 3 秒結束後 ... 轉場在接縫後 1 秒結束）
   await expect(page.getByTestId('ta-summary')).toContainText('中間');
   await page.getByTestId('ta-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   const t = (await items(page))[1]!.transitionIn!;
   expect(t.audio).toBe('custom');
   expect(t.audioOutA!).toBeLessThan(-0.3);

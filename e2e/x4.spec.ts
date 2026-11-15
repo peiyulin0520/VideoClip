@@ -10,6 +10,7 @@ async function setRatio(page: Page, name: RegExp) {
   await page.getByRole('button', { name: '畫面比例' }).tap();
   await page.getByRole('radio', { name }).tap();
   await page.getByTestId('ratio-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
 }
 
 test('X4 預覽的底固定 9:16：改比例時底、播放列的位置都不動；版面在底裡面置中，外面有斜線', async ({
@@ -121,6 +122,7 @@ test('X4 改比例「保持原樣」：疊加的綠色塊在預覽上的位置�
   await page.getByRole('radio', { name: /4:3/ }).tap();
   await page.getByTestId('ratio-fill').tap();
   await page.getByTestId('ratio-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   const tr3 = ((await project(page)).tracks[1]!.items[0] as unknown as { transform: { scale: number } })
     .transform;
   expect(tr3.scale).toBeCloseTo(tr0.scale, 4);

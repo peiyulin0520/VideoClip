@@ -138,6 +138,7 @@ test('自訂顏色：跳出彈窗，拖拉選色、色相條、RGB 細調、原�
   await page.getByRole('slider', { name: '藍色 B', exact: true }).fill('52');
   expect(await hexOf(page)).toBe('#12ab34');
   await page.getByRole('button', { name: '套用', exact: true }).tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await expect(dlg).toHaveCount(0);
   expect((await card(page)).runs[0]!.color).toBe('#12ab34');
   await expect(page.getByLabel('最近用過的顏色').getByRole('button').first()).toHaveAttribute(
@@ -197,6 +198,7 @@ test('所有顏色設定處都用同一個選擇器：字塊、字塊外框、�
   await page.getByRole('slider', { name: '綠色 G', exact: true }).fill('31');
   await page.getByRole('slider', { name: '藍色 B', exact: true }).fill('162');
   await page.getByRole('button', { name: '套用', exact: true }).tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   expect((await card(page)).runs[0]!.strokes![0]!.color).toBe('#7a1fa2');
 
   await section(page, '裝飾');

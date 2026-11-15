@@ -385,11 +385,12 @@ function EditorBody() {
                 const f = frameFractions(project.width, project.height);
                 useUI.getState().player?.pause();
                 useUI.setState({ frameEdit: { fx: f.fx, fy: f.fy, fill: ratioFill } });
+                setRatioOpen(false);
               } else if (ratioDraft !== now) {
                 const a = setProjectAspect(ratioDraft, ratioFill ? 'fill' : 'keep');
                 if (ratioDraft === 'auto' && a) toast(`已設成自動（目前是 ${a}）`);
+                else toast('已套用');
               }
-              setRatioOpen(false);
             }}
           >
             套用
@@ -424,19 +425,19 @@ function EditorBody() {
                 useProjectStore.getState().apply((d) => {
                   d.name = n;
                 });
-              setRenaming(false);
-              if (coverDraft) {
-                const p = useProjectStore.getState().project;
-                if (!p) return;
-                try {
-                  const cover = await coverFromProject(p, useUI.getState().player?.time ?? 0);
-                  useProjectStore.getState().apply((d) => {
-                    d.cover = cover;
-                  });
-                  toast('已用目前預覽畫面當封面');
-                } catch {
-                  toast('抓不到預覽畫面');
-                }
+              const withCover = coverDraft;
+              setCoverDraft(false);
+              if (!withCover) return toast('已儲存');
+              const p = useProjectStore.getState().project;
+              if (!p) return;
+              try {
+                const cover = await coverFromProject(p, useUI.getState().player?.time ?? 0);
+                useProjectStore.getState().apply((d) => {
+                  d.cover = cover;
+                });
+                toast('已儲存，並用目前預覽畫面當封面');
+              } catch {
+                toast('已儲存名稱，但抓不到預覽畫面當封面');
               }
             }}
           >

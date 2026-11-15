@@ -350,8 +350,9 @@ export function Home() {
             onClick={async () => {
               const p = coverFor;
               const d = coverDraft;
-              setCoverFor(null);
-              if (p && d) await setCover(p, d.cover);
+              if (!p || !d) return;
+              await setCover(p, d.cover);
+              setCoverDraft(null); // 套用過了：之後按 ✕ 不會撤銷
             }}
           >
             套用
@@ -393,8 +394,9 @@ export function Home() {
               if (renameFor && n) {
                 await renameProject(renameFor.id, n);
                 await refresh();
+                setRenameFor({ ...renameFor, name: n });
+                toast('已儲存');
               }
-              setRenameFor(null);
             }}
           >
             儲存

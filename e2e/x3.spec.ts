@@ -108,6 +108,7 @@ test('4:3 專案裁直式影片：畫面一樣是大的（不是縮在小小的�
   await page.getByRole('button', { name: '畫面比例' }).tap();
   await page.getByRole('radio', { name: '4:3' }).tap();
   await page.getByTestId('ratio-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '裁切' }).tap();
