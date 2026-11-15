@@ -22,6 +22,8 @@ type UI = {
   timelinePps: number;
   /** 色調分頁的「套用到」：整段素材／這個定格（只記使用者手動選的，沒選就由有沒有定格決定） */
   gradeScope: { id: string; scope: 'item' | 'key' } | null;
+  /** 自訂比例：預覽上正在拖版面的框（fx、fy＝框占 9:16 底的寬、高比例）；沒有＝沒在調 */
+  frameEdit: { fx: number; fy: number; fill: boolean } | null;
 };
 
 export const useUI = create<UI>((set, get) => ({
@@ -40,6 +42,7 @@ export const useUI = create<UI>((set, get) => ({
   gradePeek: false,
   timelinePps: 40,
   gradeScope: null,
+  frameEdit: null,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

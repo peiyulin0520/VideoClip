@@ -2,6 +2,7 @@ import type { Asset, Project, Track, VideoItem } from '../model/types';
 import { frameIndexAt, loadAnim, peekAnim } from './animImage';
 import { AudioOut, fadeGain, isIOSDevice } from './audio';
 import { Compositor } from './compositor';
+import { stageLayout } from './stage';
 import { VideoPool } from './mediaPool';
 import { expandThumbs, thumbCount, thumbIndex } from './thumbs';
 import { activeTransition, transitionAudioGain } from './transitions';
@@ -110,7 +111,15 @@ export class Player {
   static async create(opts: { host: HTMLElement; canvas: HTMLCanvasElement } & Deps): Promise<Player> {
     const p = opts.getProject();
     const size = p ? previewSize(p, opts.smooth) : { width: 540, height: 960 };
-    const compositor = await Compositor.create({ ...size, canvas: opts.canvas });
+    const lay = stageLayout(size.width, size.height);
+    const compositor = await Compositor.create({
+      ...size,
+      canvas: opts.canvas,
+      canvasWidth: lay.baseW,
+      canvasHeight: lay.baseH,
+      offsetX: lay.offX,
+      offsetY: lay.offY,
+    });
     let player: Player | null = null;
     const pool = new VideoPool(opts.host, POOL_SIZE, () => player?.scheduleRender());
     const music = new VideoPool(opts.host, MUSIC_POOL_SIZE, () => {}, 'audio');

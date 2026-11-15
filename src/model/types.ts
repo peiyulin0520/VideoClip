@@ -413,7 +413,8 @@ export type Project = {
   name: string;
   createdAt: number;
   updatedAt: number;
-  aspect: Aspect;
+  /** 'custom'＝使用者在預覽上拖出來的比例（寬高就是 width／height） */
+  aspect: Aspect | 'custom';
   /** true = 比例跟著第一個素材自動決定（使用者手動改過比例就變 false）；舊專案沒有這個欄位＝false */
   aspectAuto?: boolean;
   width: number;

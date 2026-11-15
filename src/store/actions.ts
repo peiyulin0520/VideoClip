@@ -2,6 +2,7 @@ import type { Draft } from 'immer';
 import {
   assignAspect,
   createAudioClip,
+  customSize,
   createOverlayClip,
   createShapeItem,
   createTextItem,
@@ -51,6 +52,8 @@ import {
   totalDuration,
   trackEnd,
 } from '../engine/timeline';
+import { remapKeepOnStage } from '../engine/aspectRemap';
+import { geoCtx } from '../engine/scene';
 import { cellItem, inkFor, type LayoutText, type Rect } from '../engine/layouts';
 import {
   DEFAULT_EFFECT_DURATION,
@@ -1200,17 +1203,41 @@ export { isVideoItem };
  * 改專案比例。choice='auto'＝照第一個影片／照片的形狀決定，並維持「自動」（沒有片段就維持現在的比例）。
  * 手動選比例後 aspectAuto 會關掉。可以復原。
  */
-export function setProjectAspect(choice: Aspect | 'auto'): Aspect | null {
+export function setProjectAspect(
+  choice: Aspect | 'auto',
+  /** keep＝物件在預覽上看起來的位置大小不變（超出的在斜線區）；fill＝座標照新畫面比例（影片填滿新畫面） */
+  mode: 'keep' | 'fill' = 'keep',
+): Aspect | null {
   const p = store().project;
   if (!p) return null;
   let aspect: Aspect;
   if (choice === 'auto') {
     const first = mediaItems(p)[0];
     const asset = first && p.assets.find((a) => a.id === first.assetId);
-    aspect = asset ? pickAspect(asset.width, asset.height) : p.aspect;
+    aspect = asset ? pickAspect(asset.width, asset.height) : p.aspect === 'custom' ? '9:16' : p.aspect;
   } else aspect = choice;
   store().apply((d) => {
+    const oldW = d.width;
+    const oldH = d.height;
     assignAspect(d, aspect, choice === 'auto');
+    if (mode === 'keep' && (oldW !== d.width || oldH !== d.height))
+      remapKeepOnStage(d, oldW, oldH, d.width, d.height, (w, h) => geoCtx(d as Project, w, h));
   });
   return aspect;
+}
+
+/** 自訂比例（寬／高）：長邊 1920；一步復原 */
+export function setProjectCustomRatio(ratio: number, mode: 'keep' | 'fill' = 'keep'): void {
+  if (!store().project) return;
+  const { width, height } = customSize(ratio);
+  store().apply((d) => {
+    const oldW = d.width;
+    const oldH = d.height;
+    d.aspect = 'custom';
+    d.width = width;
+    d.height = height;
+    delete d.aspectAuto;
+    if (mode === 'keep' && (oldW !== width || oldH !== height))
+      remapKeepOnStage(d, oldW, oldH, width, height, (w, h) => geoCtx(d as Project, w, h));
+  });
 }

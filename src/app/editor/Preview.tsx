@@ -15,8 +15,11 @@ import {
   type Box,
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
+import { aspectLabel } from '../../model/defaults';
+import { stageLayout } from '../../engine/stage';
 import { useSmooth } from '../../engine/previewQuality';
 import { useQuality } from '../../store/qualityStore';
+import { AspectOverlay } from './AspectOverlay';
 import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
 import { useCrop } from '../../store/cropStore';
@@ -69,7 +72,8 @@ export function Preview({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const poolRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null); // 版面（輸出範圍）
+  const baseRef = useRef<HTMLDivElement>(null); // 底：固定 9:16，手勢都在這裡收
   const [cssW, setCssW] = useState(1);
   const [safe, setSafe] = useState(readSafe);
   const [dragging, setDragging] = useState(false); // 拖移/縮放中：安全區參考線暫時出現
@@ -141,9 +145,10 @@ export function Preview({
 
   // ---- 舞台大小（CSS px）----
   useEffect(() => {
-    const el = stageRef.current!;
-    const ro = new ResizeObserver(() => setCssW(el.clientWidth || 1));
-    ro.observe(el);
+    const el = baseRef.current!;
+    const frame = stageRef.current!;
+    const ro = new ResizeObserver(() => setCssW(frame.clientWidth || 1));
+    ro.observe(frame);
     // iOS Safari：雙指在預覽上不要變成整頁縮放（touch-action 之外的保險）
     const stop = (e: Event) => e.preventDefault();
     el.addEventListener('gesturestart', stop);
@@ -231,7 +236,8 @@ export function Preview({
 
   const onPointerDown = (e: RPointerEvent) => {
     if ((e.target as HTMLElement).closest('[data-handle]')) return;
-    stageRef.current!.setPointerCapture(e.pointerId);
+    if (useUI.getState().frameEdit) return; // 正在調自訂比例：預覽上的東西先不能動
+    baseRef.current!.setPointerCapture(e.pointerId);
     const pt = toProj(e);
     pointers.current.set(e.pointerId, pt);
     const st = useProjectStore.getState();
@@ -391,14 +397,21 @@ export function Preview({
     hitBoxes.sort((a, b) => Number(a.id === selectedId) - Number(b.id === selectedId));
   // 從時間軸選了一個現在不在畫面上的物件：沒有觸控區（選取框也不會顯示）
   const minHit = 44 / k;
+  // 預覽的底固定 9:16；版面在底裡面置中，外面蓋斜線（範圍外的東西也看得到、可以拖）
+  const lay = stageLayout(width, height);
+  const hasOut = lay.fx < 0.999 || lay.fy < 0.999;
+  const pc = (n: number) => `${(n * 100).toFixed(4)}%`;
+  const fl = (lay.offX / lay.baseW) * 100;
+  const ft = (lay.offY / lay.baseH) * 100;
+  const fr = fl + lay.fx * 100;
+  const fb = ft + lay.fy * 100;
 
   return (
-    <div className="stage-wrap" style={{ ['--inv-ratio' as string]: `${height / width}` }}>
+    <div className="stage-wrap">
       <div
-        ref={stageRef}
-        className="stage"
-        style={{ ['--ratio' as string]: `${width} / ${height}` }}
-        data-testid="stage"
+        ref={baseRef}
+        className="stage-base"
+        data-testid="stage-base"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -417,58 +430,85 @@ export function Preview({
             原色預覽中
           </div>
         )}
-
-        {(safe || dragging) && (
-          <div className="safe" aria-hidden="true" data-testid="safe-zone">
-            <div className="safe-bottom" style={{ height: `${SAFE_BOTTOM * 100}%` }}>
-              <span>IG／抖音按鈕區</span>
+        <AspectOverlay baseRef={baseRef} />
+        {hasOut && (
+          <>
+            <div
+              className="out-hatch"
+              data-testid="out-hatch"
+              aria-hidden="true"
+              style={{
+                clipPath: `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${fl}% ${ft}%, ${fl}% ${fb}%, ${fr}% ${fb}%, ${fr}% ${ft}%, ${fl}% ${ft}%)`,
+              }}
+            />
+            <div className="out-label" aria-hidden="true">
+              框內是影片輸出範圍 · {aspectLabel(project)}
             </div>
-            <div className="safe-right" style={{ width: `${SAFE_RIGHT * 100}%` }}>
-              <span>按鈕</span>
+          </>
+        )}
+        <div
+          ref={stageRef}
+          className={`stage${hasOut ? ' has-out' : ''}`}
+          data-testid="stage"
+          style={{
+            left: pc(lay.offX / lay.baseW),
+            top: pc(lay.offY / lay.baseH),
+            width: pc(lay.fx),
+            height: pc(lay.fy),
+          }}
+        >
+          {(safe || dragging) && (
+            <div className="safe" aria-hidden="true" data-testid="safe-zone">
+              <div className="safe-bottom" style={{ height: `${SAFE_BOTTOM * 100}%` }}>
+                <span>IG／抖音按鈕區</span>
+              </div>
+              <div className="safe-right" style={{ width: `${SAFE_RIGHT * 100}%` }}>
+                <span>按鈕</span>
+              </div>
             </div>
-          </div>
-        )}
-        {guides.x !== null && <div className="guide v" style={{ left: guides.x * k }} />}
-        {guides.y !== null && <div className="guide h" style={{ top: guides.y * k }} />}
+          )}
+          {guides.x !== null && <div className="guide v" style={{ left: guides.x * k }} />}
+          {guides.y !== null && <div className="guide h" style={{ top: guides.y * k }} />}
 
-        {box && sel && !cropping && (
-          <div
-            className={`selbox${selLocked ? ' locked' : ''}`}
-            data-testid="selbox"
-            style={{
-              left: box.cx * k,
-              top: box.cy * k,
-              width: box.w * k,
-              height: box.h * k,
-              transform: `translate(-50%, -50%) rotate(${box.rotation}deg)`,
-            }}
-          />
-        )}
-        {!cropping &&
-          hitBoxes.map(({ id, b }) => {
-            const pad = id === selectedId ? 40 / k : 0; // 選取中的物件觸控區外擴 40px，雙指比較好放（再大就擋住預覽上的捲頁面）
-            const w = Math.max(b.w, minHit) + pad * 2;
-            const h = Math.max(b.h, minHit) + pad * 2;
-            // 沒選取的大物件（滿版影片）：觸控區不擋捲動，只靠輕點選取；選取中的、小的物件：可以直接拖
-            const large = (b.w * b.h) / (width * height) >= LARGE_AREA;
-            const eager = id === selectedId || !large;
-            return (
-              <div
-                key={id}
-                className={`hit${eager ? '' : ' soft'}`}
-                data-hit={id}
-                data-eager={eager ? '1' : '0'}
-                aria-hidden="true"
-                style={{
-                  left: b.cx * k,
-                  top: b.cy * k,
-                  width: w * k,
-                  height: h * k,
-                  transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
-                }}
-              />
-            );
-          })}
+          {box && sel && !cropping && (
+            <div
+              className={`selbox${selLocked ? ' locked' : ''}`}
+              data-testid="selbox"
+              style={{
+                left: box.cx * k,
+                top: box.cy * k,
+                width: box.w * k,
+                height: box.h * k,
+                transform: `translate(-50%, -50%) rotate(${box.rotation}deg)`,
+              }}
+            />
+          )}
+          {!cropping &&
+            hitBoxes.map(({ id, b }) => {
+              const pad = id === selectedId ? 40 / k : 0; // 選取中的物件觸控區外擴 40px，雙指比較好放（再大就擋住預覽上的捲頁面）
+              const w = Math.max(b.w, minHit) + pad * 2;
+              const h = Math.max(b.h, minHit) + pad * 2;
+              // 沒選取的大物件（滿版影片）：觸控區不擋捲動，只靠輕點選取；選取中的、小的物件：可以直接拖
+              const large = (b.w * b.h) / (width * height) >= LARGE_AREA;
+              const eager = id === selectedId || !large;
+              return (
+                <div
+                  key={id}
+                  className={`hit${eager ? '' : ' soft'}`}
+                  data-hit={id}
+                  data-eager={eager ? '1' : '0'}
+                  aria-hidden="true"
+                  style={{
+                    left: b.cx * k,
+                    top: b.cy * k,
+                    width: w * k,
+                    height: h * k,
+                    transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
+                  }}
+                />
+              );
+            })}
+        </div>
       </div>
       {emptyAction && (
         <button className="empty-import" onClick={emptyAction}>

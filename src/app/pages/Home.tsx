@@ -9,7 +9,14 @@ import {
   placeSequential,
   totalDuration,
 } from '../../engine/timeline';
-import { ASPECTS, assignAspect, createProject, nextProjectName, pickAspect } from '../../model/defaults';
+import {
+  ASPECTS,
+  aspectLabel,
+  assignAspect,
+  createProject,
+  nextProjectName,
+  pickAspect,
+} from '../../model/defaults';
 import type { Aspect, Project } from '../../model/types';
 import { requestPersistence } from '../../storage/media';
 import {
@@ -178,7 +185,7 @@ export function Home() {
                 </div>
                 <div className="card-name">{p.name}</div>
                 <div className="card-sub">
-                  {p.aspect} ·{' '}
+                  {aspectLabel(p)} ·{' '}
                   {new Date(p.updatedAt).toLocaleString('zh-TW', {
                     month: 'numeric',
                     day: 'numeric',

@@ -42,9 +42,31 @@ export function createMediaTrack(): Track {
   return { id: newId('t_'), kind: 'media', name: '影像 1', hidden: false, locked: false, items: [] };
 }
 
+/** 自訂比例：長邊 1920、寬高取偶數（比例限制在 0.4～2.5） */
+export function customSize(ratio: number): { width: number; height: number } {
+  const r = Math.min(Math.max(ratio, 0.4), 2.5);
+  const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
+  return r >= 1 ? { width: 1920, height: even(1920 / r) } : { width: even(1920 * r), height: 1920 };
+}
+
+/** 寬高比的文字：找最簡單的分數（分母 ≤ 20、誤差 < 1%），找不到就寫小數，例如 5:4、1.37 */
+export function ratioText(w: number, h: number): string {
+  const r = w / h;
+  for (let d = 1; d <= 20; d++) {
+    const n = Math.round(r * d);
+    if (n >= 1 && Math.abs(n / d - r) / r < 0.01) return `${n}:${d}`;
+  }
+  return r.toFixed(2);
+}
+
+/** 顯示用的比例名稱：一般比例就是它的名字，自訂的用寬高算出來 */
+export function aspectLabel(p: { aspect: Aspect | 'custom'; width: number; height: number }): string {
+  return p.aspect === 'custom' ? `自訂 ${ratioText(p.width, p.height)}` : p.aspect;
+}
+
 /** 改專案比例（直接改傳進來的物件，immer 草稿也可以）。auto=true 代表之後仍跟著第一個素材。 */
 export function assignAspect(
-  p: { aspect: Aspect; width: number; height: number; aspectAuto?: boolean },
+  p: { aspect: Aspect | 'custom'; width: number; height: number; aspectAuto?: boolean },
   aspect: Aspect,
   auto: boolean,
 ): void {

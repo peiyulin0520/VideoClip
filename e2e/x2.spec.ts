@@ -5,11 +5,10 @@ const SHOT = 'docs/screenshots/feedback-12';
 
 const dialog = (page: Page) => page.getByRole('dialog').last();
 const meta = (page: Page) =>
-  page.evaluate(
-    () =>
-      (
-        window as unknown as { __videoclip: { project: () => { aspect: string; name: string } } }
-      ).__videoclip.project(),
+  page.evaluate(() =>
+    (
+      window as unknown as { __videoclip: { project: () => { aspect: string; name: string } } }
+    ).__videoclip.project(),
   );
 
 test('每種彈出視窗右上角都有 ❌（關閉），底部沒有「取消」按鈕；按 ❌ 視窗就關掉', async ({ page }) => {

@@ -494,25 +494,26 @@ button {
 }
 .stage-wrap {
   position: relative;
-  /* 寬度撐滿；高度依專案比例，但最高＝一個螢幕扣掉頂列與播放列（捲到最上面時整個預覽都看得到）。用 svh：Safari 網址列伸縮時不會抖 */
-  height: max(
-    300px,
-    min(calc(100vw * var(--inv-ratio, 1.7778)), calc(100svh - var(--top-h) - var(--playbar-h)))
-  );
+  /* 預覽的底永遠是 9:16（不管專案比例）：預覽和下面的播放列、時間軸位置才不會跳。高度最高＝一個螢幕扣掉頂列與播放列。用 svh：Safari 網址列伸縮時不會抖 */
+  height: max(300px, min(calc(100vw * 16 / 9), calc(100svh - var(--top-h) - var(--playbar-h))));
   display: flex;
   align-items: center;
   justify-content: center;
   container-type: size;
   background: #0a0a0a;
 }
-.stage {
+.stage-base {
   position: relative;
-  width: min(100cqw, calc(100cqh * var(--ratio)));
-  aspect-ratio: var(--ratio);
+  width: min(100cqw, calc(100cqh * 9 / 16));
+  aspect-ratio: 9 / 16;
   overflow: hidden;
   background: #000;
+  /* 預覽空白處上下滑＝捲頁面；物件上有看不見的觸控區（.hit，touch-action:none）可以拖 */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.stage canvas {
+.stage-base canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -520,11 +521,106 @@ button {
   /* 跟舞台一樣：空白處上下滑可以捲頁面。Pixi 會在 canvas 上寫 inline 的 touch-action:none，要用 !important 蓋掉 */
   touch-action: pan-y !important;
 }
+/* 版面（輸出範圍）：在底裡面置中的透明框；選取框、觸控區、參考線都用它的座標，所以可以延伸到框外 */
 .stage {
-  /* 預覽空白處上下滑＝捲頁面；物件上有看不見的觸控區（.hit，touch-action:none）可以拖 */
-  touch-action: pan-y;
-  user-select: none;
-  -webkit-user-select: none;
+  position: absolute;
+  pointer-events: none;
+}
+.stage.has-out {
+  outline: 1.5px solid rgba(255, 255, 255, 0.7);
+}
+.stage .hit {
+  pointer-events: auto;
+}
+/* 自訂比例：預覽上的白框＋把手＋底下的「寬:高 套用 ✕」列 */
+.ao {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+}
+.ao-frame {
+  position: absolute;
+  outline: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.ao-frame .crop-h {
+  pointer-events: auto;
+}
+/* 框會貼到底的邊：把手往框裡面縮 22px，才不會被底切掉、也抓得到 */
+.ao-frame .crop-h.l,
+.ao-frame .crop-h.tl,
+.ao-frame .crop-h.bl {
+  left: 22px;
+}
+.ao-frame .crop-h.r,
+.ao-frame .crop-h.tr,
+.ao-frame .crop-h.br {
+  left: calc(100% - 22px);
+}
+.ao-frame .crop-h.t,
+.ao-frame .crop-h.tl,
+.ao-frame .crop-h.tr {
+  top: 22px;
+}
+.ao-frame .crop-h.b,
+.ao-frame .crop-h.bl,
+.ao-frame .crop-h.br {
+  top: calc(100% - 22px);
+}
+.ao-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(78%, 280px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  padding: 0.6em 0.8em 0.8em;
+  border-radius: var(--radius-ctl);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: var(--fs-body);
+  pointer-events: auto;
+}
+.ao-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ao-close {
+  min-width: 40px;
+  min-height: 40px;
+  background: transparent;
+  color: #fff;
+}
+.ao-hint {
+  margin: 0;
+  font-size: var(--fs-note);
+  opacity: 0.8;
+}
+.ao-card .btn {
+  min-height: 44px;
+}
+/* 版面外面：灰黑斜線（只是提醒，不會輸出） */
+.out-hatch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.55) 0 6px, rgba(90, 90, 90, 0.5) 6px 12px);
+}
+.out-label {
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: var(--fs-note);
+  pointer-events: none;
+  z-index: 7;
 }
 .pool {
   position: absolute;

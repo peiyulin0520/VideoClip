@@ -12,7 +12,8 @@ import { getProjectMigrated, saveProject } from '../../storage/projects';
 import { startAutosave } from '../../store/autosave';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
-import { ASPECTS } from '../../model/defaults';
+import { ASPECTS, ratioText } from '../../model/defaults';
+import { frameFractions } from '../../engine/stage';
 import { shortVersion } from '../pwa';
 import { QUALITY_LABELS } from '../../engine/previewQuality';
 import { useQuality } from '../../store/qualityStore';
@@ -127,8 +128,9 @@ function EditorBody() {
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [ratioOpen, setRatioOpen] = useState(false);
-  const [ratioDraft, setRatioDraft] = useState<'auto' | Aspect>('auto');
+  const [ratioDraft, setRatioDraft] = useState<'auto' | Aspect | 'custom'>('auto');
   const [coverDraft, setCoverDraft] = useState(false);
+  const [ratioFill, setRatioFill] = useState(false); // false＝保持原樣；true＝影片填滿新畫面
   const quality = useQuality((s) => s.q);
   const setQuality = useQuality((s) => s.set);
   const [exportOpen, setExportOpen] = useState(false);
@@ -213,10 +215,11 @@ function EditorBody() {
           aria-label="畫面比例"
           onClick={() => {
             setRatioDraft(project.aspectAuto ? 'auto' : project.aspect);
+            setRatioFill(false);
             setRatioOpen(true);
           }}
         >
-          {project.aspect}
+          {project.aspect === 'custom' ? ratioText(project.width, project.height) : project.aspect}
         </button>
         <button
           className="ratio-btn"
@@ -311,7 +314,9 @@ function EditorBody() {
       <CropEditor />
 
       <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
-        <p className="hint">改了之後，影片和文字的位置、大小會跟著新的畫面。按「套用」才會改；按 ✕ 關閉就不改。</p>
+        <p className="hint">
+          預覽的底不會變，框內是影片輸出的範圍，框外（斜線）不會輸出。按「套用」才會改；按 ✕ 關閉就不改。
+        </p>
         <div className="chips" role="radiogroup" aria-label="選擇畫面比例">
           <button
             role="radio"
@@ -332,15 +337,56 @@ function EditorBody() {
               {ASPECTS[a].label}
             </button>
           ))}
+          <button
+            role="radio"
+            aria-checked={ratioDraft === 'custom'}
+            className={`chip${ratioDraft === 'custom' ? ' active' : ''}`}
+            data-testid="ratio-custom"
+            onClick={() => setRatioDraft('custom')}
+          >
+            自訂
+          </button>
         </div>
+        {ratioDraft === 'custom' && <p className="hint">按「套用」後，在預覽上拖框的四邊或四角調整比例。</p>}
+        <div className="slider-label">改了之後</div>
+        <div className="chips" role="radiogroup" aria-label="改比例之後">
+          <button
+            role="radio"
+            aria-checked={!ratioFill}
+            className={`chip${!ratioFill ? ' active' : ''}`}
+            data-testid="ratio-keep"
+            onClick={() => setRatioFill(false)}
+          >
+            保持原樣
+          </button>
+          <button
+            role="radio"
+            aria-checked={ratioFill}
+            className={`chip${ratioFill ? ' active' : ''}`}
+            data-testid="ratio-fill"
+            onClick={() => setRatioFill(true)}
+          >
+            影片填滿畫面
+          </button>
+        </div>
+        <p className="hint">
+          {ratioFill
+            ? '位置、大小照新畫面的比例重新算，主要影片會填滿。'
+            : '每個東西在預覽上的位置、大小不變，超出框的部分留在斜線區。'}
+        </p>
         <div className="sheet-row">
           <button
             className="btn primary grow"
             data-testid="ratio-apply"
             onClick={() => {
-              const now: 'auto' | Aspect = project.aspectAuto ? 'auto' : project.aspect;
-              if (ratioDraft !== now) {
-                const a = setProjectAspect(ratioDraft);
+              const now: 'auto' | Aspect | 'custom' = project.aspectAuto ? 'auto' : project.aspect;
+              if (ratioDraft === 'custom') {
+                // 自訂：關掉視窗，在預覽上拖版面的邊（那邊也有「套用」和 ✕）
+                const f = frameFractions(project.width, project.height);
+                useUI.getState().player?.pause();
+                useUI.setState({ frameEdit: { fx: f.fx, fy: f.fy, fill: ratioFill } });
+              } else if (ratioDraft !== now) {
+                const a = setProjectAspect(ratioDraft, ratioFill ? 'fill' : 'keep');
                 if (ratioDraft === 'auto' && a) toast(`已設成自動（目前是 ${a}）`);
               }
               setRatioOpen(false);

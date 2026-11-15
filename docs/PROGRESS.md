@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-12：X1、X2（含 X2b 套用／儲存規則）、X3、X7 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
+- **下一步**：feedback-12：X1、X2（含 X2b 套用／儲存規則）、X3、X4、X7 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -75,6 +75,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 feedback-12 X4 畫面比例（Sonnet 實作）
+  - 做了什麼：①**預覽的底固定 9:16**（`.stage-wrap` 高度不再跟專案比例走、`.stage-base`），改比例時預覽、播放列、時間軸位置都不動；②**版面（輸出範圍）在底裡面置中**，外面蓋灰黑斜線（`.out-hatch`，半透明可看到框外的東西）＋左上小字「框內是影片輸出範圍 · 4:3」；③**框外也畫、也能拖**：Compositor 的 canvas 比版面大（`canvasWidth/Height`、`offsetX/Y`），圖層放在 `world` 容器裡整個位移；`samplePixel/readRegion/toCanvas` 加上位移所以座標仍以版面為準；匯出照舊只畫專案寬高；④預覽的 `.stage`（`data-testid=stage`）現在就是**版面框**（透明、`pointer-events:none`），選取框／觸控區／參考線都在它裡面，手勢收在 `.stage-base`；⑤比例視窗加「改了之後：**保持原樣**（預設，每個東西在預覽上的位置大小不變，超出的在斜線區）／**影片填滿畫面**（座標照新畫面）」，`setProjectAspect(choice, mode)`，換算在 `engine/aspectRemap.ts`（物件與定格都換算，來回不失真）；⑥**自訂比例**：比例視窗「自訂」→ 套用 → 預覽上出現白框＋四邊四角把手（框永遠置中，拖一邊＝兩邊一起動），中央小卡顯示「寬:高 ≈ 1.40（7:5）」、右上 ✕ 放棄、「套用」才改專案（`Project.aspect: 'custom'`，長邊 1920、寬高取偶數、比例限制 0.4～2.5；首頁卡片、頂列顯示 `aspectLabel／ratioText`）
+  - 動了哪些檔：新 `engine/{stage,aspectRemap}.ts`（＋test）、`app/editor/AspectOverlay.tsx`；`engine/{compositor,player}.ts`、`app/editor/{Preview,TrimSheet,MuteSheet}.tsx`、`app/pages/{Editor,Home}.tsx`、`store/{actions,uiStore}.ts`、`model/{types,defaults}.ts`、`storage/projects.ts`、`styles.css`；測試新 `e2e/x4.spec.ts`（固定底、置中、斜線；拖到框外＋輸出不含；保持原樣／填滿；自訂拖把手＋✕＋復原）、改 `fix-aspect`、`theme`
+  - 驗證：✅ 單元（stageLayout、remapKeepOnStage、customSize／ratioText）、e2e、`npm run check`  🟡 沒在真 iPhone 驗（框外的 Pixi 繪製、把手好不好抓）
+  - 跟規劃不同：①自訂比例的「套用／✕」不在預覽上方而是中央小卡（因為框貼到底的邊時，上下把手會被蓋住）；②自訂框拖的是「框占底的比例」，套用時才換算成寬高；③把手往框內縮 22px（框貼著底的邊時才不會被切掉）
+  - 下一步：X5 版型格子（示意圖、這一格視窗、多個版型）→ X6 輪流播放 → X8 畫畫
 - 2026-11-15 feedback-12 X2b 設定型彈出視窗一律有「套用／儲存」（Sonnet 實作）
   - 做了什麼：使用者新規則——設定型視窗除了 ❌ 還要有「套用」或「儲存」，沒按就關閉＝這次調整不算。畫面比例（草稿＋「套用」`ratio-apply`）、字體選擇（點字體只是先選，「套用」`font-apply`；匯入字體也只先選）、專案名稱（「儲存」，「用目前預覽畫面當封面」改成開關、按儲存才套用）、首頁更換封面（先選、「套用」`cover-apply`、選中有外框）、專案改名／片段命名（確定→儲存）、選色彈窗（確定→套用）、版型挑素材（按鈕「套用，選照片或影片」）。選單類（專案選單、軌道選單）、確認刪除、匯出（開始匯出）維持原樣
   - 動了哪些檔：`app/pages/{Editor,Home}.tsx`、`app/fonts/FontSelect.tsx`、`app/editor/LayoutPicker.tsx`、`ui/{PromptSheet,ColorPopup}.tsx`、`styles.css`；測試 `e2e/{x2,g1,g2,x1,phase1,phase3b,fix-colors,fix-aspect,x3}.spec.ts`

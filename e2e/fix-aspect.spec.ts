@@ -15,7 +15,7 @@ const info = async (page: Page): Promise<AspectInfo> => {
 /** 預覽 canvas 的寬高比 */
 const canvasRatio = (page: Page) =>
   page.evaluate(() => {
-    const c = document.querySelector('.stage canvas') as HTMLCanvasElement;
+    const c = document.querySelector('[data-testid="stage"]') as HTMLElement;
     const r = c.getBoundingClientRect();
     return r.width / r.height;
   });
