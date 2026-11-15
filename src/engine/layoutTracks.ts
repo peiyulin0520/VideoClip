@@ -34,22 +34,43 @@ export function cellTracksOf(tracks: Track[], group: string): Track[] {
 }
 
 /**
- * 把每個版型的格子軌搬到外框所在那一列的正下方（格子在外框下面，外框的洞才看得到格子）；
- * 沒有外框的格子軌不動。已經在對的位置就原樣回傳同一個陣列。
+ * 把每個版型的軌道排到外框那一列的前後（X9）：格子軌貼在外框列的正下方（外框的洞才看得到格子），
+ * 版型裡的文字、貼圖成員軌貼在外框列的正上方（彼此順序不動，可以任意穿插）。
+ * 音效成員軌沒有畫面，維持在最後面跟其他音訊一起。沒有外框的軌道不動。
+ * 已經在對的位置就原樣回傳同一個陣列。
  */
 export function normalizeGroupTracks(tracks: Track[]): Track[] {
   const groups = new Set<string>();
-  for (const t of tracks) if (t.groupRole === 'cell' && t.group) groups.add(t.group);
+  for (const t of tracks) if (t.groupRole && t.group) groups.add(t.group);
   if (groups.size === 0) return tracks;
   let out = tracks;
+  const visualMember = (t: Track, g: string) =>
+    t.group === g && t.groupRole === 'member' && t.kind !== 'audio';
   for (const g of groups) {
     const fr = frameOfGroup(out, g);
     if (!fr) continue;
     const cells = out.filter((t) => t.group === g && t.groupRole === 'cell');
-    const rest = out.filter((t) => !(t.group === g && t.groupRole === 'cell'));
-    const at = rest.findIndex((t) => t.id === fr.track.id);
-    const next = [...rest.slice(0, at), ...cells, ...rest.slice(at)];
-    if (next.some((t, i) => t !== out[i])) out = next;
+    const members = out.filter((t) => visualMember(t, g));
+    if (cells.length) {
+      const rest = out.filter((t) => !(t.group === g && t.groupRole === 'cell'));
+      const at = rest.findIndex((t) => t.id === fr.track.id);
+      const next = [...rest.slice(0, at), ...cells, ...rest.slice(at)];
+      if (next.some((t, i) => t !== out[i])) out = next;
+    }
+    if (members.length) {
+      // 成員都已經在外框列上方那一串成員軌裡 → 不動（保持使用者排的順序）
+      const fi = out.findIndex((t) => t.id === fr.track.id);
+      let end = fi + 1;
+      while (end < out.length && out[end]!.groupRole === 'member' && out[end]!.kind !== 'audio') end++;
+      const run = new Set(out.slice(fi + 1, end).map((t) => t.id));
+      if (!members.every((t) => run.has(t.id))) {
+        const rest = out.filter((t) => !visualMember(t, g));
+        const at = rest.findIndex((t) => t.id === fr.track.id);
+        let j = at + 1;
+        while (j < rest.length && rest[j]!.groupRole === 'member' && rest[j]!.kind !== 'audio') j++;
+        out = [...rest.slice(0, j), ...members, ...rest.slice(j)];
+      }
+    }
   }
   return out;
 }

@@ -4017,3 +4017,85 @@ button:not(:disabled):active,
   width: auto;
   min-width: 0;
 }
+
+/* X9：這一類的軌道中間夾著別類（在圖層分頁排成夾心）的小標 */
+.cat-mixed {
+  position: sticky;
+  left: 9em;
+  z-index: 5;
+  min-height: 0;
+  min-width: 0;
+  height: 22px;
+  margin-left: 6px;
+  padding: 0 0.7em;
+  border-radius: 11px;
+  font-size: var(--fs-note);
+  white-space: nowrap;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* X9 圖層分頁：種類標籤、第幾層、版型裡的縮排、更多排序 */
+.layer-row {
+  flex-wrap: wrap;
+}
+.layer-row.sub {
+  margin-left: 1em;
+}
+.layer-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  gap: 1px;
+}
+.layer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  align-items: center;
+  font-size: var(--fs-note);
+  color: var(--muted);
+}
+.layer-kind {
+  padding: 0 0.5em;
+  border-radius: 999px;
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+.layer-kind.k-media {
+  background: color-mix(in srgb, #4da3ff 22%, transparent);
+}
+.layer-kind.k-sticker {
+  background: color-mix(in srgb, #ffc83d 24%, transparent);
+}
+.layer-kind.k-text {
+  background: color-mix(in srgb, #ff6fa5 24%, transparent);
+}
+.layer-row .btn-zone {
+  flex: none;
+}
+.layer-row .zone-sep {
+  margin: 8px 2px;
+}
+.layer-more {
+  display: flex;
+  gap: 8px;
+  flex-basis: 100%;
+  padding: 2px 0 6px 2.2em;
+}
+
+.layer-row .layer-name {
+  flex: 1 1 10em;
+  min-width: 10em;
+}
+.layer-btns {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+}
+.layer-meta > span {
+  white-space: nowrap;
+}

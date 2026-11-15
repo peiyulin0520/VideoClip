@@ -35,7 +35,7 @@ import { Wave } from './Wave';
 import {
   closeGap,
   moveItemTo,
-  moveTrackTo,
+  moveTrackInKindTo,
   patchTrack,
   placeItem,
   removeTrack,
@@ -43,7 +43,7 @@ import {
   moveTracksMulti,
   removeTracksMulti,
   setGroupDuration,
-  shiftTrackLayer,
+  shiftTrackInKind,
 } from '../../store/actions';
 import { setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
@@ -324,7 +324,7 @@ export function Timeline({
       .filter((r) => !r.track.groupRole)
       .reverse();
     const slots: { edge: 'top' | 'bottom'; top: number }[] = [];
-    const heads: { kind: TrackKind; tracks: Track[]; top: number; open: boolean }[] = [];
+    const heads: { kind: TrackKind; tracks: Track[]; top: number; open: boolean; mixed: boolean }[] = [];
     const rows: { track: Track; index: number; h: number; top: number; sub?: string }[] = [];
     const gheads: { group: string; label: string; top: number; cells: number; empty: number }[] = [];
     const sheads: {
@@ -342,7 +342,19 @@ export function Timeline({
       if (list.length === 0) continue;
       if (kind === 'audio') y += ROW_GAP * 2;
       const open = showAll || !closed.includes(kind);
-      heads.push({ kind, tracks: list.map((r) => r.track), top: y, open });
+      // 這一類的軌道中間夾著別種類的畫面軌（在圖層分頁排成夾心）：標題列提示播放軸的上下不等於全部的上下
+      const idxs = list.map((r) => r.index);
+      const mixed =
+        kind !== 'audio' &&
+        project.tracks.some(
+          (t, i) =>
+            i > Math.min(...idxs) &&
+            i < Math.max(...idxs) &&
+            t.kind !== kind &&
+            t.kind !== 'audio' &&
+            !t.groupRole,
+        );
+      heads.push({ kind, tracks: list.map((r) => r.track), top: y, open, mixed });
       y += HEAD_H + ROW_GAP;
       if (!open) continue;
       if (slotZone === ZONE[kind]) {
@@ -405,8 +417,7 @@ export function Timeline({
     const me = rows[from];
     if (!me) return from;
     const center = me.top + me.h / 2 + dy;
-    const zone = ZONE[me.track.kind];
-    const same = rows.map((r, i) => ({ r, i })).filter((x) => !x.r.sub && ZONE[x.r.track.kind] === zone);
+    const same = rows.map((r, i) => ({ r, i })).filter((x) => !x.r.sub && x.r.track.kind === me.track.kind);
     let to = same[0]!.i;
     for (const { r, i } of same) if (i !== from && r.top + r.h / 2 < center) to++;
     return Math.min(to, same[same.length - 1]!.i);
@@ -454,7 +465,11 @@ export function Timeline({
       setTrackDrag(null);
       if (cancelled) return;
       const to = dropRow(from, ev.clientY - startY);
-      if (to !== from) moveTrackTo(trackId, rows[to]!.index); // 顯示列 → 軌道在陣列裡的位置（同一區內）
+      if (to !== from) {
+        // 顯示列 → 「同種類裡第幾條（0＝最下面）」；穿插了別種類的時候陣列 index 不連續，不能直接用
+        const same = rows.filter((r) => !r.sub && r.track.kind === rows[from]!.track.kind);
+        moveTrackInKindTo(trackId, same.length - 1 - same.indexOf(rows[to]!));
+      }
     };
     const up = (ev: PointerEvent) => end(ev, false);
     const cancel = (ev: PointerEvent) => end(ev, true);
@@ -739,7 +754,6 @@ export function Timeline({
   };
 
   const menuTrack = project.tracks.find((t) => t.id === menuTrackId) ?? null;
-  const menuIndex = menuTrack ? project.tracks.indexOf(menuTrack) : -1;
   // 時間軸高度＝全部軌道（不在裡面上下捲；上下交給整頁捲動）
   const viewH = Math.max(contentH, 112);
 
@@ -847,6 +861,17 @@ export function Timeline({
                   {hd.open ? '▾' : '▸'} {KIND_NAME[hd.kind]} {hd.tracks.length}
                   {hidden > 0 && `（${hidden} 條隱藏）`}
                 </button>
+                {hd.mixed && (
+                  <button
+                    className="cat-mixed"
+                    data-testid="cat-mixed"
+                    aria-label="這一類有圖層和別類穿插，到圖層分頁看完整順序"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => useUI.setState({ requestTab: 'layers' })}
+                  >
+                    已穿插
+                  </button>
+                )}
               </div>
             );
           })}
@@ -1271,9 +1296,8 @@ export function Timeline({
                       onClick={() => {
                         if (menuTrack.groupRole === 'member') {
                           if (!shiftMemberLayer(menuTrack.id, 1)) toast('已經是版型裡最上面的圖層');
-                        } else if (project.tracks[menuIndex + 1]?.kind !== menuTrack.kind)
-                          toast('已經是這一類最上面的軌道（影像、特效、字卡不能互相穿插）');
-                        else shiftTrackLayer(menuTrack.id, 1);
+                        } else if (!shiftTrackInKind(menuTrack.id, 1))
+                          toast('已經是這一類最上面的軌道。要讓文字夾在影像中間，到「圖層」分頁調整');
                         setMenuTrackId(null);
                       }}
                     >
@@ -1284,9 +1308,8 @@ export function Timeline({
                       onClick={() => {
                         if (menuTrack.groupRole === 'member') {
                           if (!shiftMemberLayer(menuTrack.id, -1)) toast('已經是版型裡最下面的圖層');
-                        } else if (project.tracks[menuIndex - 1]?.kind !== menuTrack.kind)
-                          toast('已經是這一類最下面的軌道（影像、特效、字卡不能互相穿插）');
-                        else shiftTrackLayer(menuTrack.id, -1);
+                        } else if (!shiftTrackInKind(menuTrack.id, -1))
+                          toast('已經是這一類最下面的軌道。要讓文字夾在影像中間，到「圖層」分頁調整');
                         setMenuTrackId(null);
                       }}
                     >

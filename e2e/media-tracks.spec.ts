@@ -83,7 +83,7 @@ test('刪除只刪這一段、留空位；刪除並補齊讓後面的往前接�
   expect(await starts()).toEqual([0, 2, 3.6]);
 });
 
-test('軌道分區：新增字卡、音樂、影像後，順序永遠是 影像 → 字卡 → 音訊；時間軸上音訊畫在最下面；影像不能換到字卡上面', async ({
+test('軌道預設順序：新增字卡、音樂、影像後是 影像 → 字卡 → 音訊；時間軸上音訊畫在最下面；圖層分頁可以讓影像換到字卡上面、音訊不參與', async ({
   page,
 }) => {
   await createProjectWith(page, ['solid-red.webm']);
@@ -103,11 +103,22 @@ test('軌道分區：新增字卡、音樂、影像後，順序永遠是 影像 
     .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.kind));
   expect(kinds).toEqual(['text', 'media', 'media', 'media', 'audio']);
 
-  // 圖層分頁：最上面那條影像軌往上一層＝提示不能跨類；字卡軌的「往下一層」也一樣
+  // 圖層分頁（X9）：最上面那條影像軌往上一層＝換到字卡上面（跨類別）；再往上一層＝已經最上面
   await openTab(page, '圖層');
   await page.getByRole('button', { name: '影像 3 往上一層' }).tap();
+  expect((await tracks(page)).map((t) => t.kind)).toEqual(['media', 'media', 'text', 'media', 'audio']);
+  await page.getByRole('button', { name: '影像 3 往上一層' }).tap();
   await expect(page.locator('.toast').filter({ hasText: '最上面的圖層' })).toBeVisible();
-  expect((await tracks(page)).map((t) => t.kind)).toEqual(['media', 'media', 'media', 'text', 'audio']);
+  expect((await tracks(page)).map((t) => t.kind)).toEqual(['media', 'media', 'text', 'media', 'audio']);
+  // 時間軸（播放軸）還是照類別分段：字卡、影像（上到下）、音訊；影像那一類中間夾了字卡 → 標題有「已穿插」
+  await showTimeline(page);
+  const after = await page
+    .getByTestId('track')
+    .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.kind));
+  expect(after).toEqual(['text', 'media', 'media', 'media', 'audio']);
+  await expect(
+    page.locator('[data-testid="cat-head"][data-kind="media"]').getByTestId('cat-mixed'),
+  ).toBeVisible();
 });
 
 test('每一條影像軌地位一樣：最下面那條也能往上換、能放在任何時間；兩條影像軌的上下順序決定誰蓋住誰', async ({

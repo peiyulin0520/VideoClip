@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-12：X1、X2（含 X2b/X2c）、X3、X4、X5、X7、版型 v2 L0～L8（含 L6 按鈕分區）都做完（待使用者在 iPhone 驗收、開 PR）；**X9 圖層跨類別自由排序已規劃好（`docs/plans/2026-11-15-x9-layer-order.md`），使用者已定案（播放軸照分類、跨類夾心在圖層分頁、主軌不特別），下一步切 Sonnet 做 X9-1～X9-4**；接著 X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
+- **下一步**：feedback-12：X1、X2（含 X2b/X2c）、X3、X4、X5、X7、版型 v2 L0～L8（含 L6）、**X9 圖層跨類別排序（X9-1～X9-4，版型裡子標題仍分類，見日誌）** 都做完（待使用者在 iPhone 驗收、開 PR）；接著 X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -83,6 +83,14 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 X9 圖層可以跨類別自由排序（Sonnet 實作）
+  - 使用者需求：文字夾在兩個影像中間；播放軸一律照分類（類別裡照順序），跨類夾心到圖層分頁調；主軌不特別（計畫 `docs/plans/2026-11-15-x9-layer-order.md`）
+  - 做了什麼：**引擎**（`engine/timeline.ts`）：軌道陣列切成「一塊」（`trackUnits`：一般軌＋下面的格子軌＋上面的版型成員軌；音訊各一塊），換順序整塊搬；`moveTrack`（跨類，圖層分頁）、`moveTrackInKind`／`reorderInKind`（同類，播放軸，跨過中間別類且不打亂夾心）、`reorderTrack`（落在版型中間→推到塊的上面或下面）、`moveTracksBy`（多選，同類）、`insertIndexFor`（新軌道＝同種類最上面那塊上面，這種還沒有→預設順序較低種類的上面）、`normalizeLayers`（音訊排最後，`projectStore.apply` 每次跑）；`normalizeZones` 只剩舊專案轉換用。`normalizeGroupTracks`：版型的文字、貼圖成員軌也貼在外框列**正上方**（音效成員仍在最後）。**actions**：`shiftTrackInKind`、`moveTrackInKindTo`、`moveTrackPast`（圖層分頁 ▲▼：跟這一秒上下最近、不同一塊的圖層換）、`moveTrackToEdge`（移到最上／最下層）、`shiftMemberLayer` 可跨種類（版型裡文字在貼圖下面）、`memberTrackFor` 新成員軌放在版型最上面成員軌上面。**播放軸**：照舊四類，拖軌道圖示／選單 ▲▼ 只在同類（沒有同類鄰居 toast「到『圖層』分頁調整」）；某類中間夾了別類 → 標題旁「已穿插」小標，點了切到圖層分頁。**圖層分頁**：每列有種類標籤（影像／貼圖／字卡）＋「第 n 層」、版型裡的縮排並寫「版型 · 名稱」／「整個版型」、▲▼ ⋯ 一組（⋯＝移到最上層／最下層）跟眼睛鎖頭用線隔開；格子列沒有 ▲▼；320 寬按鈕自動換到名稱下一行、不擠字
+  - 動了哪些檔：`engine/{timeline,layoutTracks}.ts`、`store/{actions,projectStore}.ts`、`app/editor/Timeline.tsx`、`app/editor/tabs/LayersTab.tsx`、`app/styles.css`；測試 `engine/layerOrder.test.ts`（新）、`timeline.{free,multi,test}.test.ts`、`e2e/x9-layer-order.spec.ts`（新，5 個）、`e2e/media-tracks.spec.ts`；截圖 `docs/screenshots/feedback-12/x9-*.png`
+  - 驗證：✅ 單元 1019、e2e 289、`npm run check`；夾心預覽與匯出像素一致  🟡 沒在真 iPhone 驗
+  - 踩到的坑：①舊專案載入後，版型裡的文字從「所有影像上面」變成「版型正上方」（只有版型上面同一時間還疊著別的影像時畫面會變）②**已知限制**：播放軸展開版型後的子標題（文字／貼圖／影像／音效）仍按種類分，版型裡文字與貼圖穿插的順序只在圖層分頁看得到③播放軸 `cat-mixed` 小標用 sticky 位置，標題文字很長時可能不貼齊
+  - 下一步：使用者 iPhone 驗收；X6 輪流播放、X8 畫畫
+
 - 2026-11-15 X9 定案（Opus 改計畫）
   - 使用者原話：「影像不區分是不是主軌，播放軸中的素材一樣分類，在各類別排序，如果要有分類夾心，可以再自行去圖層頁面調整，圖層頁籤可以跨分類調整圖層順序，但播放軸一律是按照分類，分類下再依據順序排序。」
   - 做了什麼：改 `docs/plans/2026-11-15-x9-layer-order.md`：拿掉「播放軸不分類」選項與「主軌永遠最下面」；分成兩種換順序——播放軸的同類換一層（跨過中間別類，`moveTrackInKind`／`reorderInKind`）、圖層分頁的跨類換一層（`moveTrack`／`moveTrackPast`）；播放軸類別標題有穿插時加「已穿插」小標（點了到圖層分頁）；驗收補「主軌可以上下移」「同類換順序不打亂穿插」

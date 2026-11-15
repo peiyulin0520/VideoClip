@@ -132,7 +132,7 @@ describe('軌道分區：影像 → 特效 → 字卡 → 音訊', () => {
     return { p, t };
   };
 
-  it('normalizeZones：依分區排好，同一區維持原本的相對順序', () => {
+  it('normalizeZones（舊專案轉換用）：依預設順序排好，同一區維持原本的相對順序', () => {
     const { p, t } = mk();
     const text1 = t('text');
     const audio = t('audio');
@@ -144,7 +144,7 @@ describe('軌道分區：影像 → 特效 → 字卡 → 音訊', () => {
     expect(normalizeZones(mixed)[1]).toBe(media2);
   });
 
-  it('insertIndexFor：新軌道放在同一區最上面；那一區還沒有就接在前面各區後面', () => {
+  it('insertIndexFor：新軌道放在同種類最上面；這種還沒有就接在預設順序比它低的種類後面', () => {
     const { p, t } = mk();
     p.tracks.push(t('text'), t('audio'));
     expect(insertIndexFor(p.tracks, 'media')).toBe(1); // 影像區只有 [0]，新的放它上面（字卡前面）

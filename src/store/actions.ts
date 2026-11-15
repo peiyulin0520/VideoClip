@@ -44,15 +44,18 @@ import {
   mergeTracksByIds,
   moveItemToTrack,
   moveTrack,
+  moveTrackInKind,
   moveTracksBy,
   placeSequential,
   removeTracksByIds,
+  reorderInKind,
   reorderTrack,
   rippleDelete,
   splitByRanges,
   splitFree,
   totalDuration,
   trackEnd,
+  trackUnits,
 } from '../engine/timeline';
 import { frameOfGroup, isFrameItem } from '../engine/layoutTracks';
 import { remapKeepOnStage } from '../engine/aspectRemap';
@@ -807,7 +810,18 @@ function memberTrackFor(
   const tr = createTrack(kind, d.tracks);
   tr.group = group;
   tr.groupRole = 'member';
-  const at = insertIndexFor(d.tracks, kind);
+  // 畫面成員軌（文字、貼圖）：放在這個版型最上面那條成員軌的上面；還沒有就貼在外框那一列的正上方（X9）。音效跟其他音訊放最後
+  let at = insertIndexFor(d.tracks, kind);
+  if (kind !== 'audio') {
+    let last = -1;
+    d.tracks.forEach((t, i) => {
+      if (t.group === group && t.groupRole === 'member' && t.kind !== 'audio') last = i;
+    });
+    const fr = frameOfGroup(d.tracks, group);
+    const fi = fr ? d.tracks.findIndex((t) => t.id === fr.track.id) : -1;
+    if (last >= 0) at = last + 1;
+    else if (fi >= 0) at = fi + 1;
+  }
   d.tracks.splice(at, 0, tr);
   return d.tracks[at]!;
 }
@@ -1554,27 +1568,98 @@ export function shiftTrackLayer(trackId: string, dir: -1 | 1) {
 }
 
 /**
- * 版型裡的文字／貼圖軌道往上（dir=1）或往下（-1）一層：只跟「同一個版型、同一種類」的鄰居換位置，
- * 不會跑到版型外面的圖層上。已經在最上面／最下面回傳 false。一步復原。
+ * 版型裡的文字／貼圖軌道往上（dir=1）或往下（-1）一層：可以跟同一個版型的其他成員軌（含不同種類，
+ * 版型裡的文字可以在貼圖下面）換位置，不會跑到版型外面的圖層上。已經在最上面／最下面回傳 false。一步復原。
  */
 export function shiftMemberLayer(trackId: string, dir: -1 | 1): boolean {
   const p = store().project;
   const i = p ? p.tracks.findIndex((t) => t.id === trackId) : -1;
   const t = p?.tracks[i];
   if (!p || !t || t.groupRole !== 'member' || !t.group) return false;
-  let j = i + dir;
-  while (j >= 0 && j < p.tracks.length) {
-    const o = p.tracks[j]!;
-    if (o.group === t.group && o.groupRole === 'member' && o.kind === t.kind) break;
-    if (o.kind !== t.kind) return false; // 到了別的類別（字卡、貼圖、影像不能互相穿插）
-    j += dir;
-  }
-  if (j < 0 || j >= p.tracks.length) return false;
+  const o = p.tracks[i + dir];
+  if (!o || o.group !== t.group || o.groupRole !== 'member' || (o.kind === 'audio') !== (t.kind === 'audio'))
+    return false;
   store().apply((d) => {
     const a = d.tracks[i]!;
-    d.tracks[i] = d.tracks[j]!;
-    d.tracks[j] = a;
+    d.tracks[i] = d.tracks[i + dir]!;
+    d.tracks[i + dir] = a;
   });
+  return true;
+}
+
+/** 播放軸用：同類換一層（往上／往下一條同種類的軌道，跨過中間別種類的軌道）。沒有同類鄰居回傳 false。一步復原 */
+export function shiftTrackInKind(trackId: string, dir: -1 | 1): boolean {
+  const p = store().project;
+  if (!p) return false;
+  const next = moveTrackInKind(p.tracks as Track[], trackId, dir);
+  if (next === p.tracks) return false;
+  store().apply((d) => void (d.tracks = next as never));
+  return true;
+}
+
+/** 播放軸拖軌道圖示：搬到同種類裡的第 toKindIndex 條（0＝同類最下面）。一步復原 */
+export function moveTrackInKindTo(trackId: string, toKindIndex: number) {
+  store().apply((d) => {
+    d.tracks = reorderInKind(d.tracks as Track[], trackId, toKindIndex) as never;
+  });
+}
+
+/**
+ * 圖層分頁用：把軌道搬到另一條軌道的上面（above=true）或下面，可以跨類別（文字夾在兩個影像中間）。
+ * 一般軌整塊搬（版型的格子、成員跟著外框）；版型成員只能在同一個版型的成員之間。
+ * 搬不動回傳 false。一步復原
+ */
+export function moveTrackPast(trackId: string, otherId: string, above: boolean): boolean {
+  const p = store().project;
+  if (!p) return false;
+  const tracks = p.tracks as Track[];
+  const from = tracks.findIndex((t) => t.id === trackId);
+  const to = tracks.findIndex((t) => t.id === otherId);
+  const t = tracks[from];
+  const o = tracks[to];
+  if (!t || !o || from === to) return false;
+  if (t.groupRole === 'member') {
+    if (o.groupRole !== 'member' || o.group !== t.group || (o.kind === 'audio') !== (t.kind === 'audio'))
+      return false;
+    const next = tracks.slice();
+    next.splice(from, 1);
+    next.splice(next.findIndex((x) => x.id === otherId) + (above ? 1 : 0), 0, t);
+    store().apply((d) => void (d.tracks = next as never));
+    return true;
+  }
+  if (t.groupRole) return false; // 版型的格子不在這裡換
+  const units = trackUnits(tracks);
+  const k = units.findIndex((u) => u.lo <= from && from <= u.hi);
+  // 對方如果是版型的成員／格子：以它所屬的那一整塊為準
+  const j = units.findIndex((u) => u.lo <= to && to <= u.hi);
+  if (k < 0 || j < 0 || k === j || (units[k]!.kind === 'audio') !== (units[j]!.kind === 'audio'))
+    return false;
+  const order = units.map((_, n) => n).filter((n) => n !== k);
+  order.splice(order.indexOf(j) + (above ? 1 : 0), 0, k);
+  if (order.every((v, n) => v === n)) return false;
+  const next = order.flatMap((n) => tracks.slice(units[n]!.lo, units[n]!.hi + 1));
+  store().apply((d) => void (d.tracks = next as never));
+  return true;
+}
+
+/**
+ * 圖層分頁「移到最上層／最下層」：一般軌搬到所有畫面圖層的最上面／最下面（整塊）；
+ * 版型成員搬到那個版型成員的最上面／最下面。已經在那裡回傳 false。一步復原
+ */
+export function moveTrackToEdge(trackId: string, edge: 'top' | 'bottom'): boolean {
+  const p = store().project;
+  const t = p?.tracks.find((x) => x.id === trackId);
+  if (!p || !t || t.groupRole === 'cell') return false;
+  if (t.groupRole === 'member') {
+    const mates = p.tracks.filter(
+      (x) => x.group === t.group && x.groupRole === 'member' && (x.kind === 'audio') === (t.kind === 'audio'),
+    );
+    const end = edge === 'top' ? mates[mates.length - 1] : mates[0];
+    return !!end && end.id !== trackId && moveTrackPast(trackId, end.id, edge === 'top');
+  }
+  const next = reorderTrack(p.tracks as Track[], trackId, edge === 'top' ? Number.MAX_SAFE_INTEGER : 0);
+  if (next === p.tracks) return false;
+  store().apply((d) => void (d.tracks = next as never));
   return true;
 }
 

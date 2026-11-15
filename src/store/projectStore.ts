@@ -1,4 +1,5 @@
 import { normalizeGroupTracks } from '../engine/layoutTracks';
+import { normalizeLayers } from '../engine/timeline';
 import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
 import type { Asset, Item, Project } from '../model/types';
@@ -46,8 +47,8 @@ export const useProjectStore = create<State>((set, get) => ({
     let next = produce(project, (d) => {
       recipe(d);
     });
-    // 版型的格子軌永遠貼在外框那一列的正下方（外框被搬到別列、軌道順序改了之後也一樣）
-    const fixed = normalizeGroupTracks(next.tracks);
+    // 版型的格子軌永遠貼在外框那一列的正下方、成員軌（文字、貼圖）貼在正上方（外框被搬到別列、軌道順序改了之後也一樣）；音訊軌永遠排最後
+    const fixed = normalizeLayers(normalizeGroupTracks(next.tracks));
     if (fixed !== next.tracks) next = { ...next, tracks: fixed };
     if (next === project) return;
     const stamped = { ...next, updatedAt: Date.now() };

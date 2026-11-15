@@ -3,10 +3,14 @@ import { MAX_SPEED, MIN_CLIP_DURATION, MIN_SPEED, newId } from '../model/default
 import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../model/types';
 import { shiftKeyframes, splitKeyframes } from './keyframes';
 
-/** 軌道種類的分區：影像 → 貼圖 → 字卡 → 音訊（陣列由前到後＝由下到上的圖層順序）。素材只能放進同種類的軌道。 */
+/**
+ * 軌道種類的「預設順序」：影像 → 貼圖 → 字卡 → 音訊。X9（2026-11-15）起不再鎖死：
+ * 影像、貼圖、字卡的軌道可以在圖層分頁任意穿插；這張表只決定「新軌道預設放哪裡」，
+ * 以及舊專案轉換（migrate）時怎麼排。音訊沒有畫面，永遠排在陣列最後。
+ */
 export const ZONE: Record<TrackKind, number> = { media: 0, sticker: 1, text: 2, audio: 3 };
 
-/** 依分區排好（同一區維持原本的相對順序） */
+/** 依預設順序排好（同一區維持原本的相對順序）。只給舊專案轉換用，不要在一般流程呼叫（會拆掉使用者排的夾心） */
 export function normalizeZones(tracks: Track[]): Track[] {
   return tracks
     .map((t, i) => ({ t, i }))
@@ -14,16 +18,95 @@ export function normalizeZones(tracks: Track[]): Track[] {
     .map((x) => x.t);
 }
 
-/** 新軌道要插在陣列的哪個位置：放在同種類（同區）的最上面；那一區還沒有軌道就接在前面各區的後面 */
-export function insertIndexFor(tracks: Track[], kind: TrackKind): number {
-  let idx = 0;
-  tracks.forEach((t, i) => {
-    if (ZONE[t.kind] <= ZONE[kind]) idx = i + 1;
-  });
-  return idx;
+/** 音訊軌一律排在最後（相對順序不變）；畫面軌的順序原樣保留。已經是這樣就回傳同一個陣列 */
+export function normalizeLayers(tracks: Track[]): Track[] {
+  const visual = tracks.filter((t) => t.kind !== 'audio');
+  const audio = tracks.filter((t) => t.kind === 'audio');
+  const next = [...visual, ...audio];
+  return next.every((t, i) => t === tracks[i]) ? tracks : next;
 }
 
-/** 這個種類的軌道在陣列裡的範圍 [lo, hi]（含）；沒有這種軌道回傳 null */
+/**
+ * 軌道陣列切成「一塊一塊」：一塊＝一條一般軌＋貼在它下面的版型格子軌＋貼在它上面的版型成員軌（文字、貼圖）；
+ * 音訊軌各自一塊。換圖層順序都是整塊搬，版型不會被拆開。lo、hi 是陣列的 index（含）。
+ */
+export interface TrackUnit {
+  lo: number;
+  hi: number;
+  /** 這一塊的一般軌（沒有就是 -1，例如只剩孤兒格子） */
+  base: number;
+  kind: TrackKind;
+}
+export function trackUnits(tracks: Track[]): TrackUnit[] {
+  const units: TrackUnit[] = [];
+  let cur: TrackUnit | null = null;
+  const flush = () => {
+    if (cur) units.push(cur);
+    cur = null;
+  };
+  tracks.forEach((t, i) => {
+    if (t.kind === 'audio') {
+      flush();
+      units.push({ lo: i, hi: i, base: i, kind: 'audio' });
+      return;
+    }
+    if (!t.groupRole) {
+      if (cur && cur.base >= 0) flush();
+      if (!cur) cur = { lo: i, hi: i, base: i, kind: t.kind };
+      else {
+        cur.hi = i;
+        cur.base = i;
+        cur.kind = t.kind;
+      }
+    } else if (t.groupRole === 'cell') {
+      if (cur && cur.base >= 0) flush();
+      if (!cur) cur = { lo: i, hi: i, base: -1, kind: t.kind };
+      else cur.hi = i;
+    } else if (!cur) cur = { lo: i, hi: i, base: -1, kind: t.kind };
+    else cur.hi = i;
+  });
+  flush();
+  return units;
+}
+
+const flatten = (tracks: Track[], units: TrackUnit[]): Track[] =>
+  units.flatMap((u) => tracks.slice(u.lo, u.hi + 1));
+
+/** 把第 from 塊搬到第 to 塊的「上面」（after=true）或「下面」；回傳新的軌道陣列，沒變回傳原陣列 */
+function moveUnit(tracks: Track[], units: TrackUnit[], from: number, to: number, after: boolean): Track[] {
+  if (from === to) return tracks;
+  const order = units.map((_, i) => i).filter((i) => i !== from);
+  const at = order.indexOf(to) + (after ? 1 : 0);
+  order.splice(at, 0, from);
+  if (order.every((v, i) => v === i)) return tracks;
+  return flatten(
+    tracks,
+    order.map((i) => units[i]!),
+  );
+}
+
+const unitOfTrack = (units: TrackUnit[], idx: number) => units.findIndex((u) => u.lo <= idx && idx <= u.hi);
+
+/**
+ * 新軌道要插在陣列的哪個位置：同種類（一般軌）最上面那一塊的上面；這種還沒有軌道 →
+ * 接在「預設順序比它低的種類」最上面那一塊的上面；都沒有 → 最下面。音訊放最後。
+ * 不會插進版型那一塊中間。
+ */
+export function insertIndexFor(tracks: Track[], kind: TrackKind): number {
+  if (kind === 'audio') return tracks.length;
+  const units = trackUnits(tracks).filter((u) => u.kind !== 'audio');
+  const top = (pred: (u: TrackUnit) => boolean) => {
+    let hi = -1;
+    for (const u of units) if (pred(u)) hi = Math.max(hi, u.hi);
+    return hi;
+  };
+  const same = top((u) => u.kind === kind);
+  if (same >= 0) return same + 1;
+  const lower = top((u) => ZONE[u.kind] < ZONE[kind]);
+  return lower >= 0 ? lower + 1 : 0;
+}
+
+/** 這個種類的一般軌在陣列裡的範圍 [lo, hi]（含，穿插時中間會夾著別種類）；沒有這種軌道回傳 null */
 export function zoneRange(tracks: Track[], kind: TrackKind): [number, number] | null {
   let lo = -1;
   let hi = -1;
@@ -317,30 +400,78 @@ export function trimEndFree(
   });
 }
 
-/** 交換圖層順序（dir = +1 往上層）。只能在同種類（同一區）的軌道之間換，不能跨區。 */
+/**
+ * 圖層分頁用：跨類別換一層（dir = +1 往上層）。整塊搬（版型的格子、成員跟著外框那一列），
+ * 可以跟別種類的軌道換（文字可以夾在兩個影像中間）；音訊只跟音訊換，畫面軌不會換到音訊後面。
+ * 版型的格子軌只跟同一個版型的格子換。到頂／到底回傳原陣列。
+ */
 export function moveTrack(tracks: Track[], id: string, dir: -1 | 1): Track[] {
   const i = tracks.findIndex((t) => t.id === id);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= tracks.length || tracks[j]!.kind !== tracks[i]!.kind) return tracks;
-  const next = tracks.slice();
-  [next[i], next[j]] = [next[j]!, next[i]!];
-  return next;
+  if (i < 0) return tracks;
+  const t = tracks[i]!;
+  if (t.groupRole) {
+    const j = i + dir;
+    const o = tracks[j];
+    if (!o || o.group !== t.group || o.groupRole !== t.groupRole || o.kind !== t.kind) return tracks;
+    const next = tracks.slice();
+    [next[i], next[j]] = [next[j]!, next[i]!];
+    return next;
+  }
+  const units = trackUnits(tracks);
+  const k = unitOfTrack(units, i);
+  const o = units[k + dir];
+  if (k < 0 || !o || (o.kind === 'audio') !== (units[k]!.kind === 'audio')) return tracks;
+  return moveUnit(tracks, units, k, k + dir, dir === 1);
 }
 
 /**
- * 把軌道搬到新的圖層位置 toIndex（tracks 的 index）；會夾在同種類（同一區）的範圍內，不能跨區。
- * 沒有變動回傳原陣列。
+ * 播放軸用：同類換一層。往上＝搬到「上面最近那條同種類軌道」的上面，中間隔著的別種類軌道被跨過去、
+ * 它們彼此的順序不變（使用者在圖層分頁排好的夾心不會被打亂）。沒有同類鄰居回傳原陣列。
+ */
+export function moveTrackInKind(tracks: Track[], id: string, dir: -1 | 1): Track[] {
+  const i = tracks.findIndex((t) => t.id === id);
+  if (i < 0 || tracks[i]!.groupRole) return tracks;
+  const units = trackUnits(tracks);
+  const k = unitOfTrack(units, i);
+  if (k < 0) return tracks;
+  for (let j = k + dir; j >= 0 && j < units.length; j += dir)
+    if (units[j]!.kind === units[k]!.kind) return moveUnit(tracks, units, k, j, dir === 1);
+  return tracks;
+}
+
+/**
+ * 直接把軌道搬到新的圖層位置 toIndex（tracks 的 index）：整塊搬；畫面軌夾在畫面軌範圍、音訊夾在音訊範圍；
+ * 目標落在別的一塊中間（版型）就放到那塊的上面或下面。沒有變動回傳原陣列。
  */
 export function reorderTrack(tracks: Track[], id: string, toIndex: number): Track[] {
   const from = tracks.findIndex((t) => t.id === id);
-  if (from < 0) return tracks;
-  const [lo, hi] = zoneRange(tracks, tracks[from]!.kind)!;
+  if (from < 0 || tracks[from]!.groupRole) return tracks;
+  const units = trackUnits(tracks);
+  const k = unitOfTrack(units, from);
+  const audio = units[k]!.kind === 'audio';
+  const cand = units.map((u, n) => ({ u, n })).filter((x) => (x.u.kind === 'audio') === audio);
+  const lo = cand[0]!.u.lo;
+  const hi = cand[cand.length - 1]!.u.hi;
   const to = Math.min(Math.max(toIndex, lo), hi);
-  if (to === from) return tracks;
-  const next = tracks.slice();
-  const [t] = next.splice(from, 1);
-  next.splice(to, 0, t!);
-  return next;
+  const target = unitOfTrack(units, to);
+  if (target < 0 || target === k) return tracks;
+  return moveUnit(tracks, units, k, target, to > from);
+}
+
+/**
+ * 播放軸拖軌道圖示：搬到「同種類軌道裡的第 toKindIndex 條」（0＝同類最下面）。
+ * 別種類的軌道相對順序不動。沒有變動回傳原陣列。
+ */
+export function reorderInKind(tracks: Track[], id: string, toKindIndex: number): Track[] {
+  const from = tracks.findIndex((t) => t.id === id);
+  if (from < 0 || tracks[from]!.groupRole) return tracks;
+  const units = trackUnits(tracks);
+  const k = unitOfTrack(units, from);
+  const same = units.map((u, n) => ({ u, n })).filter((x) => x.u.kind === units[k]!.kind);
+  const at = same.findIndex((x) => x.n === k);
+  const to = Math.min(Math.max(toKindIndex, 0), same.length - 1);
+  if (to === at) return tracks;
+  return moveUnit(tracks, units, k, same[to]!.n, to > at);
 }
 
 /** 在哪一條同類型軌道的 [start, start+duration) 是空的；找不到回傳 -1（呼叫端要新增軌道） */
@@ -432,9 +563,10 @@ export function moveItemToTrack(
   );
   const fresh = makeTrack(kind, without);
   fresh.items = [{ ...item, start: at }];
-  const range = zoneRange(without, kind);
+  // 最上面＝同種類最上面那一塊的上面；最下面＝同種類最下面那一塊的下面（不插進版型中間）
+  const sameKind = trackUnits(without).filter((u) => u.kind === kind);
   const index =
-    target.edge === 'top' ? insertIndexFor(without, kind) : range ? range[0] : insertIndexFor(without, kind);
+    target.edge === 'top' || sameKind.length === 0 ? insertIndexFor(without, kind) : sameKind[0]!.lo;
   return [...without.slice(0, index), fresh, ...without.slice(index)];
 }
 
@@ -502,27 +634,40 @@ export function expandGroupTracks(tracks: Track[], ids: string[]): Set<string> {
 }
 
 /**
- * 選到的軌道一起往上（dir=+1，圖層更上面）或往下（dir=-1）移一格：只在自己的分區內移，
- * 碰到分區邊緣或另一條選到的軌道就不動；選到的軌道彼此的相對順序不變。回傳新的軌道陣列（沒變就是同一個）。
+ * 選到的軌道一起往上（dir=+1，圖層更上面）或往下（dir=-1）移一格：只在自己的種類內移，
+ * 跨過中間別種類的軌道（它們的順序不動）；碰到同類的邊緣或另一條選到的軌道就不動；
+ * 選到的軌道彼此的相對順序不變。版型整塊一起動。回傳新的軌道陣列（沒變就是同一個）。
  */
 export function moveTracksBy(tracks: Track[], ids: string[], dir: 1 | -1): Track[] {
   const sel = expandGroupTracks(tracks, ids);
-  const a = [...tracks];
+  const units = trackUnits(tracks);
+  let order = units.map((_, i) => i);
+  const picked = new Set(
+    units.map((u, i) => (tracks.slice(u.lo, u.hi + 1).some((t) => sel.has(t.id)) ? i : -1)),
+  );
+  picked.delete(-1);
   let changed = false;
-  const swap = (i: number, j: number) => {
-    [a[i], a[j]] = [a[j]!, a[i]!];
-    changed = true;
-  };
-  if (dir === 1) {
-    for (let i = a.length - 2; i >= 0; i--)
-      if (sel.has(a[i]!.id) && !sel.has(a[i + 1]!.id) && ZONE[a[i]!.kind] === ZONE[a[i + 1]!.kind])
-        swap(i, i + 1);
-  } else {
-    for (let i = 1; i < a.length; i++)
-      if (sel.has(a[i]!.id) && !sel.has(a[i - 1]!.id) && ZONE[a[i]!.kind] === ZONE[a[i - 1]!.kind])
-        swap(i, i - 1);
+  const scan = dir === 1 ? [...order].reverse() : order.slice();
+  for (const u of scan) {
+    if (!picked.has(u)) continue;
+    const pos = order.indexOf(u);
+    for (let j = pos + dir; j >= 0 && j < order.length; j += dir) {
+      const o = order[j]!;
+      if (units[o]!.kind !== units[u]!.kind) continue;
+      if (picked.has(o)) break;
+      const rest = order.filter((x) => x !== u);
+      rest.splice(rest.indexOf(o) + (dir === 1 ? 1 : 0), 0, u);
+      order = rest;
+      changed = true;
+      break;
+    }
   }
-  return changed ? a : tracks;
+  return changed
+    ? flatten(
+        tracks,
+        order.map((i) => units[i]!),
+      )
+    : tracks;
 }
 
 /** 刪掉選到的軌道（版型整個一起）；至少留一條影像軌 */
