@@ -60,7 +60,12 @@ export type SceneLayer = {
   cornerRadius: number; // 0–0.5
   outline?: Outline;
   /** 轉場：只畫這個範圍裡面的（畫布像素；矩形可以有好幾塊，或一個圓） */
-  clip?: { rects?: [number, number, number, number][]; circle?: { cx: number; cy: number; r: number } };
+  clip?: {
+    rects?: [number, number, number, number][];
+    circle?: { cx: number; cy: number; r: number };
+    /** 多邊形（畫布座標，例如旋轉過的版型範圍）：每個是一圈頂點 */
+    poly?: [number, number][][];
+  };
   /** 轉場：模糊程度（畫布像素） */
   blur?: number;
   /** 色調（亮度、飽和度、色溫、色調）；沒有或全是 0＝不加濾鏡 */
@@ -468,8 +473,10 @@ export class Compositor {
         o.clip.clear();
         if (c.circle) o.clip.circle(c.circle.cx, c.circle.cy, Math.max(c.circle.r, 0.5)).fill(0xffffff);
         for (const [x, y, w, h] of c.rects ?? []) o.clip.rect(x, y, w, h).fill(0xffffff);
+        for (const pts of c.poly ?? []) o.clip.poly(pts.flat()).fill(0xffffff);
         // 一塊都沒有：遮罩要有東西，不然 Pixi 會當作沒有遮罩 → 畫一個看不到的小點
-        if (!c.circle && (c.rects ?? []).length === 0) o.clip.rect(-10, -10, 1, 1).fill(0xffffff);
+        if (!c.circle && (c.rects ?? []).length === 0 && (c.poly ?? []).length === 0)
+          o.clip.rect(-10, -10, 1, 1).fill(0xffffff);
         o.clipKey = key;
       }
       o.holder.mask = o.clip;

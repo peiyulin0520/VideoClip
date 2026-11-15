@@ -1,4 +1,5 @@
-import { isFrameItem } from '../../engine/layoutTracks';
+import { frameOfGroup, isFrameItem } from '../../engine/layoutTracks';
+import { groupClipArea } from '../../engine/scene';
 import { showPlaceholders } from '../../engine/placeholder';
 import { Layers, Maximize, Minimize, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
@@ -199,6 +200,13 @@ export function Preview({
   const sel = findItem(rproject, selectedId);
   const box = sel && selVisible ? selectionBox(sel.item, geo) : null;
   const selLocked = !!sel?.track.locked || !!sel?.track.hidden;
+  // 選到版型裡的素材（素材層）：把「畫面只露出來的範圍」畫成虛線框（版型旋轉也跟著轉），知道超出去的部分不會出現
+  const clipPts = useMemo(() => {
+    if (!sel || !selVisible || sel.item.type === 'audio' || !sel.item.group || isFrameItem(sel.item))
+      return undefined;
+    const fr = frameOfGroup(rproject.tracks, sel.item.group);
+    return fr ? groupClipArea(sel.item, fr.item, geo, width, height, { x: 0, y: 0 }, true) : undefined;
+  }, [sel, selVisible, rproject, geo, width, height]);
 
   const pointers = useRef(new Map<number, Pt>());
   const gesture = useRef<Gesture | null>(null);
@@ -471,6 +479,28 @@ export function Preview({
           {guides.x !== null && <div className="guide v" style={{ left: guides.x * k }} />}
           {guides.y !== null && <div className="guide h" style={{ top: guides.y * k }} />}
 
+          {clipPts && !cropping && (
+            <>
+              <svg
+                className="clip-area"
+                data-testid="clip-area"
+                viewBox={`0 0 ${width} ${height}`}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <polygon points={clipPts.map((p) => p.join(',')).join(' ')} />
+              </svg>
+              <span
+                className="clip-tag"
+                style={{
+                  left: Math.min(...clipPts.map((p) => p[0])) * k + 4,
+                  top: Math.min(...clipPts.map((p) => p[1])) * k + 4,
+                }}
+              >
+                只露出這個範圍
+              </span>
+            </>
+          )}
           {box && sel && !cropping && (
             <div
               className={`selbox${selLocked ? ' locked' : ''}${sel.item.group && !isFrameItem(sel.item) ? ' member' : ''}`}

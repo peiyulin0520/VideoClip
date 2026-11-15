@@ -254,8 +254,8 @@ export function buildScene(
         const gt = group ? gts.get(group) : undefined;
         // 版型裡的素材可以放大、移到框外，但畫面只露出版型裡面（格子：自己那一格；文字、貼圖：版型外框的範圍）
         if (frame && group && !layer.clip) {
-          const rect = groupClipRect(l.item, frame.item, ctx, canvasW, canvasH, off);
-          if (rect) layer.clip = { rects: [rect] };
+          const clip = groupClipFor(l.item, frame.item, ctx, canvasW, canvasH, off);
+          if (clip) layer.clip = clip;
         }
         if (fx)
           applyGroupOrItemEffect(
@@ -346,22 +346,34 @@ export function buildScene(
 }
 
 /**
- * 版型裡的素材「露出的範圍」（畫面像素）：被單獨動過的格子＝它自己那一格；版型裡的文字、貼圖＝外框看得到的範圍。
- * 版型旋轉時用矩形切會切歪，先不遮；沒有需要遮的回傳 undefined。
+ * 版型裡的素材「露出的範圍」（畫面像素的四個頂點，版型旋轉也算進去）：
+ * 單獨動過的格子（或 force）＝它自己那一格；版型裡的文字、貼圖＝外框線以內的整個範圍（含格子與邊框）。
+ * 沒有需要遮的（沒動過的格子、外框自己）回傳 undefined。
  */
-export function groupClipRect(
+export function groupClipArea(
   item: Item,
   frame: VideoItem,
   ctx: GeoCtx,
   W: number,
   H: number,
   off: { x: number; y: number },
-): [number, number, number, number] | undefined {
+  force = false,
+): [number, number][] | undefined {
   if (item.type === 'audio' || !item.group || item.group !== frame.group) return undefined;
-  const rot = ((frame.transform.rotation % 360) + 360) % 360;
-  if (rot > 0.5 && rot < 359.5) return undefined;
+  const a = (frame.transform.rotation * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const corners = (cx: number, cy: number, w: number, h: number): [number, number][] =>
+    (
+      [
+        [-w / 2, -h / 2],
+        [w / 2, -h / 2],
+        [w / 2, h / 2],
+        [-w / 2, h / 2],
+      ] as const
+    ).map(([dx, dy]) => [cx + dx * cos - dy * sin + off.x * W, cy + dx * sin + dy * cos + off.y * H]);
   if (item.type !== 'text' && item.cell) {
-    if (!item.cellEdit) return undefined;
+    if (!item.cellEdit && !force) return undefined;
     const r = cellRect(item.cell, W, H);
     const c = composeWith(
       { x: (r.x + r.w / 2) / W, y: (r.y + r.h / 2) / H, scale: 1, rotation: 0, opacity: 1 },
@@ -369,21 +381,37 @@ export function groupClipRect(
       W,
       H,
     );
-    const w = r.w * frame.transform.scale;
-    const h = r.h * frame.transform.scale;
-    return [c.x * W - w / 2 + off.x * W, c.y * H - h / 2 + off.y * H, w, h];
+    return corners(c.x * W, c.y * H, r.w * frame.transform.scale, r.h * frame.transform.scale);
   }
-  if (frame === (item as unknown)) return undefined;
   if (item.type !== 'text' && !item.member) return undefined; // 外框自己
   const fb = itemBox(frame, ctx);
   if (!fb) return undefined;
   const v = frame.visible ?? { x: 0, y: 0, w: 1, h: 1 };
-  return [
-    fb.cx - fb.w / 2 + v.x * fb.w + off.x * W,
-    fb.cy - fb.h / 2 + v.y * fb.h + off.y * H,
-    v.w * fb.w,
-    v.h * fb.h,
-  ];
+  const ox = (v.x + v.w / 2 - 0.5) * fb.w;
+  const oy = (v.y + v.h / 2 - 0.5) * fb.h;
+  return corners(fb.cx + ox * cos - oy * sin, fb.cy + ox * sin + oy * cos, v.w * fb.w, v.h * fb.h);
+}
+
+/** 遮罩：沒旋轉用矩形（省事），旋轉過用多邊形 */
+export function groupClipFor(
+  item: Item,
+  frame: VideoItem,
+  ctx: GeoCtx,
+  W: number,
+  H: number,
+  off: { x: number; y: number },
+): SceneLayer['clip'] | undefined {
+  const pts = groupClipArea(item, frame, ctx, W, H, off);
+  if (!pts) return undefined;
+  const rot = ((frame.transform.rotation % 360) + 360) % 360;
+  if (rot < 0.01 || rot > 359.99) {
+    const xs = pts.map((p) => p[0]);
+    const ys = pts.map((p) => p[1]);
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+    return { rects: [[x, y, Math.max(...xs) - x, Math.max(...ys) - y]] };
+  }
+  return { poly: [pts] };
 }
 
 /** 版型參加轉場：整組都套外框的轉場（位移、放大、透明度、裁切、模糊，跟外框完全一樣所以一起動） */
