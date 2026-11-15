@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-12：X1、X3、X7 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X2 視窗統一 → X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
+- **下一步**：feedback-12：X1、X2、X3、X7 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -75,6 +75,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 feedback-12 X2 彈出視窗統一（Sonnet 實作）
+  - 做了什麼：`ui/Sheet.tsx` 標題列右邊加 ❌（`aria-label="關閉"`，`.sheet-close`），按了＝關閉、這次在視窗裡做的不存；拿掉各視窗底部的「取消」（PromptSheet、ConfirmSheet、片段範圍、版型挑素材、轉場時間／聲音、畫面比例旁的專案名稱、首頁改名、自訂顏色彈窗［也加了 ❌］）；匯出面板選項／完成／失敗的「關閉」按鈕拿掉（❌ 取代），匯出中的「取消」改叫「停止匯出」；片段範圍視窗：▶ ↩ ↪ 目前秒數同一列（新增重做）、套用鈕滿版主題色、預覽 ▶ 按下去時 `unlock()` 並 `muted=false`（iPhone 靜音模式也要有聲音，跟主預覽一樣）、白線在沒選取的地方預覽變灰（靜音模式相反）＋左上角標「沒選取／選取中 第 N 組」。
+  - 動了哪些檔：`ui/Sheet.tsx`、`ui/PromptSheet.tsx`、`ui/ColorPopup.tsx`、`app/editor/{RangeMarkerSheet,ExportSheet,EffectTimingSheet,TransitionAudio,LayoutPicker}.tsx`、`app/pages/{Editor,Home}.tsx`、`styles.css`
+  - 驗證：✅ 新 `e2e/x2.spec.ts`（八種視窗都有 ❌、沒有「取消」；❌ 後專案沒變、套用才變；↩ ↪；套用鈕是主題色；播放後 `muted === false`；沒選取灰階＋標籤）、完整 e2e 258 個全過  🟡 只在 Chromium  🔴 iPhone 真機未測（片段預覽的聲音是不是真的出得來）
+  - 跟規劃不同：沒做 `useSheetTxn`（沒有「即時寫進專案、❌ 要復原」的視窗：畫面比例、字體是點了就套用並關閉；轉場聲音視窗自己有還原）；其他視窗（`MuteSheet` 進階就是片段範圍視窗，已有 ↩ ↪）沒有另外多步編輯
+  - 下一步：X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫
 - 2026-11-15 feedback-12 X7 轉場時的聲音（Sonnet 實作）
   - 做了什麼：轉場加「轉場時的聲音」六選一（特效分頁、轉場下面）：**交叉淡化**（預設，等功率）／**直接切換**（不淡化，自己選切換點）／**自訂起迄**（前段標「前迄」、後段標「後起」，可以等轉場結束之後才放後段的聲音，中間可以沒聲音或重疊）／只要前段／只要後段／靜音；切換點與起迄都在「聲音軸」上拖旗標（`TransitionAudio.tsx`，軸＝接縫前後各最多 4 秒、時間是相對接縫的秒數），有「試聽轉場」。資料：`transitionIn.audio／audioCut／audioOutA／audioInB`（沒寫＝交叉淡化）。引擎：`seamGains`／`transitionAudioGain`／`seamAudioExtent`（`engine/transitions.ts`）；預覽 `Player.syncVideo` 用「原本的物件＋轉場倍數」算每個影片的聲音（虛擬的提前 B、延長 A 不再是靜音）；匯出 `mixAudio` 讓 B 提早放、A 多放到接縫後，並用一個倍數節點在接縫前後逐 1/60 秒調音量，跟預覽一致。換轉場效果時聲音設定會留著。
   - 動了哪些檔：`engine/transitions.ts`（＋test）、`engine/player.ts`、`engine/exporter.ts`、`engine/debug.ts`（`audioGains`）、`model/types.ts`、`store/actions.ts`（`setTransitionAudio`、換效果保留聲音設定）、新 `app/editor/TransitionAudio.tsx`、`tabs/EffectTab.tsx`、`styles.css`
