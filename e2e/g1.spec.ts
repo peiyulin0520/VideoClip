@@ -165,6 +165,12 @@ test('專案封面：首頁「更換封面」從相簿選照片、恢復預設�
   await page.getByRole('button', { name: '更換封面' }).tap();
   await expect(page.getByTestId('cover-strip').locator('.cover-pick')).toHaveCount(1); // 專案裡只有 1 個素材
   await page.getByTestId('cover-file').setInputFiles(fixture('photo.png'));
+  await page.getByRole('button', { name: '關閉', exact: true }).tap(); // ✕：沒按套用 → 封面不變
+  expect(await cardCover()).toBe(original);
+  await page.getByRole('button', { name: '新專案 1 的選單' }).tap();
+  await page.getByRole('button', { name: '更換封面' }).tap();
+  await page.getByTestId('cover-file').setInputFiles(fixture('photo.png'));
+  await page.getByTestId('cover-apply').tap();
   await expect(page.locator('.toast').filter({ hasText: '封面已更換' })).toBeVisible();
   const changed = await cardCover();
   expect(changed).not.toBe(original);
@@ -177,6 +183,7 @@ test('專案封面：首頁「更換封面」從相簿選照片、恢復預設�
   await page.getByRole('button', { name: '新專案 1 的選單' }).tap();
   await page.getByRole('button', { name: '更換封面' }).tap();
   await page.getByRole('button', { name: /恢復預設/ }).tap();
+  await page.getByTestId('cover-apply').tap();
   await expect.poll(cardCover).not.toBe(changed);
   const [r, g, b] = (await colorOf(await cardCover())) as number[];
   expect(r!).toBeGreaterThan(200);
@@ -187,7 +194,8 @@ test('專案封面：首頁「更換封面」從相簿選照片、恢復預設�
   await page.getByRole('link', { name: /開啟 新專案 1/ }).tap();
   await expect(page.getByTestId('clip').first()).toBeVisible();
   await page.getByRole('button', { name: '專案名稱', exact: true }).tap();
-  await page.getByRole('button', { name: '用目前預覽畫面當封面' }).tap();
+  await page.getByRole('switch', { name: '用目前預覽畫面當封面' }).tap();
+  await page.getByRole('button', { name: '儲存', exact: true }).tap();
   await expect(page.locator('.toast').filter({ hasText: '已用目前預覽畫面當封面' })).toBeVisible();
   await page.waitForTimeout(1300);
   await page.getByRole('link', { name: '回首頁' }).tap();

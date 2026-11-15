@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-12：X1、X2、X3、X7 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
+- **下一步**：feedback-12：X1、X2（含 X2b 套用／儲存規則）、X3、X7 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X4 畫面比例 → X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -75,6 +75,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 feedback-12 X2b 設定型彈出視窗一律有「套用／儲存」（Sonnet 實作）
+  - 做了什麼：使用者新規則——設定型視窗除了 ❌ 還要有「套用」或「儲存」，沒按就關閉＝這次調整不算。畫面比例（草稿＋「套用」`ratio-apply`）、字體選擇（點字體只是先選，「套用」`font-apply`；匯入字體也只先選）、專案名稱（「儲存」，「用目前預覽畫面當封面」改成開關、按儲存才套用）、首頁更換封面（先選、「套用」`cover-apply`、選中有外框）、專案改名／片段命名（確定→儲存）、選色彈窗（確定→套用）、版型挑素材（按鈕「套用，選照片或影片」）。選單類（專案選單、軌道選單）、確認刪除、匯出（開始匯出）維持原樣
+  - 動了哪些檔：`app/pages/{Editor,Home}.tsx`、`app/fonts/FontSelect.tsx`、`app/editor/LayoutPicker.tsx`、`ui/{PromptSheet,ColorPopup}.tsx`、`styles.css`；測試 `e2e/{x2,g1,g2,x1,phase1,phase3b,fix-colors,fix-aspect,x3}.spec.ts`
+  - 驗證：✅ 新 x2 測試「設定型視窗都有套用／儲存；按 ❌ 不算」（畫面比例、專案名稱、片段命名、字體）、全部 e2e 與 `npm run check`  🟡 未在真 iPhone 驗
+  - 下一步：X4 畫面比例（比例視窗要照這條規則：草稿＋套用）→ X5 → X6 → X8
 - 2026-11-15 feedback-12 X2 彈出視窗統一（Sonnet 實作）
   - 做了什麼：`ui/Sheet.tsx` 標題列右邊加 ❌（`aria-label="關閉"`，`.sheet-close`），按了＝關閉、這次在視窗裡做的不存；拿掉各視窗底部的「取消」（PromptSheet、ConfirmSheet、片段範圍、版型挑素材、轉場時間／聲音、畫面比例旁的專案名稱、首頁改名、自訂顏色彈窗［也加了 ❌］）；匯出面板選項／完成／失敗的「關閉」按鈕拿掉（❌ 取代），匯出中的「取消」改叫「停止匯出」；片段範圍視窗：▶ ↩ ↪ 目前秒數同一列（新增重做）、套用鈕滿版主題色、預覽 ▶ 按下去時 `unlock()` 並 `muted=false`（iPhone 靜音模式也要有聲音，跟主預覽一樣）、白線在沒選取的地方預覽變灰（靜音模式相反）＋左上角標「沒選取／選取中 第 N 組」。
   - 動了哪些檔：`ui/Sheet.tsx`、`ui/PromptSheet.tsx`、`ui/ColorPopup.tsx`、`app/editor/{RangeMarkerSheet,ExportSheet,EffectTimingSheet,TransitionAudio,LayoutPicker}.tsx`、`app/pages/{Editor,Home}.tsx`、`styles.css`

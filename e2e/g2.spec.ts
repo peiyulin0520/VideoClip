@@ -14,7 +14,7 @@ test('片段命名：剪輯分頁「命名」、時間軸顯示「序號 名稱�
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '命名', exact: true }).tap();
   await page.getByLabel('片段名稱').fill('開場・揮手');
-  await page.getByRole('button', { name: '確定' }).tap();
+  await page.getByRole('button', { name: '儲存', exact: true }).tap();
   await expect(clips(page).first()).toContainText('1 開場・揮手');
   await expect(clips(page).first()).toContainText('2.0s');
   await page.screenshot({ path: `${SHOT}/named.png` });
@@ -32,7 +32,7 @@ test('片段命名：剪輯分頁「命名」、時間軸顯示「序號 名稱�
   await clips(page).first().tap();
   await page.getByRole('button', { name: '命名', exact: true }).tap();
   await page.getByLabel('片段名稱').fill('');
-  await page.getByRole('button', { name: '確定' }).tap();
+  await page.getByRole('button', { name: '儲存', exact: true }).tap();
   await expect(clips(page).first()).toContainText('1 影片'); // 空白＝預設名稱
   await page.getByRole('button', { name: '復原' }).tap();
   await expect(clips(page).first()).toContainText('1 開場・揮手');
@@ -45,13 +45,13 @@ test('片段命名：剪輯分頁「命名」、時間軸顯示「序號 名稱�
   await page.waitForTimeout(120);
   await page.touchscreen.tap(playhead.x + 30, box.y + box.height - 8);
   await page.getByLabel('片段名稱').fill('蛋糕前');
-  await page.getByRole('button', { name: '確定' }).tap();
+  await page.getByRole('button', { name: '儲存', exact: true }).tap();
   await expect(clips(page).nth(1)).toContainText('2 蛋糕前');
 
   // 軌道改名
   await page.getByTestId('track-chip').first().tap();
   await page.getByRole('button', { name: '改名', exact: true }).tap();
   await page.getByLabel('軌道名稱').fill('主畫面');
-  await page.getByRole('button', { name: '確定' }).tap();
+  await page.getByRole('button', { name: '儲存', exact: true }).tap();
   await expect(page.getByRole('button', { name: '主畫面 軌道設定' })).toBeVisible();
 });

@@ -8,7 +8,7 @@ async function nameFirstClip(page: Page, name: string) {
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '命名', exact: true }).tap();
   await page.getByLabel('片段名稱').fill(name);
-  await page.getByRole('button', { name: '確定' }).tap();
+  await page.getByRole('button', { name: '儲存', exact: true }).tap();
 }
 
 test('X1-1 播放列按鈕叫「定格」；整個頁面看不到「定位」', async ({ page }) => {

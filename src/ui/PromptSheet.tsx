@@ -67,7 +67,7 @@ function PromptBody({
             onClose();
           }}
         >
-          確定
+          儲存
         </button>
       </div>
     </>

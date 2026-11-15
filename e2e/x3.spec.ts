@@ -107,6 +107,7 @@ test('4:3 專案裁直式影片：畫面一樣是大的（不是縮在小小的�
   await createProjectWith(page, ['clip-a.webm']); // 320×568
   await page.getByRole('button', { name: '畫面比例' }).tap();
   await page.getByRole('radio', { name: '4:3' }).tap();
+  await page.getByTestId('ratio-apply').tap();
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '裁切' }).tap();

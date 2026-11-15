@@ -204,7 +204,7 @@ export function LayoutPicker() {
             </p>
             <div className="sheet-row">
               <button className="btn primary" onClick={() => input.current?.click()}>
-                選照片或影片
+                套用，選照片或影片
               </button>
             </div>
           </div>

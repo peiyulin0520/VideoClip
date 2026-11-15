@@ -158,7 +158,7 @@ export function ColorPopup({
 
         <div className="sheet-row">
           <button className="btn primary" onClick={() => onConfirm(hex)}>
-            確定
+            套用
           </button>
         </div>
       </div>

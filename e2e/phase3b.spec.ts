@@ -123,7 +123,10 @@ test('字卡換字體：選單每個字體用自己的字形；沒下載過的�
     .toContain('vcp-pop-gothic');
   await page.screenshot({ path: `${SHOT}/font-select.png` });
 
-  await list.locator('[data-font-key="pop-gothic"]').tap(); // 還沒下載 → 自動下載並套用
+  await list.locator('[data-font-key="pop-gothic"]').tap(); // 還沒下載 → 自動下載（先選，還沒套用）
+  await expect(list.locator('[data-font-key="pop-gothic"]')).toHaveClass(/active/, { timeout: 30_000 });
+  expect((await project(page)).tracks[1]!.items[0]!.card!.runs[0]!.fontId).not.toBe('pop-gothic');
+  await page.getByTestId('font-apply').tap();
   await expect(page.getByRole('dialog', { name: '選擇字體' })).toBeHidden({ timeout: 30_000 });
   const run = (await project(page)).tracks[1]!.items[0]!.card!.runs[0]!;
   expect(run.fontId).toBe('pop-gothic');
@@ -156,6 +159,7 @@ test('匯入自己的字體：選了檔案就能用，存在這台裝置，重�
       .filter({ hasText: /已匯入/ })
       .first(),
   ).toBeVisible();
+  await page.getByTestId('font-apply').tap();
   const p = await project(page);
   const fontId = p.tracks[1]!.items[0]!.card!.runs[0]!.fontId;
   expect(fontId.startsWith('u:')).toBe(true);

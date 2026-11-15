@@ -127,6 +127,8 @@ function EditorBody() {
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [ratioOpen, setRatioOpen] = useState(false);
+  const [ratioDraft, setRatioDraft] = useState<'auto' | Aspect>('auto');
+  const [coverDraft, setCoverDraft] = useState(false);
   const quality = useQuality((s) => s.q);
   const setQuality = useQuality((s) => s.set);
   const [exportOpen, setExportOpen] = useState(false);
@@ -197,6 +199,7 @@ function EditorBody() {
           aria-label="專案名稱"
           onClick={() => {
             setNameDraft(project.name);
+            setCoverDraft(false);
             setRenaming(true);
           }}
         >
@@ -205,7 +208,14 @@ function EditorBody() {
             {shortVersion()}
           </span>
         </button>
-        <button className="ratio-btn" aria-label="畫面比例" onClick={() => setRatioOpen(true)}>
+        <button
+          className="ratio-btn"
+          aria-label="畫面比例"
+          onClick={() => {
+            setRatioDraft(project.aspectAuto ? 'auto' : project.aspect);
+            setRatioOpen(true);
+          }}
+        >
           {project.aspect}
         </button>
         <button
@@ -301,17 +311,13 @@ function EditorBody() {
       <CropEditor />
 
       <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
-        <p className="hint">改了之後，影片和文字的位置、大小會跟著新的畫面。可以按「復原」改回來。</p>
+        <p className="hint">改了之後，影片和文字的位置、大小會跟著新的畫面。按「套用」才會改；按 ✕ 關閉就不改。</p>
         <div className="chips" role="radiogroup" aria-label="選擇畫面比例">
           <button
             role="radio"
-            aria-checked={!!project.aspectAuto}
-            className={`chip${project.aspectAuto ? ' active' : ''}`}
-            onClick={() => {
-              const a = setProjectAspect('auto');
-              if (a) toast(`已設成自動（目前是 ${a}）`);
-              setRatioOpen(false);
-            }}
+            aria-checked={ratioDraft === 'auto'}
+            className={`chip${ratioDraft === 'auto' ? ' active' : ''}`}
+            onClick={() => setRatioDraft('auto')}
           >
             自動（跟第一支影片）
           </button>
@@ -319,16 +325,29 @@ function EditorBody() {
             <button
               key={a}
               role="radio"
-              aria-checked={!project.aspectAuto && project.aspect === a}
-              className={`chip${!project.aspectAuto && project.aspect === a ? ' active' : ''}`}
-              onClick={() => {
-                setProjectAspect(a);
-                setRatioOpen(false);
-              }}
+              aria-checked={ratioDraft === a}
+              className={`chip${ratioDraft === a ? ' active' : ''}`}
+              onClick={() => setRatioDraft(a)}
             >
               {ASPECTS[a].label}
             </button>
           ))}
+        </div>
+        <div className="sheet-row">
+          <button
+            className="btn primary grow"
+            data-testid="ratio-apply"
+            onClick={() => {
+              const now: 'auto' | Aspect = project.aspectAuto ? 'auto' : project.aspect;
+              if (ratioDraft !== now) {
+                const a = setProjectAspect(ratioDraft);
+                if (ratioDraft === 'auto' && a) toast(`已設成自動（目前是 ${a}）`);
+              }
+              setRatioOpen(false);
+            }}
+          >
+            套用
+          </button>
         </div>
       </Sheet>
 
@@ -342,37 +361,40 @@ function EditorBody() {
           autoFocus
         />
         <button
-          className="menu-item"
-          onClick={async () => {
-            const p = useProjectStore.getState().project;
-            if (!p) return;
-            setRenaming(false);
-            try {
-              const cover = await coverFromProject(p, useUI.getState().player?.time ?? 0);
-              useProjectStore.getState().apply((d) => {
-                d.cover = cover;
-              });
-              toast('已用目前預覽畫面當封面');
-            } catch {
-              toast('抓不到預覽畫面');
-            }
-          }}
+          role="switch"
+          aria-checked={coverDraft}
+          className={`chip${coverDraft ? ' active' : ''}`}
+          data-testid="cover-now"
+          onClick={() => setCoverDraft((v) => !v)}
         >
           用目前預覽畫面當封面
         </button>
         <div className="sheet-row">
           <button
             className="btn primary"
-            onClick={() => {
+            onClick={async () => {
               const n = nameDraft.trim();
               if (n)
                 useProjectStore.getState().apply((d) => {
                   d.name = n;
                 });
               setRenaming(false);
+              if (coverDraft) {
+                const p = useProjectStore.getState().project;
+                if (!p) return;
+                try {
+                  const cover = await coverFromProject(p, useUI.getState().player?.time ?? 0);
+                  useProjectStore.getState().apply((d) => {
+                    d.cover = cover;
+                  });
+                  toast('已用目前預覽畫面當封面');
+                } catch {
+                  toast('抓不到預覽畫面');
+                }
+              }
             }}
           >
-            確定
+            儲存
           </button>
         </div>
       </Sheet>

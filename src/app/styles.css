@@ -2291,6 +2291,14 @@ button {
   background: var(--btn2) center / cover;
   border-radius: 10px;
 }
+.cover-pick.active {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.menu-item.active {
+  color: var(--accent);
+  font-weight: 600;
+}
 
 /* 時間軸收合：圖層清單鈕、摘要列、細軌道、片段兩行名稱 */
 .layers-toggle {

@@ -65,7 +65,7 @@ test('專案卡片選單：改名、複製、刪除', async ({ page }) => {
   await page.getByRole('button', { name: '新專案 1 的選單' }).tap();
   await page.getByRole('button', { name: '改名' }).tap();
   await page.getByLabel('新名稱').fill('旅行 vlog');
-  await page.getByRole('button', { name: '確定' }).tap();
+  await page.getByRole('button', { name: '儲存', exact: true }).tap();
   await expect(page.getByTestId('project-card').filter({ hasText: '旅行 vlog' })).toBeVisible();
 
   await page.getByRole('button', { name: '旅行 vlog 的選單' }).tap();
@@ -171,7 +171,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   // 改專案名稱
   await page.getByRole('button', { name: '專案名稱', exact: true }).tap();
   await page.getByLabel('專案名稱輸入').fill('我的片頭');
-  await page.getByRole('button', { name: '確定' }).tap();
+  await page.getByRole('button', { name: '儲存', exact: true }).tap();
   await expect(page.getByRole('button', { name: '專案名稱', exact: true })).toContainText('我的片頭');
 });
 
