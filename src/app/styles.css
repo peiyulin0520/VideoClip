@@ -3924,3 +3924,96 @@ button:not(:disabled):active,
 .lr-card {
   z-index: 10;
 }
+
+/* ---- L6 按鈕分區：功能層級不同的按鈕用「分區＋細線」隔開 ---- */
+.btn-zone {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.btn-zone.grow {
+  flex: 1;
+}
+.zone-sep {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: 0.7em 4px;
+  background: var(--border);
+}
+.ed-top .zone-sep {
+  margin: 12px 3px;
+}
+.playbar .zone-sep {
+  margin: 10px 4px;
+}
+.playbar .spacer {
+  flex: 1;
+}
+.export-btn {
+  color: var(--accent);
+}
+
+/* 版型分頁：〔這個版型〕卡片（移除版型在右上、紅色）／分隔線／〔新增版型〕淡底區 */
+.this-layout {
+  margin: 4px 0;
+  padding: 0.4em 0.5em 0.5em;
+  border-radius: var(--radius-ctl);
+  border: 1px solid var(--border);
+}
+.this-layout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-body);
+}
+.this-layout-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  padding: 0 0.8em;
+  white-space: nowrap;
+}
+.zone-line {
+  height: 1px;
+  margin: 10px 0;
+  border: 0;
+  background: var(--border);
+}
+.new-layout {
+  margin-top: 4px;
+}
+
+/* 播放軸上版型的 ▾：跟軌道圖示不同的底色（強調色），一眼看出是「整個版型」的鈕 */
+.cat-toggle.grp {
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  border-color: var(--accent);
+}
+.rm-play-row .zone-sep {
+  margin: 6px 0;
+}
+.playbar {
+  gap: 2px;
+  padding: 2px 4px;
+}
+.playbar .zone-sep {
+  margin: 10px 2px;
+}
+.ed-top {
+  gap: 0;
+  padding-inline: 4px;
+}
+.ed-top .btn-zone {
+  gap: 0;
+}
+.ed-top .zone-sep {
+  margin: 12px 2px;
+}
+.this-layout .this-layout-remove {
+  flex: none;
+  width: auto;
+  min-width: 0;
+}

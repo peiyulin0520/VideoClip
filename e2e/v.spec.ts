@@ -180,12 +180,13 @@ test('播放列：播放鍵與時間在最左；定格、色調(👁)、縮小�
   const inn = await box(page.getByRole('button', { name: '放大時間軸' }));
   expect(play.x).toBeLessThan(20);
   expect(kf.x).toBeGreaterThan(play.x + 100);
-  for (const [a, b] of [
-    [kf, peek],
-    [peek, out],
-    [out, inn],
+  // 同一區的鈕靠很近；不同區（定格／色調 ｜ 縮小／放大）中間多一條細線
+  for (const [a, b, max] of [
+    [kf, peek, 8],
+    [peek, out, 12],
+    [out, inn, 8],
   ] as const) {
-    expect(b.x - (a.x + a.width)).toBeLessThanOrEqual(8);
+    expect(b.x - (a.x + a.width)).toBeLessThanOrEqual(max);
     expect(b.x - (a.x + a.width)).toBeGreaterThanOrEqual(0);
   }
   const vw = page.viewportSize()!.width;

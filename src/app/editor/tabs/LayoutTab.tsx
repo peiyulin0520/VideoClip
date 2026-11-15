@@ -13,7 +13,7 @@ import { cellTracksOf, frameOfGroup } from '../../../engine/layoutTracks';
 import { CellSheet } from '../CellSheet';
 import { LayoutDiagram } from '../LayoutDiagram';
 import { LayoutPicker } from '../LayoutPicker';
-import { ToolButton, type Found } from './shared';
+import type { Found } from './shared';
 
 /** 外框顏色、透明度：換顏色立刻重畫；透明度滑桿停下來 0.4 秒才重畫（每次重畫都是一張新的外框圖） */
 function FrameStyleEditor({ group, color, opacity }: { group: string; color: string; opacity: number }) {
@@ -179,17 +179,28 @@ export function LayoutTab({ found }: { found: Found }) {
   return (
     <>
       {group && (
-        <div className="toolbar" role="toolbar" aria-label="版型工具">
-          <ToolButton icon={Trash2} label="移除版型" onClick={() => removeGroup(group)} />
-        </div>
+        <section className="this-layout" data-testid="zone-this-layout" aria-label="這個版型">
+          <div className="this-layout-head">
+            <b>這個版型</b>
+            <button className="btn danger this-layout-remove" onClick={() => removeGroup(group)}>
+              <Trash2 size={16} /> 移除版型
+            </button>
+          </div>
+          <GroupPanel project={project} group={group} />
+        </section>
       )}
-      {group && <GroupPanel project={project} group={group} />}
+      {group && <hr className="zone-line" aria-hidden="true" />}
       {group && !adding ? (
-        <button className="btn" data-testid="layout-add-more" onClick={() => setAddingFor(group)}>
-          ＋ 再新增一個版型
-        </button>
+        <div className="zone-soft new-layout" data-testid="zone-new-layout">
+          <button className="btn" data-testid="layout-add-more" onClick={() => setAddingFor(group)}>
+            ＋ 再新增一個版型
+          </button>
+        </div>
       ) : (
-        <div className="panel">
+        <div
+          className={`panel${group ? ' new-layout' : ''}`}
+          data-testid={group ? 'zone-new-layout' : undefined}
+        >
           <LayoutPicker />
         </div>
       )}

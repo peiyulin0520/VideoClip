@@ -193,73 +193,84 @@ function EditorBody() {
   return (
     <main className={`editor${previewFull ? ' preview-full' : ''}`}>
       <header className="ed-top">
-        <Link className="icon-btn" to="/" aria-label="回首頁">
-          <ChevronLeft />
-        </Link>
-        <button
-          className="name-btn"
-          aria-label="專案名稱"
-          onClick={() => {
-            setNameDraft(project.name);
-            setCoverDraft(false);
-            setRenaming(true);
-          }}
-        >
-          {project.name}
-          <span className="proj-ver" data-testid="proj-ver">
-            {shortVersion()}
-          </span>
-        </button>
-        <button
-          className="ratio-btn"
-          aria-label="畫面比例"
-          onClick={() => {
-            setRatioDraft(project.aspectAuto ? 'auto' : project.aspect);
-            setRatioFill(false);
-            setRatioOpen(true);
-          }}
-        >
-          {project.aspect === 'custom' ? ratioText(project.width, project.height) : project.aspect}
-        </button>
-        <button
-          className="ratio-btn"
-          aria-label={`預覽畫質 ${QUALITY_LABELS[quality]}（點一下切換）`}
-          data-testid="quality-btn"
-          onClick={() => setQuality(quality === 'smooth' ? 'clear' : 'smooth')}
-        >
-          {quality === 'clear' ? '高清' : quality === 'smooth' ? '順暢' : '自動'}
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="復原"
-          aria-disabled={!canUndo}
-          onClick={() => {
-            if (!useProjectStore.getState().undo()) toast('沒有可復原的動作');
-          }}
-        >
-          <Undo2 size={22} />
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="重做"
-          aria-disabled={!canRedo}
-          onClick={() => {
-            if (!useProjectStore.getState().redo()) toast('沒有可重做的動作');
-          }}
-        >
-          <Redo2 size={22} />
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="匯出影片"
-          onClick={() => {
-            useUI.getState().player?.pause();
-            useUI.setState({ gradePeek: false });
-            setExportOpen(true);
-          }}
-        >
-          <Share size={22} />
-        </button>
+        <div className="btn-zone grow" data-testid="zone-nav">
+          <Link className="icon-btn" to="/" aria-label="回首頁">
+            <ChevronLeft />
+          </Link>
+          <button
+            className="name-btn"
+            aria-label="專案名稱"
+            onClick={() => {
+              setNameDraft(project.name);
+              setCoverDraft(false);
+              setRenaming(true);
+            }}
+          >
+            {project.name}
+            <span className="proj-ver" data-testid="proj-ver">
+              {shortVersion()}
+            </span>
+          </button>
+        </div>
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-view">
+          <button
+            className="ratio-btn"
+            aria-label="畫面比例"
+            onClick={() => {
+              setRatioDraft(project.aspectAuto ? 'auto' : project.aspect);
+              setRatioFill(false);
+              setRatioOpen(true);
+            }}
+          >
+            {project.aspect === 'custom' ? ratioText(project.width, project.height) : project.aspect}
+          </button>
+          <button
+            className="ratio-btn"
+            aria-label={`預覽畫質 ${QUALITY_LABELS[quality]}（點一下切換）`}
+            data-testid="quality-btn"
+            onClick={() => setQuality(quality === 'smooth' ? 'clear' : 'smooth')}
+          >
+            {quality === 'clear' ? '高清' : quality === 'smooth' ? '順暢' : '自動'}
+          </button>
+        </div>
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-history">
+          <button
+            className="icon-btn"
+            aria-label="復原"
+            aria-disabled={!canUndo}
+            onClick={() => {
+              if (!useProjectStore.getState().undo()) toast('沒有可復原的動作');
+            }}
+          >
+            <Undo2 size={22} />
+          </button>
+          <button
+            className="icon-btn"
+            aria-label="重做"
+            aria-disabled={!canRedo}
+            onClick={() => {
+              if (!useProjectStore.getState().redo()) toast('沒有可重做的動作');
+            }}
+          >
+            <Redo2 size={22} />
+          </button>
+        </div>
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-export">
+          <button
+            className="icon-btn export-btn"
+            aria-label="匯出影片"
+            onClick={() => {
+              useUI.getState().player?.pause();
+              useUI.setState({ gradePeek: false });
+              setExportOpen(true);
+            }}
+          >
+            <Share size={22} />
+          </button>
+        </div>
       </header>
 
       <Preview
@@ -270,31 +281,39 @@ function EditorBody() {
       />
 
       <div className="playbar">
-        <PlaybarButton
-          icon={playing ? Pause : Play}
-          ariaLabel={playing ? '暫停' : '播放'}
-          fill
-          onClick={() => {
-            if (total <= 0) return toast('先匯入影片或照片');
-            player?.toggle();
-          }}
-        />
-        <TimeText total={total} />
+        <div className="btn-zone" data-testid="zone-play">
+          <PlaybarButton
+            icon={playing ? Pause : Play}
+            ariaLabel={playing ? '暫停' : '播放'}
+            fill
+            onClick={() => {
+              if (total <= 0) return toast('先匯入影片或照片');
+              player?.toggle();
+            }}
+          />
+          <TimeText total={total} />
+        </div>
         <span className="spacer" />
-        <KeyframeButton />
-        <GradePeekButton />
-        <PlaybarButton
-          icon={ZoomOut}
-          label="縮小"
-          ariaLabel="縮小時間軸"
-          onClick={() => setPps(Math.max(pps / 1.5, MIN_PPS))}
-        />
-        <PlaybarButton
-          icon={ZoomIn}
-          label="放大"
-          ariaLabel="放大時間軸"
-          onClick={() => setPps(Math.min(pps * 1.5, MAX_PPS))}
-        />
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-fx">
+          <KeyframeButton />
+          <GradePeekButton />
+        </div>
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-zoom">
+          <PlaybarButton
+            icon={ZoomOut}
+            label="縮小"
+            ariaLabel="縮小時間軸"
+            onClick={() => setPps(Math.max(pps / 1.5, MIN_PPS))}
+          />
+          <PlaybarButton
+            icon={ZoomIn}
+            label="放大"
+            ariaLabel="放大時間軸"
+            onClick={() => setPps(Math.min(pps * 1.5, MAX_PPS))}
+          />
+        </div>
       </div>
 
       <Timeline pps={pps} setPps={setPps} onAdd={() => pick('main')} />

@@ -307,37 +307,42 @@ export function RangeMarkerSheet({
       </div>
       <div className="rm-play-row">
         {mediaKind !== 'none' && (
+          <div className="btn-zone" data-testid="rm-zone-play">
+            <button
+              className="rm-icon-btn"
+              data-testid="rm-play"
+              aria-label={playing ? '暫停' : '播放'}
+              onClick={togglePlay}
+            >
+              {playing ? (
+                <Pause size={20} fill="currentColor" aria-hidden="true" />
+              ) : (
+                <Play size={20} fill="currentColor" aria-hidden="true" />
+              )}
+            </button>
+          </div>
+        )}
+        {mediaKind !== 'none' && <span className="zone-sep" aria-hidden="true" />}
+        <div className="btn-zone" data-testid="rm-zone-history">
           <button
             className="rm-icon-btn"
-            data-testid="rm-play"
-            aria-label={playing ? '暫停' : '播放'}
-            onClick={togglePlay}
+            aria-label="復原"
+            data-testid="rm-undo"
+            disabled={undoCount === 0}
+            onClick={doUndo}
           >
-            {playing ? (
-              <Pause size={20} fill="currentColor" aria-hidden="true" />
-            ) : (
-              <Play size={20} fill="currentColor" aria-hidden="true" />
-            )}
+            <Undo2 size={20} aria-hidden="true" />
           </button>
-        )}
-        <button
-          className="rm-icon-btn"
-          aria-label="復原"
-          data-testid="rm-undo"
-          disabled={undoCount === 0}
-          onClick={doUndo}
-        >
-          <Undo2 size={20} aria-hidden="true" />
-        </button>
-        <button
-          className="rm-icon-btn"
-          aria-label="重做"
-          data-testid="rm-redo"
-          disabled={redoCount === 0}
-          onClick={doRedo}
-        >
-          <Redo2 size={20} aria-hidden="true" />
-        </button>
+          <button
+            className="rm-icon-btn"
+            aria-label="重做"
+            data-testid="rm-redo"
+            disabled={redoCount === 0}
+            onClick={doRedo}
+          >
+            <Redo2 size={20} aria-hidden="true" />
+          </button>
+        </div>
         <span className="rm-now" data-testid="rm-now">
           目前 {fmt2(cursor)} 秒
         </span>
