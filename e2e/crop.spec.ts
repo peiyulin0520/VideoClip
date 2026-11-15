@@ -14,7 +14,6 @@ async function setup(page: Page) {
 }
 
 async function dragHandle(page: Page, id: string, dx: number, dy: number) {
-  await page.evaluate(() => window.scrollTo(0, 0)); // 預覽在頁面最上面（用過下面的面板後要捲回來）
   const b = (await page.getByTestId(`crop-h-${id}`).boundingBox())!;
   const x = b.x + b.width / 2;
   const y = b.y + b.height / 2;
@@ -33,7 +32,6 @@ test('裁切在剪輯分頁：預覽上拖四邊拉霸，切完留下的畫面�
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
-  await expect(page.getByTestId('crop-panel')).toBeVisible();
   // 八個把手都在、觸控範圍 ≥ 44px
   for (const h of ['l', 'r', 't', 'b', 'tl', 'tr', 'bl', 'br']) {
     const b = (await page.getByTestId(`crop-h-${h}`).boundingBox())!;
@@ -51,7 +49,7 @@ test('裁切在剪輯分頁：預覽上拖四邊拉霸，切完留下的畫面�
   await page.screenshot({ path: `${SHOT}/crop-dragged.png` });
   // 還沒按完成：資料沒改
   expect((await overlay(page)).crop).toBeUndefined();
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   await expect(page.getByTestId('crop-layer')).toHaveCount(0);
   const after = await overlay(page);
   expect(after.crop!.r).toBeCloseTo(0.4, 1);
@@ -74,7 +72,7 @@ test('裁切在剪輯分頁：預覽上拖四邊拉霸，切完留下的畫面�
   await expect.poll(async () => isGreen(await samplePreview(page, 0.7, 0.4))).toBe(true);
 });
 
-test('裁切：取消不改；重設；在框裡面拖＝整塊平移；拖角；第二次進來看得到完整畫面再往外拉回來', async ({
+test('裁切：❌ 不改；復原／重做；在框裡面拖＝整塊平移；拖角；第二次進來看得到完整畫面再往外拉回來', async ({
   page,
 }) => {
   await setup(page);
@@ -82,17 +80,20 @@ test('裁切：取消不改；重設；在框裡面拖＝整塊平移；拖角�
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   await dragHandle(page, 'tl', fr.width * 0.3, fr.height * 0.2);
   await expect(page.getByTestId('crop-size')).toContainText('保留 70% × 80%');
-  await page.getByRole('button', { name: '取消' }).tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
   expect((await overlay(page)).crop).toBeUndefined();
   await expect(page.getByTestId('crop-layer')).toHaveCount(0);
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
 
-  // 重設
+  // 復原／重做：拉完一次放手算一步
   await page.getByRole('button', { name: '裁切' }).tap();
   await dragHandle(page, 'br', -fr.width * 0.5, -fr.height * 0.5);
   await expect(page.getByTestId('crop-size')).toContainText('保留 50% × 50%');
-  await page.getByRole('button', { name: '重設' }).tap();
+  await page.getByTestId('crop-undo').tap();
   await expect(page.getByTestId('crop-size')).toContainText('保留 100% × 100%');
+  await page.getByTestId('crop-redo').tap();
+  await expect(page.getByTestId('crop-size')).toContainText('保留 50% × 50%');
+  await page.getByTestId('crop-undo').tap();
 
   // 整塊平移：先縮到一半，再往右拖
   await dragHandle(page, 'br', -fr.width * 0.5, -fr.height * 0.5);
@@ -101,7 +102,7 @@ test('裁切：取消不改；重設；在框裡面拖＝整塊平移；拖角�
   await page.mouse.down();
   await page.mouse.move(rect.x + rect.width / 2 + fr.width * 0.25, rect.y + rect.height / 2, { steps: 6 });
   await page.mouse.up();
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   const c = (await overlay(page)).crop!;
   expect(c.l).toBeGreaterThan(0.15);
   expect(c.l + c.r).toBeCloseTo(0.5, 1); // 寬度還是 50%
@@ -109,8 +110,9 @@ test('裁切：取消不改；重設；在框裡面拖＝整塊平移；拖角�
   // 再進去：完整畫面又出現，把左邊拉回 0（往外拉回來）
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-size')).toContainText('保留 50% × 50%');
-  await page.getByRole('button', { name: '重設' }).tap();
-  await page.getByRole('button', { name: '完成' }).tap();
+  await dragHandle(page, 'tl', -fr.width * 0.5, -fr.height * 0.5); // 往外拉回來
+  await dragHandle(page, 'br', fr.width * 0.5, fr.height * 0.5);
+  await page.getByTestId('crop-apply').tap();
   const back = await overlay(page);
   expect(back.crop).toBeUndefined();
   expect(back.transform.scale).toBeCloseTo(0.5, 2);
@@ -133,11 +135,14 @@ test('裁切比例：1:1／9:16／原比例；鎖定比例後拖角仍保持比�
   expect((w * 320) / (h * 568)).toBeLessThan(1.05);
   await page.getByRole('radio', { name: '原比例' }).tap();
   await expect(page.getByTestId('crop-size')).toContainText(/保留 \d+% × \d+%/);
-  await page.getByRole('radio', { name: '自由' }).tap();
-  await page.getByRole('button', { name: '重設' }).tap();
+  await page.getByTestId('crop-options').getByRole('radio', { name: '自由', exact: true }).tap();
   await page.getByRole('radio', { name: '9:16' }).tap();
-  await expect(page.getByTestId('crop-size')).toContainText('保留 100% × 100%'); // 素材本來就是 9:16
-  await page.getByRole('button', { name: '取消' }).tap();
+  const t2 = (await page.getByTestId('crop-size').textContent()) ?? '';
+  const m2 = /保留 (\d+)% × (\d+)%/.exec(t2)!;
+  const r916 = (Number(m2[1]) * 320) / (Number(m2[2]) * 568);
+  expect(r916).toBeGreaterThan(0.5625 * 0.93); // 素材本來就是 9:16：保留區域也是 9:16
+  expect(r916).toBeLessThan(0.5625 * 1.07);
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
 });
 
 test('自由形狀（描邊）：手指畫一圈，只留圈裡面，外面透明；保留區域自動框住；可復原；重新進入看得到形狀', async ({
@@ -145,8 +150,7 @@ test('自由形狀（描邊）：手指畫一圈，只留圈裡面，外面透�
 }) => {
   await setup(page);
   await page.getByRole('button', { name: '裁切' }).tap();
-  await page.getByRole('switch', { name: '自由形狀' }).tap();
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByTestId('crop-tool-lasso').tap();
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;
   const cy = fr.y + fr.height / 2;
@@ -161,7 +165,7 @@ test('自由形狀（描邊）：手指畫一圈，只留圈裡面，外面透�
   await page.mouse.up();
   await expect(page.getByTestId('crop-polygon')).toBeVisible();
   await page.screenshot({ path: `${SHOT}/crop-lasso.png` });
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   const it = await overlay(page);
   expect(it.mask!.length).toBeGreaterThan(20);
   expect(it.crop!.l).toBeGreaterThan(0.05); // 保留區域框住圈圈
@@ -186,17 +190,16 @@ test('自由形狀（描邊）：手指畫一圈，只留圈裡面，外面透�
   expect((await overlay(page)).mask).toBeDefined();
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-polygon')).toBeVisible();
+  await page.getByTestId('crop-tool-lasso').tap();
   await page.getByRole('button', { name: '清除形狀' }).tap();
   await expect(page.getByTestId('crop-polygon')).toHaveCount(0);
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   const cleared = await overlay(page);
   expect(cleared.mask).toBeUndefined();
   expect(cleared.crop).toBeUndefined();
 });
 
-test('裁切模式的進出：沒選東西會提示；文字不能裁切；換分頁／選別的片段會結束裁切（不套用）', async ({
-  page,
-}) => {
+test('裁切模式的進出：沒選東西會提示；❌ 關閉不套用；選到別的片段會結束裁切（不套用）', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '裁切' }).tap();
@@ -206,7 +209,9 @@ test('裁切模式的進出：沒選東西會提示；文字不能裁切；換�
   await page.getByTestId('clip').first().tap(); // 選主軌片段：主軌也能裁切
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
-  await openTab(page, '疊加'); // 換分頁 → 結束，不套用
+  const fr = (await page.getByTestId('crop-frame').boundingBox())!;
+  await dragHandle(page, 'r', -fr.width * 0.4, 0);
+  await page.getByTestId('crop-close').tap(); // ❌：不套用
   await expect(page.getByTestId('crop-layer')).toHaveCount(0);
   const m = (await project(page)).tracks[0]!.items[0] as unknown as Item;
   expect(m.crop).toBeUndefined();

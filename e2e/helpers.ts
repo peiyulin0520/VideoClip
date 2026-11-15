@@ -154,12 +154,8 @@ export async function openTab(
   name: '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '色調' | '素材' | '音訊',
 ) {
   const tab = page.locator('.tabs').getByRole('tab', { name, exact: true }); // 只找底部分頁列（文字面板裡也有叫「文字」的小分頁）
-  // 點「目前的分頁」會收合面板，所以已經在這個分頁且展開時就不用再點
-  if (
-    (await tab.getAttribute('aria-selected')) === 'true' &&
-    (await tab.getAttribute('aria-expanded')) === 'true'
-  )
-    return;
+  // 已經在這個分頁就不用再點（再點也不會收合）
+  if ((await tab.getAttribute('aria-selected')) === 'true') return;
   await tab.tap();
 }
 
@@ -264,4 +260,84 @@ export async function setSwitch(page: Page, name: string, on: boolean) {
 export async function legacyBox(page: Page) {
   await setSwitch(page, '填滿', true);
   await setSwitch(page, '框線', false);
+}
+
+/** 版型 v2：外框是一般影像軌上的片段（有 group、沒有 cell）；這條軌道就是「外框所在的軌道」 */
+export const isFrameTrack = (t: { items: object[] }): boolean =>
+  t.items.some((x) => {
+    const i = x as { group?: string; cell?: unknown; type?: string };
+    return !!i.group && !i.cell && i.type !== 'text';
+  });
+
+/**
+ * 版型 v2：已經在「版型」分頁點了某個版型（可選外框顏色等）→ 按「確定」新增空版型，
+ * 再依序把素材放進各格（素材比格子少就輪流重複，跟舊版一樣；files 是檔案路徑）。
+ * 結束時選到第 1 格。`motion` 是版型動畫（到特效分頁設）。
+ */
+export async function finishLayout(page: Page, files: string[], opts: { motion?: string } = {}) {
+  await page.getByTestId('layout-confirm').tap();
+  // 選項區收起來＝新版型已經加好、而且選到它了（不然讀到的是上一個版型的示意圖）
+  await expect(page.getByTestId('layout-options')).toHaveCount(0, { timeout: 30_000 });
+  const cells = page.getByTestId('ld-cell');
+  await expect(cells.first()).toBeVisible({ timeout: 30_000 });
+  const n = await cells.count();
+  if (opts.motion) {
+    await openTab(page, '特效');
+    await page.getByRole('radio', { name: `動畫 ${opts.motion}` }).tap();
+    await openTab(page, '版型');
+  }
+  for (let i = 0; i < n; i++) {
+    await cells.nth(i).tap();
+    await page.getByTestId('cell-file').setInputFiles(files[i % files.length]!);
+    await expect(page.getByTestId('cell-sheet')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: '關閉', exact: true }).last().tap();
+  }
+  await cells.first().tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap();
+}
+
+/** 時間軸上選到一個片段，把尾端的把手拖 seconds 秒（正＝拉長）；回傳拖完後它的長度 */
+export async function trimClipEnd(page: Page, itemId: string, seconds: number): Promise<number> {
+  await showTimeline(page);
+  const clip = page.locator(`[data-testid="clip"][data-item-id="${itemId}"]`);
+  await clip.tap();
+  // 第一下點下去時時間軸會自動捲動，收尾的 click 有時落在背景上又取消選取：沒選到就再點一次
+  const shown = await page
+    .getByTestId('trim-end')
+    .waitFor({ timeout: 1500 })
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!shown) await clip.tap();
+  const p0 = await project(page);
+  const dur0 = (p0.tracks.flatMap((t) => t.items) as unknown as { id: string; duration: number }[]).find(
+    (i) => i.id === itemId,
+  )!.duration;
+  const pps = (await clip.boundingBox())!.width / dur0;
+  const h = (await page.getByTestId('trim-end').boundingBox())!;
+  const x = h.x + h.width / 2;
+  const y = h.y + h.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + (seconds * pps) / 2, y, { steps: 5 });
+  await page.mouse.move(x + seconds * pps, y, { steps: 5 });
+  await page.mouse.up();
+  const p1 = await project(page);
+  return (p1.tracks.flatMap((t) => t.items) as unknown as { id: string; duration: number }[]).find(
+    (i) => i.id === itemId,
+  )!.duration;
+}
+
+/** 版型 v2：選到「整個版型」（版型層）——點時間軸上的版型片段；之後移動、縮放、定格都是整組一起 */
+export async function selectFrame(page: Page) {
+  await showTimeline(page);
+  const tr = (await project(page)).tracks as unknown as {
+    items: { id: string; group?: string; cell?: unknown; type: string; member?: boolean }[];
+  }[];
+  const id = tr
+    .flatMap((t) => t.items)
+    .find((i) => i.group && !i.cell && i.type !== 'text' && i.type !== 'audio' && !i.member)!.id;
+  await page.locator(`[data-testid="clip"][data-item-id="${id}"]`).tap();
+  await page.evaluate(() => window.scrollTo(0, 0));
 }

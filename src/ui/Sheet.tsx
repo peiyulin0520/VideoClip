@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 /** 從底部滑出的面板；點背景關閉。 */
@@ -25,7 +26,13 @@ export function Sheet({
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sheet-title">{title}</div>
+        <div className="sheet-head">
+          <div className="sheet-title">{title}</div>
+          {/* ❌：關閉，這次在視窗裡做的都不存 */}
+          <button className="sheet-close" aria-label="關閉" data-testid="sheet-close" onClick={onClose}>
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
         {children}
       </div>
     </div>
@@ -51,9 +58,6 @@ export function ConfirmSheet({
     <Sheet open={open} title={title} onClose={onClose}>
       <p className="sheet-msg">{message}</p>
       <div className="sheet-row">
-        <button className="btn" onClick={onClose}>
-          取消
-        </button>
         <button
           className="btn danger"
           onClick={() => {

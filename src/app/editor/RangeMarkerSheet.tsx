@@ -1,7 +1,7 @@
-import { Undo2 } from 'lucide-react';
+import { Pause, Play, Redo2, Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type { Range } from '../../engine/timeline';
-import { toast } from '../../store/uiStore';
+import { toast, useUI } from '../../store/uiStore';
 import { thumbStrip } from '../../engine/thumbs';
 import { Sheet } from '../../ui/Sheet';
 import { Wave } from './Wave';
@@ -39,6 +39,7 @@ export function RangeMarkerSheet({
   extra,
   allowEmpty,
   onRangesChange,
+  fixedLen,
 }: {
   title: string;
   /** 整條軸的長度（秒） */
@@ -69,11 +70,15 @@ export function RangeMarkerSheet({
   allowEmpty?: boolean;
   /** 標記有變動時通知呼叫端（切換模式時要換算） */
   onRangesChange?: (ranges: Range[]) => void;
+  /** 只有一組、長度固定（版型的一格）：只能拖「起」，迄＝起＋這個長度；沒有新增／移除 */
+  fixedLen?: number;
 }) {
   const dur = Math.max(duration, 0.1);
   const [ranges, setRanges] = useState<Range[]>(initial.map((r): Range => [r[0], r[1]]));
   const undo = useRef<Range[][]>([]);
+  const redo = useRef<Range[][]>([]);
   const [undoCount, setUndoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);
   const [cursor, setCursor] = useState(initial[0]?.[0] ?? 0);
   const [playing, setPlaying] = useState(false);
   const media = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
@@ -86,15 +91,29 @@ export function RangeMarkerSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ranges]);
 
+  const copyRanges = (rs: Range[]) => rs.map((r): Range => [r[0], r[1]]);
+  /** 做新的動作之前記一份；重做的紀錄清掉 */
   const snapshot = () => {
-    undo.current = [...undo.current.slice(-19), rangesRef.current.map((r): Range => [r[0], r[1]])];
+    undo.current = [...undo.current.slice(-19), copyRanges(rangesRef.current)];
+    redo.current = [];
     setUndoCount(undo.current.length);
+    setRedoCount(0);
   };
   const doUndo = () => {
     const prev = undo.current.pop();
     if (!prev) return;
+    redo.current = [...redo.current, copyRanges(rangesRef.current)];
     setUndoCount(undo.current.length);
+    setRedoCount(redo.current.length);
     setRanges(prev);
+  };
+  const doRedo = () => {
+    const next = redo.current.pop();
+    if (!next) return;
+    undo.current = [...undo.current, copyRanges(rangesRef.current)];
+    setUndoCount(undo.current.length);
+    setRedoCount(redo.current.length);
+    setRanges(next);
   };
 
   const mediaTime = (t: number) => srcOffset + t * srcSpeed;
@@ -157,6 +176,10 @@ export function RangeMarkerSheet({
       return;
     }
     if (cursor >= dur - 0.05) seek(0);
+    // 按播放的這一下（使用者手勢）：打開聲音（iPhone 靜音模式也要有聲音，跟主預覽一樣）
+    useUI.getState().player?.audio.unlock();
+    m.muted = false;
+    m.volume = 1;
     void m
       .play()
       .then(() => setPlaying(true))
@@ -187,7 +210,10 @@ export function RangeMarkerSheet({
       const d = ((ev.clientX - x0) / width) * dur;
       const next = base.map((r): Range => [r[0], r[1]]);
       const r = next[i]!;
-      if (side === 0) r[0] = clamp(origin + d, next[i - 1]?.[1] ?? 0, r[1] - minLen);
+      if (fixedLen !== undefined) {
+        r[0] = clamp(origin + d, 0, Math.max(dur - fixedLen, 0));
+        r[1] = r[0] + fixedLen;
+      } else if (side === 0) r[0] = clamp(origin + d, next[i - 1]?.[1] ?? 0, r[1] - minLen);
       else r[1] = clamp(origin + d, r[0] + minLen, next[i + 1]?.[0] ?? dur);
       setRanges(next);
       seek(r[side]);
@@ -228,6 +254,15 @@ export function RangeMarkerSheet({
   if (at < dur) gaps.push([at, dur]);
   const pct = (t: number) => `${(clamp(t, 0, dur) / dur) * 100}%`;
   const kept = ranges.reduce((n, [a, b]) => n + (b - a), 0);
+  // 白線現在在不在「選取」（靜音模式＝靜音）的範圍裡：預覽用灰階提示
+  const inIdx = ranges.findIndex(([a, b]) => cursor >= a && cursor < b);
+  const onMarked = inIdx >= 0;
+  const grayPreview = mode === 'silence' ? onMarked : !onMarked;
+  const stateText = onMarked
+    ? `${mode === 'silence' ? '靜音中' : mode === 'timing' ? '特效中' : '選取中'} 第 ${inIdx + 1} 組`
+    : mode === 'silence'
+      ? '有聲音'
+      : '沒選取';
   const defaultSummary =
     mode === 'timing'
       ? `特效：${ranges[0] ? `${fmt2(ranges[0][0])} → ${fmt2(ranges[0][1])} 秒（共 ${fmt2(ranges[0][1] - ranges[0][0])} 秒）` : '還沒有標記'}`
@@ -237,17 +272,11 @@ export function RangeMarkerSheet({
 
   return (
     <Sheet open title={title} onClose={onClose} tall>
-      <button
-        className="rm-undo"
-        aria-label="復原上一步"
-        data-testid="rm-undo"
-        disabled={undoCount === 0}
-        onClick={doUndo}
-      >
-        <Undo2 size={22} />
-      </button>
       {extra}
       <div className="rm-preview" data-testid="rm-preview">
+        <span className={`rm-state${grayPreview ? ' off' : ''}`} data-testid="rm-state">
+          {stateText}
+        </span>
         {mediaKind === 'video' && mediaUrl && (
           <video
             ref={(el) => {
@@ -258,6 +287,7 @@ export function RangeMarkerSheet({
             preload="auto"
             onLoadedMetadata={() => seek(cursor)}
             data-testid="rm-video"
+            style={grayPreview ? { filter: 'grayscale(1) brightness(0.8)' } : undefined}
           />
         )}
         {mediaKind === 'audio' && mediaUrl && (
@@ -277,12 +307,44 @@ export function RangeMarkerSheet({
       </div>
       <div className="rm-play-row">
         {mediaKind !== 'none' && (
-          <button className="btn" data-testid="rm-play" onClick={togglePlay}>
-            {playing ? '⏸ 暫停' : '▶ 播放'}
-          </button>
+          <div className="btn-zone" data-testid="rm-zone-play">
+            <button
+              className="rm-icon-btn"
+              data-testid="rm-play"
+              aria-label={playing ? '暫停' : '播放'}
+              onClick={togglePlay}
+            >
+              {playing ? (
+                <Pause size={20} fill="currentColor" aria-hidden="true" />
+              ) : (
+                <Play size={20} fill="currentColor" aria-hidden="true" />
+              )}
+            </button>
+          </div>
         )}
+        {mediaKind !== 'none' && <span className="zone-sep" aria-hidden="true" />}
+        <div className="btn-zone" data-testid="rm-zone-history">
+          <button
+            className="rm-icon-btn"
+            aria-label="復原"
+            data-testid="rm-undo"
+            disabled={undoCount === 0}
+            onClick={doUndo}
+          >
+            <Undo2 size={20} aria-hidden="true" />
+          </button>
+          <button
+            className="rm-icon-btn"
+            aria-label="重做"
+            data-testid="rm-redo"
+            disabled={redoCount === 0}
+            onClick={doRedo}
+          >
+            <Redo2 size={20} aria-hidden="true" />
+          </button>
+        </div>
         <span className="rm-now" data-testid="rm-now">
-          目前白線：{fmt2(cursor)} 秒
+          目前 {fmt2(cursor)} 秒
         </span>
       </div>
       <div className="rm-ruler" aria-hidden="true">
@@ -308,11 +370,11 @@ export function RangeMarkerSheet({
               </button>
               <button
                 className="rm-flag end"
-                style={{ left: pct(b) }}
                 role="slider"
                 aria-label={`第 ${i + 1} 組 終點`}
                 aria-valuetext={`第 ${fmt2(b)} 秒`}
                 data-testid={`range-flag-end-${i}`}
+                style={{ left: pct(b), ...(fixedLen !== undefined ? { pointerEvents: 'none' } : {}) }}
                 onPointerDown={(e) => dragFlag(e, i, 1)}
               >
                 <i />
@@ -349,34 +411,34 @@ export function RangeMarkerSheet({
           <div className="rm-cursor" data-testid="rm-cursor" style={{ left: pct(cursor) }} />
         </div>
       </div>
-      <button className="btn rm-add" data-testid="range-add" onClick={addGroup}>
-        在白線位置新增一組起迄標記
-      </button>
+      {fixedLen === undefined && (
+        <button className="btn rm-add" data-testid="range-add" onClick={addGroup}>
+          在白線位置新增一組起迄標記
+        </button>
+      )}
       <ul className="rm-list">
-        {ranges.map(([a, b], i) => (
-          <li key={i}>
-            <span>
-              第 {i + 1} 組：{fmt2(a)}–{fmt2(b)} 秒
-            </span>
-            <button className="chip sm" data-testid={`range-remove-${i}`} onClick={() => removeGroup(i)}>
-              移除第 {i + 1} 組{mode === 'timing' ? '' : '片段'}
-            </button>
-          </li>
-        ))}
+        {fixedLen === undefined &&
+          ranges.map(([a, b], i) => (
+            <li key={i}>
+              <span>
+                第 {i + 1} 組：{fmt2(a)}–{fmt2(b)} 秒
+              </span>
+              <button className="chip sm" data-testid={`range-remove-${i}`} onClick={() => removeGroup(i)}>
+                移除第 {i + 1} 組{mode === 'timing' ? '' : '片段'}
+              </button>
+            </li>
+          ))}
       </ul>
       <p className="rm-summary" data-testid="trim-info">
         {summary ? summary(ranges) : defaultSummary}
       </p>
       <p className="hint">
         {hint ??
-          '點縮圖只移動白線與預覽；按「新增」才建立下一組。原色是選取，灰色是不選；中間沒選的地方保留原本的時間空白。右上角可復原，取消不套用變更。'}
+          '點縮圖只移動白線與預覽；按「新增」才建立下一組。原色是選取，灰色是不選；中間沒選的地方保留原本的時間空白。復原、重做在播放鍵旁邊；右上角 ✕ 關閉不套用變更。'}
       </p>
       <div className="sheet-row">
-        <button className="btn" onClick={onClose}>
-          取消
-        </button>
         <button
-          className="btn primary"
+          className="btn primary grow"
           data-testid="rm-apply"
           disabled={ranges.length === 0 && !allowEmpty}
           onClick={() => onApply(ranges)}

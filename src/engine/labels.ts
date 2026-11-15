@@ -4,6 +4,7 @@ import type { Asset, Item } from '../model/types';
 /** 物件沒有自己命名時的預設名稱 */
 export function defaultName(item: Item, asset?: Asset): string {
   if (item.type === 'text') {
+    if (item.placeholder) return 'Aa（還沒輸入）';
     const t = item.card.runs[0]?.text.replace(/\n/g, ' ') ?? '';
     return t === '' ? '圖形' : `Aa ${t}`;
   }

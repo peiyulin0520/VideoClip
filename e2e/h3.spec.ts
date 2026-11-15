@@ -10,6 +10,7 @@ import {
   project,
   samplePreview,
   showTimeline,
+  finishLayout,
 } from './helpers';
 
 type Cell = { x: number; y: number; w: number; h: number };
@@ -63,8 +64,7 @@ test('同時播放的影片超過預覽的上限：多的格子畫縮圖、不�
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '版型');
   await page.getByRole('button', { name: '版型 九宮格', exact: true }).tap();
-  await page.getByTestId('layout-input').setInputFiles([fixture('solid-red.webm')]);
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, [fixture('solid-red.webm')]);
   await expect(page.locator('.toast').filter({ hasText: '同時播放超過' })).toBeVisible();
   const tr = (await project(page)).tracks as unknown as { items: { cell?: Cell }[] }[];
   const cells = tr.flatMap((t) => t.items).flatMap((i) => (i.cell ? [i.cell] : []));
@@ -84,7 +84,7 @@ test('修剪面板：拖旗標時預覽的白線跟著（顯示那一秒）；�
   await showTimeline(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '修剪', exact: true }).tap();
+  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
   await expect(page.getByTestId('rm-video')).toBeVisible();
   const flag = (await page.getByTestId('range-flag-end-0').boundingBox())!;
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;

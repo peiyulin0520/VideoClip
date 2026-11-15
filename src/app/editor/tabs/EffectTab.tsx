@@ -14,6 +14,7 @@ import {
 import type { EffectKind, Item, TextFxKind, VideoItem } from '../../../model/types';
 import {
   editItem,
+  setGroupMotion,
   setItemEffect,
   setTextFx,
   setTransition,
@@ -22,9 +23,11 @@ import {
 } from '../../../store/actions';
 import { TEXT_FXS, textFxName } from '../../../engine/textFx';
 import { useProjectStore } from '../../../store/projectStore';
+import { isFrameItem } from '../../../engine/layoutTracks';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
 import { EffectTimingSheet } from '../EffectTimingSheet';
+import { TransitionAudioBlock } from '../TransitionAudio';
 import { TransitionCard } from '../TransitionCards';
 import type { Found } from './shared';
 
@@ -36,7 +39,9 @@ export function EffectTab({ found }: { found: Found }) {
   useProjectStore((s) => s.project); // 專案變了要重畫
   const fxFocus = useUI((s) => s.fxFocus);
   const [cat, setCat] = useState<CatKey | null>(null);
-  const item: Item | null = found && !('group' in found.item && found.item.group) ? found.item : null;
+  // 版型：只有外框（整個版型）能在這裡設特效與轉場；格子、版型裡的文字各自走版型分頁
+  const item: Item | null =
+    found && (isFrameItem(found.item) || !('group' in found.item && found.item.group)) ? found.item : null;
   const track = item ? found!.track : null;
   const part: Part = item && fxFocus?.id === item.id ? fxFocus.role : 'in';
   const setPart = (role: Part) => item && useUI.setState({ fxFocus: { id: item.id, role } });
@@ -49,12 +54,37 @@ export function EffectTab({ found }: { found: Found }) {
       </div>
       {!item || !track ? (
         <p className="hint">
-          先在時間軸點一個素材（選進場、出場特效），或點兩個素材中間的小圓圈（選轉場），再選特效。版型整體的特效請到「版型」分頁。
+          先在時間軸點一個素材（選進場、出場特效），或點兩個素材中間的小圓圈（選轉場），再選特效。整個版型的特效：點時間軸上的版型那一條；版型裡的格子、文字目前請到「版型」分頁改。
         </p>
       ) : item.type === 'audio' ? (
         <AudioFx item={item as VideoItem} />
       ) : (
         <>
+          {isFrameItem(item) && (
+            <div className="zone-soft" data-testid="layout-motion">
+              <div className="slider-label">整個版型的動畫</div>
+              <div className="chips" role="radiogroup" aria-label="版型動畫">
+                {(
+                  [
+                    [undefined, '不動'],
+                    ['drift', '捲動'],
+                    ['slide', '滑入滑出'],
+                  ] as const
+                ).map(([id, name]) => (
+                  <button
+                    key={name}
+                    role="radio"
+                    aria-checked={item.motion === id}
+                    aria-label={`動畫 ${name}`}
+                    className={`chip${item.motion === id ? ' active' : ''}`}
+                    onClick={() => setGroupMotion(item.group!, id)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="chips cat-chips" role="tablist" aria-label="特效位置">
             {(
               [
@@ -230,7 +260,7 @@ function SingleBlock({
           onApply={(v) => {
             setItemEffect(item.id, role, cur.kind, v.d);
             focus();
-            setAdjust(false);
+            toast('已套用');
           }}
         />
       )}
@@ -325,7 +355,7 @@ function SeamBlock({
           onApply={(v) => {
             setTransitionSplit(item.id, v.before, v.after);
             focus();
-            setAdjust(false);
+            toast('已套用');
           }}
         />
       )}
@@ -352,6 +382,7 @@ function SeamBlock({
           >
             全部套用（這一軌所有銜接處）
           </button>
+          {spanNow && <TransitionAudioBlock item={item} prev={spanNow.prev} />}
         </>
       )}
     </>

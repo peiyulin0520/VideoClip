@@ -9,6 +9,8 @@ import {
   project,
   samplePreview,
   selectedItemId,
+  isFrameTrack,
+  finishLayout,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-5/layout';
@@ -31,14 +33,16 @@ const tracks = async (page: Page) =>
 
 async function addLayout(page: Page, name: string, color: string, files: string[]) {
   await openTab(page, '版型');
+  // 已經選到某個版型時，「新增版型」收合成一顆鈕，要先展開
+  const more = page.getByTestId('layout-add-more');
+  if (await more.isVisible()) await more.tap();
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
-  await expect(page.getByTestId('layout-sheet')).toBeVisible();
+  await expect(page.getByTestId('layout-options')).toBeVisible();
   await page
-    .getByTestId('layout-sheet')
+    .getByTestId('layout-options')
     .getByRole('radio', { name: `外框 ${color}` })
     .tap();
-  await page.getByTestId('layout-input').setInputFiles(files.map(fixture));
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, files.map(fixture));
 }
 const center = (c: Cell): [number, number] => [c.x + c.w / 2, c.y + c.h / 2];
 const near = (c: number[] | null, want: number[], tol = 40) =>
@@ -49,13 +53,13 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
 }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '版型');
-  await expect(page.getByTestId('layout-grid').locator('.layout-card')).toHaveCount(8);
+  await expect(page.getByTestId('layout-grid').locator('.layout-card')).toHaveCount(10);
   await page.screenshot({ path: `${SHOT}/picker.png` });
   await addLayout(page, '拍貼機直條', '黑', ['solid-red.webm', 'solid-green.webm']);
 
   const tr = await tracks(page);
   const cellTracks = tr.filter((t) => t.items[0]?.cell);
-  const frameTrack = tr.find((t) => t.groupRole === 'frame')!;
+  const frameTrack = tr.find(isFrameTrack)!;
   expect(cellTracks).toHaveLength(4);
   expect(frameTrack.locked).toBeFalsy(); // 外框不鎖：它代表整個版型，可以整體縮放移動
   expect(tr.indexOf(frameTrack)).toBe(tr.length - 1); // 在最上層
@@ -131,19 +135,12 @@ test('版型：每個版型都做得出來，格子數對、素材輪流或只�
   }
 });
 
-test('版型：素材比格子多只用前面的；同時超過 5 支影片會提醒；照片裁成格子的比例', async ({ page }) => {
+test('版型：同時超過 5 支影片會提醒；照片裁成格子的比例', async ({ page }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-blue.webm']);
-  // 3 格的版型放 4 個素材：只用前 3 個
-  await addLayout(page, '三格', '白', [
-    'solid-red.webm',
-    'solid-green.webm',
-    'solid-blue.webm',
-    'clip-a.webm',
-  ]);
+  await addLayout(page, '三格', '白', ['solid-red.webm', 'solid-green.webm', 'solid-blue.webm']);
   const cells = (await tracks(page)).filter((t) => t.items[0]?.cell);
   expect(cells).toHaveLength(3);
-  await expect(page.locator('.toast').filter({ hasText: '只用了前 3 個素材' })).toBeVisible();
 
   // 九宮格放 6 支影片：提醒同時播放太多
   const six = Array.from({ length: 6 }, () => 'solid-red.webm');
@@ -181,8 +178,7 @@ test('版型的格子可以用裁切調整露出的範圍：預設鎖定格子�
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
   await expect(page.getByRole('radio', { name: '格子比例' })).toHaveAttribute('aria-checked', 'true');
-  // 鎖定比例後拖保留區域的角（縮小），再按完成
-  await page.evaluate(() => window.scrollTo(0, 0));
+  // 鎖定比例後拖保留區域的角（縮小），再按套用裁切
   const h = (await page.getByTestId('crop-h-br').boundingBox())!;
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
@@ -191,7 +187,7 @@ test('版型的格子可以用裁切調整露出的範圍：預設鎖定格子�
     steps: 5,
   });
   await page.mouse.up();
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   const after = (await tracks(page)).filter((t) => t.items[0]?.cell)[0]!.items[0]!;
   expect(after.crop).toBeDefined();
   // 位置還是格子中心；方框大小還是格子大小（露出的範圍變小，縮放跟著重算）

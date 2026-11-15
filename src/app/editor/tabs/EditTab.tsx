@@ -3,6 +3,7 @@ import {
   Copy,
   Crop as CropIcon,
   Gauge,
+  LayoutGrid,
   Maximize,
   Minimize,
   MoveHorizontal,
@@ -12,22 +13,24 @@ import {
   Trash2,
   Volume2,
 } from 'lucide-react';
+import { cellTracksOf } from '../../../engine/layoutTracks';
 import { isVideoItem, visibleLayers } from '../../../engine/timeline';
 import type { Item } from '../../../model/types';
 import {
   duplicateAny,
   editItem,
+  moveToCell,
   removeAnyItem,
   renameItem,
   rippleRemoveItem,
   splitAny,
 } from '../../../store/actions';
 import { PromptSheet } from '../../../ui/PromptSheet';
+import { Sheet } from '../../../ui/Sheet';
 import { useState } from 'react';
-import { startCrop, useCrop } from '../../../store/cropStore';
+import { startCrop } from '../../../store/cropStore';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
-import { CropPanel } from '../CropPanel';
 import { ClipPanel, panelActive } from './ClipPanel';
 import { ToolButton, type Found, type Panel } from './shared';
 
@@ -46,8 +49,14 @@ export function EditTab({
   const project = useProjectStore((s) => s.project)!;
   const player = useUI((s) => s.player);
   const [naming, setNaming] = useState(false);
-  const cropping = useCrop((s) => !!s.s);
+  const [moveOpen, setMoveOpen] = useState(false);
   const selected = found?.item;
+  // 版型格子裡的素材：可以［移至格子］（同一版型的別格）
+  const cellSel =
+    selected && selected.type !== 'text' && selected.type !== 'audio' && selected.cell && selected.group
+      ? selected
+      : undefined;
+  const cellTracks = cellSel ? cellTracksOf(project.tracks, cellSel.group!) : [];
 
   const need = (): Item | undefined => {
     if (!selected) toast('請先點選一個片段');
@@ -103,7 +112,6 @@ export function EditTab({
     setPanel(p);
   };
 
-  if (cropping) return <CropPanel />;
   if (panelActive(panel, found)) return <ClipPanel panel={panel} setPanel={setPanel} found={found} />;
 
   return (
@@ -114,7 +122,7 @@ export function EditTab({
       <ToolButton icon={ArrowLeftToLine} label="刪除並補齊" onClick={removeAndClose} />
       <ToolButton icon={Copy} label="複製" onClick={() => need() && duplicateAny(selected!.id)} />
       <ToolButton icon={Pencil} label="命名" onClick={() => need() && setNaming(true)} />
-      <ToolButton icon={MoveHorizontal} label="修剪" onClick={() => openPanel('trim')} />
+      <ToolButton icon={MoveHorizontal} label="片段範圍" onClick={() => openPanel('trim')} />
       <ToolButton
         icon={CropIcon}
         label="裁切"
@@ -132,6 +140,28 @@ export function EditTab({
         label={selected && isVideoItem(selected) && selected.fit === 'contain' ? '填滿' : '完整'}
         onClick={toggleFit}
       />
+      {cellSel && (
+        <>
+          <span className="zone-sep tool-sep" aria-hidden="true" />
+          <ToolButton icon={LayoutGrid} label="移至格子" onClick={() => setMoveOpen(true)} />
+          <Sheet open={moveOpen} title="移至格子" onClose={() => setMoveOpen(false)}>
+            {cellTracks.map((t, i) => (
+              <button
+                key={t.id}
+                className={`menu-item${t.id === found?.track.id ? ' active' : ''}`}
+                aria-label={`移至第 ${i + 1} 格`}
+                disabled={t.id === found?.track.id}
+                onClick={() => {
+                  setMoveOpen(false);
+                  if (!moveToCell(cellSel.id, t.id)) toast('搬不過去');
+                }}
+              >
+                第 {i + 1} 格{t.id === found?.track.id ? '（目前）' : ''}
+              </button>
+            ))}
+          </Sheet>
+        </>
+      )}
       <PromptSheet
         open={naming && !!selected}
         title="片段命名"

@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import type { Asset } from '../model/types';
 import { itemBox, type GeoCtx } from './geometry';
-import { cellItem, cellRect, cellTransform, coverCrop, LAYOUTS, type Rect } from './layouts';
+import {
+  applyLineScale,
+  buildIn,
+  cellGap,
+  cellItem,
+  cellRect,
+  cellTransform,
+  coverCrop,
+  defOf,
+  GRID_MAX,
+  LINE_MAX,
+  gridDef,
+  LAYOUTS,
+  layoutById,
+  planCell,
+  type Rect,
+} from './layouts';
 
 const SIZES: [string, number, number][] = [
   ['9:16', 1080, 1920],
@@ -110,5 +126,90 @@ describe('每一格的物件：素材裁好、剛好填滿格子', () => {
     expect(cellItem(a, wins[0]!, W, H, 2, 4, 'g').start).toBe(2);
     expect(cellItem(a, wins[0]!, W, H, 2, 4, 'g').duration).toBe(4);
     expect(cellItem(a, wins[0]!, W, H, 0, 0, 'g').duration).toBe(0.2);
+  });
+});
+
+describe('planCell', () => {
+  it('素材比格子短：keep 留後面空白；blank before 空白在前面', () => {
+    expect(planCell(2, 3, 'keep')).toEqual({ speed: 1, duration: 2, offset: 0, blank: [2, 3] });
+    expect(planCell(2, 3, 'blank', 'before')).toEqual({ speed: 1, duration: 2, offset: 1, blank: [0, 1] });
+  });
+  it('fit：慢動作 speed = S/L；快動作；超出範圍有限制', () => {
+    expect(planCell(2, 3, 'fit').speed).toBeCloseTo(2 / 3, 6);
+    expect(planCell(2, 3, 'fit').blank).toBeNull();
+    expect(planCell(6, 3, 'fit')).toMatchObject({ speed: 2, duration: 3, blank: null });
+    const slow = planCell(0.3, 3, 'fit');
+    expect(slow.speed).toBe(0.25);
+    expect(slow.duration).toBeCloseTo(1.2, 6);
+    expect(slow.blank![0]).toBeCloseTo(1.2, 6);
+    expect(planCell(100, 3, 'fit').speed).toBe(4);
+  });
+  it('素材比格子長：keep 只用前面', () => {
+    expect(planCell(10, 3, 'keep')).toEqual({ speed: 1, duration: 3, offset: 0, blank: null });
+  });
+});
+
+describe('版型 v2：左右雙格、自訂格數、版型大小', () => {
+  it('左右雙格：兩格左右並排、同高', () => {
+    const b = layoutById('split-1x2').build(1080, 1920);
+    expect(b.windows).toHaveLength(2);
+    expect(b.windows[0]!.y).toBeCloseTo(b.windows[1]!.y, 6);
+    expect(b.windows[0]!.x + b.windows[0]!.w).toBeLessThan(b.windows[1]!.x);
+  });
+  it('gridDef：列×欄格數、不重疊、都在版型範圍內；超出範圍的列欄被夾住', () => {
+    const d = gridDef(3, 2);
+    const b = d.build(1000, 1000);
+    expect(b.windows).toHaveLength(6);
+    for (const w of b.windows) {
+      expect(w.x).toBeGreaterThanOrEqual(0);
+      expect(w.x + w.w).toBeLessThanOrEqual(1000.001);
+      expect(w.y + w.h).toBeLessThanOrEqual(1000.001);
+    }
+    expect(gridDef(9, 9).cells).toBe(GRID_MAX * GRID_MAX);
+    expect(gridDef(0, 0).cells).toBe(1);
+  });
+  it('buildIn：沒給大小＝整個畫面；給大小＝縮小後置中，格子長寬比例跟著版型', () => {
+    const d = gridDef(1, 2);
+    const full = buildIn(d, 1000, 2000);
+    expect(full.windows[0]!.h).toBeGreaterThan(1500);
+    const small = buildIn(d, 1000, 2000, { w: 0.5, h: 0.25 });
+    // 版型寬 500、高 500，放在畫面正中央（x 從 250、y 從 750）
+    const xs = small.windows.map((w) => w.x);
+    const ys = small.windows.map((w) => w.y);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(250);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(750);
+    expect(Math.max(...small.windows.map((w) => w.x + w.w))).toBeLessThanOrEqual(750.001);
+    expect(Math.max(...small.windows.map((w) => w.y + w.h))).toBeLessThanOrEqual(1250.001);
+    expect(small.panels[0]).toMatchObject({ x: 250, y: 750, w: 500, h: 500 });
+  });
+  it('defOf：自訂格數依列欄產生，其他依 id', () => {
+    expect(defOf({ layout: 'grid', rows: 2, cols: 3 }).cells).toBe(6);
+    expect(defOf({ layout: 'booth-2x2' }).cells).toBe(4);
+  });
+});
+
+describe('格子之間的框線粗細', () => {
+  const b0 = gridDef(1, 2).build(1000, 1000);
+  const gapOf = (b: typeof b0) => b.windows[1]!.x - (b.windows[0]!.x + b.windows[0]!.w);
+  it('cellGap：兩格之間的空隙；只有一格沒有', () => {
+    expect(cellGap(b0.windows)).toBeCloseTo(gapOf(b0), 3);
+    expect(cellGap(gridDef(1, 1).build(1000, 1000).windows)).toBeUndefined();
+  });
+  it('applyLineScale：2 倍＝空隙變 2 倍、0＝格子貼在一起、1＝不動；格子仍在原範圍內', () => {
+    const g = gapOf(b0);
+    expect(gapOf(applyLineScale(b0, 2))).toBeCloseTo(g * 2, 3);
+    expect(gapOf(applyLineScale(b0, 0))).toBeCloseTo(0, 3);
+    expect(applyLineScale(b0, 1)).toBe(b0);
+    expect(gapOf(applyLineScale(b0, 99))).toBeCloseTo(g * LINE_MAX, 3); // 上限 3 倍
+    for (const w of applyLineScale(b0, 3).windows) expect(w.w).toBeGreaterThan(0);
+  });
+  it('buildIn 帶 line；每個內建多格版型都有框線可調，拍立得（一格）沒有', () => {
+    for (const d of LAYOUTS) {
+      const gap = cellGap(d.build(1080, 1920).windows);
+      if (d.cells === 1) expect(gap).toBeUndefined();
+      else expect(gap).toBeGreaterThan(0);
+    }
+    const thick = buildIn(gridDef(1, 2), 1000, 1000, undefined, 2);
+    expect(gapOf(thick)).toBeCloseTo(gapOf(b0) * 2, 3);
   });
 });

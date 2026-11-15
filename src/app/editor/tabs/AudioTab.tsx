@@ -1,4 +1,5 @@
-import { Copy, MoveHorizontal, Scissors, Trash2, Volume2, VolumeX } from 'lucide-react';
+import { AddToGroupToggle } from '../AddToGroupToggle';
+import { Copy, Film, MoveHorizontal, Scissors, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ensureUrls } from '../../../engine/assetUrls';
 import { importFiles } from '../../../engine/importMedia';
@@ -51,11 +52,12 @@ function MusicImport() {
   };
   return (
     <>
+      <AddToGroupToggle what="新增的音樂／音效" />
       <div className="panel-head">
         <span>背景音樂</span>
       </div>
       <button className="btn done" onClick={() => input.current?.click()}>
-        ＋ 加入背景音樂（從「檔案」選 mp3、m4a、wav…）
+        ＋ 加入背景音樂
       </button>
       <input
         ref={input}
@@ -67,8 +69,9 @@ function MusicImport() {
         onChange={(e) => void onFiles(e.target.files)}
       />
       <p className="hint music-note">
-        音樂會放在目前這一秒，最長到影片結束。點時間軸上的音樂可以分割、修剪、調音量和淡入淡出。發 Reels
-        時，也可以先匯出，再在 Instagram 裡加熱門音樂（比較不會有版權問題）。
+        可以選 mp3、m4a、wav
+        等檔案。音樂會放在目前這一秒，最長到影片結束。點時間軸上的音樂可以分割、片段範圍、調音量和淡入淡出。發
+        Reels 時，也可以先匯出，再在 Instagram 裡加熱門音樂（比較不會有版權問題）。
       </p>
     </>
   );
@@ -124,7 +127,7 @@ export function AudioTab({
             }}
           />
           <ToolButton icon={Copy} label="複製" onClick={() => duplicateAny(selected.id)} />
-          <ToolButton icon={MoveHorizontal} label="修剪" onClick={() => setPanel('trim')} />
+          <ToolButton icon={MoveHorizontal} label="片段範圍" onClick={() => setPanel('trim')} />
           <ToolButton icon={Volume2} label="音量" onClick={() => setPanel('volume')} />
         </div>
       )}
@@ -155,11 +158,14 @@ export function AudioTab({
                     {item.type === 'audio' && <b>♪</b>}
                   </span>
                 ) : (
-                  <span className="audio-ico">{item.type === 'audio' ? '♪' : '🎬'}</span>
+                  <span className="audio-ico">
+                    {item.type === 'audio' ? '♪' : <Film size={18} aria-hidden="true" />}
+                  </span>
                 )}
                 <span className="audio-text">
-                  {item.type === 'video' ? `${ordinalIn(track.items, item.id)} ` : ''}
-                  {itemTitle(item, asset)}
+                  {item.type === 'video'
+                    ? `原音 · ${ordinalIn(track.items, item.id)} ${itemTitle(item, asset)}`
+                    : itemTitle(item, asset)}
                   <small>
                     {formatTime(item.start)}–{formatTime(item.start + item.duration)}
                     {track.muted ? ' · 這條軌道靜音' : ''}
@@ -189,14 +195,14 @@ export function AudioTab({
                 <button
                   className="chip sm"
                   data-testid="audio-trim"
-                  aria-label={`修剪 ${itemTitle(item, asset)}`}
+                  aria-label={`片段範圍 ${itemTitle(item, asset)}`}
                   onClick={() => {
                     useProjectStore.getState().select(item.id);
                     player?.seek(item.start);
                     setPanel('trim');
                   }}
                 >
-                  修剪
+                  片段範圍
                 </button>
               )}
               {item.type === 'video' && (

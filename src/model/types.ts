@@ -14,7 +14,9 @@ export type Asset = {
   height: number;
   hasAudio: boolean;
   /** 貼圖（內建貼圖、GIPHY、我的貼圖）加進專案時記下來：時間軸上自成一類「貼圖」，放在貼圖軌 */
-  origin?: 'sticker';
+  origin?: 'sticker' | 'color';
+  /** 色塊素材（origin==='color'）：純色照片，版型格子裡穿插用的色塊；不列在素材庫 */
+  color?: string;
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
   /** 縮圖已經補滿（每 2 秒一張）；沒有這個欄位的舊素材會在背景補（見 engine/thumbs.ts） */
@@ -41,6 +43,8 @@ export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'add';
 export type Outline = { color: string; width: number }; // width：以 1080 寬畫面為基準的 px
 /** 裁切：各邊切掉的比例 0–0.9 */
 export type Crop = { l: number; t: number; r: number; b: number };
+/** 裁切的一筆筆刷（keep＝留下）或橡皮擦（erase＝去掉）；座標、粗細都是「整張原始畫面」的比例 0–1（w 佔畫面寬） */
+export type CropStroke = { mode: 'keep' | 'erase'; w: number; pts: [number, number][] };
 
 export type ItemBase = {
   id: string;
@@ -58,13 +62,26 @@ export type ItemBase = {
    * 進場轉場：跟前面緊接的同類素材（影像接影像、貼圖接貼圖、字卡接字卡）之間的效果，以兩個片段的接縫為中心。
    * duration＝總長；before＝佔前一段結尾幾秒、after＝佔這一段開頭幾秒（沒寫就各一半，舊資料也是）。
    */
-  transitionIn?: { kind: TransitionKind; duration: number; before?: number; after?: number };
+  transitionIn?: {
+    kind: TransitionKind;
+    duration: number;
+    before?: number;
+    after?: number;
+    /** 轉場時的聲音（沒寫＝交叉淡化）；cut／custom 的時間點都是「相對接縫的秒數」 */
+    audio?: 'cross' | 'cut' | 'custom' | 'prev' | 'next' | 'mute';
+    /** cut：從哪個時間直接換成後一段的聲音（沒寫＝接縫，0） */
+    audioCut?: number;
+    /** custom：前一段的聲音停在哪（沒寫＝接縫，0；可以是負的） */
+    audioOutA?: number;
+    /** custom：後一段的聲音從哪裡開始（沒寫＝接縫，0；可以等轉場結束之後） */
+    audioInB?: number;
+  };
   /** 單一素材的進場特效（這個素材當 B，一定從開頭開始）與出場特效（這個素材當 A，一定在結尾結束）；duration＝特效幾秒 */
   inEffect?: { kind: EffectKind; duration: number };
   outEffect?: { kind: EffectKind; duration: number };
-  /** 定位（關鍵影格），照時間排序；沒有＝照 transform */
+  /** 定格（關鍵影格），照時間排序；沒有＝照 transform */
   keyframes?: Keyframe[];
-  /** 物件本身的手動調色（沒有定位時用它；有定位時是沒寫的項目的底） */
+  /** 物件本身的手動調色（沒有定格時用它；有定格時是沒寫的項目的底） */
   adjust?: Partial<Adjust>;
   /** 色調組合（黑白、復古、清新…）＋強度；實際調色＝組合×強度＋手動調整 */
   look?: LookRef;
@@ -106,8 +123,8 @@ export type LookRef = {
 };
 
 /**
- * 定位（關鍵影格）：這個物件在「開始後 t 秒」的位置、大小、旋轉、透明度與色調；
- * 兩個定位之間全部線性漸變；第一個之前、最後一個之後維持那一個的樣子。
+ * 定格（關鍵影格）：這個物件在「開始後 t 秒」的位置、大小、旋轉、透明度與色調；
+ * 兩個定格之間全部線性漸變；第一個之前、最後一個之後維持那一個的樣子。
  * adjust 沒寫的項目沿用物件本身的色調。
  */
 export type Keyframe = {
@@ -119,11 +136,11 @@ export type Keyframe = {
   opacity: number;
   adjust?: Partial<Adjust>;
   /**
-   * 這個定位的色調組合：沒寫＝沿用物件本身的；null＝這個定位明確不用色調組合（原色）。
-   * 兩個定位之間用「實際調色值」（組合×強度＋手動）逐項內插，所以可以從原色漸漸變成黑白。
+   * 這個定格的色調組合：沒寫＝沿用物件本身的；null＝這個定格明確不用色調組合（原色）。
+   * 兩個定格之間用「實際調色值」（組合×強度＋手動）逐項內插，所以可以從原色漸漸變成黑白。
    */
   look?: LookRef | null;
-  /** 在這個定位的時間「原地動一下」（震／彈／晃／跳）；不是進場、離場或轉場 */
+  /** 在這個定格的時間「原地動一下」（震／彈／晃／跳）；不是進場、離場或轉場 */
   pulse?: { kind: 'shake' | 'pop' | 'wobble' | 'jump'; duration: number; strength: number };
 };
 
@@ -148,16 +165,42 @@ export type VideoItem = ItemBase & {
    * 有它時優先於 mask（多邊形）。
    */
   maskBitmap?: string;
+  /**
+   * 裁切模式的編輯內容（一般裁切的四邊、自由裁切的多邊形、筆刷／橡皮擦的筆畫），讓下次進裁切可以接著改。
+   * 有筆畫時才存（沒有筆畫時 crop／mask 本身就是全部）。maskBitmap 是它畫出來的結果。
+   */
+  cropEdit?: { crop: Crop; mask: [number, number][] | null; strokes: CropStroke[] };
   /** 多格版型：這個物件所在的格子（佔畫面寬、高的比例）。裁切模式完成時，畫面會填滿這個格子 */
   cell?: { x: number; y: number; w: number; h: number };
+  /** 版型裡的貼圖／音效（不是外框、不是格子）：有 group 又沒有 cell 的影像物件預設會被當成外框，所以要標記 */
+  member?: true;
+  /** 版型的格子：使用者單獨動過這一格的位置／大小（放大、平移）。有它就不被「格子回到洞裡」的保險拉回去 */
+  cellEdit?: true;
   /** 同一個版型的物件（外框與各格）共用的 id：一起縮放、移動、同一段時間，也用來「刪除整個版型」 */
   group?: string;
   /** 版型外框專用：看得到的範圍（佔整張外框圖的比例）；選取框、點選範圍用它，不用整張透明的圖 */
   visible?: { x: number; y: number; w: number; h: number };
   /** 版型外框專用：用哪個版型、外框的顏色與透明度（之後改顏色要重畫外框圖用；舊專案沒有） */
-  frameStyle?: { layout: string; color: string; opacity: number };
+  frameStyle?: {
+    layout: string;
+    color: string;
+    opacity: number;
+    /** 自訂格數（layout==='grid'）的列、欄 */
+    rows?: number;
+    cols?: number;
+    /** 版型占畫面的寬、高比例（沒有＝整個畫面）；調整版型大小會改它 */
+    box?: { w: number; h: number };
+    /** 格子之間框線的粗細倍數（沒有＝1，原本的粗細；0＝沒有框線，最大 3） */
+    line?: number;
+  };
   /** 版型外框專用：整個版型的動畫（捲動＝由下往上捲過畫面；滑入滑出＝開頭從右邊滑進來、結尾往左滑出去） */
   motion?: 'drift' | 'slide';
+  /** 版型外框專用：最後選的排法（同步＝各格都從版型開頭；依序＝一格接一格，之後加素材／改長度會把後面的格子往後推）。沒有＝同步 */
+  layoutPlay?: 'sync' | 'seq';
+  /** 版型外框專用：格子沒素材可播的空檔——停格＝停在前一段最後一格、色塊＝格子的 fill 色、透明＝不畫。沒有＝舊版型的行為（有 fill 才畫色塊） */
+  gapMode?: 'hold' | 'fill' | 'none';
+  /** 只在計算畫面時暫時出現（不存檔）：這個格子素材是空檔裡的停格，before＝停在第一格、after＝停在最後一格，不 play()、沒有聲音 */
+  hold?: 'before' | 'after';
   /** 動態模板的格子：格子的範圍從 from（佔畫面寬、高的比例）在 t0–t1 秒（片段開始後）滑到 cell；之前停在 from */
   cellAnim?: { from: { x: number; y: number; w: number; h: number }; t0: number; t1: number };
   /** 動態模板外框：這個版型是哪一種動態模板（有整套的時間表，見 engine/story.ts） */
@@ -346,11 +389,17 @@ export type TextCard = {
 };
 export type TextItem = ItemBase & {
   type: 'text';
+  /** 版型某一格的「空白畫面」上的文字：那一格的軌道 id（「這一格」視窗用它找回來） */
+  cellFor?: string;
+  /** 色塊素材（格子裡穿插的色塊）上的文字：那一段色塊的物件 id；色塊移動、改長度、刪除時文字跟著 */
+  onItem?: string;
   card: TextCard;
   /** 屬於哪個動態模板（標題、副標）：模板整個移動、拿掉、改長度時它們跟著 */
   group?: string;
   /** 字體輪播：開始後 until 秒內每 interval 秒換下一個字體（依序輪流），之後固定用 fonts[0] */
   fontCycle?: { fonts: string[]; interval: number; until: number };
+  /** 還沒輸入內容（新增文字的提示狀態）：內容是空的，預覽顯示半透明的「點兩下編輯文字」，匯出不畫 */
+  placeholder?: boolean;
   /** 文字樣式特效（IG 那種，整段一直動）；沒有＝無 */
   textFx?: { kind: TextFxKind };
 };
@@ -380,9 +429,12 @@ export type Track = {
    * 各格的軌道藏起來；在預覽上點格子可以個別選片段。
    */
   group?: string;
-  groupRole?: 'frame' | 'cell';
+  /** 'cell'＝版型的格子軌（貼在外框那一列下面）；'member'＝版型裡的文字／貼圖／音效軌（只在版型展開時看得到）。'frame' 是舊資料（外框自己一條軌），載入時會轉成一般影像軌 */
+  groupRole?: 'frame' | 'cell' | 'member';
+  /** 格子軌：這一格的位置（佔畫面寬、高的比例）。格子還沒放素材時靠它知道在哪 */
+  cell?: { x: number; y: number; w: number; h: number };
   /** 格子軌道：素材放完（或這段時間沒有素材）時，格子顯示的色塊顏色 */
-  fill?: 'black' | 'white';
+  fill?: string; // 'black'／'white'（舊值）或任何色碼
   items: Item[];
 };
 
@@ -391,7 +443,8 @@ export type Project = {
   name: string;
   createdAt: number;
   updatedAt: number;
-  aspect: Aspect;
+  /** 'custom'＝使用者在預覽上拖出來的比例（寬高就是 width／height） */
+  aspect: Aspect | 'custom';
   /** true = 比例跟著第一個素材自動決定（使用者手動改過比例就變 false）；舊專案沒有這個欄位＝false */
   aspectAuto?: boolean;
   width: number;

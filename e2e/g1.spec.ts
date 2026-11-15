@@ -91,7 +91,9 @@ test('字塊預設透明底＋棕色框線；形狀縮圖是線框；獨立圖�
 
   // 獨立圖形：透明底＋棕色框線
   await page.getByRole('button', { name: '＋ 另外新增一個獨立圖形' }).tap();
-  const shape = (await cards(page)).find((c) => c.card.runs[0]!.text === '')!;
+  const shape = (await cards(page)).find(
+    (c) => c.card.runs[0]!.text === '' && !(c as { placeholder?: boolean }).placeholder,
+  )!;
   expect(shape.card.box!.fillOn).toBe(false);
   expect(shape.card.box!.stroke?.color.toLowerCase()).toBe('#8b5a44');
 });
@@ -163,7 +165,14 @@ test('專案封面：首頁「更換封面」從相簿選照片、恢復預設�
   await page.getByRole('button', { name: '更換封面' }).tap();
   await expect(page.getByTestId('cover-strip').locator('.cover-pick')).toHaveCount(1); // 專案裡只有 1 個素材
   await page.getByTestId('cover-file').setInputFiles(fixture('photo.png'));
+  await page.getByRole('button', { name: '關閉', exact: true }).tap(); // ✕：沒按套用 → 封面不變
+  expect(await cardCover()).toBe(original);
+  await page.getByRole('button', { name: '新專案 1 的選單' }).tap();
+  await page.getByRole('button', { name: '更換封面' }).tap();
+  await page.getByTestId('cover-file').setInputFiles(fixture('photo.png'));
+  await page.getByTestId('cover-apply').tap();
   await expect(page.locator('.toast').filter({ hasText: '封面已更換' })).toBeVisible();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   const changed = await cardCover();
   expect(changed).not.toBe(original);
   expect(changed).toContain('data:image/jpeg');
@@ -175,6 +184,8 @@ test('專案封面：首頁「更換封面」從相簿選照片、恢復預設�
   await page.getByRole('button', { name: '新專案 1 的選單' }).tap();
   await page.getByRole('button', { name: '更換封面' }).tap();
   await page.getByRole('button', { name: /恢復預設/ }).tap();
+  await page.getByTestId('cover-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await expect.poll(cardCover).not.toBe(changed);
   const [r, g, b] = (await colorOf(await cardCover())) as number[];
   expect(r!).toBeGreaterThan(200);
@@ -185,8 +196,10 @@ test('專案封面：首頁「更換封面」從相簿選照片、恢復預設�
   await page.getByRole('link', { name: /開啟 新專案 1/ }).tap();
   await expect(page.getByTestId('clip').first()).toBeVisible();
   await page.getByRole('button', { name: '專案名稱', exact: true }).tap();
-  await page.getByRole('button', { name: '用目前預覽畫面當封面' }).tap();
-  await expect(page.locator('.toast').filter({ hasText: '已用目前預覽畫面當封面' })).toBeVisible();
+  await page.getByRole('switch', { name: '用目前預覽畫面當封面' }).tap();
+  await page.getByRole('button', { name: '儲存', exact: true }).tap();
+  await expect(page.locator('.toast').filter({ hasText: '用目前預覽畫面當封面' })).toBeVisible();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 儲存後視窗不會自動關，按 ✕ 關
   await page.waitForTimeout(1300);
   await page.getByRole('link', { name: '回首頁' }).tap();
   const fromPreview = await cardCover();

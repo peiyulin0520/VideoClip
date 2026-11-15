@@ -1,3 +1,12 @@
+import { cellTracksOf, frameOfGroup, isFrameItem, memberTracksOf } from '../../engine/layoutTracks';
+import { useGroupOpen } from '../../store/groupOpenStore';
+import { EmptyCellSlot } from './EmptyCellSlot';
+import { CellSheet } from './CellSheet';
+import { importFilesIntoCell } from './cellImport';
+import { CellAddSheet } from './CellAddSheet';
+import { createAudioClip, createTextItem } from '../../model/defaults';
+import { ensureUrls } from '../../engine/assetUrls';
+import { importFiles } from '../../engine/importMedia';
 import { Eye, EyeOff, Film, Lock, Music, Plus, Sparkles, Type, Volume2, VolumeX } from 'lucide-react';
 import {
   useCallback,
@@ -27,7 +36,7 @@ import { Wave } from './Wave';
 import {
   closeGap,
   moveItemTo,
-  moveTrackTo,
+  moveTrackInKindTo,
   patchTrack,
   placeItem,
   removeTrack,
@@ -35,14 +44,14 @@ import {
   moveTracksMulti,
   removeTracksMulti,
   setGroupDuration,
-  shiftTrackLayer,
+  shiftTrackInKind,
 } from '../../store/actions';
 import { setTrackItems, useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemHasGrade } from '../../engine/grade';
-import { keyframeTarget } from '../../store/actions';
+import { addGroupMember, keyframeTarget, shiftMemberLayer, trimCellEnd } from '../../store/actions';
 import { KeyframeDot } from './KeyframeDot';
 import { itemTitle, ordinalIn } from '../../engine/labels';
 import { textFxCode, textFxName } from '../../engine/textFx';
@@ -82,7 +91,7 @@ function Tiles({
   if (!thumbs.some(Boolean))
     return (
       <div className="tiles no-thumb" data-testid="clip-name">
-        {asset?.name ?? ''}
+        {item.label?.trim() || asset?.name || ''}
       </div>
     );
   const aspect = asset && asset.height ? asset.width / asset.height : 0.56;
@@ -134,6 +143,8 @@ const ORDER: TrackKind[] = ['text', 'sticker', 'media', 'audio'];
 const GUTTER = 56;
 const HEAD_H = 22; // 每一類的標題列
 const KIND_NAME: Record<TrackKind, string> = { media: '影像', sticker: '貼圖', text: '字卡', audio: '音訊' };
+/** 展開的版型裡的分類名稱 */
+const SUB_NAME: Record<TrackKind, string> = { media: '影像', sticker: '貼圖', text: '文字', audio: '音效' };
 const KIND_BAR: Record<TrackKind, string> = {
   media: 'var(--clip)',
   sticker: 'var(--clip-effect)',
@@ -250,6 +261,8 @@ export function Timeline({
   const baseId = baseMediaTrack(project)?.id;
   const [gapSel, setGapSel] = useState<{ trackId: string; at: number } | null>(null);
   const [closed, setClosed] = useState<TrackKind[]>(readClosed);
+  const groupOpen = useGroupOpen((s) => s.open);
+  const groupClosed = useGroupOpen((s) => s.closed);
   const setClosedSave = (next: TrackKind[]) => {
     setClosed(next);
     try {
@@ -260,6 +273,16 @@ export function Timeline({
   };
   const [renameTrackId, setRenameTrackId] = useState<string | null>(null);
   const [renameItemId, setRenameItemId] = useState<string | null>(null);
+  // 展開的版型：點格子開「這一格」視窗、空格子「＋ 匯入」、版型尾端「＋」加文字／音效
+  const [cellSheet, setCellSheet] = useState<{ id: string; index: number } | null>(null);
+  const [cellAdd, setCellAdd] = useState<{ id: string; index: number } | null>(null);
+  const cellFileRef = useRef<HTMLInputElement>(null);
+  const cellImportFor = useRef<string | null>(null);
+  const audioFileRef = useRef<HTMLInputElement>(null);
+  const [addMenuGroup, setAddMenuGroup] = useState<string | null>(null);
+  const addMenuGroupRef = useRef<string | null>(null);
+  const toggleGroup = useGroupOpen((s) => s.toggleGroup);
+  const toggleKind = useGroupOpen((s) => s.toggleKind);
   // 選到某個物件、或加進新的物件：它那一類自動展開
   useEffect(
     () =>
@@ -297,21 +320,43 @@ export function Timeline({
   const [multi, setMulti] = useState<string[] | null>(null);
   const showAll = !!drag || !!multi; // 拖素材、多選的時候全部展開（才找得到要放的軌道）
   const layout = useMemo(() => {
-    // 版型的各格軌道藏起來（時間軸上由外框那一條代表整個版型）
+    // 版型的附屬軌道（格子、文字／貼圖／音效）不在一般類別裡：版型片段展開時才在它下面看得到
     const all = project.tracks
       .map((track, index) => ({ track, index }))
-      .filter((r) => r.track.groupRole !== 'cell')
+      .filter((r) => !r.track.groupRole)
       .reverse();
     const slots: { edge: 'top' | 'bottom'; top: number }[] = [];
-    const heads: { kind: TrackKind; tracks: Track[]; top: number; open: boolean }[] = [];
-    const rows: { track: Track; index: number; h: number; top: number }[] = [];
+    const heads: { kind: TrackKind; tracks: Track[]; top: number; open: boolean; mixed: boolean }[] = [];
+    const rows: { track: Track; index: number; h: number; top: number; sub?: string }[] = [];
+    const gheads: { group: string; label: string; top: number; cells: number; empty: number }[] = [];
+    const sheads: {
+      group: string;
+      kind: TrackKind;
+      label: string;
+      count: number;
+      top: number;
+      open: boolean;
+    }[] = [];
+    const idxOf = (t: Track) => project.tracks.indexOf(t);
     let y = RULER_H + ROW_GAP;
     for (const kind of ORDER) {
       const list = all.filter((r) => r.track.kind === kind);
       if (list.length === 0) continue;
       if (kind === 'audio') y += ROW_GAP * 2;
       const open = showAll || !closed.includes(kind);
-      heads.push({ kind, tracks: list.map((r) => r.track), top: y, open });
+      // 這一類的軌道中間夾著別種類的畫面軌（在圖層分頁排成夾心）：標題列提示播放軸的上下不等於全部的上下
+      const idxs = list.map((r) => r.index);
+      const mixed =
+        kind !== 'audio' &&
+        project.tracks.some(
+          (t, i) =>
+            i > Math.min(...idxs) &&
+            i < Math.max(...idxs) &&
+            t.kind !== kind &&
+            t.kind !== 'audio' &&
+            !t.groupRole,
+        );
+      heads.push({ kind, tracks: list.map((r) => r.track), top: y, open, mixed });
       y += HEAD_H + ROW_GAP;
       if (!open) continue;
       if (slotZone === ZONE[kind]) {
@@ -322,14 +367,48 @@ export function Timeline({
         const h = r.track.id === baseId ? BASE_H : ROW_H;
         rows.push({ ...r, h, top: y });
         y += h + ROW_GAP;
+        // 這一列上有展開的版型：接著畫版型裡面（文字、貼圖、影像的各格、音效）
+        for (const fr of r.track.items) {
+          if (!isFrameItem(fr) || !groupOpen.includes(fr.group!)) continue;
+          const g = fr.group!;
+          const cells = cellTracksOf(project.tracks, g);
+          gheads.push({
+            group: g,
+            label: fr.label ?? '版型',
+            top: y,
+            cells: cells.length,
+            empty: cells.filter((c) => c.items.length === 0).length,
+          });
+          y += HEAD_H + ROW_GAP;
+          const shut = groupClosed[g] ?? [];
+          for (const sk of ['text', 'sticker', 'media', 'audio'] as TrackKind[]) {
+            const ts = sk === 'media' ? cells : memberTracksOf(project.tracks, g, sk).slice().reverse();
+            if (ts.length === 0) continue;
+            const sopen = !shut.includes(sk);
+            sheads.push({
+              group: g,
+              kind: sk,
+              label: SUB_NAME[sk],
+              count: ts.reduce((n, t) => n + t.items.length, 0),
+              top: y,
+              open: sopen,
+            });
+            y += HEAD_H + ROW_GAP;
+            if (!sopen) continue;
+            for (const t of ts) {
+              rows.push({ track: t, index: idxOf(t), h: ROW_H, top: y, sub: g });
+              y += ROW_H + ROW_GAP;
+            }
+          }
+        }
       }
       if (slotZone === ZONE[kind]) {
         slots.push({ edge: 'bottom', top: y });
         y += SLOT_H + ROW_GAP;
       }
     }
-    return { rows, slots, heads, end: y - ROW_GAP };
-  }, [project.tracks, baseId, slotZone, showAll, closed]);
+    return { rows, slots, heads, gheads, sheads, end: y - ROW_GAP };
+  }, [project.tracks, baseId, slotZone, showAll, closed, groupOpen, groupClosed]);
   const rows = layout.rows;
   const layoutRef = useRef(layout);
   useLayoutEffect(() => {
@@ -340,8 +419,7 @@ export function Timeline({
     const me = rows[from];
     if (!me) return from;
     const center = me.top + me.h / 2 + dy;
-    const zone = ZONE[me.track.kind];
-    const same = rows.map((r, i) => ({ r, i })).filter((x) => ZONE[x.r.track.kind] === zone);
+    const same = rows.map((r, i) => ({ r, i })).filter((x) => !x.r.sub && x.r.track.kind === me.track.kind);
     let to = same[0]!.i;
     for (const { r, i } of same) if (i !== from && r.top + r.h / 2 < center) to++;
     return Math.min(to, same[same.length - 1]!.i);
@@ -389,7 +467,11 @@ export function Timeline({
       setTrackDrag(null);
       if (cancelled) return;
       const to = dropRow(from, ev.clientY - startY);
-      if (to !== from) moveTrackTo(trackId, rows[to]!.index); // 顯示列 → 軌道在陣列裡的位置（同一區內）
+      if (to !== from) {
+        // 顯示列 → 「同種類裡第幾條（0＝最下面）」；穿插了別種類的時候陣列 index 不連續，不能直接用
+        const same = rows.filter((r) => !r.sub && r.track.kind === rows[from]!.track.kind);
+        moveTrackInKindTo(trackId, same.length - 1 - same.indexOf(rows[to]!));
+      }
     };
     const up = (ev: PointerEvent) => end(ev, false);
     const cancel = (ev: PointerEvent) => end(ev, true);
@@ -599,12 +681,7 @@ export function Timeline({
         if (cancelled) return;
         const start = item.start + snapStart(dx).dx / pps;
         const target = targetFor(resolveHover(ev.clientY));
-        if (
-          !target ||
-          (target.type === 'track' && target.trackId === track.id) ||
-          track.groupRole === 'frame'
-        )
-          placeItem(item.id, start); // 版型只能左右移動（換時間），不換軌道
+        if (!target || (target.type === 'track' && target.trackId === track.id)) placeItem(item.id, start);
         else if (target.type === 'invalid')
           toast(`${KIND_LABEL[target.kind]}只能放在${KIND_LABEL[target.kind]}的軌道上，已放回原位`);
         else moveItemTo(item.id, target, start);
@@ -627,11 +704,32 @@ export function Timeline({
     const asset = isVideoItem(item) ? project.assets.find((a) => a.id === item.assetId) : undefined;
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
+    // 版型裡的文字、貼圖、音效：頭尾不能超出版型的時間範圍
+    const isCellItem = item.type !== 'text' && item.type !== 'audio' && !!item.cell && !!item.group;
+    const snapshot = useProjectStore.getState().project!;
+    const frameSpan =
+      item.group && !isFrameItem(item) && !(isCellItem && side === 'end')
+        ? (() => {
+            const fr = frameOfGroup(useProjectStore.getState().project!.tracks, item.group!);
+            return fr ? { start: fr.item.start, end: fr.item.start + fr.item.duration } : null;
+          })()
+        : null;
     const move = (ev: PointerEvent) => {
-      const delta = (ev.clientX - startX) / pps;
-      if (track.groupRole === 'frame' && isVideoItem(item) && item.group) {
+      let delta = (ev.clientX - startX) / pps;
+      if (frameSpan)
+        delta =
+          side === 'end'
+            ? Math.min(delta, frameSpan.end - (item.start + item.duration))
+            : Math.max(delta, frameSpan.start - item.start);
+      // 版型格子素材的尾端：依序時後面的素材、各格跟著推，超出版型就把外框拉長
+      if (isCellItem && side === 'end') {
+        trimCellEnd(snapshot, item.id, item.duration + delta, { coalesce: `trim:${item.id}` });
+        player?.peek(item.start + Math.max(item.duration + delta, 0.2) - 0.05);
+        return;
+      }
+      if (isFrameItem(item)) {
         // 版型：改整組的長度（各格超出的部分切掉）
-        setGroupDuration(item.group, item.duration + delta, { coalesce: `trim:${item.id}` });
+        setGroupDuration(item.group!, item.duration + delta, { coalesce: `trim:${item.id}` });
         player?.peek(item.start + Math.max(item.duration + delta, 0.5) - 0.05);
         return;
       }
@@ -666,7 +764,6 @@ export function Timeline({
   };
 
   const menuTrack = project.tracks.find((t) => t.id === menuTrackId) ?? null;
-  const menuIndex = menuTrack ? project.tracks.indexOf(menuTrack) : -1;
   // 時間軸高度＝全部軌道（不在裡面上下捲；上下交給整頁捲動）
   const viewH = Math.max(contentH, 112);
 
@@ -774,10 +871,71 @@ export function Timeline({
                   {hd.open ? '▾' : '▸'} {KIND_NAME[hd.kind]} {hd.tracks.length}
                   {hidden > 0 && `（${hidden} 條隱藏）`}
                 </button>
+                {hd.mixed && (
+                  <button
+                    className="cat-mixed"
+                    data-testid="cat-mixed"
+                    aria-label="這一類有圖層和別類穿插，到圖層分頁看完整順序"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => useUI.setState({ requestTab: 'layers' })}
+                  >
+                    已穿插
+                  </button>
+                )}
               </div>
             );
           })}
-          {rows.map(({ track, top, h }, rowIdx) => {
+          {layout.gheads.map((gh) => (
+            <div
+              key={`gh-${gh.group}`}
+              className="group-head"
+              data-testid="group-head"
+              data-bg="1"
+              style={{ top: gh.top, height: HEAD_H }}
+            >
+              <button
+                className="cat-toggle grp"
+                aria-expanded
+                aria-label={`收合版型 ${gh.label}`}
+                data-testid="group-toggle"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => toggleGroup(gh.group)}
+              >
+                ▾ 版型：{gh.label} · {gh.cells} 格{gh.empty > 0 ? `（${gh.empty} 格空）` : ''}
+              </button>
+              <button
+                className="grp-add"
+                aria-label={`加入到版型 ${gh.label}`}
+                data-testid="group-add"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => setAddMenuGroup(gh.group)}
+              >
+                <Plus size={14} /> 加入
+              </button>
+            </div>
+          ))}
+          {layout.sheads.map((sh) => (
+            <div
+              key={`sh-${sh.group}-${sh.kind}`}
+              className="sub-head"
+              data-testid="sub-head"
+              data-kind={sh.kind}
+              data-bg="1"
+              style={{ top: sh.top, height: HEAD_H }}
+            >
+              <button
+                className="cat-toggle sub"
+                aria-expanded={sh.open}
+                aria-label={`${sh.open ? '收合' : '展開'}版型的${sh.label}（${sh.count} 個）`}
+                data-testid="sub-toggle"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => toggleKind(sh.group, sh.kind)}
+              >
+                {sh.open ? '▾' : '▸'} {sh.label} {sh.count}
+              </button>
+            </div>
+          ))}
+          {rows.map(({ track, top, h, sub }, rowIdx) => {
             // 拖軌道時：被拖的那列跟著手指，中間經過的列讓位
             let shift = 0;
             const isDragged = trackDrag?.id === track.id;
@@ -791,7 +949,8 @@ export function Timeline({
             return (
               <div
                 key={track.id}
-                className={`track${track.hidden ? ' off' : ''}${isDragged ? ' track-dragging' : ''}${dropClass(track)}`}
+                className={`track${track.hidden ? ' off' : ''}${isDragged ? ' track-dragging' : ''}${dropClass(track)}${sub ? ' sub-row' : ''}`}
+                data-sub={sub}
                 data-testid="track"
                 data-kind={track.kind}
                 data-track-id={track.id}
@@ -804,12 +963,22 @@ export function Timeline({
                 }}
               >
                 <button
-                  className={`track-chip draggable${multi ? (multi.includes(track.id) ? ' multi-on' : ' multi-off') : ''}`}
-                  aria-label={`${track.name} 軌道設定`}
+                  className={`track-chip${sub ? ' sub' : ' draggable'}${multi ? (multi.includes(track.id) ? ' multi-on' : ' multi-off') : ''}`}
+                  aria-label={
+                    sub && track.groupRole === 'cell'
+                      ? `第 ${cellTracksOf(project.tracks, track.group!).indexOf(track) + 1} 格 軌道`
+                      : `${track.name} 軌道設定`
+                  }
                   data-testid="track-chip"
-                  onPointerDown={(e) => startTrackDrag(e, track.id, rowIdx)}
+                  onPointerDown={(e) => (sub ? e.stopPropagation() : startTrackDrag(e, track.id, rowIdx))}
                   onClick={() => {
                     if (suppressChipClick.current) return;
+                    if (sub && track.groupRole === 'cell') {
+                      const i = cellTracksOf(project.tracks, track.group!).indexOf(track);
+                      const it = track.items[0];
+                      if (it) useProjectStore.getState().select(it.id);
+                      return setCellSheet({ id: track.id, index: i });
+                    }
                     if (multi)
                       setMulti((m) =>
                         m ? (m.includes(track.id) ? m.filter((x) => x !== track.id) : [...m, track.id]) : m,
@@ -818,7 +987,11 @@ export function Timeline({
                   }}
                   aria-pressed={multi ? multi.includes(track.id) : undefined}
                 >
-                  {track.kind === 'media' ? (
+                  {sub && track.groupRole === 'cell' ? (
+                    <span className="cell-no" data-testid="cell-no">
+                      {cellTracksOf(project.tracks, track.group!).indexOf(track) + 1}
+                    </span>
+                  ) : track.kind === 'media' ? (
                     <Film size={16} />
                   ) : track.kind === 'text' ? (
                     <Type size={16} />
@@ -836,7 +1009,22 @@ export function Timeline({
                   ) : null}
                 </button>
 
+                {sub && track.groupRole === 'cell' && track.items.length === 0 && (
+                  <EmptyCellSlot
+                    track={track}
+                    index={cellTracksOf(project.tracks, track.group!).indexOf(track)}
+                    project={project}
+                    left={half}
+                    pps={pps}
+                    onPick={(id: string) => {
+                      cellImportFor.current = id;
+                      cellFileRef.current?.click();
+                    }}
+                  />
+                )}
+
                 {track.kind === 'media' &&
+                  !sub &&
                   gapsOf(track.items, track.id === baseId).map((g) => {
                     const sel = gapSel?.trackId === track.id && Math.abs(gapSel.at - g.start) < 1e-6;
                     return (
@@ -868,7 +1056,7 @@ export function Timeline({
                   return (
                     <div
                       key={it.id}
-                      className={`clip${selected ? ' selected' : ''}${dragging ? ' dragging' : ''}${it.type === 'text' ? ' is-text' : ''}${it.type === 'audio' ? ' is-audio' : ''}${it.duration * pps < 80 ? ' short' : ''}`}
+                      className={`clip${selected ? ' selected' : ''}${dragging ? ' dragging' : ''}${it.type === 'text' ? ' is-text' : ''}${it.type === 'audio' ? ' is-audio' : ''}${isFrameItem(it) ? ' is-frame' : ''}${it.duration * pps < 80 ? ' short' : ''}`}
                       data-testid="clip"
                       data-selected={selected}
                       data-item-id={it.id}
@@ -885,6 +1073,21 @@ export function Timeline({
                       ) : isVideoItem(it) ? (
                         <Tiles item={it} asset={asset} pps={pps} h={h} />
                       ) : null}
+                      {isFrameItem(it) && (
+                        <button
+                          className="grp-toggle"
+                          aria-expanded={groupOpen.includes(it.group!)}
+                          aria-label={`${groupOpen.includes(it.group!) ? '收合' : '展開'}版型 ${it.label ?? ''}`}
+                          data-testid="clip-group-toggle"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleGroup(it.group!);
+                          }}
+                        >
+                          {groupOpen.includes(it.group!) ? '▾' : '▸'}
+                        </button>
+                      )}
                       <div className="clip-label">
                         {it.type === 'text' || it.type === 'audio' ? (
                           <span className="cl-name">{itemTitle(it, asset)}</span>
@@ -906,7 +1109,7 @@ export function Timeline({
                       </div>
                       {selected && !dragging && !track.locked && (
                         <>
-                          {track.groupRole !== 'frame' && (
+                          {!isFrameItem(it) && (
                             <div
                               className="handle left"
                               data-testid="trim-start"
@@ -923,6 +1126,26 @@ export function Timeline({
                     </div>
                   );
                 })}
+
+                {sub && track.groupRole === 'cell' && track.items.length > 0 && (
+                  <button
+                    className="cell-add"
+                    data-testid="cell-add"
+                    aria-label={`第 ${cellTracksOf(project.tracks, track.group!).indexOf(track) + 1} 格 加素材`}
+                    style={{
+                      left: half + Math.max(...track.items.map((x) => x.start + x.duration)) * pps + 6,
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() =>
+                      setCellAdd({
+                        id: track.id,
+                        index: cellTracksOf(project.tracks, track.group!).indexOf(track),
+                      })
+                    }
+                  >
+                    <Plus size={14} />
+                  </button>
+                )}
 
                 {track.kind !== 'audio' &&
                   !track.groupRole &&
@@ -978,7 +1201,7 @@ export function Timeline({
                               e.stopPropagation();
                               useProjectStore.getState().select(it.id);
                               useUI.setState({
-                                requestTab: track.groupRole === 'frame' ? 'layout' : 'effect',
+                                requestTab: 'effect',
                                 fxFocus: { id: it.id, role },
                               });
                               player?.seek(it.start + (role === 'in' ? 0.02 : it.duration - 0.05));
@@ -1019,21 +1242,20 @@ export function Timeline({
                     );
                   })}
 
-                {/* 定位（關鍵影格）：物件開始後 t 秒的位置放一個小菱形；點一下＝播放頭跳過去並選取 */}
-                {track.groupRole !== 'cell' &&
-                  track.items.flatMap((it) =>
-                    (it.keyframes ?? []).map((k, i) => (
-                      <KeyframeDot
-                        key={`kf-${it.id}-${i}`}
-                        item={it}
-                        index={i}
-                        k={k}
-                        left={half + (it.start + k.t) * pps}
-                        active={kfTargetId === it.id}
-                        pps={pps}
-                      />
-                    )),
-                  )}
+                {/* 定格（關鍵影格）：物件開始後 t 秒的位置放一個小菱形；點一下＝播放頭跳過去並選取 */}
+                {track.items.flatMap((it) =>
+                  (it.keyframes ?? []).map((k, i) => (
+                    <KeyframeDot
+                      key={`kf-${it.id}-${i}`}
+                      item={it}
+                      index={i}
+                      k={k}
+                      left={half + (it.start + k.t) * pps}
+                      active={kfTargetId === it.id}
+                      pps={pps}
+                    />
+                  )),
+                )}
 
                 {track.id === baseId && (
                   <button
@@ -1106,9 +1328,10 @@ export function Timeline({
                     <button
                       className="menu-item"
                       onClick={() => {
-                        if (project.tracks[menuIndex + 1]?.kind !== menuTrack.kind)
-                          toast('已經是這一類最上面的軌道（影像、特效、字卡不能互相穿插）');
-                        else shiftTrackLayer(menuTrack.id, 1);
+                        if (menuTrack.groupRole === 'member') {
+                          if (!shiftMemberLayer(menuTrack.id, 1)) toast('已經是版型裡最上面的圖層');
+                        } else if (!shiftTrackInKind(menuTrack.id, 1))
+                          toast('已經是這一類最上面的軌道。要讓文字夾在影像中間，到「圖層」分頁調整');
                         setMenuTrackId(null);
                       }}
                     >
@@ -1117,9 +1340,10 @@ export function Timeline({
                     <button
                       className="menu-item"
                       onClick={() => {
-                        if (project.tracks[menuIndex - 1]?.kind !== menuTrack.kind)
-                          toast('已經是這一類最下面的軌道（影像、特效、字卡不能互相穿插）');
-                        else shiftTrackLayer(menuTrack.id, -1);
+                        if (menuTrack.groupRole === 'member') {
+                          if (!shiftMemberLayer(menuTrack.id, -1)) toast('已經是版型裡最下面的圖層');
+                        } else if (!shiftTrackInKind(menuTrack.id, -1))
+                          toast('已經是這一類最下面的軌道。要讓文字夾在影像中間，到「圖層」分頁調整');
                         setMenuTrackId(null);
                       }}
                     >
@@ -1144,6 +1368,88 @@ export function Timeline({
             }
           </>
         )}
+      </Sheet>
+      {cellAdd && (
+        <CellAddSheet
+          key={cellAdd.id}
+          projectId={project.id}
+          trackId={cellAdd.id}
+          index={cellAdd.index}
+          onClose={() => setCellAdd(null)}
+        />
+      )}
+      {cellSheet && (
+        <CellSheet
+          key={cellSheet.id}
+          trackId={cellSheet.id}
+          index={cellSheet.index}
+          onClose={() => setCellSheet(null)}
+        />
+      )}
+      <input
+        ref={cellFileRef}
+        type="file"
+        accept="video/*,image/*"
+        hidden
+        data-testid="cell-file-timeline"
+        onChange={(e) => {
+          const files = e.target.files ? Array.from(e.target.files) : [];
+          e.target.value = '';
+          const id = cellImportFor.current;
+          cellImportFor.current = null;
+          if (id) void importFilesIntoCell(project.id, id, files);
+        }}
+      />
+      <input
+        ref={audioFileRef}
+        type="file"
+        accept="audio/*,video/*"
+        hidden
+        data-testid="group-audio-file"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          const g = addMenuGroupRef.current;
+          if (!file || !g) return;
+          const { setBusy } = useUI.getState();
+          setBusy('匯入音效…');
+          try {
+            const res = await importFiles(project.id, [file]);
+            const a = res.assets.find((x) => x.kind === 'audio') ?? res.assets[0];
+            if (!a) return toast('這個檔案放不進來');
+            await ensureUrls(project.id, [a]);
+            addGroupMember(g, createAudioClip(a, player?.time ?? 0));
+          } finally {
+            setBusy(null);
+          }
+        }}
+      />
+      <Sheet open={!!addMenuGroup} title="加入到版型裡" onClose={() => setAddMenuGroup(null)}>
+        <p className="hint">
+          加進去的東西屬於這個版型：跟著整個版型移動、縮放、一起刪除；時間只能在版型的範圍裡。貼圖到「素材」分頁加（選到版型時會加進版型裡）。
+        </p>
+        <button
+          className="menu-item"
+          data-testid="group-add-text"
+          onClick={() => {
+            const g = addMenuGroup!;
+            setAddMenuGroup(null);
+            addGroupMember(g, createTextItem(player?.time ?? 0));
+          }}
+        >
+          文字
+        </button>
+        <button
+          className="menu-item"
+          data-testid="group-add-audio"
+          onClick={() => {
+            addMenuGroupRef.current = addMenuGroup;
+            setAddMenuGroup(null);
+            audioFileRef.current?.click();
+          }}
+        >
+          音效（從檔案選）
+        </button>
       </Sheet>
       <PromptSheet
         open={!!renameTrackId}

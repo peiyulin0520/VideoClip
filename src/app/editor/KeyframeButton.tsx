@@ -7,8 +7,8 @@ import { toast, useUI } from '../../store/uiStore';
 import { PlaybarButton } from './PlaybarButton';
 
 /**
- * 播放列的「定位」按鈕（◇）：選到素材時才亮。播放頭這個時間沒有定位 → 新增（值＝目前畫面上的樣子）；
- * 有 → 變成實心（◆），按了刪除這個定位。版型裡的任何物件＝整個版型（外框）。
+ * 播放列的「定格」按鈕（◇）：選到素材時才亮。播放頭這個時間沒有定格 → 新增（值＝目前畫面上的樣子）；
+ * 有 → 變成實心（◆），按了刪除這個定格。版型裡的任何物件＝整個版型（外框）。
  */
 export function KeyframeButton() {
   const project = useProjectStore((s) => s.project)!;
@@ -31,8 +31,8 @@ export function KeyframeButton() {
   return (
     <PlaybarButton
       icon={Diamond}
-      label="定位"
-      ariaLabel={has ? '刪除這個時間的定位' : '在這個時間新增定位'}
+      label="定格"
+      ariaLabel={has ? '刪除這個時間的定格' : '在這個時間新增定格'}
       testId="kf-btn"
       on={has}
       fill={has}
@@ -42,7 +42,7 @@ export function KeyframeButton() {
         player?.pause();
         const r = toggleKeyframe(selectedId);
         if (r === 'added')
-          toast('已新增定位。換個時間再拖或縮放會自動多一個；播放線碰到菱形時，只會改那一個', 3500);
+          toast('已新增定格。換個時間再拖或縮放會自動多一個；播放線碰到菱形時，只會改那一個', 3500);
       }}
     />
   );

@@ -8,9 +8,11 @@ import {
   openTab,
   project,
   seekTo,
+  finishLayout,
+  selectFrame,
 } from './helpers';
 
-test('播放列：播放鍵只有圖示；定位、縮小、放大是圖示加中文；按住時有顏色回饋；定位開著時是主題色', async ({
+test('播放列：播放鍵只有圖示；定格、縮小、放大是圖示加中文；按住時有顏色回饋；定格開著時是主題色', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -19,7 +21,7 @@ test('播放列：播放鍵只有圖示；定位、縮小、放大是圖示加�
   expect(((await play.innerText()) ?? '').trim()).toBe('');
   await expect(page.getByRole('button', { name: '縮小時間軸' })).toContainText('縮小');
   await expect(page.getByRole('button', { name: '放大時間軸' })).toContainText('放大');
-  await expect(page.getByTestId('kf-btn')).toContainText('定位');
+  await expect(page.getByTestId('kf-btn')).toContainText('定格');
   // 按住：底色疊一層主題色（box-shadow 跟沒按時不同）
   const zoom = page.getByRole('button', { name: '放大時間軸' });
   const shadow = () => zoom.evaluate((el) => getComputedStyle(el).boxShadow);
@@ -31,7 +33,7 @@ test('播放列：播放鍵只有圖示；定位、縮小、放大是圖示加�
   await page.mouse.up();
   await expect.poll(shadow).toBe(rest);
   await page.screenshot({ path: 'docs/screenshots/feedback-10/playbar.png' });
-  // 定位：選到素材、新增定位後，按鈕變主題色底（aria-pressed）
+  // 定格：選到素材、新增定格後，按鈕變主題色底（aria-pressed）
   await clips(page).first().tap();
   const kf = page.getByTestId('kf-btn');
   const bg = () => kf.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -90,8 +92,8 @@ async function makeBooth(
   if (opts.black) await page.getByRole('radio', { name: '外框 黑' }).tap();
   if (opts.opacity !== undefined)
     await page.getByLabel('外框透明度').fill(String(Math.round(opts.opacity * 100)));
-  await page.getByTestId('layout-input').setInputFiles([fixture('solid-green.webm')]);
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, [fixture('solid-green.webm')]);
+  await selectFrame(page); // 版型層：整個版型
   await expect(page.getByTestId('group-panel')).toBeVisible();
 }
 
@@ -163,12 +165,11 @@ test('版型可以選「不附版型文字」', async ({ page }) => {
   await openTab(page, '版型');
   await page.getByRole('button', { name: '版型 拍貼機直條', exact: true }).tap();
   await page.getByRole('switch', { name: '附上版型文字' }).tap();
-  await page.getByTestId('layout-input').setInputFiles([fixture('solid-green.webm')]);
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, [fixture('solid-green.webm')]);
   expect((await allItems(page)).filter((i) => i.type === 'text')).toHaveLength(0);
 });
 
-test('播放列：播放鍵與時間在最左；定位、色調(👁)、縮小、放大靠在最右、彼此間距 ≤ 8px', async ({ page }) => {
+test('播放列：播放鍵與時間在最左；定格、色調(👁)、縮小、放大靠在最右、彼此間距 ≤ 8px', async ({ page }) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm']);
   const box = async (loc: ReturnType<typeof page.getByRole>) => (await loc.boundingBox())!;
@@ -179,12 +180,13 @@ test('播放列：播放鍵與時間在最左；定位、色調(👁)、縮小�
   const inn = await box(page.getByRole('button', { name: '放大時間軸' }));
   expect(play.x).toBeLessThan(20);
   expect(kf.x).toBeGreaterThan(play.x + 100);
-  for (const [a, b] of [
-    [kf, peek],
-    [peek, out],
-    [out, inn],
+  // 同一區的鈕靠很近；不同區（定格／色調 ｜ 縮小／放大）中間多一條細線
+  for (const [a, b, max] of [
+    [kf, peek, 8],
+    [peek, out, 12],
+    [out, inn, 8],
   ] as const) {
-    expect(b.x - (a.x + a.width)).toBeLessThanOrEqual(8);
+    expect(b.x - (a.x + a.width)).toBeLessThanOrEqual(max);
     expect(b.x - (a.x + a.width)).toBeGreaterThanOrEqual(0);
   }
   const vw = page.viewportSize()!.width;

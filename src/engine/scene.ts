@@ -5,7 +5,9 @@ import { effectiveAdjust } from './grade';
 import { timeResolved } from './keyframes';
 import { renderText, measureTextItem, uiScale } from './textRender';
 import { applyTextFx, typingCount } from './textFx';
+import { gapFillColor } from './cellGap';
 import { visibleLayers } from './timeline';
+import { frameOfGroup, isFrameItem } from './layoutTracks';
 import { composeWith, motionOffset } from './groupTransform';
 import { cellRect, cellTransform } from './layouts';
 import { maskCanvasFor } from './maskBitmap';
@@ -14,9 +16,11 @@ import {
   applyLook,
   clipPx,
   effectFrame,
+  extendForGroupTransition,
   itemEffectAt,
   type ClipFrac,
   type Cover,
+  type TransitionFrame,
 } from './transitions';
 
 /** 預覽/匯出各自提供「這個影片/照片物件現在的畫面」 */
@@ -76,11 +80,54 @@ export const FILL_COLORS = { black: '#000000', white: '#ffffff' } as const;
 
 /** 版型外框（代表整個版型的那一個物件）；動畫、整組變形都看它 */
 function frameOf(project: Project, group: string): { item: VideoItem } | null {
-  for (const tr of project.tracks)
-    if (tr.groupRole === 'frame') {
-      const it = tr.items.find((x) => x.type !== 'text' && x.group === group);
-      if (it && it.type !== 'text') return { item: it };
+  return frameOfGroup(project.tracks, group);
+}
+
+type GroupTr = {
+  look: TransitionFrame['a'];
+  early: number;
+  late: number;
+  frameStart: number;
+  frameEnd: number;
+};
+
+/** 這一刻有哪些版型正在參加轉場（外框是轉場的 A 或 B）：整個版型照外框的轉場一起動 */
+export function groupTransitions(project: Project, t: number): Map<string, GroupTr> {
+  const out = new Map<string, GroupTr>();
+  for (const track of project.tracks) {
+    if (track.kind === 'audio' || track.hidden || track.groupRole) continue;
+    const at = activeTransition(track.items, t);
+    if (!at) continue;
+    for (const [role, x] of [
+      ['a', at.a],
+      ['b', at.b],
+    ] as const) {
+      if (!x || !isFrameItem(x)) continue;
+      const real = track.items.find((i) => i.id === x.id) ?? x;
+      out.set(x.group!, {
+        look: at.frame[role],
+        early: Math.max(real.start - x.start, 0),
+        late: Math.max(x.duration - real.duration, 0),
+        frameStart: real.start,
+        frameEnd: real.start + real.duration,
+      });
     }
+  }
+  return out;
+}
+
+/** 版型轉場延長的那一小段：這一軌（格子軌、版型文字）這一刻要畫的虛擬物件 */
+function groupExtended(track: Track, gts: Map<string, GroupTr>, t: number): Item | null {
+  for (const [g, gt] of gts) {
+    const mine =
+      track.groupRole === 'cell'
+        ? track.group === g
+        : track.items.some((x) => x.type === 'text' && x.group === g);
+    if (!mine) continue;
+    const items = track.groupRole === 'cell' ? track.items : track.items.filter((x) => x.group === g);
+    const it = extendForGroupTransition(items as Item[], gt, t);
+    if (it) return it;
+  }
   return null;
 }
 
@@ -90,6 +137,7 @@ function frameOf(project: Project, group: string): { item: VideoItem } | null {
 export function sceneItems(project: Project, t: number): { item: Item; track: Track }[] {
   const out: { item: Item; track: Track }[] = [];
   const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
+  const gts = groupTransitions(project, t);
   project.tracks.forEach((track, i) => {
     const at =
       track.kind !== 'audio' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
@@ -99,6 +147,10 @@ export function sceneItems(project: Project, t: number): { item: Item; track: Tr
     }
     const l = live.get(i);
     if (l) out.push({ item: l.item, track });
+    else if (gts.size) {
+      const ext = groupExtended(track, gts, t);
+      if (ext) out.push({ item: ext, track });
+    }
   });
   return out;
 }
@@ -112,16 +164,30 @@ export function buildScene(
   provide: SourceProvider,
   opts: { guardCells?: boolean } = {},
 ): SceneLayer[] {
-  // 有定位（關鍵影格）的物件換成「這個時間」的位置、大小、色調；預覽、單格輸出、整支匯出都走這裡所以一致
+  // 有定格（關鍵影格）的物件換成「這個時間」的位置、大小、色調；預覽、單格輸出、整支匯出都走這裡所以一致
   const project = timeResolved(projectIn, t);
   const ctx = geoCtx(project, canvasW, canvasH);
   const out: SceneLayer[] = [];
   const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
+  const gts = groupTransitions(project, t); // 版型整組參加轉場
+  // 參加轉場的版型：格子（在外框那一列下面）要跟著外框一起疊在 A、B 之間，不然會被 A（例如主軌影片）蓋住
+  const deferred = new Map<string, SceneLayer[]>();
+  const emit = (group: string | undefined, layer: SceneLayer, isCell: boolean) => {
+    if (isCell && group && gts.has(group)) {
+      const list = deferred.get(group) ?? [];
+      list.push(layer);
+      deferred.set(group, list);
+    } else out.push(layer);
+  };
   // 轉場期間要蓋的顏色層（蓋在最上面）
   const covers: { id: string; c: Cover }[] = [];
   const covered = new Set<string>(); // 版型整組的顏色層只蓋一次
   project.tracks.forEach((track, i) => {
-    const l = live.get(i);
+    let l = live.get(i);
+    if (!l && gts.size) {
+      const ext = groupExtended(track, gts, t);
+      if (ext) l = { item: ext, track, trackIndex: i };
+    }
     const li = l?.item;
     const group = li && li.type !== 'audio' ? li.group : track.group;
     const frame = group ? frameOf(project, group) : null;
@@ -145,7 +211,24 @@ export function buildScene(
       };
       const A = mk(at.a, at.frame.a);
       const B = mk(at.b, at.frame.b);
-      for (const x of at.frame.bOnTop ? [A, B] : [B, A]) if (x) out.push(x);
+      const pairs: [SceneLayer | null, Item | null][] = at.frame.bOnTop
+        ? [
+            [A, at.a],
+            [B, at.b],
+          ]
+        : [
+            [B, at.b],
+            [A, at.a],
+          ];
+      for (const [x, it] of pairs) {
+        if (!x) continue;
+        const g = it && isFrameItem(it) ? it.group! : undefined;
+        if (g) {
+          out.push(...(deferred.get(g) ?? []));
+          deferred.delete(g);
+        }
+        out.push(x);
+      }
       at.frame.covers.forEach((c, n) => covers.push({ id: `${i}-${n}`, c }));
     } else if (l) {
       // 單一素材的進場／出場特效；版型的格子與外框看外框的特效（整組一起動）；字卡的「打字」只決定露出幾個字
@@ -169,6 +252,12 @@ export function buildScene(
       );
       if (layer) {
         layer.box = { ...layer.box, cx: layer.box.cx + off.x * canvasW, cy: layer.box.cy + off.y * canvasH };
+        const gt = group ? gts.get(group) : undefined;
+        // 版型裡的素材可以放大、移到框外，但畫面只露出版型裡面（格子：自己那一格；文字、貼圖：版型外框的範圍）
+        if (frame && group && !layer.clip) {
+          const clip = groupClipFor(l.item, frame.item, ctx, canvasW, canvasH, off);
+          if (clip) layer.clip = clip;
+        }
         if (fx)
           applyGroupOrItemEffect(
             layer,
@@ -182,22 +271,29 @@ export function buildScene(
             covered,
             `${i}`,
           );
-        out.push(layer);
+        if (gt) applyGroupLook(layer, gt.look, canvasW, canvasH);
+        emit(group, layer, track.groupRole === 'cell');
       }
-    } else if (track.groupRole === 'cell' && track.fill && !track.hidden && frame) {
+    } else if (track.groupRole === 'cell' && !track.hidden && frame && gapFillColor(track, frame.item)) {
       // 這一格沒有素材可播（放完了或空位）：顯示色塊，湊滿版型的秒數
       const fr = frame.item;
-      if (t < fr.start || t >= fr.start + fr.duration) return;
+      const gtf = group ? gts.get(group) : undefined;
+      const inFrame = t >= fr.start && t < fr.start + fr.duration;
+      const inExt = !!gtf && t >= fr.start - gtf.early && t < fr.start + fr.duration + gtf.late;
+      if (!inFrame && !inExt) return;
       const ref = track.items.find((x) => x.type !== 'text' && x.cell);
-      if (!ref || ref.type === 'text' || !ref.cell) return;
-      const r = cellRect(ref.cell, canvasW, canvasH);
+      const cellBox =
+        track.cell ?? (ref && ref.type !== 'text' && ref.type !== 'audio' ? ref.cell : undefined);
+      if (!cellBox) return;
+      const r = cellRect(cellBox, canvasW, canvasH);
       const c = composeWith(
         { x: (r.x + r.w / 2) / canvasW, y: (r.y + r.h / 2) / canvasH, scale: 1, rotation: 0, opacity: 1 },
         fr.transform,
         canvasW,
         canvasH,
       );
-      const color = FILL_COLORS[track.fill];
+      const fillRaw = gapFillColor(track, frame.item)!;
+      const color = FILL_COLORS[fillRaw as keyof typeof FILL_COLORS] ?? fillRaw;
       const fillLayer: SceneLayer = {
         id: `fill-${track.id}`,
         kind: 'text',
@@ -220,9 +316,11 @@ export function buildScene(
       const fillFx = itemEffectAt(fr, t - fr.start);
       if (fillFx)
         applyGroupOrItemEffect(fillLayer, fillFx, group, fr, ctx, canvasW, canvasH, covers, covered, `${i}`);
-      out.push(fillLayer);
+      if (gtf) applyGroupLook(fillLayer, gtf.look, canvasW, canvasH);
+      emit(group, fillLayer, true);
     }
   });
+  for (const list of deferred.values()) out.push(...list); // 外框不在轉場那一列的保險
   // 轉場的顏色層：蓋在最上面
   for (const { id, c } of covers) {
     const r = c.rect ?? [0, 0, 1, 1];
@@ -247,6 +345,83 @@ export function buildScene(
     });
   }
   return out;
+}
+
+/**
+ * 版型裡的素材「露出的範圍」（畫面像素的四個頂點，版型旋轉也算進去）：
+ * 單獨動過的格子（或 force）＝它自己那一格；版型裡的文字、貼圖＝外框線以內的整個範圍（含格子與邊框）。
+ * 沒有需要遮的（沒動過的格子、外框自己）回傳 undefined。
+ */
+export function groupClipArea(
+  item: Item,
+  frame: VideoItem,
+  ctx: GeoCtx,
+  W: number,
+  H: number,
+  off: { x: number; y: number },
+  force = false,
+): [number, number][] | undefined {
+  if (item.type === 'audio' || !item.group || item.group !== frame.group) return undefined;
+  const a = (frame.transform.rotation * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const corners = (cx: number, cy: number, w: number, h: number): [number, number][] =>
+    (
+      [
+        [-w / 2, -h / 2],
+        [w / 2, -h / 2],
+        [w / 2, h / 2],
+        [-w / 2, h / 2],
+      ] as const
+    ).map(([dx, dy]) => [cx + dx * cos - dy * sin + off.x * W, cy + dx * sin + dy * cos + off.y * H]);
+  if (item.type !== 'text' && item.cell) {
+    if (!item.cellEdit && !force) return undefined;
+    const r = cellRect(item.cell, W, H);
+    const c = composeWith(
+      { x: (r.x + r.w / 2) / W, y: (r.y + r.h / 2) / H, scale: 1, rotation: 0, opacity: 1 },
+      frame.transform,
+      W,
+      H,
+    );
+    return corners(c.x * W, c.y * H, r.w * frame.transform.scale, r.h * frame.transform.scale);
+  }
+  if (item.type !== 'text' && !item.member) return undefined; // 外框自己
+  const fb = itemBox(frame, ctx);
+  if (!fb) return undefined;
+  const v = frame.visible ?? { x: 0, y: 0, w: 1, h: 1 };
+  const ox = (v.x + v.w / 2 - 0.5) * fb.w;
+  const oy = (v.y + v.h / 2 - 0.5) * fb.h;
+  return corners(fb.cx + ox * cos - oy * sin, fb.cy + ox * sin + oy * cos, v.w * fb.w, v.h * fb.h);
+}
+
+/** 遮罩：沒旋轉用矩形（省事），旋轉過用多邊形 */
+export function groupClipFor(
+  item: Item,
+  frame: VideoItem,
+  ctx: GeoCtx,
+  W: number,
+  H: number,
+  off: { x: number; y: number },
+): SceneLayer['clip'] | undefined {
+  const pts = groupClipArea(item, frame, ctx, W, H, off);
+  if (!pts) return undefined;
+  const rot = ((frame.transform.rotation % 360) + 360) % 360;
+  if (rot < 0.01 || rot > 359.99) {
+    const xs = pts.map((p) => p[0]);
+    const ys = pts.map((p) => p[1]);
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+    return { rects: [[x, y, Math.max(...xs) - x, Math.max(...ys) - y]] };
+  }
+  return { poly: [pts] };
+}
+
+/** 版型參加轉場：整組都套外框的轉場（位移、放大、透明度、裁切、模糊，跟外框完全一樣所以一起動） */
+function applyGroupLook(layer: SceneLayer, look: TransitionFrame['a'], W: number, H: number) {
+  layer.box = applyLook(layer.box, look, W, H);
+  layer.opacity *= look.opacity;
+  if (look.clip) layer.clip = clipPx(look.clip, W, H);
+  if (look.blur) layer.blur = look.blur * Math.min(W, H);
 }
 
 /**
@@ -353,6 +528,7 @@ export function guardCell(
 ): Item {
   if (item.type === 'text' || item.type === 'audio' || !item.cell || !frame || item.group !== frame.group)
     return item;
+  if (item.cellEdit) return item; // 使用者單獨動過這一格（素材層）：不拉回洞裡
   const asset = project.assets.find((a) => a.id === item.assetId);
   if (!asset) return item;
   const want = composeWith(

@@ -99,6 +99,7 @@ test('框線不再被填滿的透明度牽動；填滿透明度可以到 0%', as
     .getByRole('button', { name: /新增文字/ })
     .first()
     .tap();
+  await page.getByLabel('文字內容').fill('點兩下編輯文字'); // 新文字一開始是空的提示狀態；打字後才是實心字
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
   await page.getByRole('radio', { name: '方形' }).tap();
   await legacyBox(page);

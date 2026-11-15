@@ -89,7 +89,7 @@ test('選到音樂：只有音樂用得到的工具；音量 0–200%、淡入�
   await openTab(page, '音訊');
   const tools = page.getByRole('toolbar', { name: '音樂工具' });
   await expect(tools).toBeVisible();
-  for (const n of ['分割', '刪除', '複製', '修剪', '音量'])
+  for (const n of ['分割', '刪除', '複製', '片段範圍', '音量'])
     await expect(tools.getByRole('button', { name: n })).toBeVisible();
   for (const n of ['變速', '裁切', '填滿', '完整'])
     await expect(tools.getByRole('button', { name: n })).toHaveCount(0);
@@ -146,7 +146,7 @@ test('音樂可以分割、複製、刪除；修剪面板顯示波形；音樂�
   expect(items[1]!.trimIn).toBeCloseTo(2, 1);
 
   // 修剪面板：有波形，可以改留下的區段
-  await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '修剪' }).tap();
+  await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '片段範圍' }).tap();
   await expect(page.getByTestId('trim-strip').getByTestId('wave')).toBeVisible();
   await page.waitForTimeout(500); // 等面板滑上來
   const assetSec = ((await project(page)).assets as unknown as { kind: string; duration: number }[]).find(

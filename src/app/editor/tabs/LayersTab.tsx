@@ -1,10 +1,20 @@
+import { itemTitle } from '../../../engine/labels';
 import { useEffect, useState } from 'react';
 import type { Player } from '../../../engine/player';
-import { ArrowDown, ArrowUp, Eye, EyeOff, Layers, Lock, Type } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, Layers, Lock, MoreHorizontal, Type } from 'lucide-react';
 import { BLEND_LABELS } from '../../../engine/geometry';
 import { timeResolved } from '../../../engine/keyframes';
-import { findItem, isVideoItem, layersAt } from '../../../engine/timeline';
-import { editItem, patchTrack, resetTransform, setTransform, shiftTrackLayer } from '../../../store/actions';
+import { frameOfGroup, isFrameItem } from '../../../engine/layoutTracks';
+import { findItem, isVideoItem, layersAt, trackUnits } from '../../../engine/timeline';
+import type { TrackKind } from '../../../model/types';
+import {
+  editItem,
+  patchTrack,
+  resetTransform,
+  setTransform,
+  moveTrackPast,
+  moveTrackToEdge,
+} from '../../../store/actions';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
@@ -32,6 +42,8 @@ function usePlayerTime(player: Player | null): number {
   return t;
 }
 
+const KIND_TAG: Record<TrackKind, string> = { media: '影像', sticker: '貼圖', text: '字卡', audio: '音訊' };
+
 export function LayersTab() {
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
@@ -39,7 +51,9 @@ export function LayersTab() {
   const t = usePlayerTime(player);
   // 目前這一秒有哪些圖層（最上層在最上面）
   const layers = layersAt(project, t, true).slice().reverse();
-  // 有定位（關鍵影格）的物件：滑桿顯示播放頭這個時間的樣子
+  const units = trackUnits(project.tracks);
+  // 有定格（關鍵影格）的物件：滑桿顯示播放頭這個時間的樣子
+  const [moreFor, setMoreFor] = useState<string | null>(null);
   const found = findItem(timeResolved(project, t), selectedId);
   const it = found && found.item.type !== 'audio' ? found.item : undefined;
 
@@ -49,66 +63,130 @@ export function LayersTab() {
         <span>這一秒的圖層（上面的會蓋住下面的）</span>
       </div>
       <ul className="layer-list" data-testid="layer-list">
-        {layers.map(({ item, track, trackIndex }) => {
+        {layers.map(({ item, track }, idx) => {
           const asset = isVideoItem(item) ? project.assets.find((a) => a.id === item.assetId) : undefined;
-          const label =
-            item.type === 'text'
-              ? item.card.runs[0]?.text === ''
-                ? '圖形'
-                : `文字：${item.card.runs[0]?.text.slice(0, 8) ?? ''}`
-              : (asset?.name ?? '素材');
+          const label = itemTitle(item, asset);
+          const sub = !!track.groupRole;
+          const gName = track.group ? (frameOfGroup(project.tracks, track.group)?.item.label ?? '版型') : '';
+          const isFrame = isFrameItem(item as never) && !track.groupRole;
+          // ▲▼：跟「這一秒」上面／下面最近的、不屬於同一塊的圖層換（旁邊的軌道這一秒可能沒東西，按了會看不出變化）
+          const unitOf = (i: number) => units.findIndex((u) => u.lo <= i && i <= u.hi);
+          const myUnit = unitOf(project.tracks.indexOf(track));
+          const neighbour = (dir: -1 | 1) => {
+            for (let j = idx + dir; j >= 0 && j < layers.length; j += dir) {
+              const o = layers[j]!.track;
+              if (track.groupRole === 'member') {
+                if (o.groupRole === 'member' && o.group === track.group) return o;
+              } else if (unitOf(project.tracks.indexOf(o)) !== myUnit) return o;
+            }
+            return null;
+          };
+          const move = (dir: -1 | 1) => {
+            const o = neighbour(dir);
+            if (!o || !moveTrackPast(track.id, o.id, dir === -1))
+              toast(
+                track.groupRole === 'member'
+                  ? `已經是版型裡最${dir === -1 ? '上' : '下'}面的圖層`
+                  : `已經是最${dir === -1 ? '上' : '下'}面的圖層`,
+              );
+          };
           return (
             <li
               key={item.id}
-              className={`layer-row${item.id === selectedId ? ' selected' : ''}`}
+              className={`layer-row${item.id === selectedId ? ' selected' : ''}${sub ? ' sub' : ''}`}
               data-testid="layer-row"
               data-item-id={item.id}
+              data-kind={track.kind}
+              data-layer-no={layers.length - idx}
             >
               <button className="layer-name" onClick={() => useProjectStore.getState().select(item.id)}>
                 <span className="layer-ico">
                   {item.type === 'text' ? <Type size={16} /> : <Layers size={16} />}
                 </span>
-                <span className="layer-text">
-                  {`${track.name} · `}
-                  {label}
+                <span className="layer-main">
+                  <span className="layer-text">
+                    {`${track.name} · `}
+                    {label}
+                  </span>
+                  <span className="layer-meta">
+                    <span className={`layer-kind k-${track.kind}`}>{KIND_TAG[track.kind]}</span>
+                    <span data-testid="layer-no">第 {layers.length - idx} 層</span>
+                    {sub && <span>版型 · {gName}</span>}
+                    {isFrame && <span>整個版型</span>}
+                  </span>
                 </span>
               </button>
-              <button
-                className="icon-btn sm"
-                aria-label={`${track.name} ${track.hidden ? '顯示' : '隱藏'}`}
-                onClick={() => patchTrack(track.id, { hidden: !track.hidden })}
-              >
-                {track.hidden ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-              <button
-                className={`icon-btn sm${track.locked ? ' on' : ''}`}
-                aria-label={`${track.name} ${track.locked ? '解鎖' : '鎖定'}`}
-                onClick={() => patchTrack(track.id, { locked: !track.locked })}
-              >
-                <Lock size={18} />
-              </button>
-              <button
-                className="icon-btn sm"
-                aria-label={`${track.name} 往上一層`}
-                onClick={() =>
-                  project.tracks[trackIndex + 1]?.kind !== track.kind
-                    ? toast('已經是這一類最上面的圖層（影像、特效、字卡不能互相穿插）')
-                    : shiftTrackLayer(track.id, 1)
-                }
-              >
-                <ArrowUp size={18} />
-              </button>
-              <button
-                className="icon-btn sm"
-                aria-label={`${track.name} 往下一層`}
-                onClick={() =>
-                  project.tracks[trackIndex - 1]?.kind !== track.kind
-                    ? toast('已經是這一類最下面的圖層（影像、特效、字卡不能互相穿插）')
-                    : shiftTrackLayer(track.id, -1)
-                }
-              >
-                <ArrowDown size={18} />
-              </button>
+              <div className="layer-btns">
+                <div className="btn-zone">
+                  <button
+                    className="icon-btn sm"
+                    aria-label={`${track.name} ${track.hidden ? '顯示' : '隱藏'}`}
+                    onClick={() => patchTrack(track.id, { hidden: !track.hidden })}
+                  >
+                    {track.hidden ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                  <button
+                    className={`icon-btn sm${track.locked ? ' on' : ''}`}
+                    aria-label={`${track.name} ${track.locked ? '解鎖' : '鎖定'}`}
+                    onClick={() => patchTrack(track.id, { locked: !track.locked })}
+                  >
+                    <Lock size={18} />
+                  </button>
+                </div>
+                {track.groupRole !== 'cell' && (
+                  <>
+                    <span className="zone-sep" aria-hidden="true" />
+                    <div className="btn-zone">
+                      <button
+                        className="icon-btn sm"
+                        aria-label={`${track.name} 往上一層`}
+                        onClick={() => move(-1)}
+                      >
+                        <ArrowUp size={18} />
+                      </button>
+                      <button
+                        className="icon-btn sm"
+                        aria-label={`${track.name} 往下一層`}
+                        onClick={() => move(1)}
+                      >
+                        <ArrowDown size={18} />
+                      </button>
+                      <button
+                        className="icon-btn sm"
+                        aria-label={`${track.name} 更多排序`}
+                        aria-expanded={moreFor === track.id}
+                        onClick={() => setMoreFor(moreFor === track.id ? null : track.id)}
+                      >
+                        <MoreHorizontal size={18} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              {moreFor === track.id && (
+                <div className="layer-more" data-testid="layer-more">
+                  <button
+                    className="chip"
+                    aria-label={`${track.name} 移到最上層`}
+                    onClick={() => {
+                      if (!moveTrackToEdge(track.id, 'top')) toast('已經是最上面的圖層');
+                      setMoreFor(null);
+                    }}
+                  >
+                    移到最上層
+                  </button>
+                  <button
+                    className="chip"
+                    aria-label={`${track.name} 移到最下層`}
+                    onClick={() => {
+                      if (!moveTrackToEdge(track.id, 'bottom')) toast('已經是最下面的圖層');
+                      setMoreFor(null);
+                    }}
+                  >
+                    移到最下層
+                  </button>
+                </div>
+              )}
             </li>
           );
         })}

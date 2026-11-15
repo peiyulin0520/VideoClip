@@ -27,7 +27,6 @@ async function setup(page: Page) {
 
 /** 在裁切框上畫一條線（框的比例座標） */
 async function stroke(page: Page, from: [number, number], to: [number, number]) {
-  await page.evaluate(() => window.scrollTo(0, 0));
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const at = (p: [number, number]) => [fr.x + fr.width * p[0], fr.y + fr.height * p[1]] as const;
   const [x0, y0] = at(from);
@@ -40,8 +39,7 @@ async function stroke(page: Page, from: [number, number], to: [number, number]) 
 }
 
 async function lassoCircle(page: Page) {
-  await page.getByRole('switch', { name: '自由形狀' }).tap();
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByTestId('crop-tool-lasso').tap();
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;
   const cy = fr.y + fr.height / 2;
@@ -64,16 +62,18 @@ test('自由形狀圈完之後：橡皮擦擦掉中間一條（可調粗細）�
   await lassoCircle(page);
 
   // 橡皮擦：粗細調到 10%，在正中間橫畫一條
-  await page.getByRole('switch', { name: '橡皮擦' }).tap();
+  await page.getByTestId('crop-tool-erase').tap();
   await expect(page.getByTestId('paint-bar')).toBeVisible();
   await page.getByLabel('粗細').fill('10');
   await stroke(page, [0.1, 0.5], [0.9, 0.5]);
   await expect(page.getByTestId('crop-tint')).toBeVisible();
   await page.screenshot({ path: `${SHOT}/eraser.png` });
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   const it = await overlay(page);
   expect(it.maskBitmap).toMatch(/^data:image\/png/);
   expect(it.mask).toBeUndefined(); // 點陣圖遮罩取代了多邊形
+  expect((it as { cropEdit?: { strokes: unknown[]; mask: unknown[] } }).cropEdit!.strokes).toHaveLength(1); // 向量筆畫也存起來，下次可以接著改
+  expect((it as { cropEdit?: { mask: unknown[] } }).cropEdit!.mask.length).toBeGreaterThan(20);
   // 中間被擦掉（露出底下的紅），上面還是綠
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(true);
   expect(isGreen(await samplePreview(page, 0.5, 0.36))).toBe(true);
@@ -81,10 +81,10 @@ test('自由形狀圈完之後：橡皮擦擦掉中間一條（可調粗細）�
 
   // 再進裁切：用筆刷把中間補回來
   await page.getByRole('button', { name: '裁切' }).tap();
-  await page.getByRole('switch', { name: '筆刷' }).tap();
+  await page.getByTestId('crop-tool-brush').tap();
   await page.getByLabel('粗細').fill('10');
   await stroke(page, [0.3, 0.5], [0.7, 0.5]);
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
   await page.screenshot({ path: `${SHOT}/brush-done.png` });
 
@@ -93,12 +93,12 @@ test('自由形狀圈完之後：橡皮擦擦掉中間一條（可調粗細）�
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(true);
 });
 
-test('粗細：同樣一筆，粗細不同、擦掉的範圍就不同；復原筆畫；重設去掉遮罩', async ({ page }) => {
+test('粗細：同樣一筆，粗細不同、擦掉的範圍就不同；復原；再進去形狀還在', async ({ page }) => {
   test.setTimeout(90_000);
   await setup(page);
   await page.getByRole('button', { name: '裁切' }).tap();
   await lassoCircle(page);
-  await page.getByRole('switch', { name: '橡皮擦' }).tap();
+  await page.getByTestId('crop-tool-erase').tap();
   const tint = page.getByTestId('crop-tint');
   // 細的一筆
   await page.getByLabel('粗細').fill('2');
@@ -117,18 +117,15 @@ test('粗細：同樣一筆，粗細不同、擦掉的範圍就不同；復原�
   await stroke(page, [0.3, 0.5], [0.7, 0.5]);
   const thick = await redCount();
   expect(thick).toBeGreaterThan(thin + 1000);
-  // 復原筆畫：回到細的那一筆
-  await page.getByRole('button', { name: '復原筆畫' }).tap();
-  expect(await redCount()).toBe(thin);
-  await page.getByRole('button', { name: '完成' }).tap();
+  // 復原：回到細的那一筆
+  await page.getByTestId('crop-undo').tap();
+  await expect.poll(redCount).toBe(thin);
+  await page.getByTestId('crop-apply').tap();
   expect((await overlay(page)).maskBitmap).toBeDefined();
-  // 重設：再進去按重設、完成 → 遮罩與裁切都沒了
+  // 再進去：圈選的形狀還在（筆畫也存著，可以接著改）
   await page.getByRole('button', { name: '裁切' }).tap();
-  await page.getByRole('button', { name: '重設' }).tap();
-  await page.getByRole('button', { name: '完成' }).tap();
-  const cleared = await overlay(page);
-  expect(cleared.maskBitmap).toBeUndefined();
-  expect(cleared.crop).toBeUndefined();
+  await expect(page.getByTestId('crop-polygon')).toBeVisible(); // 圈選的形狀還在
+  await page.getByTestId('crop-close').tap();
 });
 
 test('匯出：筆刷／橡皮擦畫的遮罩也套用（單格匯出中間是被擦掉露出的紅色）', async ({ page }) => {
@@ -136,10 +133,10 @@ test('匯出：筆刷／橡皮擦畫的遮罩也套用（單格匯出中間是�
   await setup(page);
   await page.getByRole('button', { name: '裁切' }).tap();
   await lassoCircle(page);
-  await page.getByRole('switch', { name: '橡皮擦' }).tap();
+  await page.getByTestId('crop-tool-erase').tap();
   await page.getByLabel('粗細').fill('10');
   await stroke(page, [0.1, 0.5], [0.9, 0.5]);
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   const out = await exportFrame(page, 0.5, [
     [0.5, 0.5],
     [0.5, 0.36],

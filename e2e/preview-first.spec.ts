@@ -44,7 +44,8 @@ test('預覽很大而且大小永遠不變：每個分頁、面板開合、選�
     .first()
     .tap();
   expect(await stageSize(page)).toEqual(base);
-  await page.locator('.tabs').getByRole('tab', { name: '文字', exact: true }).tap(); // 收合
+  await page.locator('.tabs').getByRole('tab', { name: '文字', exact: true }).tap(); // 再點一次：面板不收合
+  await expect(page.getByLabel('文字內容')).toBeVisible();
   expect(await stageSize(page)).toEqual(base);
 });
 

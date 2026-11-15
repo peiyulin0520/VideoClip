@@ -12,6 +12,10 @@ import {
   seekTo,
   selectedItemId,
   showTimeline,
+  isFrameTrack,
+  finishLayout,
+  trimClipEnd,
+  selectFrame,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g4';
@@ -30,17 +34,19 @@ const tracks = async (page: Page) => (await project(page)).tracks as unknown as 
 
 async function addLayout(page: Page, name: string, files: string[], motion?: string) {
   await openTab(page, '版型');
+  // 已經選到某個版型時，「新增版型」收合成一顆鈕，要先展開
+  const more = page.getByTestId('layout-add-more');
+  if (await more.isVisible()) await more.tap();
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
-  await expect(page.getByTestId('layout-sheet')).toBeVisible();
-  if (motion) await page.getByRole('radio', { name: `動畫 ${motion}` }).tap();
-  await page.getByTestId('layout-input').setInputFiles(files.map(fixture));
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByTestId('layout-options')).toBeVisible();
+  await finishLayout(page, files.map(fixture), { motion });
 }
 const members = (tr: Tr[]) => tr.filter((t) => t.groupRole).flatMap((t) => t.items);
 
 test('版型整組移動：拖其中一格，外框與所有格子一起動，相對位置不變', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '拍貼機直條', ['solid-red.webm', 'solid-green.webm']);
+  await selectFrame(page); // 版型層：整組一起動（選到單一格子只會動那一格）
   const before = members(await tracks(page));
   const box = await previewBox(page);
   const c = before.find((m) => m.cell)!.cell!;
@@ -66,6 +72,7 @@ test('版型整組移動：拖其中一格，外框與所有格子一起動，�
 test('版型整組縮放：雙指縮小，格子大小與間距按比例一起縮小（不跑版）', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '拍貼機直條', ['solid-red.webm', 'solid-green.webm']);
+  await selectFrame(page);
   const before = members(await tracks(page));
   const s = await previewBox(page);
   await pinch(page, { cx: s.x + s.width / 2, cy: s.y + s.height / 2, from: 160, to: 80 });
@@ -91,24 +98,30 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '三格', ['solid-red.webm', 'solid-green.webm', 'solid-blue.webm']);
   await showTimeline(page);
-  // 時間軸上：主軌 1 + 版型代表列 1（格子的軌道藏起來）
+  // 時間軸上：新版型預設展開，影像下面是各格一列；收合後只剩主軌 1 + 版型那一列
+  await expect(page.locator('.track.sub-row[data-kind="media"]')).toHaveCount(3);
+  await page.getByTestId('group-toggle').tap();
   await expect(page.getByTestId('track')).toHaveCount(2);
+  await expect(page.locator('.track.sub-row')).toHaveCount(0);
   const tr = await tracks(page);
-  const frame = tr.find((t) => t.groupRole === 'frame')!.items[0]!;
+  const frame = tr.find(isFrameTrack)!.items[0]!;
   // 版型分頁列出每一格；點「選第 2 格」選到那一格
   await openTab(page, '版型');
   await expect(page.getByTestId('group-panel')).toBeVisible();
-  await expect(page.getByTestId('cell-row')).toHaveCount(3);
-  await page.getByRole('button', { name: '選第 2 格' }).tap();
+  await expect(page.getByTestId('ld-cell')).toHaveCount(3);
+  await page.getByTestId('ld-cell').nth(1).tap(); // 點示意圖的第 2 格：選到那一格＋開「這一格」視窗
+  await expect(page.getByRole('dialog', { name: '第 2 格' })).toBeVisible();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
   const cell2 = tr.filter((t) => t.groupRole === 'cell')[1]!.items[0]!;
   await expect.poll(() => selectedItemId(page)).toBe(cell2.id);
   await page.screenshot({ path: `${SHOT}/group-panel.png` });
 
-  // 版型多 1 秒
+  // 拖版型尾端拉長 1 秒
   const d0 = frame.duration;
-  await page.getByRole('button', { name: '版型 多 1 秒' }).tap();
-  const frame2 = (await tracks(page)).find((t) => t.groupRole === 'frame')!.items[0]!;
-  expect(frame2.duration).toBeCloseTo(d0 + 1, 3);
+  const d1 = await trimClipEnd(page, frame.id, 1);
+  expect(d1).toBeGreaterThan(d0 + 0.5);
+  expect((await tracks(page)).find(isFrameTrack)!.items[0]!.duration).toBeCloseTo(d1, 3);
+  await openTab(page, '版型');
 
   // 刪掉外框＝整個版型拿掉（復原回來）
   await page.getByRole('button', { name: '移除版型' }).tap();
@@ -121,6 +134,8 @@ test('版型：素材比版型短，剩下的秒數顯示色塊——反黑，�
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-blue.webm']); // 4 秒
   await addLayout(page, '上下雙格', ['clip-a.webm', 'solid-red.webm']); // clip-a 2 秒；紅 4 秒 → 版型 4 秒
+  await openTab(page, '版型');
+  await page.getByRole('radio', { name: '空檔 色塊' }).tap(); // 這幾個測試要的是「空檔畫色塊」那一套
   const tr = await tracks(page);
   const cell0 = tr.filter((t) => t.groupRole === 'cell')[0]!;
   const cell = cell0.items[0]!.cell!;
@@ -144,8 +159,12 @@ test('版型：素材比版型短，剩下的秒數顯示色塊——反黑，�
   await page.screenshot({ path: `${SHOT}/fill-black.png` });
   // 改成反白
   await openTab(page, '版型');
-  await page.getByRole('radio', { name: '第 1 格 反白' }).tap();
-  expect((await tracks(page)).find((t) => t.groupRole === 'cell')!.fill).toBe('white');
+  await page.getByTestId('ld-cell').first().tap();
+  await page.getByTestId('cell-mode-blank').tap();
+  await page.getByRole('button', { name: '空白畫面顏色 #ffffff' }).tap();
+  await page.getByTestId('cell-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
+  expect((await tracks(page)).find((t) => t.groupRole === 'cell')!.fill).toBe('#ffffff');
   await expect
     .poll(async () => {
       const c = await samplePreview(page, nx, ny);
@@ -159,7 +178,7 @@ test('版型動畫：捲動——不同時間整組的位置不同；選「不�
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '三格', ['solid-red.webm', 'solid-green.webm', 'solid-blue.webm'], '捲動');
   const tr = await tracks(page);
-  const frame = tr.find((t) => t.groupRole === 'frame')!.items[0]!;
+  const frame = tr.find(isFrameTrack)!.items[0]!;
   expect(frame.motion).toBe('drift');
   const cell = tr.filter((t) => t.groupRole === 'cell')[0]!.items[0]!.cell!;
   const nx = cell.x + cell.w / 2;
@@ -171,10 +190,12 @@ test('版型動畫：捲動——不同時間整組的位置不同；選「不�
   // 開頭整組被推到畫面下方，同一個點看到的不是紅色
   expect(isRed(a)).toBe(false);
   await page.screenshot({ path: `${SHOT}/drift.png` });
-  await openTab(page, '版型');
-  await page.getByRole('button', { name: '選第 1 格' }).tap();
+  // 動畫在特效分頁：選到整個版型（時間軸上的版型片段）→ 動畫選「不動」
+  await showTimeline(page);
+  await page.locator(`[data-testid="clip"][data-item-id="${frame.id}"]`).tap();
+  await openTab(page, '特效');
   await page.getByRole('radio', { name: '動畫 不動' }).tap();
-  const frame2 = (await tracks(page)).find((t) => t.groupRole === 'frame')!.items[0]!;
+  const frame2 = (await tracks(page)).find(isFrameTrack)!.items[0]!;
   expect(frame2.motion).toBeUndefined();
   void clips;
 });

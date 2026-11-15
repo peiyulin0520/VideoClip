@@ -180,7 +180,7 @@ test('匯出可以取消：回到選項、暫存檔清掉；之後可以重新�
   const bar = page.getByRole('progressbar', { name: '匯出進度' });
   await expect(bar).toBeVisible();
   await expect.poll(async () => Number(await bar.getAttribute('aria-valuenow'))).toBeGreaterThan(5);
-  await page.getByRole('button', { name: '取消' }).tap();
+  await page.getByRole('button', { name: '停止匯出' }).tap();
   await expect(page.getByTestId('export-options')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('export-done')).toHaveCount(0);
   const left = await tempCount(page);

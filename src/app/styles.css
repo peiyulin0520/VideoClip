@@ -1,5 +1,10 @@
 :root {
   color-scheme: dark;
+  /* 字級：全站只有這三個（跟著螢幕寬等比縮小，390 寬＝14px） */
+  --fs-body: clamp(12px, 3.59vw, 14px);
+  --fs-note: calc(var(--fs-body) * 0.86);
+  --fs-pb: calc(var(--fs-body) * 0.79);
+  --radius-ctl: 12px;
   --bg: #111;
   --fg: #f4f4f4;
   --muted: #9a9a9a;
@@ -208,8 +213,9 @@ button {
 }
 .btn {
   min-height: 48px;
-  padding: 0 18px;
-  font-size: 16px;
+  padding: 0 max(8px, 1.1em);
+  white-space: nowrap;
+  font-size: var(--fs-body);
   flex: 1;
 }
 .btn.primary {
@@ -226,14 +232,15 @@ button {
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: max(6px, 0.55em);
   margin: 8px 0;
 }
 .chip {
   min-height: 44px;
-  padding: 0 16px;
-  border-radius: 22px;
-  font-size: 15px;
+  padding: 0 max(8px, 1.1em);
+  white-space: nowrap;
+  border-radius: var(--radius-ctl);
+  font-size: var(--fs-body);
 }
 .chip.active {
   background: var(--accent);
@@ -243,7 +250,7 @@ button {
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
-  font-size: 16px;
+  font-size: var(--fs-body);
   color: var(--fg);
   background: var(--field);
   border: 1px solid var(--border);
@@ -262,11 +269,48 @@ button {
   padding: 16px 16px calc(16px + var(--safe-bottom));
   background: var(--panel);
   border-radius: 20px 20px 0 0;
+  /* 內容比螢幕高就在視窗裡捲，標題列（含 ✕）黏在最上面，隨時關得掉 */
+  max-height: 94dvh;
+  overflow-y: auto;
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: sticky;
+  top: -16px;
+  z-index: 3;
+  margin: -16px -16px 8px;
+  padding: 16px 16px 8px;
+  background: var(--panel);
 }
 .sheet-title {
-  margin-bottom: 8px;
-  font-size: 17px;
+  margin: 0;
+  font-size: var(--fs-body);
   font-weight: 600;
+}
+.sheet-row .btn.grow {
+  flex: 1 1 auto;
+}
+.rm-preview {
+  position: relative;
+}
+.rm-state {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-note);
+  pointer-events: none;
+}
+.rm-state.off {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
 }
 .sheet-msg {
   margin: 4px 0 12px;
@@ -284,7 +328,7 @@ button {
   min-height: 52px;
   padding: 0 8px;
   justify-content: flex-start;
-  font-size: 17px;
+  font-size: var(--fs-body);
   background: transparent;
   border-radius: 8px;
 }
@@ -303,7 +347,7 @@ button {
 .toast {
   max-width: 100%;
   padding: 10px 16px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1.4;
   background: var(--panel);
   border: 1px solid var(--border);
@@ -344,7 +388,7 @@ button {
   gap: 8px;
   padding: 10px 12px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.5;
   background: var(--note-bg);
   border-radius: 12px;
@@ -382,7 +426,7 @@ button {
   right: 8px;
   bottom: 8px;
   padding: 2px 8px;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: #fff;
   background: rgba(0, 0, 0, 0.6);
   border-radius: 8px;
@@ -390,12 +434,12 @@ button {
 .card-name {
   margin-top: 6px;
   overflow: hidden;
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .card-sub {
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .card-menu {
@@ -458,25 +502,26 @@ button {
 }
 .stage-wrap {
   position: relative;
-  /* 寬度撐滿；高度依專案比例，但最高＝一個螢幕扣掉頂列與播放列（捲到最上面時整個預覽都看得到）。用 svh：Safari 網址列伸縮時不會抖 */
-  height: max(
-    300px,
-    min(calc(100vw * var(--inv-ratio, 1.7778)), calc(100svh - var(--top-h) - var(--playbar-h)))
-  );
+  /* 預覽的底永遠是 9:16（不管專案比例）：預覽和下面的播放列、時間軸位置才不會跳。高度最高＝一個螢幕扣掉頂列與播放列。用 svh：Safari 網址列伸縮時不會抖 */
+  height: max(300px, min(calc(100vw * 16 / 9), calc(100svh - var(--top-h) - var(--playbar-h))));
   display: flex;
   align-items: center;
   justify-content: center;
   container-type: size;
   background: #0a0a0a;
 }
-.stage {
+.stage-base {
   position: relative;
-  width: min(100cqw, calc(100cqh * var(--ratio)));
-  aspect-ratio: var(--ratio);
+  width: min(100cqw, calc(100cqh * 9 / 16));
+  aspect-ratio: 9 / 16;
   overflow: hidden;
   background: #000;
+  /* 預覽空白處上下滑＝捲頁面；物件上有看不見的觸控區（.hit，touch-action:none）可以拖 */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.stage canvas {
+.stage-base canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -484,11 +529,106 @@ button {
   /* 跟舞台一樣：空白處上下滑可以捲頁面。Pixi 會在 canvas 上寫 inline 的 touch-action:none，要用 !important 蓋掉 */
   touch-action: pan-y !important;
 }
+/* 版面（輸出範圍）：在底裡面置中的透明框；選取框、觸控區、參考線都用它的座標，所以可以延伸到框外 */
 .stage {
-  /* 預覽空白處上下滑＝捲頁面；物件上有看不見的觸控區（.hit，touch-action:none）可以拖 */
-  touch-action: pan-y;
-  user-select: none;
-  -webkit-user-select: none;
+  position: absolute;
+  pointer-events: none;
+}
+.stage.has-out {
+  outline: 1.5px solid rgba(255, 255, 255, 0.7);
+}
+.stage .hit {
+  pointer-events: auto;
+}
+/* 自訂比例：預覽上的白框＋把手＋底下的「寬:高 套用 ✕」列 */
+.ao {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+}
+.ao-frame {
+  position: absolute;
+  outline: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.ao-frame .crop-h {
+  pointer-events: auto;
+}
+/* 框會貼到底的邊：把手往框裡面縮 22px，才不會被底切掉、也抓得到 */
+.ao-frame .crop-h.l,
+.ao-frame .crop-h.tl,
+.ao-frame .crop-h.bl {
+  left: 22px;
+}
+.ao-frame .crop-h.r,
+.ao-frame .crop-h.tr,
+.ao-frame .crop-h.br {
+  left: calc(100% - 22px);
+}
+.ao-frame .crop-h.t,
+.ao-frame .crop-h.tl,
+.ao-frame .crop-h.tr {
+  top: 22px;
+}
+.ao-frame .crop-h.b,
+.ao-frame .crop-h.bl,
+.ao-frame .crop-h.br {
+  top: calc(100% - 22px);
+}
+.ao-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(78%, 280px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  padding: 0.6em 0.8em 0.8em;
+  border-radius: var(--radius-ctl);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: var(--fs-body);
+  pointer-events: auto;
+}
+.ao-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ao-close {
+  min-width: 40px;
+  min-height: 40px;
+  background: transparent;
+  color: #fff;
+}
+.ao-hint {
+  margin: 0;
+  font-size: var(--fs-note);
+  opacity: 0.8;
+}
+.ao-card .btn {
+  min-height: 44px;
+}
+/* 版面外面：灰黑斜線（只是提醒，不會輸出） */
+.out-hatch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.55) 0 6px, rgba(90, 90, 90, 0.5) 6px 12px);
+}
+.out-label {
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: var(--fs-note);
+  pointer-events: none;
+  z-index: 7;
 }
 .pool {
   position: absolute;
@@ -511,7 +651,7 @@ button {
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.85);
-  font-size: 11px;
+  font-size: var(--fs-note);
   line-height: 1.2;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   overflow: hidden;
@@ -594,7 +734,7 @@ button {
   align-items: center;
   gap: 4px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   position: absolute;
   right: 6px;
   bottom: 6px;
@@ -615,7 +755,7 @@ button {
   font-size: 17px;
   color: #fff;
   background: var(--accent);
-  border-radius: 26px;
+  border-radius: var(--radius-ctl);
   transform: translate(-50%, -50%);
 }
 .playbar {
@@ -798,9 +938,11 @@ button {
   flex: none;
   flex-direction: column;
   gap: 2px;
-  min-width: 62px;
+  min-width: 4.6em;
+  padding: 0 max(6px, 0.4em);
+  white-space: nowrap;
   height: 56px;
-  font-size: 11px;
+  font-size: var(--fs-body);
   background: transparent;
 }
 .tool.active {
@@ -813,7 +955,7 @@ button {
 .panel-head {
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
+  font-size: var(--fs-body);
 }
 .panel input[type='range'] {
   width: 100%;
@@ -883,10 +1025,11 @@ button {
   display: none;
 }
 .tab {
-  flex: 1 0 52px;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 44px;
-  padding: 0 4px;
-  font-size: 14px;
+  padding: 0 0.2em;
+  font-size: var(--fs-body);
   white-space: nowrap;
   color: var(--muted);
   background: transparent;
@@ -901,13 +1044,18 @@ button {
 }
 .hint {
   margin: 6px 0;
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.5;
   color: var(--muted);
 }
+.text-input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
 .text-input.area {
   min-height: 64px;
-  padding: 10px 14px;
+  padding: 12px 14px;
+  line-height: 1.4;
   margin: 8px 0;
   font-family: inherit;
   resize: none;
@@ -919,7 +1067,7 @@ button {
 }
 .slider-label {
   min-width: 56px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .slider-row input[type='range'] {
@@ -929,7 +1077,7 @@ button {
 }
 .slider-val {
   min-width: 44px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   text-align: right;
 }
 .swatch {
@@ -964,7 +1112,7 @@ button {
   gap: 8px;
   justify-content: flex-start;
   min-width: 0;
-  font-size: 14px;
+  font-size: var(--fs-body);
   background: transparent;
 }
 .layer-text {
@@ -1031,7 +1179,7 @@ button {
 .btn.sm {
   min-height: 44px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   gap: 4px;
   flex: none;
 }
@@ -1050,14 +1198,14 @@ button {
   align-items: flex-start;
   gap: 4px;
   padding: 14px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-align: left;
   background: var(--panel);
   border: 2px solid transparent;
   border-radius: 14px;
 }
 .radio-card span {
-  font-size: 13px;
+  font-size: var(--fs-body);
   line-height: 1.5;
   color: var(--muted);
 }
@@ -1069,7 +1217,7 @@ button {
   flex-direction: column;
   gap: 6px;
   margin: 6px 0;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .ok {
@@ -1100,11 +1248,11 @@ button {
 .pack-name {
   display: flex;
   flex-direction: column;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .pack-name small,
 .pack-head small {
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .progress {
@@ -1140,12 +1288,12 @@ button {
   min-height: 44px;
   padding: 0;
   margin-top: 8px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
   background: transparent;
 }
 .licenses {
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.5;
 }
 .licenses small {
@@ -1168,7 +1316,7 @@ button {
   justify-content: space-between;
   gap: 8px;
   padding: 0 12px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   background: var(--field);
   border: 1px solid var(--border);
 }
@@ -1188,7 +1336,7 @@ button {
   top: 0;
   z-index: 1;
   padding: 8px 4px 4px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--muted);
   background: var(--panel);
 }
@@ -1212,7 +1360,7 @@ button {
   justify-content: flex-start;
   gap: 8px;
   margin-top: 8px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .font-prev {
@@ -1236,7 +1384,7 @@ button {
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  font-size: 11px;
+  font-size: var(--fs-note);
   white-space: nowrap;
 }
 .font-tags em {
@@ -1258,7 +1406,7 @@ button {
   gap: 8px;
   padding: 10px 12px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.5;
   background: var(--info-bg);
   border-radius: 12px;
@@ -1269,9 +1417,9 @@ button {
 }
 
 .ratio-btn {
-  min-width: 56px;
-  padding: 0 10px;
-  font-size: 14px;
+  min-width: clamp(44px, 14vw, 56px);
+  padding: 0 clamp(4px, 2.5vw, 10px);
+  font-size: var(--fs-body);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1287,7 +1435,7 @@ button {
 .chip.sm {
   min-height: 36px;
   padding: 0 12px;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .chip.sm.add {
   color: #fff;
@@ -1301,7 +1449,7 @@ button {
 .panel.text-panel .chip {
   min-height: 38px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: var(--fs-body);
 }
 .panel.text-panel .swatch {
   flex: none;
@@ -1332,7 +1480,7 @@ button {
   align-items: center;
   gap: 2px;
   padding: 6px 4px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   background: #f4f1ec;
   color: #333;
   border: 2px solid transparent;
@@ -1363,7 +1511,7 @@ button {
   gap: 2px;
   min-height: 64px;
   padding: 4px 2px;
-  font-size: 11px;
+  font-size: var(--fs-body);
   background: var(--btn2);
   border: 2px solid transparent;
   border-radius: 10px;
@@ -1400,7 +1548,7 @@ button {
 .color-tag {
   display: block;
   margin: 2px 0 0;
-  font-size: 11px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .color-row {
@@ -1499,7 +1647,7 @@ button {
   display: flex;
   align-items: flex-end;
   padding: 4px 8px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   border: 1px solid var(--border);
   border-radius: 10px;
 }
@@ -1512,7 +1660,7 @@ button {
 .cp-hex {
   align-self: center;
   min-width: 76px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .cp-channel {
@@ -1584,14 +1732,14 @@ button {
   pointer-events: none;
 }
 .hint.small {
-  font-size: 11px;
+  font-size: var(--fs-note);
 }
 
 /* GIPHY */
 .giphy-steps {
   margin: 4px 0 8px;
   padding-left: 22px;
-  font-size: 13px;
+  font-size: var(--fs-note);
   line-height: 1.6;
   color: var(--fg);
 }
@@ -1636,7 +1784,7 @@ button {
   justify-content: center;
   width: 26px;
   height: 26px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: #fff;
   background: #e5484d;
   border-radius: 50%;
@@ -1663,7 +1811,7 @@ button {
   align-items: center;
   gap: 10px;
   min-height: 44px;
-  font-size: 16px;
+  font-size: var(--fs-body);
 }
 .check-row input {
   width: 24px;
@@ -1713,7 +1861,7 @@ button {
 }
 .trim-nothumb {
   padding: 8px;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .trim-dim {
@@ -1767,7 +1915,7 @@ button {
 }
 .trim-info {
   margin: 4px 0 8px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .trim-info b {
@@ -1800,24 +1948,10 @@ button {
 }
 
 /* 裁切模式（預覽上） */
-.crop-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 8;
-}
 .crop-frame {
-  position: absolute;
+  position: relative;
+  flex: none;
   touch-action: none;
-}
-.crop-dim-clip {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.crop-rect-shadow {
-  position: absolute;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
 }
 .crop-rect {
   position: absolute;
@@ -1942,31 +2076,6 @@ button {
   transform: translate(6px, 6px);
 }
 
-.crop-bar {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
-  z-index: 3;
-  display: flex;
-  gap: 6px;
-}
-.crop-bar .btn {
-  min-height: 44px;
-  padding: 0 9px;
-  font-size: 13px;
-  white-space: nowrap;
-  background: rgba(20, 20, 20, 0.85);
-  color: #fff; /* 固定白字：底色固定是深色，不跟著淺色主題變成深色字 */
-}
-.crop-bar .btn:disabled {
-  color: rgba(255, 255, 255, 0.45);
-}
-.crop-bar .btn.primary {
-  background: var(--accent, #ff4d8d);
-  color: #fff;
-}
-
 /* 匯出面板 */
 .export-bar {
   height: 14px;
@@ -2031,7 +2140,7 @@ button {
   gap: 8px;
   height: auto;
   padding: 10px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-align: left;
   background: var(--btn);
   border: 2px solid transparent;
@@ -2066,7 +2175,7 @@ button {
   height: auto;
   min-width: 0;
   padding: 6px 2px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   background: var(--btn);
   border-radius: 10px;
 }
@@ -2094,7 +2203,7 @@ button {
   align-items: center;
   gap: 4px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: #fff;
   background: rgba(0, 0, 0, 0.5);
 }
@@ -2121,7 +2230,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .peek ul {
   padding: 0;
@@ -2154,7 +2263,7 @@ button {
   justify-content: center;
   width: 44px;
   height: 44px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   background: var(--btn2) center / cover;
   border-radius: 8px;
 }
@@ -2191,7 +2300,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--muted);
   border: 1.5px dashed var(--border);
   border-radius: 8px;
@@ -2226,7 +2335,7 @@ button {
   flex: none;
   min-height: 38px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
   white-space: nowrap;
   background: transparent;
@@ -2252,11 +2361,11 @@ button {
 .chip3 {
   min-height: 38px;
   padding: 0 14px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--fg);
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 19px;
+  border-radius: var(--radius-ctl);
 }
 .chip3.on {
   font-weight: 600;
@@ -2285,6 +2394,14 @@ button {
   height: 96px;
   background: var(--btn2) center / cover;
   border-radius: 10px;
+}
+.cover-pick.active {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.menu-item.active {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* 時間軸收合：圖層清單鈕、摘要列、細軌道、片段兩行名稱 */
@@ -2392,12 +2509,12 @@ button {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--fs-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .audio-text small {
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .audio-vol {
@@ -2424,14 +2541,14 @@ button {
 .cell-row .grow {
   flex: 1;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 .chip-static {
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 /* 轉場小圓圈：兩個緊接的片段之間。有轉場＝白底、代號；沒有＝虛線灰圈「＋」；目前選的＝實心 */
@@ -2519,7 +2636,7 @@ button {
   min-height: 0;
   height: 24px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: #fff;
   background: rgba(0, 0, 0, 0.5);
   border-radius: 12px;
@@ -2544,7 +2661,7 @@ button {
 .multi-count {
   flex: none;
   margin-right: 4px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   font-weight: 700;
   color: var(--accent);
   white-space: nowrap;
@@ -2584,7 +2701,7 @@ button {
   width: 72px;
   min-height: 0;
   padding: 4px 4px 2px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--fg);
   background: transparent;
   border: 2px solid transparent;
@@ -2665,49 +2782,6 @@ button {
   box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.45);
   pointer-events: none;
 }
-.crop-bar.paint-bar {
-  top: 60px;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 12px;
-  background: rgba(20, 20, 20, 0.85);
-  color: #fff;
-}
-.crop-bar.paint-bar {
-  right: 8px;
-}
-.crop-bar.paint-bar {
-  flex-wrap: wrap;
-}
-.crop-bar.paint-bar .paint-size {
-  flex: 1 1 100%;
-  min-width: 0;
-  color: #fff;
-}
-.crop-bar.paint-bar .slider-row input[type='range'] {
-  height: 34px;
-}
-.crop-bar.paint-bar .slider-label {
-  min-width: 44px;
-  white-space: nowrap;
-  color: #ddd;
-}
-.crop-bar.paint-bar .slider-val {
-  color: #fff;
-}
-.crop-bar.paint-bar .slider-row {
-  min-width: 0;
-}
-.crop-bar.paint-bar .slider-label {
-  min-width: 0;
-  color: #ddd;
-}
-.crop-bar.paint-bar .btn {
-  flex: none;
-}
-.crop-bar.paint-bar .btn {
-  background: rgba(255, 255, 255, 0.12);
-}
 
 /* 有新版本的橫幅（蓋在畫面最底下） */
 .update-banner {
@@ -2721,7 +2795,7 @@ button {
   justify-content: space-between;
   gap: 10px;
   padding: 8px 8px 8px 14px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--fg);
   background: var(--panel);
   border: 1px solid var(--accent);
@@ -2743,18 +2817,19 @@ button {
   max-height: 94dvh;
   overflow-y: auto;
 }
-.rm-undo {
-  position: absolute;
-  top: 10px;
-  right: 14px;
-  width: 48px;
-  min-width: 48px;
-  height: 48px;
+.rm-icon-btn {
+  flex: none;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
-  background: var(--btn);
-  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-ctl, 12px);
 }
-.rm-undo:disabled {
+.rm-icon-btn:disabled {
   opacity: 0.4;
 }
 .rm-preview {
@@ -2776,23 +2851,27 @@ button {
 .rm-nopreview {
   padding: 24px;
   color: #888;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .rm-play-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin: 4px 0;
 }
 .rm-now {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 7.5em;
+  text-align: left;
+  white-space: nowrap;
 }
 .rm-ruler {
   display: flex;
   justify-content: space-between;
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--muted);
 }
 .rm-wrap {
@@ -2831,7 +2910,7 @@ button {
 }
 .rm-flag small {
   margin-top: 1px;
-  font-size: 12px;
+  font-size: var(--fs-note);
   color: var(--fg);
 }
 .rm-strip {
@@ -2899,11 +2978,11 @@ button {
   flex-wrap: wrap;
   gap: 8px;
   margin: 4px 0;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .rm-summary {
   margin: 10px 0 4px;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 
 /* 兩個影片銜接的轉場圓圈：沒選取＝米色、選取中＝橘棕（不隨主題換，才認得出來） */
@@ -2930,7 +3009,7 @@ button {
   border: 1.5px solid #7f8c6a;
   background: #d5dcc6;
   color: #1e3b2f;
-  font-size: 12px;
+  font-size: var(--fs-note);
   font-weight: 700;
   line-height: 1;
   display: flex;
@@ -2965,7 +3044,7 @@ button {
 }
 .fx-legend .lg {
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-ctl);
   font-size: 12px;
   font-weight: 700;
 }
@@ -3008,7 +3087,7 @@ button {
 .et-text {
   padding: 8px;
   color: #fff;
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-align: center;
   word-break: break-all;
 }
@@ -3092,7 +3171,7 @@ button {
   width: 64px;
   min-height: 44px;
   text-align: center;
-  font-size: 16px;
+  font-size: var(--fs-body);
 }
 
 .group-fx-row {
@@ -3105,15 +3184,15 @@ button {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .group-fx select {
   min-height: 44px;
-  font-size: 16px;
+  font-size: var(--fs-body);
 }
 
-/* 播放列的「定位」按鈕 */
+/* 播放列的「定格」按鈕 */
 .kf-btn {
   display: flex;
   align-items: center;
@@ -3127,7 +3206,7 @@ button {
   line-height: 1;
 }
 .kf-btn small {
-  font-size: 12px;
+  font-size: var(--fs-pb);
 }
 .kf-btn.on {
   color: var(--accent);
@@ -3135,7 +3214,7 @@ button {
 .kf-btn:disabled {
   opacity: 0.4;
 }
-/* 時間軸片段上的定位小菱形 */
+/* 時間軸片段上的定格小菱形 */
 .kf-dot {
   position: absolute;
   z-index: 7;
@@ -3191,7 +3270,7 @@ button {
   align-items: center;
   gap: 6px;
   padding: 4px 0;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .color-panel .look-row {
   display: flex;
@@ -3212,7 +3291,7 @@ button {
   border: 2px solid transparent;
   border-radius: 10px;
   background: var(--btn);
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 .look-card canvas {
   width: 52px;
@@ -3230,7 +3309,7 @@ button {
   flex: 1;
   white-space: nowrap;
   padding: 0 8px;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 .peek-tag {
@@ -3239,10 +3318,10 @@ button {
   left: 50%;
   transform: translateX(-50%);
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-ctl);
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
-  font-size: 12px;
+  font-size: var(--fs-note);
   pointer-events: none;
   z-index: 8;
 }
@@ -3255,13 +3334,13 @@ button {
 .pb-btn {
   flex-direction: column;
   gap: 1px;
-  min-width: 48px;
+  min-width: calc(var(--fs-body) * 3.3);
   height: 52px;
   padding: 0 6px;
-  font-size: 12px;
+  font-size: var(--fs-pb);
 }
 .pb-btn small {
-  font-size: 11px;
+  font-size: var(--fs-pb);
   line-height: 1;
   white-space: nowrap;
 }
@@ -3302,4 +3381,833 @@ button:not(:disabled):active,
 /* 進階：標記要靜音的聲音——標起來的地方畫成灰色斜線 */
 .rm-body.silence {
   background: repeating-linear-gradient(135deg, rgba(60, 60, 60, 0.7) 0 5px, rgba(60, 60, 60, 0.45) 5px 10px);
+}
+
+/* 卡片名稱一律一行（放不下就縮在框內，不換行）；卡片的字跟全站一樣大 */
+.look-card span,
+.tr-card,
+.layout-card,
+.look-card,
+.card-name {
+  white-space: nowrap;
+}
+.look-card span,
+.card-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 頂列：窄螢幕（320 寬）七個控制項要放得進一列，名稱欄位吃剩下的 */
+.ed-top .icon-btn,
+.ed-top button.icon-btn {
+  min-width: clamp(40px, 11vw, 44px);
+}
+
+/* 面板裡的小標題跟上面的說明、清單隔開一點（不要黏在一起） */
+.panel .panel-head:not(:first-child),
+.panel h3:not(:first-child) {
+  margin-top: 14px;
+}
+.music-note {
+  margin-bottom: 8px;
+}
+
+/* ---- 裁切編輯畫面（全螢幕、一頁放得下）---- */
+.crop-editor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: calc(var(--safe-top) + 6px) 8px calc(var(--safe-bottom) + 6px);
+  background: var(--bg);
+  color: var(--fg);
+  box-sizing: border-box;
+}
+.ce-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.ce-size {
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ce-zoomctl {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.rm-icon-btn.sm {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+.ce-zoomval {
+  min-width: 3.4em;
+  min-height: 36px;
+  padding: 0 4px;
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+}
+.sheet-close {
+  flex: none;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--btn);
+}
+.ce-stage {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+  border-radius: 10px;
+  touch-action: none;
+}
+.ce-zoom {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 0 0;
+}
+.ce-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+.ce-nomedia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.ce-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+}
+.ce-bar .btn {
+  flex: none;
+  min-height: 44px;
+}
+.ce-bar .btn.grow {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.ce-tools {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--btn);
+  border-radius: var(--radius-ctl);
+}
+.ce-tool {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 2px;
+  font-size: var(--fs-body);
+  white-space: nowrap;
+  background: transparent;
+  border-radius: calc(var(--radius-ctl) - 3px);
+}
+.ce-tool.on {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.ce-ctx {
+  flex: none;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+}
+.ce-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: max(6px, 0.55em);
+  overflow-x: auto;
+  scrollbar-width: none;
+  width: 100%;
+}
+.ce-chips .chip {
+  flex: none;
+}
+.ce-lasso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.ce-lasso .hint {
+  flex: 1;
+  margin: 0;
+}
+.ce-paint {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.ce-paint .paint-size {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.ce-paint .slider-row {
+  gap: 6px;
+}
+.ce-paint .slider-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+.ce-paint .slider-row input[type='range'] {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+.ce-paint .slider-label {
+  flex: none;
+  min-width: 0;
+}
+.ce-paint .slider-val {
+  flex: none;
+  min-width: 2.6em;
+  text-align: right;
+}
+
+/* 裁切工具卡：跟上面的播放／復原／套用分開（分隔線＋不同底色＋小標題） */
+.ce-divider {
+  flex: none;
+  height: 1px;
+  margin: 2px 0;
+  background: var(--line);
+}
+.ce-toolcard {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ctl);
+}
+.ce-toolcard-title {
+  font-size: var(--fs-note);
+  color: var(--muted);
+  line-height: 1.2;
+}
+.ce-toolcard .ce-tools {
+  background: var(--btn);
+}
+.ce-toolcard .ce-ctx {
+  min-height: 48px;
+}
+
+/* 轉場時的聲音 */
+.tr-audio {
+  margin-top: 8px;
+}
+.tr-audio-axis {
+  margin: 4px 0 8px;
+}
+
+/* 轉場聲音的兩個旗標可能在同一個位置：前迄靠左、後起靠右，各自抓得到 */
+.rm-flag.out {
+  transform: translateX(-100%);
+  align-items: flex-end;
+}
+.rm-flag.in {
+  transform: none;
+  align-items: flex-start;
+}
+.rm-flag.out i {
+  margin-right: -8px;
+}
+.rm-flag.in i {
+  margin-left: -8px;
+}
+
+/* 版型示意圖：外框（跟實際同色同透明度）＋每一格的素材縮圖，每一格可以點 */
+.layout-diagram {
+  position: relative;
+  width: min(160px, 100%);
+  margin: 8px 0;
+  background: #4a4a50;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ld-cell {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: #6b6b73 center / cover no-repeat;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+.ld-cell small {
+  max-width: 100%;
+  padding: 0 0.3em;
+  font-size: 10px;
+  line-height: 1.3;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ld-cell.active {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.ld-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.layout-preview {
+  display: flex;
+  justify-content: center;
+  margin: 6px 0;
+}
+.layout-preview .layout-thumb {
+  width: min(160px, 60%);
+}
+.ld-cell.empty {
+  background: repeating-linear-gradient(135deg, #5a5a62 0 6px, #4a4a52 6px 12px);
+  outline: 1.5px dashed rgba(255, 255, 255, 0.55);
+  outline-offset: -3px;
+}
+/* 一小塊跟旁邊分開的區域（淡底）：例如特效分頁「整個版型的動畫」跟下面各素材特效的分隔 */
+.zone-soft {
+  margin: 4px 0 10px;
+  padding: 0.6em 0.8em;
+  border-radius: var(--radius-ctl);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.layout-options {
+  margin-top: 8px;
+  padding: 0.6em 0.8em;
+  border-radius: var(--radius-ctl);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.layout-card.active {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ---- 播放軸上展開的版型：版型標題列、分類標題列、格子／成員列、空格子 ---- */
+.group-head,
+.sub-head {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 3;
+}
+.group-head {
+  /* 版型內容整塊用主題色的線圈起來 */
+  border-left: 3px solid var(--accent);
+  padding-left: 4px;
+}
+.sub-head {
+  border-left: 3px solid var(--accent);
+  padding-left: 14px;
+}
+.cat-toggle.grp {
+  position: sticky;
+  left: 4px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.cat-toggle.sub {
+  position: sticky;
+  left: 14px;
+  font-size: var(--fs-note);
+}
+.grp-add {
+  position: sticky;
+  left: 60%;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 0;
+  padding: 0 0.7em;
+  height: 20px;
+  border-radius: var(--radius-ctl);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-note);
+}
+.track.sub-row {
+  border-left: 3px solid var(--accent);
+}
+.track-chip.sub {
+  background: color-mix(in srgb, var(--accent) 18%, var(--btn2));
+}
+.grp-toggle {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  z-index: 4;
+  min-height: 0;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  color: var(--on-accent);
+  font-size: 12px;
+}
+.empty-cell-slot {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+  font-size: var(--fs-note);
+  white-space: nowrap;
+  overflow: hidden;
+  min-height: 0;
+}
+.clip.is-frame .clip-label {
+  padding-left: 26px;
+}
+/* 選到版型裡的某個素材（素材層）：框線用虛線，跟「整個版型」（實線）分得出來 */
+.selbox.member {
+  border-style: dashed;
+}
+/* 選到版型裡的素材：畫面只露出來的範圍（虛線框，版型旋轉也跟著轉） */
+.clip-area {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.clip-area polygon {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2px;
+  stroke-dasharray: 8 6;
+  vector-effect: non-scaling-stroke;
+}
+.clip-tag {
+  position: absolute;
+  padding: 0 0.5em;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-note);
+  line-height: 1.5;
+  pointer-events: none;
+  white-space: nowrap;
+}
+/* 選到版型裡的素材：畫面只露出來的範圍（虛線框，版型旋轉也跟著轉） */
+.clip-area {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.clip-area polygon {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2px;
+  stroke-dasharray: 8 6;
+  vector-effect: non-scaling-stroke;
+}
+.clip-tag {
+  position: absolute;
+  padding: 0 0.5em;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-note);
+  line-height: 1.5;
+  pointer-events: none;
+  white-space: nowrap;
+}
+/* 自訂格數：列數、欄數的加減 */
+.grid-steppers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em 1.4em;
+  margin: 6px 0;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.stepper b {
+  min-width: 1.2em;
+  text-align: center;
+}
+/* 調整版型大小：版型現在占的範圍（跟著版型旋轉）＋把手；框貼到邊時把手往框內縮 */
+.lr-frame {
+  position: absolute;
+  outline: 2px dashed var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  z-index: 9;
+}
+.lr-frame .crop-h {
+  pointer-events: auto;
+}
+.lr-frame .crop-h.l,
+.lr-frame .crop-h.tl,
+.lr-frame .crop-h.bl {
+  left: 22px;
+}
+.lr-frame .crop-h.r,
+.lr-frame .crop-h.tr,
+.lr-frame .crop-h.br {
+  left: calc(100% - 22px);
+}
+.lr-frame .crop-h.t,
+.lr-frame .crop-h.tl,
+.lr-frame .crop-h.tr {
+  top: 22px;
+}
+.lr-frame .crop-h.b,
+.lr-frame .crop-h.bl,
+.lr-frame .crop-h.br {
+  top: calc(100% - 22px);
+}
+.lr-card {
+  z-index: 10;
+}
+
+/* ---- L6 按鈕分區：功能層級不同的按鈕用「分區＋細線」隔開 ---- */
+.btn-zone {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.btn-zone.grow {
+  flex: 1;
+}
+.zone-sep {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: 0.7em 4px;
+  background: var(--border);
+}
+.ed-top .zone-sep {
+  margin: 12px 3px;
+}
+.playbar .zone-sep {
+  margin: 10px 4px;
+}
+.playbar .spacer {
+  flex: 1;
+}
+.export-btn {
+  color: var(--accent);
+}
+
+/* 版型分頁：〔這個版型〕卡片（移除版型在右上、紅色）／分隔線／〔新增版型〕淡底區 */
+.this-layout {
+  margin: 4px 0;
+  padding: 0.4em 0.5em 0.5em;
+  border-radius: var(--radius-ctl);
+  border: 1px solid var(--border);
+}
+.this-layout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-body);
+}
+.this-layout-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  padding: 0 0.8em;
+  white-space: nowrap;
+}
+.zone-line {
+  height: 1px;
+  margin: 10px 0;
+  border: 0;
+  background: var(--border);
+}
+.new-layout {
+  margin-top: 4px;
+}
+
+/* 播放軸上版型的 ▾：跟軌道圖示不同的底色（強調色），一眼看出是「整個版型」的鈕 */
+.cat-toggle.grp {
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  border-color: var(--accent);
+}
+.rm-play-row .zone-sep {
+  margin: 6px 0;
+}
+.playbar {
+  gap: 2px;
+  padding: 2px 4px;
+}
+.playbar .zone-sep {
+  margin: 10px 2px;
+}
+.ed-top {
+  gap: 0;
+  padding-inline: 4px;
+}
+.ed-top .btn-zone {
+  gap: 0;
+}
+.ed-top .zone-sep {
+  margin: 12px 2px;
+}
+.this-layout .this-layout-remove {
+  flex: none;
+  width: auto;
+  min-width: 0;
+}
+
+/* X9：這一類的軌道中間夾著別類（在圖層分頁排成夾心）的小標 */
+.cat-mixed {
+  position: sticky;
+  left: 9em;
+  z-index: 5;
+  min-height: 0;
+  min-width: 0;
+  height: 22px;
+  margin-left: 6px;
+  padding: 0 0.7em;
+  border-radius: 11px;
+  font-size: var(--fs-note);
+  white-space: nowrap;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* X9 圖層分頁：種類標籤、第幾層、版型裡的縮排、更多排序 */
+.layer-row {
+  flex-wrap: wrap;
+}
+.layer-row.sub {
+  margin-left: 1em;
+}
+.layer-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  gap: 1px;
+}
+.layer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  align-items: center;
+  font-size: var(--fs-note);
+  color: var(--muted);
+}
+.layer-kind {
+  padding: 0 0.5em;
+  border-radius: 999px;
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+.layer-kind.k-media {
+  background: color-mix(in srgb, #4da3ff 22%, transparent);
+}
+.layer-kind.k-sticker {
+  background: color-mix(in srgb, #ffc83d 24%, transparent);
+}
+.layer-kind.k-text {
+  background: color-mix(in srgb, #ff6fa5 24%, transparent);
+}
+.layer-row .btn-zone {
+  flex: none;
+}
+.layer-row .zone-sep {
+  margin: 8px 2px;
+}
+.layer-more {
+  display: flex;
+  gap: 8px;
+  flex-basis: 100%;
+  padding: 2px 0 6px 2.2em;
+}
+
+.layer-row .layer-name {
+  flex: 1 1 10em;
+  min-width: 10em;
+}
+.layer-btns {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+}
+.layer-meta > span {
+  white-space: nowrap;
+}
+
+/* X6：版型的格子列——軌道圖示是格子編號；列尾的＋加素材 */
+.cell-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  border-radius: 999px;
+  font-size: var(--fs-note);
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.cell-add {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  min-width: 28px;
+  min-height: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.ld-no {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: var(--fs-note);
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.toolbar .tool-sep {
+  flex: none;
+  margin: 10px 4px;
+}
+.menu-item.active {
+  color: var(--accent);
+}
+
+/* X6：這一格視窗的素材清單 */
+.cell-items {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cell-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-ctl);
+}
+.cell-item.selected {
+  outline: 1px solid var(--accent);
+}
+.cell-item-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  background: transparent;
+  font-size: var(--fs-body);
+}
+.cell-thumb {
+  flex: none;
+  width: 2.2em;
+  height: 2.2em;
+  border-radius: 6px;
+  background-color: var(--btn2);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
+}
+.cell-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.cell-item-dur {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--fs-note);
+  white-space: nowrap;
+}
+.cell-item-edit {
+  flex-basis: 100%;
 }

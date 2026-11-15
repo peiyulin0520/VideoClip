@@ -8,6 +8,9 @@ import {
   previewBox,
   project,
   showTimeline,
+  isFrameTrack,
+  finishLayout,
+  selectFrame,
 } from './helpers';
 
 type Tf = { x: number; y: number; scale: number; rotation: number; opacity: number };
@@ -18,8 +21,7 @@ const tracks = async (page: Page) => (await project(page)).tracks as unknown as 
 async function addLayout(page: Page, name: string, files: string[]) {
   await openTab(page, '版型');
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
-  await page.getByTestId('layout-input').setInputFiles(files.map(fixture));
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, files.map(fixture));
 }
 
 test('「刪除並補齊」刪掉版型的外框＝整個版型（含各格）拿掉，不會留下看不到卻還在畫的格子', async ({
@@ -27,10 +29,10 @@ test('「刪除並補齊」刪掉版型的外框＝整個版型（含各格）�
 }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '拍貼機直條', ['solid-red.webm', 'solid-green.webm']);
-  expect((await tracks(page)).filter((t) => t.groupRole)).toHaveLength(5);
+  expect((await tracks(page)).filter((t) => t.groupRole === 'cell')).toHaveLength(4);
   await showTimeline(page);
   // 時間軸上的版型代表列（外框）：點它、剪輯 → 刪除並補齊
-  const frameId = (await tracks(page)).find((t) => t.groupRole === 'frame')!.items[0]!.id;
+  const frameId = (await tracks(page)).find(isFrameTrack)!.items[0]!.id;
   await page.locator(`[data-testid="clip"][data-item-id="${frameId}"]`).tap();
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '刪除並補齊' }).tap();
@@ -43,6 +45,7 @@ test('「刪除並補齊」刪掉版型的外框＝整個版型（含各格）�
 test('圖層分頁「位置、大小、旋轉歸位」＝整個版型歸位；整個圖層透明度也是整組一起', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '拍貼機直條', ['solid-red.webm', 'solid-green.webm']);
+  await selectFrame(page); // 版型層（整個版型）
   const members = async () =>
     (await tracks(page))
       .filter((t) => t.groupRole)
@@ -74,16 +77,31 @@ test('音訊分頁每一列左邊是那支影片的首圖（縮圖），不再�
   await page.screenshot({ path: 'docs/screenshots/feedback-8/audio-thumb.png' });
 });
 
-test('裁切工具列的字固定是白色（底色固定深色，淺色主題下也看得到）', async ({ page }) => {
+test('裁切畫面的按鈕字在淺色主題下也看得清楚（跟底色的對比夠）', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('vc-theme', 'warm'));
   await createProjectWith(page, ['solid-red.webm']);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
-  const color = await page
-    .locator('.crop-bar .btn')
-    .first()
-    .evaluate((el) => getComputedStyle(el).color);
-  expect(color).toBe('rgb(255, 255, 255)');
+  const contrast = await page.evaluate(() => {
+    const rgb = (c: string) => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+    const lum = ([r, g, b]: number[]) => {
+      const f = (v: number) => {
+        const x = v / 255;
+        return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * f(r!) + 0.7152 * f(g!) + 0.0722 * f(b!);
+    };
+    const out: number[] = [];
+    for (const id of ['crop-apply', 'crop-check']) {
+      const el = document.querySelector(`[data-testid=${id}]`) as HTMLElement;
+      const cs = getComputedStyle(el);
+      const l1 = lum(rgb(cs.color));
+      const l2 = lum(rgb(cs.backgroundColor));
+      out.push((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05));
+    }
+    return out;
+  });
+  for (const c of contrast) expect(c).toBeGreaterThan(3);
 });

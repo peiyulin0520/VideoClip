@@ -10,10 +10,10 @@ const ids = (t: Track[]) => t.map((x) => x.id).join(',');
 
 describe('moveTracksBy', () => {
   const base = [tr('m1', 'media'), tr('m2', 'media'), tr('m3', 'media'), tr('m4', 'media'), tr('t1', 'text')];
-  it('選到的一起往上移一格，相對順序不變；碰到另一個分區就不動', () => {
+  it('選到的一起往上移一格，相對順序不變；碰到同類的邊緣就不動', () => {
     expect(ids(moveTracksBy(base, ['m1', 'm2'], 1))).toBe('m3,m1,m2,m4,t1');
-    expect(ids(moveTracksBy(base, ['m3', 'm4'], 1))).toBe('m1,m2,m3,m4,t1'); // m4 已經在影像區最上面
-    expect(ids(moveTracksBy(base, ['t1'], 1))).toBe('m1,m2,m3,m4,t1'); // 字卡已經最上面
+    expect(ids(moveTracksBy(base, ['m3', 'm4'], 1))).toBe('m1,m2,m3,m4,t1'); // m4 已經是影像最上面
+    expect(ids(moveTracksBy(base, ['t1'], 1))).toBe('m1,m2,m3,m4,t1'); // 字卡只有一條，沒有同類可換
   });
   it('往下移', () => {
     expect(ids(moveTracksBy(base, ['m3', 'm4'], -1))).toBe('m1,m3,m4,m2,t1');
@@ -23,7 +23,7 @@ describe('moveTracksBy', () => {
     const t = [
       tr('m1', 'media'),
       tr('c1', 'media', [], { group: 'g', groupRole: 'cell' }),
-      tr('f', 'media', [], { group: 'g', groupRole: 'frame' }),
+      tr('f', 'media'), // 外框是一般的影像軌（v2）
       tr('m2', 'media'),
     ];
     expect(ids(moveTracksBy(t, ['f'], 1))).toBe('m1,m2,c1,f');

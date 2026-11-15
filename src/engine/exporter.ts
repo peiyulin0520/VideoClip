@@ -16,7 +16,8 @@ import {
   type StreamTargetChunk,
   type Target,
 } from 'mediabunny';
-import type { Asset, Project, VideoItem } from '../model/types';
+import type { Asset, Item, Project, VideoItem } from '../model/types';
+import { seamAudioExtent, transitionAudioGain } from './transitions';
 import { getMedia } from '../storage/media';
 import { animBitmapAt } from './animImage';
 import { fadeSpans } from './audio';
@@ -203,14 +204,14 @@ class VideoFrames {
 // ---------- 聲音混音 ----------
 
 /** 影片物件要不要出聲：素材有音軌、軌道沒靜音沒隱藏、音量 > 0 */
-export function audibleItems(project: Project): { item: VideoItem; asset: Asset }[] {
-  const out: { item: VideoItem; asset: Asset }[] = [];
+export function audibleItems(project: Project): { item: VideoItem; asset: Asset; trackItems: Item[] }[] {
+  const out: { item: VideoItem; asset: Asset; trackItems: Item[] }[] = [];
   for (const track of project.tracks) {
     if (track.kind === 'text' || track.muted || track.hidden) continue;
     for (const it of track.items) {
       if ((it.type !== 'video' && it.type !== 'audio') || it.volume <= 0) continue; // 影片與背景音樂
       const asset = project.assets.find((a) => a.id === it.assetId);
-      if (asset?.hasAudio) out.push({ item: it, asset });
+      if (asset?.hasAudio) out.push({ item: it, asset, trackItems: track.items });
     }
   }
   return out;
@@ -228,7 +229,7 @@ async function mixAudio(
   const sr = 48000;
   const ctx = new OfflineAudioContext(2, Math.max(Math.ceil(total * sr), sr), sr);
   let any = false;
-  for (const { item, asset } of items) {
+  for (const { item, asset, trackItems } of items) {
     if (signal?.aborted) throw new ExportCancelled();
     const input = new Input({ source: new BlobSource(await getFile(asset)), formats: ALL_FORMATS });
     try {
@@ -237,18 +238,46 @@ async function mixAudio(
       const sink = new AudioBufferSink(track);
       // 這個物件自己一個音量節點：音量、淡入淡出都在這裡（時間單位是時間軸秒數）
       const gain = ctx.createGain();
-      gain.connect(ctx.destination);
+      // 轉場聲音（交叉淡化、直接切換、自訂起迄…）：另一個倍數節點，在接縫前後逐格調整
+      const tg = ctx.createGain();
+      gain.connect(tg);
+      tg.connect(ctx.destination);
       const { fi, fo } = fadeSpans(item.duration, item.fadeIn, item.fadeOut);
       const endAt = item.start + item.duration;
+      gain.gain.setValueAtTime(item.volume, 0); // 轉場提早放的聲音（接縫前）也用這個音量
       gain.gain.setValueAtTime(fi > 0 ? 0 : item.volume, item.start);
       if (fi > 0) gain.gain.linearRampToValueAtTime(item.volume, item.start + fi);
       if (fo > 0) {
         gain.gain.setValueAtTime(item.volume, endAt - fo);
         gain.gain.linearRampToValueAtTime(0, endAt);
       }
+      const ext =
+        item.type === 'audio' ? { before: 0, after: 0, windows: [] } : seamAudioExtent(trackItems, item);
+      const wins = [...ext.windows].sort((a, b) => a[0] - b[0]);
+      tg.gain.setValueAtTime(1, 0);
+      for (const [w0, w1] of wins) {
+        const from = Math.max(w0, 0);
+        tg.gain.setValueAtTime(transitionAudioGain(trackItems, item, from), from);
+        for (let tt = from + 1 / 60; tt < w1 + 1 / 60; tt += 1 / 60)
+          tg.gain.linearRampToValueAtTime(transitionAudioGain(trackItems, item, tt), tt);
+      }
       const srcStart = item.trimIn;
-      // 靜音標記（audioRanges）：只把保留聲音的那幾段放進去，其他地方沒有聲音
-      for (const [spanA, spanB] of audioSpans(item)) {
+      const srcEnd = item.trimIn + item.duration * item.speed;
+      // 靜音標記（audioRanges）：只把保留聲音的那幾段放進去，其他地方沒有聲音；
+      // 轉場讓前一段多放到接縫後、後一段提早到接縫前：把那一段素材（有的話）也放進去
+      const spans: [number, number][] = [...audioSpans(item)];
+      const clipRanges = (a: number, b: number): [number, number][] => {
+        const lo = Math.max(a, 0);
+        const hi = Math.min(b, asset.duration);
+        if (hi - lo < 1e-4) return [];
+        if (!item.audioRanges) return [[lo, hi]];
+        return item.audioRanges
+          .map(([x, y]): [number, number] => [Math.max(x, lo), Math.min(y, hi)])
+          .filter(([x, y]) => y - x > 1e-4);
+      };
+      if (ext.before > 0) spans.push(...clipRanges(srcStart - ext.before * item.speed, srcStart));
+      if (ext.after > 0) spans.push(...clipRanges(srcEnd, srcEnd + ext.after * item.speed));
+      for (const [spanA, spanB] of spans) {
         for await (const wb of sink.buffers(spanA, spanB)) {
           const from = Math.max(wb.timestamp, spanA);
           const to = Math.min(wb.timestamp + wb.buffer.duration, spanB);
@@ -257,7 +286,9 @@ async function mixAudio(
           node.buffer = wb.buffer;
           node.playbackRate.value = item.speed;
           node.connect(gain);
-          node.start(item.start + (from - srcStart) / item.speed, from - wb.timestamp, to - from);
+          const at = item.start + (from - srcStart) / item.speed;
+          const skip = Math.max(0, -at) * item.speed; // 不能比 0 秒更早開始：多出來的開頭跳過
+          node.start(Math.max(at, 0), from - wb.timestamp + skip, to - from - skip);
           any = true;
         }
       }

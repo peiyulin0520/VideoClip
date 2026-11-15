@@ -145,7 +145,7 @@ export const LOOKS: LookDef[] = [
   { id: 'bw', name: '黑白', adjust: { contrast: 0.15, saturation: -1 } },
   {
     id: 'bwHigh',
-    name: '高反差黑白',
+    name: '高反差',
     adjust: { contrast: 0.45, highlights: 0.1, shadows: -0.15, blacks: -0.3, saturation: -1 },
   },
   {
@@ -178,17 +178,17 @@ export const LOOKS: LookDef[] = [
   },
   {
     id: 'cool',
-    name: '冷色調',
+    name: '冷調',
     adjust: { contrast: 0.1, saturation: -0.1, temperature: -0.45, tint: -0.05 },
   },
   {
     id: 'warm',
-    name: '暖色調',
+    name: '暖調',
     adjust: { exposure: 0.05, shadows: 0.05, vibrance: 0.15, temperature: 0.4, tint: 0.05 },
   },
   {
     id: 'cinema',
-    name: '電影感',
+    name: '電影',
     adjust: { contrast: 0.25, highlights: -0.3, blacks: -0.15, saturation: -0.15, temperature: 0.05 },
   },
   {
@@ -230,7 +230,7 @@ export function effectiveFull(
 
 /**
  * 實際要用的調色值＝色調組合 × 強度＋手動調整。
- * adjustNow：這個時間的手動調整（有定位時是內插後的值）。全部是 0 回傳 undefined（不用加濾鏡）。
+ * adjustNow：這個時間的手動調整（有定格時是內插後的值）。全部是 0 回傳 undefined（不用加濾鏡）。
  */
 export function effectiveAdjust(
   item: Pick<Item, 'look'>,
@@ -240,7 +240,7 @@ export function effectiveAdjust(
   return isNeutral(out) ? undefined : out;
 }
 
-/** 有調色（色調組合、手動調整、定位裡的調色）嗎 */
+/** 有調色（色調組合、手動調整、定格裡的調色）嗎 */
 export function itemHasGrade(it: Item): boolean {
   return (
     !!it.look ||

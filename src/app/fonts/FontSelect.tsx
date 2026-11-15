@@ -22,6 +22,8 @@ async function loadPreviews(fonts: CatalogFont[], onReady: (key: string, family:
 /** 字體選單：每個字體用自己的字形顯示名稱。放在字卡分頁。 */
 export function FontSelect({ value, onChange }: { value: string; onChange: (fontId: string) => void }) {
   const [open, setOpen] = useState(false);
+  /** 草稿：點一個字體只是先選，按「套用」才真的換；按 ✕ 關閉就不換 */
+  const [draft, setDraft] = useState(value);
   const [families, setFamilies] = useState<Record<string, string | null>>({});
   const installed = useFonts((s) => s.installed);
   const userFonts = useFonts((s) => s.userFonts);
@@ -50,15 +52,18 @@ export function FontSelect({ value, onChange }: { value: string; onChange: (font
       const ok = await ensureFont(fontId).finally(() => setBusy(null));
       if (!ok) return toast('字體載入失敗，請確認網路後再試一次');
     }
-    onChange(fontId);
-    setOpen(false);
+    setDraft(fontId);
   };
 
   const packs = Object.keys(PACKS);
 
   return (
     <>
-      <button className="font-select" aria-label="字體" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+      <button className="font-select" aria-label="字體" aria-haspopup="dialog" onClick={() => {
+          setDraft(value);
+          setOpen(true);
+        }}
+      >
         <Type size={18} />
         <span className="font-select-name">{current}</span>
         <ChevronDown size={18} />
@@ -66,13 +71,13 @@ export function FontSelect({ value, onChange }: { value: string; onChange: (font
 
       <Sheet open={open} title="選擇字體" onClose={() => setOpen(false)}>
         <div className="font-list" data-testid="font-list">
-          <button className={`font-row${value === SYSTEM_FONT_ID ? ' active' : ''}`} onClick={() => void pick(SYSTEM_FONT_ID)}>
+          <button className={`font-row${draft === SYSTEM_FONT_ID ? ' active' : ''}`} onClick={() => void pick(SYSTEM_FONT_ID)}>
             <span className="font-prev">系統預設字體 永遠的家 Aa 123</span>
           </button>
 
           {userFonts.length > 0 && <div className="font-group">我的字體（只存在這台裝置）</div>}
           {userFonts.map((u) => (
-            <button key={u.id} className={`font-row${value === `u:${u.id}` ? ' active' : ''}`} onClick={() => void pick(`u:${u.id}`)}>
+            <button key={u.id} className={`font-row${draft === `u:${u.id}` ? ' active' : ''}`} onClick={() => void pick(`u:${u.id}`)}>
               <span className="font-prev" style={{ fontFamily: `vcu-${u.id}, system-ui` }}>
                 {u.name} 永遠的家 Aa 123
               </span>
@@ -91,7 +96,7 @@ export function FontSelect({ value, onChange }: { value: string; onChange: (font
                   return (
                     <button
                       key={f.key}
-                      className={`font-row${value === f.key ? ' active' : ''}`}
+                      className={`font-row${draft === f.key ? ' active' : ''}`}
                       data-testid="font-row"
                       data-font-key={f.key}
                       onClick={() => void pick(f.key)}
@@ -124,6 +129,18 @@ export function FontSelect({ value, onChange }: { value: string; onChange: (font
             <Plus size={18} /> 匯入字體檔（.ttf .otf .woff2，可以從「檔案」App 選）
           </button>
         </div>
+        <div className="sheet-row">
+          <button
+            className="btn primary grow"
+            data-testid="font-apply"
+            onClick={() => {
+              if (draft !== value) onChange(draft);
+              toast('已套用');
+            }}
+          >
+            套用
+          </button>
+        </div>
       </Sheet>
       <input
         ref={fileRef}
@@ -140,8 +157,7 @@ export function FontSelect({ value, onChange }: { value: string; onChange: (font
           try {
             const uf = await importUserFont(file);
             toast(`已匯入「${uf.name}」`);
-            onChange(`u:${uf.id}`);
-            setOpen(false);
+            setDraft(`u:${uf.id}`);
           } catch {
             toast('這個檔案不是瀏覽器能讀的字體檔');
           } finally {

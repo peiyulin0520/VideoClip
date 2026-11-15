@@ -116,6 +116,7 @@ export function installDebugHook(player: Player) {
     editorRenders: () => editorRenders,
     /** 播放畫格數與每格合成耗時 */
     stats: () => player.stats(),
+    audioGains: () => player.audioGains(),
     /** 聲音輸出：模式、有沒有在跑、目前輸出音量（0–1） */
     audio: () => ({ mode: player.audio.mode, running: player.audio.running, level: player.audio.level() }),
     lastImportErrors: () => JSON.parse(JSON.stringify(lastImportErrors)),

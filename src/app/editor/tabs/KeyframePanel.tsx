@@ -15,21 +15,21 @@ import { Slider } from '../../../ui/Slider';
 import { usePlayheadTime } from '../usePlayheadTime';
 
 /**
- * 定位細部調整：位置（X、Y，可以放到畫面外）。色調在「色調」分頁（有定位時也能漸變）。有定位時，這裡改的是「播放頭這個時間」的定位（沒有就自動新增一個），
- * 兩個定位之間線性漸變；沒有定位時改物件本身。item 是「這個時間」的樣子（已套用定位）。
+ * 定格細部調整：位置（X、Y，可以放到畫面外）。色調在「色調」分頁（有定格時也能漸變）。有定格時，這裡改的是「播放頭這個時間」的定格（沒有就自動新增一個），
+ * 兩個定格之間線性漸變；沒有定格時改物件本身。item 是「這個時間」的樣子（已套用定格）。
  */
 export function KeyframePanel({ item, project }: { item: Item; project: Project }) {
   const player = useUI((s) => s.player);
   const pps = useUI((s) => s.timelinePps);
   const time = usePlayheadTime(player, 4);
-  // 試播時播放線會離開定位：這段時間繼續用試播的那個定位（面板不會閃掉）
+  // 試播時播放線會離開定格：這段時間繼續用試播的那個定格（面板不會閃掉）
   const [locked, setLocked] = useState<number | null>(null);
   const target = keyframeTarget(project, item.id);
   if (!target) return null;
   const nearIdx = locked ?? (hasKeyframes(target) ? keyframeNear(target, time - target.start, 8 / pps) : -1);
   const near = nearIdx >= 0;
   const pulse = near ? target.keyframes![nearIdx]!.pulse : undefined;
-  // 從這個定位播一次小特效給你看，播完回到原本的位置
+  // 從這個定格播一次小特效給你看，播完回到原本的位置
   const preview = (idx: number, at: number, dur: number) => {
     if (!player) return;
     const back = player.time;
@@ -48,14 +48,14 @@ export function KeyframePanel({ item, project }: { item: Item; project: Project 
   };
   const kfs = target.keyframes?.length ?? 0;
   const note = hasKeyframes(target)
-    ? `（定位 ${kfs} 個）時間軸上播放線碰到的菱形（白色那個）就是選到的定位，這裡改的只有它；沒碰到就在播放線的時間新增一個`
-    : '沒有定位時改的是物件本身';
+    ? `（定格 ${kfs} 個）時間軸上播放線碰到的菱形（白色那個）就是選到的定格，這裡改的只有它；沒碰到就在播放線的時間新增一個`
+    : '沒有定格時改的是物件本身';
   return (
     <div className="props kf-panel" data-testid="kf-panel">
       <div className="panel-head">
-        <span>定位細部調整</span>
+        <span>定格細部調整</span>
       </div>
-      <p className="hint">{note}。按播放列的「◇ 定位」新增定位（離別的定位很近也可以新增）。</p>
+      <p className="hint">{note}。按播放列的「◇ 定格」新增定格（離別的定格很近也可以新增）。</p>
       <Slider
         label="X 位置"
         value={Math.round(item.transform.x * 100)}
@@ -74,14 +74,14 @@ export function KeyframePanel({ item, project }: { item: Item; project: Project 
         format={(v) => `${v}%`}
         onChange={(v) => setTransform(item.id, { y: v / 100 }, `y:${item.id}`)}
       />
-      <div className="slider-label">這個定位的小特效（原地動一下，不是進場、離場或轉場）</div>
+      <div className="slider-label">這個定格的小特效（原地動一下，不是進場、離場或轉場）</div>
       {!near ? (
         <p className="hint" data-testid="pulse-hint">
-          先讓時間軸的播放線碰到一個定位（菱形變白色），再選小特效。
+          先讓時間軸的播放線碰到一個定格（菱形變白色），再選小特效。
         </p>
       ) : (
         <>
-          <div className="chips" role="radiogroup" aria-label="定位小特效">
+          <div className="chips" role="radiogroup" aria-label="定格小特效">
             <button
               role="radio"
               aria-checked={!pulse}
@@ -101,7 +101,7 @@ export function KeyframePanel({ item, project }: { item: Item; project: Project 
                 data-testid={`pulse-${p.id}`}
                 onClick={() => {
                   const at = setKeyframePulse(item.id, { kind: p.id }, undefined, nearIdx);
-                  if (at === null) return toast('先讓播放線碰到一個定位');
+                  if (at === null) return toast('先讓播放線碰到一個定格');
                   preview(nearIdx, at, pulse?.duration ?? 0.5);
                 }}
               >
@@ -151,7 +151,7 @@ export function KeyframePanel({ item, project }: { item: Item; project: Project 
           disabled={!near}
           onClick={() => deleteNearKeyframe(item.id)}
         >
-          刪除這個定位
+          刪除這個定格
         </button>
         <button
           className="chip"
@@ -159,7 +159,7 @@ export function KeyframePanel({ item, project }: { item: Item; project: Project 
           disabled={kfs === 0}
           onClick={() => clearKeyframes(item.id)}
         >
-          清除全部定位
+          清除全部定格
         </button>
       </div>
     </div>

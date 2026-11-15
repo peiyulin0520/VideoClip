@@ -26,7 +26,7 @@ const P = (kind: 'shake' | 'pop' | 'wobble' | 'jump', extra = {}) => ({
   ...extra,
 });
 
-describe('pulseOffset：定位小特效（震／彈／晃／跳）', () => {
+describe('pulseOffset：定格小特效（震／彈／晃／跳）', () => {
   it('開始前、結束後都沒有偏移；力道 0 也沒有', () => {
     for (const kind of ['shake', 'pop', 'wobble', 'jump'] as const) {
       const none = { dx: 0, dy: 0, scale: 1, rotation: 0 };
@@ -61,7 +61,7 @@ describe('pulseAt／withTime：小特效疊在內插後的位置上', () => {
     expect(pulseAt(it2, 1.9)).toBeNull();
     expect(pulseAt(it2, 2.7)).toBeNull();
   });
-  it('小特效播放中（不被下一個定位截斷）位置有偏移，結束後回到原位', () => {
+  it('小特效播放中（不被下一個定格截斷）位置有偏移，結束後回到原位', () => {
     const during = withTime(it2, 10 + 2.01).transform.x;
     const after = withTime(it2, 10 + 2.8).transform.x;
     expect(Math.abs(during - 0.9)).toBeGreaterThan(0.005);
@@ -72,7 +72,7 @@ describe('pulseAt／withTime：小特效疊在內插後的位置上', () => {
     applyPulse(tf, { dx: 0.1, dy: 0, scale: 1, rotation: 0 });
     expect(tf.x).toBe(0.5);
   });
-  it('新增定位用的底值不含小特效（transformAt 不吃偏移）', async () => {
+  it('新增定格用的底值不含小特效（transformAt 不吃偏移）', async () => {
     const { upsertKeyframe } = await import('./keyframes');
     const kfs = upsertKeyframe(it2 as Item, 2.1, {});
     const mid = kfs.find((k) => Math.abs(k.t - 2.1) < 1e-6)!;

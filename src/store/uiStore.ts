@@ -20,8 +20,14 @@ type UI = {
   gradePeek: boolean;
   /** 時間軸目前每秒幾 px：決定「播放線碰到菱形」的範圍 */
   timelinePps: number;
-  /** 色調分頁的「套用到」：整段素材／這個定位（只記使用者手動選的，沒選就由有沒有定位決定） */
+  /** 色調分頁的「套用到」：整段素材／這個定格（只記使用者手動選的，沒選就由有沒有定格決定） */
   gradeScope: { id: string; scope: 'item' | 'key' } | null;
+  /** 自訂比例：預覽上正在拖版面的框（fx、fy＝框占 9:16 底的寬、高比例）；沒有＝沒在調 */
+  frameEdit: { fx: number; fy: number; fill: boolean } | null;
+  /** 選到版型（或版型裡的東西）時，新增文字／貼圖／音效預設加進那個版型；使用者在各分頁關掉＝這個旗標 true */
+  addToGroupOff: boolean;
+  /** 調整版型大小：預覽上正在拖版型的邊（sx、sy＝相對於開始時的寬、高倍數）；沒有＝沒在調 */
+  layoutEdit: { group: string; sx: number; sy: number } | null;
 };
 
 export const useUI = create<UI>((set, get) => ({
@@ -40,6 +46,9 @@ export const useUI = create<UI>((set, get) => ({
   gradePeek: false,
   timelinePps: 40,
   gradeScope: null,
+  frameEdit: null,
+  addToGroupOff: false,
+  layoutEdit: null,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

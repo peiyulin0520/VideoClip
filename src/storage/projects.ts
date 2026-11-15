@@ -53,7 +53,7 @@ export async function duplicateProject(id: string): Promise<Project | undefined>
   const src = await getProject(id);
   if (!src) return undefined;
   const now = Date.now();
-  const base = createProject(`${src.name} 副本`, src.aspect, now);
+  const base = createProject(`${src.name} 副本`, src.aspect === 'custom' ? '9:16' : src.aspect, now);
   const copy: Project = {
     ...structuredClone(src),
     id: base.id,

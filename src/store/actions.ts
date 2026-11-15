@@ -2,6 +2,7 @@ import type { Draft } from 'immer';
 import {
   assignAspect,
   createAudioClip,
+  customSize,
   createOverlayClip,
   createShapeItem,
   createTextItem,
@@ -34,26 +35,63 @@ import {
   type Range,
   findItem,
   findFreeStart,
+  canPlace,
   firstFreeTrack,
+  trackKindOf,
   insertIndexFor,
   isVideoItem,
   mediaItems,
   mergeTracksByIds,
   moveItemToTrack,
   moveTrack,
+  moveTrackInKind,
   moveTracksBy,
   placeSequential,
   removeTracksByIds,
+  reorderInKind,
   reorderTrack,
   rippleDelete,
   splitByRanges,
   splitFree,
+  maxDuration,
   totalDuration,
   trackEnd,
+  trackUnits,
+  trimEndFree,
 } from '../engine/timeline';
-import { cellItem, inkFor, type LayoutText, type Rect } from '../engine/layouts';
-import { DEFAULT_EFFECT_DURATION, DEFAULT_TRANSITION_DURATION, seamsOf } from '../engine/transitions';
-import { groupPatch, transformAbout } from '../engine/groupTransform';
+import {
+  arrangeCells,
+  cellDefaultSeconds,
+  fitFrameToCells,
+  moveToCellTracks,
+  rippleAfter,
+  textsOnItem,
+} from '../engine/cellOps';
+import { cellItems } from '../engine/cellGap';
+import { cellTracksOf, frameOfGroup, isFrameItem } from '../engine/layoutTracks';
+import { remapKeepOnStage } from '../engine/aspectRemap';
+import { geoCtx } from '../engine/scene';
+import {
+  buildIn,
+  cellItem,
+  cellRect,
+  cellTransform,
+  coverCrop,
+  defOf,
+  inkFor,
+  MAX_CELL_VIDEOS,
+  planCell,
+  type CellMode,
+  type LayoutText,
+  type Rect,
+} from '../engine/layouts';
+import {
+  DEFAULT_EFFECT_DURATION,
+  DEFAULT_TRANSITION_DURATION,
+  seamsOf,
+  type TransitionAudioMode,
+} from '../engine/transitions';
+import { composeWith, groupPatch, transformAbout } from '../engine/groupTransform';
 import { DEFAULT_PULSE, type Pulse } from '../engine/pulse';
 import {
   hasKeyframes,
@@ -66,6 +104,7 @@ import {
   usesKeyframeLook,
   withTime,
 } from '../engine/keyframes';
+import { useGroupOpen } from './groupOpenStore';
 import { useProjectStore } from './projectStore';
 import { toast, useUI } from './uiStore';
 
@@ -152,11 +191,7 @@ export function resetTransform(id: string): void {
 
 /** 版型（同一個 group）的外框與各格：外框的 transform 就是整組的 transform */
 function groupFrame(p: Project, group: string): { item: VideoItem; track: Track } | null {
-  for (const track of p.tracks)
-    for (const item of track.items)
-      if (item.type !== 'text' && item.group === group && (track.groupRole === 'frame' || !item.cell))
-        return { item: item as VideoItem, track };
-  return null;
+  return frameOfGroup(p.tracks, group);
 }
 
 function groupItems(p: Project, group: string): VideoItem[] {
@@ -165,17 +200,17 @@ function groupItems(p: Project, group: string): VideoItem[] {
     .filter((i): i is VideoItem => i.type !== 'text' && i.group === group);
 }
 
-/** 播放頭在這個物件自己的時間裡的位置（夾在 0～長度之間）；定位（關鍵影格）用 */
+/** 播放頭在這個物件自己的時間裡的位置（夾在 0～長度之間）；定格（關鍵影格）用 */
 function localTime(it: Item): number {
   const t = useUI.getState().player?.time ?? 0;
   return Math.min(Math.max(t - it.start, 0), it.duration);
 }
 
-/** 播放線碰到定位菱形的範圍（CSS px，菱形的一半寬） */
+/** 播放線碰到定格菱形的範圍（CSS px，菱形的一半寬） */
 const KF_HIT_PX = 8;
 
 /**
- * 定位要改的時間（物件自己的秒）：播放線碰到某個定位的菱形 → 那個定位的時間；沒碰到 → 播放線的位置（會新增一個）。
+ * 定格要改的時間（物件自己的秒）：播放線碰到某個定格的菱形 → 那個定格的時間；沒碰到 → 播放線的位置（會新增一個）。
  */
 export function keyframeLocal(it: Item): number {
   const local = localTime(it);
@@ -184,7 +219,7 @@ export function keyframeLocal(it: Item): number {
   return i >= 0 ? it.keyframes![i]!.t : local;
 }
 
-/** 色調分頁的「套用到」：沒有定位＝整段素材；有定位＝預設「這個定位」，使用者可以改成「整段素材」 */
+/** 色調分頁的「套用到」：沒有定格＝整段素材；有定格＝預設「這個定格」，使用者可以改成「整段素材」 */
 export function gradeScopeOf(target: Item): 'item' | 'key' {
   if (!hasKeyframes(target)) return 'item';
   const o = useUI.getState().gradeScope;
@@ -195,11 +230,45 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   const p = store().project;
   const f = p && findItem(p, id);
   const frame = p && f && f.item.type !== 'audio' && f.item.group ? groupFrame(p, f.item.group) : null;
+  // 選到的是版型裡的某個素材（格子、文字、貼圖）：只動它自己（素材層）；選到外框才是整組一起動（版型層）
+  if (p && f && frame && f.item.type !== 'audio' && !isFrameItem(f.item)) {
+    const group = f.item.group!;
+    let stored: Partial<Transform> = patch;
+    if (hasKeyframes(frame.item)) {
+      // 整組有定格：畫面上看到的是「素材自己的值」套上整組的變化；存回去要反過來換算
+      const t = useUI.getState().player?.time ?? 0;
+      const pr = timeResolved(p, t);
+      const rf = groupFrame(pr, group);
+      const rm = findItem(pr, id);
+      if (rf && rm) {
+        const merged = { ...(rm.item.transform as Transform), ...patch };
+        const s = transformAbout(merged, rf.item.transform, frame.item.transform, p.width, p.height);
+        stored = {
+          x: s.x,
+          y: s.y,
+          scale: s.scale,
+          rotation: s.rotation,
+          ...(patch.opacity !== undefined ? { opacity: patch.opacity } : {}),
+        };
+      }
+    }
+    editItem(
+      id,
+      (it) => {
+        if (it.type !== 'text' && it.type !== 'audio' && it.cell) it.cellEdit = true;
+        if (hasKeyframes(it as Item))
+          it.keyframes = upsertKeyframe(it as Item, keyframeLocal(it as Item), stored);
+        else Object.assign(it.transform, stored);
+      },
+      { coalesce },
+    );
+    return;
+  }
   if (p && f && frame && f.item.type !== 'audio') {
     // 版型裡的任何物件：移動、縮放、旋轉都變成「整組」一起動（格子不會單獨跑掉）
     const group = f.item.group!;
     if (hasKeyframes(frame.item)) {
-      // 外框有定位：改的是播放頭這個時間的定位（整組一起動，各格由外框算出來，不用動）
+      // 外框有定格：改的是播放頭這個時間的定格（整組一起動，各格由外框算出來，不用動）
       const t = useUI.getState().player?.time ?? 0;
       const pr = timeResolved(p, t);
       const rf = groupFrame(pr, group);
@@ -230,6 +299,13 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
                 ? { ...T1 }
                 : { ...transformAbout(it.transform as Transform, T0, T1, W, H), opacity: op };
             it.transform.opacity = op;
+            // 素材自己的定格也要跟著整組換算（不然整組一動，它們的定格位置就對不上）
+            if (it.id !== frame.item.id && it.keyframes)
+              it.keyframes = it.keyframes.map((k) => ({
+                ...k,
+                ...transformAbout(k as Transform, T0, T1, W, H),
+                opacity: k.opacity,
+              }));
           }
       },
       { coalesce },
@@ -239,7 +315,7 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   editItem(
     id,
     (it) => {
-      // 有定位：改的是播放頭這個時間的定位（沒有就自動新增一個）；沒有定位：改物件本身
+      // 有定格：改的是播放頭這個時間的定格（沒有就自動新增一個）；沒有定格：改物件本身
       if (hasKeyframes(it as Item))
         it.keyframes = upsertKeyframe(it as Item, keyframeLocal(it as Item), patch);
       else Object.assign(it.transform, patch);
@@ -248,15 +324,14 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   );
 }
 
-/** 定位（關鍵影格）作用的物件：版型裡的任何物件＝外框（整組一起動）；音樂沒有 */
+/** 定格（關鍵影格）作用的物件：選到外框＝整個版型（整組一起動）；選到版型裡的素材＝只有它自己；音樂沒有 */
 export function keyframeTarget(p: Project, id: string | null): Item | null {
   const f = id ? findItem(p, id) : null;
   if (!f || f.item.type === 'audio') return null;
-  if (f.item.group) return groupFrame(p, f.item.group)?.item ?? f.item;
-  return f.item;
+  return f.item; // 外框＝整個版型；版型裡的素材＝它自己（素材層）
 }
 
-/** 播放頭這個時間有沒有定位：沒有就新增（值＝目前畫面上的樣子），有就刪掉。回傳做了什麼 */
+/** 播放頭這個時間有沒有定格：沒有就新增（值＝目前畫面上的樣子），有就刪掉。回傳做了什麼 */
 export function toggleKeyframe(id: string): 'added' | 'removed' | null {
   const p = store().project;
   const target = p && keyframeTarget(p, id);
@@ -265,7 +340,7 @@ export function toggleKeyframe(id: string): 'added' | 'removed' | null {
   const idx = keyframeIndexAt(target, local);
   const t = useUI.getState().player?.time ?? 0;
   if (t < target.start || t > target.start + target.duration + 1e-6) {
-    toast('播放頭要在這個素材的時間範圍裡才能打定位');
+    toast('播放頭要在這個素材的時間範圍裡才能打定格');
     return null;
   }
   editItem(target.id, (it) => {
@@ -278,7 +353,7 @@ export function toggleKeyframe(id: string): 'added' | 'removed' | null {
   return idx >= 0 ? 'removed' : 'added';
 }
 
-/** 刪除播放線碰到的那個定位（沒碰到什麼都不做）。回傳有沒有刪 */
+/** 刪除播放線碰到的那個定格（沒碰到什麼都不做）。回傳有沒有刪 */
 export function deleteNearKeyframe(id: string): boolean {
   const p = store().project;
   const target = p && keyframeTarget(p, id);
@@ -294,14 +369,14 @@ export function deleteNearKeyframe(id: string): boolean {
 }
 
 /**
- * 設定（或取消）播放線碰到的那個定位的小特效（震／彈／晃／跳）。回傳設定到的定位時間（物件自己的秒），沒碰到定位回傳 null。
+ * 設定（或取消）播放線碰到的那個定格的小特效（震／彈／晃／跳）。回傳設定到的定格時間（物件自己的秒），沒碰到定格回傳 null。
  * patch 只改指定的欄位（沒有小特效時用預設值補齊）；null＝取消。
  */
 export function setKeyframePulse(
   id: string,
   patch: Partial<Pulse> | null,
   coalesce?: string,
-  /** 指定第幾個定位（試播中播放線不在定位上時用）；沒給就用播放線碰到的 */
+  /** 指定第幾個定格（試播中播放線不在定格上時用）；沒給就用播放線碰到的 */
   index?: number,
 ): number | null {
   const p = store().project;
@@ -323,7 +398,7 @@ export function setKeyframePulse(
   return at;
 }
 
-/** 清除全部定位：物件停在播放頭這個時間的樣子（畫面不跳）；一步復原 */
+/** 清除全部定格：物件停在播放頭這個時間的樣子（畫面不跳）；一步復原 */
 export function clearKeyframes(id: string): void {
   const p = store().project;
   const target = p && keyframeTarget(p, id);
@@ -340,7 +415,7 @@ export function clearKeyframes(id: string): void {
 }
 
 /**
- * 色調（亮度、飽和度、色溫、色調）。有定位＝改播放頭這個時間的定位；沒有＝改物件本身（版型＝整組每個物件都改）。
+ * 色調（亮度、飽和度、色溫、色調）。有定格＝改播放頭這個時間的定格；沒有＝改物件本身（版型＝整組每個物件都改）。
  */
 export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${id}`): void {
   const p = store().project;
@@ -389,7 +464,7 @@ export function setLook(id: string, lookId: LookRef['id'] | null, amount?: numbe
   if (!p) return;
   const target = keyframeTarget(p, id);
   if (target && hasKeyframes(target) && gradeScopeOf(target) === 'key') {
-    // 有定位：改的是播放線碰到（或這個時間新增）的定位；null＝這個定位明確用原色
+    // 有定格：改的是播放線碰到（或這個時間新增）的定格；null＝這個定格明確用原色
     editItem(
       target.id,
       (it) => {
@@ -419,7 +494,7 @@ export function setLook(id: string, lookId: LookRef['id'] | null, amount?: numbe
   );
 }
 
-/** 調色全部歸零：色調組合、手動調整、定位裡的調色都清掉（定位的位置大小不動）；一步復原 */
+/** 調色全部歸零：色調組合、手動調整、定格裡的調色都清掉（定格的位置大小不動）；一步復原 */
 export function resetGrade(id: string): void {
   const p = store().project;
   if (!p) return;
@@ -438,7 +513,7 @@ export function resetGrade(id: string): void {
   });
 }
 
-/** 清掉定位上的調色（色調組合、手動調整），位置大小不動；從「這個定位」改成「整段素材」時用；一步復原 */
+/** 清掉定格上的調色（色調組合、手動調整），位置大小不動；從「這個定格」改成「整段素材」時用；一步復原 */
 export function clearKeyframeGrade(id: string): void {
   const p = store().project;
   const target = p && keyframeTarget(p, id);
@@ -451,7 +526,7 @@ export function clearKeyframeGrade(id: string): void {
   });
 }
 
-/** 定位上有沒有調色（色調組合或手動調整） */
+/** 定格上有沒有調色（色調組合或手動調整） */
 export function keyframeHasGrade(it: Item): boolean {
   return !!it.keyframes?.some((k) => k.look !== undefined || (k.adjust && Object.keys(k.adjust).length > 0));
 }
@@ -486,6 +561,25 @@ export function addOverlayClips(
   opts: { scale?: number; sticker?: boolean } = {},
 ): string | null {
   if (assets.length === 0) return null;
+  // 貼圖：選到版型時加進版型裡（版型中的任何位置、可以疊在外框上；不是填進格子）
+  const target = opts.sticker ? addTargetGroup() : null;
+  if (target) {
+    store().apply((d) => {
+      for (const asset of assets) {
+        const have = d.assets.find((a) => a.id === asset.id);
+        if (!have) d.assets.push({ ...asset, origin: 'sticker' });
+        else have.origin = 'sticker';
+      }
+    });
+    let first: string | null = null;
+    for (const asset of assets) {
+      const clip = createOverlayClip(asset, t);
+      if (opts.scale) clip.transform.scale = opts.scale;
+      const id = addGroupMember(target, clip);
+      first ??= id;
+    }
+    return first;
+  }
   let firstId: string | null = null;
   store().apply((d) => {
     // 素材和片段在同一步加入（一次復原就整個拿掉）；已經在專案裡的素材不重複加
@@ -550,6 +644,16 @@ export function importToBase(assets: Asset[], clips: VideoItem[]): number {
 /** 背景音樂：放在播放頭這一秒（最長到專案結束），放在音樂軌；同一時間有別的音樂就開新的音樂軌 */
 export function addMusic(assets: Asset[], t: number): string | null {
   if (assets.length === 0) return null;
+  const target = addTargetGroup();
+  if (target) {
+    // 加進版型的音效：時間夾在版型範圍內
+    store().apply((d) => {
+      for (const asset of assets) if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    });
+    let first: string | null = null;
+    for (const asset of assets) first ??= addGroupMember(target, createAudioClip(asset, t));
+    return first;
+  }
   const total = totalDuration(store().project!);
   let firstId: string | null = null;
   store().apply((d) => {
@@ -586,7 +690,8 @@ export function setAllVideoMuted(muted: boolean) {
  * 再點一下格子才會選到那一格（可以個別選片段，但不能單獨縮放）。只有第 1 格預設出聲。一步復原整個拿掉。
  */
 export function addLayout(o: {
-  cells: { asset: Asset; win: Rect }[];
+  /** asset 沒給＝空的格子（之後再匯入素材） */
+  cells: { asset?: Asset; win: Rect }[];
   frame: Asset;
   start: number;
   duration: number;
@@ -607,21 +712,11 @@ export function addLayout(o: {
   const { width: W, height: H } = proj;
   const group = newId('g_');
   let firstId: string | null = null;
+  let frameId = '';
   store().apply((d) => {
     for (const a of [...o.cells.map((c) => c.asset), o.frame])
-      if (!d.assets.some((x) => x.id === a.id)) d.assets.push(a);
-    o.cells.forEach((c, i) => {
-      const dur = c.asset.kind === 'image' ? o.duration : Math.min(c.asset.duration, o.duration);
-      const item = cellItem(c.asset, c.win, W, H, o.start, dur, group);
-      if (i > 0) item.volume = 0; // 只有第 1 格出聲
-      const tr = createTrack('media', d.tracks as Track[]);
-      tr.group = group;
-      tr.groupRole = 'cell';
-      tr.fill = 'black';
-      tr.items.push(item);
-      d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, tr);
-      firstId ??= item.id;
-    });
+      if (a && !d.assets.some((x) => x.id === a.id)) d.assets.push(a);
+    // 外框是一個普通的影像片段：放在最下面（主軌）那段時間有空的影像列，沒有就開新的一列
     const frame = createOverlayClip(o.frame, o.start);
     frame.duration = o.duration;
     frame.fit = 'contain';
@@ -629,6 +724,8 @@ export function addLayout(o: {
     frame.group = group;
     frame.label = o.frameName;
     if (o.frameStyle) frame.frameStyle = o.frameStyle;
+    frame.gapMode = 'hold'; // 格子的空檔停在前一段的最後一格
+    frame.layoutPlay = 'sync';
     if (o.motion) frame.motion = o.motion;
     if (o.inEffect)
       frame.inEffect = { kind: o.inEffect, duration: Math.min(DEFAULT_EFFECT_DURATION, o.duration) };
@@ -641,12 +738,44 @@ export function addLayout(o: {
         w: o.frameVisible.w / W,
         h: o.frameVisible.h / H,
       };
-    const ft = createTrack('media', d.tracks as Track[]);
-    ft.name = o.frameName;
-    ft.group = group;
-    ft.groupRole = 'frame';
-    ft.items.push(frame);
-    d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, ft);
+    frameId = frame.id;
+    const free = (d.tracks as Track[]).find(
+      (t) =>
+        t.kind === 'media' &&
+        !t.groupRole &&
+        !t.locked &&
+        !t.items.some((x) => x.start < o.start + o.duration - 1e-6 && x.start + x.duration > o.start + 1e-6),
+    );
+    let ft: Track;
+    if (free) {
+      ft = d.tracks.find((t) => t.id === free.id) as Track;
+      ft.items.push(frame);
+      ft.items.sort((x, y) => x.start - y.start);
+    } else {
+      ft = createTrack('media', d.tracks as Track[]);
+      ft.items.push(frame);
+      d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, ft);
+    }
+    // 各格：版型自己的格子軌（藏起來），一律貼在外框那一列的正下面
+    o.cells.forEach((c, i) => {
+      const tr = createTrack('media', d.tracks as Track[]);
+      tr.group = group;
+      tr.groupRole = 'cell';
+      tr.fill = '#000000';
+      tr.cell = { x: c.win.x / W, y: c.win.y / H, w: c.win.w / W, h: c.win.h / H };
+      if (c.asset) {
+        const dur = c.asset.kind === 'image' ? o.duration : Math.min(c.asset.duration, o.duration);
+        const item = cellItem(c.asset, c.win, W, H, o.start, dur, group);
+        if (i > 0) item.volume = 0; // 只有第 1 格出聲
+        tr.items.push(item);
+        firstId ??= item.id;
+      }
+      d.tracks.splice(
+        d.tracks.findIndex((t) => t.id === ft.id),
+        0,
+        tr,
+      );
+    });
     // 版型的文字：普通的字卡，但 group 跟版型一樣——跟著整個版型移動、縮放、進出場，一起刪除
     const ink = inkFor(o.frameStyle?.color ?? '#ffffff');
     for (const lt of o.texts ?? []) {
@@ -662,12 +791,239 @@ export function addLayout(o: {
       run.color = ink;
       run.lineHeight = 1.3;
       delete run.shadow;
-      const ki = trackIndexFor(d.tracks as Track[], 'text', ti.start, ti.duration);
-      d.tracks[ki]!.items.push(ti);
+      memberTrackFor(d as { tracks: Track[] }, group, 'text', ti.start, ti.duration).items.push(ti as never);
     }
   });
-  if (firstId) store().select(firstId);
-  return firstId;
+  const pick = firstId ?? frameId;
+  useGroupOpen.getState().openGroup(group); // 新版型在播放軸上預設展開
+  if (pick) store().select(pick);
+  return pick || null;
+}
+
+/**
+ * 版型的成員軌：這個版型裡同種類、這段時間放得下的那一條；沒有就新增一條（放在該種類那一區的最上面）。
+ * 直接改傳進來的草稿。
+ */
+function memberTrackFor(
+  d: { tracks: Track[] },
+  group: string,
+  kind: Track['kind'],
+  start: number,
+  duration: number,
+): Track {
+  const free = d.tracks.find(
+    (t) =>
+      t.group === group &&
+      t.groupRole === 'member' &&
+      t.kind === kind &&
+      !t.locked &&
+      canPlace(t.items, start, duration),
+  );
+  if (free) return free;
+  const tr = createTrack(kind, d.tracks);
+  tr.group = group;
+  tr.groupRole = 'member';
+  // 畫面成員軌（文字、貼圖）：放在這個版型最上面那條成員軌的上面；還沒有就貼在外框那一列的正上方（X9）。音效跟其他音訊放最後
+  let at = insertIndexFor(d.tracks, kind);
+  if (kind !== 'audio') {
+    let last = -1;
+    d.tracks.forEach((t, i) => {
+      if (t.group === group && t.groupRole === 'member' && t.kind !== 'audio') last = i;
+    });
+    const fr = frameOfGroup(d.tracks, group);
+    const fi = fr ? d.tracks.findIndex((t) => t.id === fr.track.id) : -1;
+    if (last >= 0) at = last + 1;
+    else if (fi >= 0) at = fi + 1;
+  }
+  d.tracks.splice(at, 0, tr);
+  return d.tracks[at]!;
+}
+
+/** 版型的時間範圍（外框的開始與結束） */
+function groupSpan(p: Project, group: string): { start: number; end: number } | null {
+  const f = groupFrame(p, group);
+  return f ? { start: f.item.start, end: f.item.start + f.item.duration } : null;
+}
+
+/**
+ * 把文字／貼圖／音效加進版型（放在版型自己的成員軌）：開始時間＝播放線，夾在版型的時間範圍裡，
+ * 長度最多到版型結束。回傳物件 id；找不到版型回傳 null。
+ */
+export function addGroupMember(group: string, item: Item): string | null {
+  const p = store().project;
+  const span = p && groupSpan(p, group);
+  if (!p || !span) return null;
+  const kind = trackKindOf(item, p.assets);
+  const start = Math.min(Math.max(item.start, span.start), Math.max(span.end - 0.2, span.start));
+  item.start = start;
+  item.duration = Math.max(Math.min(item.duration, span.end - start), 0.2);
+  item.group = group;
+  if (item.type !== 'text') (item as VideoItem).member = true;
+  store().apply((d) => {
+    memberTrackFor(d as { tracks: Track[] }, group, kind, item.start, item.duration).items.push(
+      item as never,
+    );
+  });
+  store().select(item.id);
+  return item.id;
+}
+
+/** 版型成員的時間夾在版型範圍裡（拖移、修剪用）：回傳夾好的 start、duration */
+export function clampToGroup(
+  p: Project,
+  item: Item,
+  start: number,
+  duration: number,
+): { start: number; duration: number } {
+  const span = item.group && !isFrameItem(item) ? groupSpan(p, item.group) : null;
+  if (!span) return { start, duration };
+  const d = Math.min(duration, span.end - span.start);
+  return { start: Math.min(Math.max(start, span.start), span.end - d), duration: d };
+}
+
+/**
+ * 把素材放進版型的某一格（空格或換掉原本的素材）。素材比版型長只用前面（版型長度不變）。
+ * 名稱、音量保留。回傳這一格的物件 id。
+ */
+export function importIntoCell(trackId: string, asset: Asset): string | null {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  const frame = p && track?.group ? groupFrame(p, track.group) : null;
+  const box = track?.cell ?? (track && cellMain(track)?.cell);
+  if (!p || !track || !frame || !box) return null;
+  const group = track.group!;
+  const old = cellMain(track);
+  let id = '';
+  store().apply((d) => {
+    if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    const tr = d.tracks.find((t) => t.id === trackId)!;
+    const L = frame.item.duration;
+    const rect = cellRect(box, d.width, d.height);
+    const dur = asset.kind === 'image' ? L : Math.min(asset.duration, L);
+    const fresh = cellItem(asset, rect, d.width, d.height, frame.item.start, dur, group);
+    if (old) {
+      fresh.volume = old.volume;
+      if (old.label) fresh.label = old.label;
+      fresh.id = old.id;
+    } else if (
+      d.tracks.filter((t) => t.group === group && t.groupRole === 'cell').some((t) => t.items.length > 0)
+    )
+      fresh.volume = 0; // 只有第一個放進去的出聲
+    id = fresh.id;
+    tr.cell = { ...box };
+    tr.items = [fresh] as never;
+  });
+  // 同時播放的影片太多（手機解不動）：剛好超過的那一次提醒
+  const videos = store()
+    .project!.tracks.filter((t) => t.group === group && t.groupRole === 'cell')
+    .filter((t) => cellMain(t)?.type === 'video').length;
+  if (asset.kind === 'video' && videos === MAX_CELL_VIDEOS + 1)
+    toast(`同時播放超過 ${MAX_CELL_VIDEOS} 支影片，手機可能會卡，建議多放照片`, 9000);
+  return id || null;
+}
+
+/** 依序把素材放進版型還空著的格子（素材比空格少就留空，比空格多就只用前面的） */
+export function fillEmptyCells(group: string, assets: Asset[]): number {
+  const p = store().project;
+  if (!p) return 0;
+  const empty = p.tracks.filter((t) => t.group === group && t.groupRole === 'cell' && !cellMain(t));
+  let n = 0;
+  empty.forEach((t, i) => {
+    const a = assets[i];
+    if (a && importIntoCell(t.id, a)) n++;
+  });
+  return n;
+}
+
+/**
+ * 版型改形狀（自訂格數的列欄、版型的長寬）：新的外框圖（已經重畫好）換掉外框素材，格子依新的排版換位置，
+ * 多出來的格子新增（空的）、少掉的格子拿掉（呼叫端要先確認）；格子裡的素材重新裁成填滿新的格子，版型裡的文字貼圖照比例換位置。
+ * 一步復原。
+ */
+export function applyLayoutShape(
+  group: string,
+  asset: Asset,
+  style: NonNullable<VideoItem['frameStyle']>,
+  opts?: Opts,
+): void {
+  const p = store().project;
+  const fr = p && groupFrame(p, group);
+  if (!p || !fr) return;
+  const W = p.width;
+  const H = p.height;
+  const oldBox = fr.item.frameStyle?.box ?? { w: 1, h: 1 };
+  const newBox = style.box ?? { w: 1, h: 1 };
+  const b = buildIn(defOf(style), W, H, style.box, style.line);
+  const rs = b.panels.length ? b.panels : b.windows;
+  const l = Math.min(...rs.map((r) => r.x));
+  const tp = Math.min(...rs.map((r) => r.y));
+  const visible = {
+    x: l / W,
+    y: tp / H,
+    w: (Math.max(...rs.map((r) => r.x + r.w)) - l) / W,
+    h: (Math.max(...rs.map((r) => r.y + r.h)) - tp) / H,
+  };
+  const frac = (r: Rect) => ({ x: r.x / W, y: r.y / H, w: r.w / W, h: r.h / H });
+  store().apply((d) => {
+    if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    const frameTrack = d.tracks.find((t) => t.id === fr.track.id)!;
+    const frameItem = frameTrack.items.find((x) => x.id === fr.item.id) as VideoItem;
+    const cells = d.tracks.filter((t) => t.group === group && t.groupRole === 'cell');
+    b.windows.forEach((win, i) => {
+      let tr = cells[i];
+      if (!tr) {
+        tr = createTrack('media', d.tracks as Track[]);
+        tr.group = group;
+        tr.groupRole = 'cell';
+        tr.fill = '#000000';
+        d.tracks.splice(
+          d.tracks.findIndex((t) => t.id === frameTrack.id),
+          0,
+          tr,
+        );
+        tr = d.tracks.find((t) => t.id === tr!.id)!;
+        cells.push(tr);
+      }
+      tr.cell = frac(win);
+      for (const it of tr.items) {
+        if (it.type === 'text' || it.type === 'audio' || !it.cell) continue;
+        const a = d.assets.find((x) => x.id === it.assetId);
+        if (!a) continue;
+        // 自己裁切過（筆刷、自由形狀）的保留裁切；其他的重新裁成填滿新的格子
+        if (!it.cropEdit && !it.mask && !it.maskBitmap) {
+          const crop = coverCrop(a as Asset, win);
+          if (crop) it.crop = crop;
+          else delete it.crop;
+        }
+        const base = cellTransform(a as Asset, it.crop, win, W, H);
+        it.transform = {
+          ...composeWith(base, frameItem.transform as Transform, W, H),
+          opacity: it.transform.opacity,
+        };
+        it.cell = frac(win);
+        delete it.cellEdit;
+      }
+    });
+    // 少掉的格子：拿掉（連素材）
+    d.tracks = d.tracks.filter(
+      (t) => !(t.group === group && t.groupRole === 'cell' && cells.indexOf(t) >= b.windows.length),
+    ) as never;
+    // 版型的大小變了：版型裡的文字、貼圖照比例換位置（版型在畫面正中央排版）
+    if (Math.abs(newBox.w - oldBox.w) > 1e-6 || Math.abs(newBox.h - oldBox.h) > 1e-6) {
+      const kx = newBox.w / oldBox.w;
+      const ky = newBox.h / oldBox.h;
+      for (const t of d.tracks)
+        for (const it of t.items) {
+          if (it.group !== group || it.id === frameItem.id || it.type === 'audio') continue;
+          if (it.type !== 'text' && it.cell) continue;
+          it.transform.x = 0.5 + (it.transform.x - 0.5) * kx;
+          it.transform.y = 0.5 + (it.transform.y - 0.5) * ky;
+        }
+    }
+    frameItem.assetId = asset.id;
+    frameItem.frameStyle = { ...style };
+    frameItem.visible = visible;
+  }, opts);
 }
 
 /**
@@ -711,8 +1067,7 @@ export function moveGroupTo(group: string, start: number) {
   const shift = Math.max(delta, -minStart);
   if (Math.abs(shift) < 1e-9) return;
   store().apply((d) => {
-    for (const track of d.tracks)
-      for (const it of track.items) if (it.type !== 'audio' && it.group === group) it.start += shift;
+    for (const track of d.tracks) for (const it of track.items) if (it.group === group) it.start += shift;
   });
 }
 
@@ -730,7 +1085,7 @@ export function setGroupDuration(group: string, duration: number, opts?: Opts) {
     for (const track of d.tracks) {
       const keep: Item[] = [];
       for (const it of track.items) {
-        if (it.type === 'audio' || it.group !== group) {
+        if (it.group !== group) {
           keep.push(it as Item);
           continue;
         }
@@ -754,8 +1109,10 @@ export function removeGroup(group: string) {
     (d) => {
       for (const t of d.tracks) t.items = t.items.filter((x) => (x as VideoItem).group !== group) as never;
       // 空掉的軌道拿掉；至少留一條影像軌
-      const keep = d.tracks.find((t) => t.kind === 'media')?.id;
-      d.tracks = d.tracks.filter((t) => t.id === keep || t.items.length > 0) as never;
+      const keep = d.tracks.find((t) => t.kind === 'media' && !t.groupRole)?.id;
+      d.tracks = d.tracks.filter(
+        (t) => t.id === keep || t.items.length > 0 || (t.groupRole === 'cell' && t.group !== group),
+      ) as never;
     },
     { select: null },
   );
@@ -775,6 +1132,25 @@ function withDuration(
   };
 }
 
+/** 換轉場效果時，原本設好的「轉場聲音」要留著 */
+function keepAudio(
+  tr: { audio?: unknown; audioCut?: number; audioOutA?: number; audioInB?: number } | undefined,
+) {
+  if (!tr) return {};
+  const { audio, audioCut, audioOutA, audioInB } = tr as {
+    audio?: TransitionAudioMode;
+    audioCut?: number;
+    audioOutA?: number;
+    audioInB?: number;
+  };
+  return {
+    ...(audio ? { audio } : {}),
+    ...(audioCut !== undefined ? { audioCut } : {}),
+    ...(audioOutA !== undefined ? { audioOutA } : {}),
+    ...(audioInB !== undefined ? { audioInB } : {}),
+  };
+}
+
 /** 設定（或取消）一個片段的進場轉場；duration 沒給就沿用原本的 */
 export function setTransition(id: string, kind: TransitionKind | null, duration?: number, opts?: Opts): void {
   editItem(
@@ -784,6 +1160,7 @@ export function setTransition(id: string, kind: TransitionKind | null, duration?
       if (!kind) delete it.transitionIn;
       else
         it.transitionIn = {
+          ...keepAudio(it.transitionIn),
           kind,
           ...withDuration(
             it.transitionIn,
@@ -815,6 +1192,29 @@ export function setTransitionSplit(id: string, before: number, after: number, op
     (it) => {
       if (it.type === 'audio' || !it.transitionIn) return;
       it.transitionIn = { ...it.transitionIn, before, after, duration: before + after };
+    },
+    opts,
+  );
+}
+
+/** 轉場時的聲音：模式（交叉淡化／直接切換／自訂起迄／只要前段／只要後段／靜音）與時間點（相對接縫的秒數）。一步復原 */
+export function setTransitionAudio(
+  id: string,
+  patch: {
+    audio?: TransitionAudioMode;
+    audioCut?: number;
+    audioOutA?: number;
+    audioInB?: number;
+  },
+  opts?: Opts,
+): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type === 'audio' || !it.transitionIn) return;
+      Object.assign(it.transitionIn, patch);
+      if (it.transitionIn.audio === 'cross') it.transitionIn.audio = undefined; // 預設不用寫
+      if (it.transitionIn.audio === undefined) delete it.transitionIn.audio;
     },
     opts,
   );
@@ -854,6 +1254,7 @@ export function setTransitionAll(trackId: string, kind: TransitionKind | null, d
       if (!kind) delete it.transitionIn;
       else
         it.transitionIn = {
+          ...keepAudio(it.transitionIn),
           kind,
           ...withDuration(
             it.transitionIn,
@@ -878,15 +1279,373 @@ export function setGroupMotion(group: string, motion: 'drift' | 'slide' | undefi
 }
 
 /** 版型某一格的素材放完（或這段是空位）時顯示的色塊：反黑或反白 */
-export function setCellFill(trackId: string, fill: 'black' | 'white') {
+export function setCellFill(trackId: string, fill: string) {
   store().apply((d) => {
     const t = d.tracks.find((x) => x.id === trackId);
     if (t) t.fill = fill;
   });
 }
 
+/** 「這一格」視窗的設定（按「套用」一次寫入，一步復原） */
+export type CellDraft = {
+  name: string;
+  assetId: string;
+  mode: CellMode;
+  /** 空白畫面放在素材前面或後面 */
+  pos: 'before' | 'after';
+  color: string;
+  /** 空白畫面上的文字（空白＝沒有） */
+  text: string;
+};
+
+/** 這一格的主要素材（版型的格子軌上第一個影片／照片物件） */
+export function cellMain(track: Track): VideoItem | undefined {
+  return cellItems(track)[0];
+}
+
+/** 這一格素材從入點算起還能用幾秒（照片＝不限） */
+export function cellAvailable(item: VideoItem, asset: Asset | undefined): number {
+  if (item.type === 'image' || !asset) return Infinity;
+  return Math.max(asset.duration - item.trimIn, 0.2);
+}
+
+export function applyCell(trackId: string, draft: CellDraft): boolean {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  const first = track && cellMain(track);
+  const frame = p && track?.group ? groupFrame(p, track.group) : null;
+  if (!p || !track || !first || !frame || !first.cell) return false;
+  const group = track.group!;
+  const L = frame.item.duration;
+  // 一格只有一個素材、而且空檔不是「停格」：照舊用「素材比這一格短／長」整理時間；否則只改名稱（和空檔顏色），不動時間
+  const legacy = cellItems(track).length === 1 && frame.item.gapMode !== 'hold';
+  store().apply((d) => {
+    const tr = d.tracks.find((t) => t.id === trackId)!;
+    const idx = tr.items.findIndex((x) => x.id === first.id);
+    let it = tr.items[idx] as VideoItem;
+    const asset = d.assets.find((a) => a.id === draft.assetId);
+    if (asset && asset.id !== it.assetId) {
+      // 換素材：照這一格的位置重新裁成填滿，名稱、音量保留
+      const rect = cellRect(first.cell!, d.width, d.height);
+      const fresh = cellItem(
+        asset as Asset,
+        rect,
+        d.width,
+        d.height,
+        legacy ? frame.item.start : it.start,
+        legacy ? L : it.duration,
+        group,
+      );
+      const next = { ...fresh, id: it.id, volume: it.volume } as VideoItem;
+      if (it.label) next.label = it.label;
+      tr.items[idx] = next;
+      it = tr.items[idx] as VideoItem;
+    }
+    const name = draft.name.trim();
+    if (name) it.label = name;
+    else delete it.label;
+    if (!legacy) {
+      if (frame.item.gapMode === 'fill') tr.fill = draft.color;
+      return;
+    }
+    // 時間安排（照片沒有「太短」的問題，永遠整段）
+    const a = d.assets.find((x) => x.id === it.assetId);
+    const S = cellAvailable(it, a as Asset | undefined);
+    const plan = Number.isFinite(S)
+      ? planCell(S, L, draft.mode, draft.pos)
+      : { speed: 1, duration: L, offset: 0, blank: null };
+    it.speed = plan.speed;
+    it.duration = Math.max(plan.duration, 0.2);
+    it.start = frame.item.start + plan.offset;
+    if (draft.mode === 'blank' || plan.blank || frame.item.gapMode === 'fill') tr.fill = draft.color;
+    // 空白畫面上的文字
+    let ti = -1;
+    let li = -1;
+    d.tracks.forEach((t, k) =>
+      t.items.forEach((x, m) => {
+        if (x.type === 'text' && x.cellFor === trackId) {
+          ti = k;
+          li = m;
+        }
+      }),
+    );
+    const wantText = draft.mode === 'blank' && plan.blank && draft.text.trim();
+    if (!wantText) {
+      if (ti >= 0) d.tracks[ti]!.items.splice(li, 1);
+      return;
+    }
+    const [b0, b1] = plan.blank!;
+    let txt = ti >= 0 ? (d.tracks[ti]!.items[li] as TextItem) : null;
+    if (!txt) {
+      txt = createTextItem(frame.item.start + b0, draft.text.trim());
+      txt.group = group;
+      txt.cellFor = trackId;
+      txt.transform = {
+        x: first.cell!.x + first.cell!.w / 2,
+        y: first.cell!.y + first.cell!.h / 2,
+        scale: 1,
+        rotation: 0,
+        opacity: 1,
+      };
+      const run = txt.card.runs[0]!;
+      run.size = 72;
+      run.weight = 'bold';
+      delete run.shadow;
+      const k = trackIndexFor(d.tracks as Track[], 'text', frame.item.start + b0, b1 - b0);
+      d.tracks[k]!.items.push(txt);
+    }
+    txt.start = frame.item.start + b0;
+    txt.duration = Math.max(b1 - b0, 0.2);
+    txt.card.runs[0]!.text = draft.text.trim();
+    txt.card.runs[0]!.color = inkFor(draft.color);
+  });
+  return true;
+}
+
+/** 這一格換入點（秒，素材時間）；長度不變 */
+/** 版型的空檔（格子沒素材可播的時候）：停格＝停在前一段最後一格、色塊＝格子的 fill 色、透明＝不畫。一步復原 */
+export function setGapMode(group: string, mode: 'hold' | 'fill' | 'none') {
+  const p = store().project;
+  const frame = p && groupFrame(p, group);
+  if (!p || !frame) return;
+  editItem(frame.item.id, (it) => {
+    if (it.type !== 'text' && it.type !== 'audio') it.gapMode = mode;
+  });
+}
+
+/** 同步／依序：把各格的素材排好（同步＝都從版型開頭；依序＝一格接一格），外框長度跟著算。一步復原 */
+export function arrangeGroup(group: string, mode: 'sync' | 'seq') {
+  const p = store().project;
+  if (!p || !groupFrame(p, group)) return;
+  const next = arrangeCells(p.tracks as Track[], group, mode);
+  store().apply((d) => void (d.tracks = next as never));
+}
+
+/**
+ * 把素材（影片、照片、色塊）加進版型的某一格，接在這一格最後一個素材後面（還沒有素材就從版型開頭）。
+ * 依序時後面各格的素材往後推、外框變長；同步時超出版型結尾就把外框拉長。回傳新物件的 id。一步復原
+ */
+export function addToCell(trackId: string, asset: Asset): string | null {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  const frame = p && track?.group ? groupFrame(p, track.group) : null;
+  const box = track?.cell ?? (track && cellMain(track)?.cell);
+  if (!p || !track || !frame || !box) return null;
+  const group = track.group!;
+  const seq = frame.item.layoutPlay === 'seq';
+  const dur = cellDefaultSeconds(asset);
+  const existing = cellItems(track);
+  const start = existing.length ? Math.max(...existing.map((x) => x.start + x.duration)) : frame.item.start;
+  const cells = cellTracksOf(p.tracks, group);
+  let id = '';
+  store().apply((d) => {
+    if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    let tracks = d.tracks as Track[];
+    if (seq)
+      tracks = rippleAfter(
+        tracks,
+        group,
+        cells.findIndex((c) => c.id === trackId),
+        start,
+        dur,
+      );
+    const item = cellItem(asset, cellRect(box, d.width, d.height), d.width, d.height, start, dur, group);
+    // 依序時各自單獨播，都有聲音；同步時只有第一個放進去的出聲
+    const others = tracks.some((t) => t.group === group && t.groupRole === 'cell' && t.items.length > 0);
+    if (!seq && others) item.volume = 0;
+    id = item.id;
+    tracks = tracks.map((t) =>
+      t.id === trackId ? ({ ...t, cell: { ...box }, items: [...t.items, item] } as Track) : t,
+    );
+    const fr = frameOfGroup(tracks, group)!;
+    const needEnd = start + dur;
+    if (seq) tracks = fitFrameToCells(tracks, group);
+    else if (needEnd > fr.item.start + fr.item.duration + 1e-9) {
+      const nd = needEnd - fr.item.start;
+      tracks = tracks.map((t) =>
+        t.id === fr.track.id
+          ? ({ ...t, items: t.items.map((x) => (x.id === fr.item.id ? { ...x, duration: nd } : x)) } as Track)
+          : t,
+      );
+    }
+    d.tracks = tracks as never;
+  });
+  return id || null;
+}
+
+/** 把一個格子素材移到同一版型的另一格（時間不變，畫面照新格子重新填滿，色塊上的文字跟著）。一步復原 */
+export function moveToCell(itemId: string, cellTrackId: string): boolean {
+  const p = store().project;
+  if (!p) return false;
+  const next = moveToCellTracks(p.tracks as Track[], p.assets, p.width, p.height, itemId, cellTrackId);
+  if (!next) return false;
+  store().apply((d) => void (d.tracks = next as never));
+  return true;
+}
+
+/**
+ * 拖時間軸上格子素材的尾端（snapshot＝開始拖之前的專案）。同步時跟一般素材一樣（不能壓到後面的素材）；
+ * 依序時不受後面素材限制：後面的素材、後面各格一起往後（前）推，外框長度跟著。超出版型結尾會把外框拉長。
+ * 連續拖用同一個 coalesce 合併成一步復原。
+ */
+export function trimCellEnd(snapshot: Project, itemId: string, newDuration: number, opts?: Opts): boolean {
+  const f = findItem(snapshot, itemId);
+  const it = f?.item;
+  if (!f || !it || it.type === 'text' || it.type === 'audio' || !it.cell || !it.group) return false;
+  const group = it.group;
+  const fr = frameOfGroup(snapshot.tracks, group);
+  if (!fr || f.track.groupRole !== 'cell') return false;
+  const asset = snapshot.assets.find((a) => a.id === it.assetId);
+  const seq = fr.item.layoutPlay === 'seq';
+  let tracks = snapshot.tracks as Track[];
+  if (seq) {
+    const d2 = Math.min(Math.max(newDuration, 0.2), maxDuration(it, asset));
+    const delta = d2 - it.duration;
+    const idx = cellTracksOf(tracks, group).findIndex((c) => c.id === f.track.id);
+    tracks = tracks.map((t) =>
+      t.id === f.track.id
+        ? ({ ...t, items: t.items.map((x) => (x.id === itemId ? { ...x, duration: d2 } : x)) } as Track)
+        : t,
+    );
+    tracks = rippleAfter(tracks, group, idx, it.start + it.duration, delta);
+  } else {
+    const items = trimEndFree(f.track.items as Item[], itemId, newDuration, asset);
+    tracks = tracks.map((t) => (t.id === f.track.id ? ({ ...t, items } as Track) : t));
+    const cur = items.find((x) => x.id === itemId)!;
+    const fr2 = frameOfGroup(tracks, group)!;
+    const need = cur.start + cur.duration - fr2.item.start;
+    if (need > fr2.item.duration + 1e-9)
+      tracks = tracks.map((t) =>
+        t.id === fr2.track.id
+          ? ({
+              ...t,
+              items: t.items.map((x) => (x.id === fr2.item.id ? { ...x, duration: need } : x)),
+            } as Track)
+          : t,
+      );
+  }
+  store().apply((d) => void (d.tracks = tracks as never), opts);
+  return true;
+}
+
+/** 刪掉一個格子素材（上面的色塊文字一起刪）；依序時後面的素材、各格往前補，外框縮短 */
+export function removeCellItem(id: string): boolean {
+  const p = store().project;
+  const f = p && findItem(p, id);
+  const it = f?.item;
+  if (!p || !f || !it || it.type === 'text' || it.type === 'audio' || !it.cell || !it.group) return false;
+  const group = it.group;
+  const fr = frameOfGroup(p.tracks, group);
+  const seq = fr?.item.layoutPlay === 'seq';
+  const idx = cellTracksOf(p.tracks, group).findIndex((c) => c.id === f.track.id);
+  const gone = new Set([id, ...textsOnItem(p.tracks as Track[], id).map((x) => x.id)]);
+  store().apply(
+    (d) => {
+      let tracks = (d.tracks as Track[]).map((t) =>
+        t.items.some((x) => gone.has(x.id))
+          ? ({ ...t, items: t.items.filter((x) => !gone.has(x.id)) } as Track)
+          : t,
+      );
+      if (seq && idx >= 0) tracks = rippleAfter(tracks, group, idx, it.start + it.duration, -it.duration);
+      d.tracks = tracks as never;
+    },
+    { select: null },
+  );
+  return true;
+}
+
+/** 色塊素材換顏色（asset＝那個顏色的色塊素材）；不是色塊素材不處理。一步復原 */
+export function setColorItem(itemId: string, asset: Asset): boolean {
+  const p = store().project;
+  const f = p && findItem(p, itemId);
+  if (!p || !f || f.item.type === 'text' || f.item.type === 'audio' || !f.item.cell) return false;
+  store().apply((d) => {
+    if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    const it = d.tracks[f.trackIndex]!.items.find((x) => x.id === itemId);
+    if (it && it.type !== 'text' && it.type !== 'audio') it.assetId = asset.id;
+  });
+  return true;
+}
+
+/**
+ * 色塊（或格子素材）上的文字：空白＝拿掉；有字就建一個文字（時間、長度跟那一段一樣、在那一格中間），
+ * 之後色塊移動、改長度、刪除時它跟著（TextItem.onItem）。一步復原
+ */
+export function setCellCaption(itemId: string, text: string): boolean {
+  const p = store().project;
+  const f = p && findItem(p, itemId);
+  const it = f?.item;
+  if (!p || !f || !it || it.type === 'text' || it.type === 'audio' || !it.cell || !it.group) return false;
+  const group = it.group;
+  const t = text.trim();
+  const old = textsOnItem(p.tracks as Track[], itemId)[0];
+  if (!t && !old) return true;
+  store().apply((d) => {
+    if (!t) {
+      for (const tr of d.tracks)
+        tr.items = tr.items.filter((x) => !(x.type === 'text' && x.onItem === itemId)) as never;
+      return;
+    }
+    if (old) {
+      for (const tr of d.tracks)
+        for (const x of tr.items)
+          if (x.type === 'text' && x.onItem === itemId) {
+            const run = x.card.runs[0];
+            if (run) run.text = t;
+            delete x.placeholder;
+          }
+      return;
+    }
+    const tx = createTextItem(it.start, t);
+    tx.duration = it.duration;
+    tx.group = group;
+    tx.onItem = itemId;
+    tx.transform = {
+      x: it.cell!.x + it.cell!.w / 2,
+      y: it.cell!.y + it.cell!.h / 2,
+      scale: 1,
+      rotation: 0,
+      opacity: 1,
+    };
+    memberTrackFor(d as { tracks: Track[] }, group, 'text', tx.start, tx.duration).items.push(tx as never);
+  });
+  return true;
+}
+
+export function setCellTrim(itemId: string, trimIn: number) {
+  const p = store().project;
+  const f = p && findItem(p, itemId);
+  if (!f || f.item.type === 'text' || f.item.type === 'audio') return;
+  const a = p.assets.find((x) => x.id === (f.item as VideoItem).assetId);
+  const span = f.item.duration * f.item.speed;
+  const max = a ? Math.max(a.duration - span, 0) : 0;
+  editItem(itemId, (it) => {
+    if (it.type !== 'text' && it.type !== 'audio') it.trimIn = Math.min(Math.max(trimIn, 0), max);
+  });
+}
+
+/**
+ * 現在選到的東西屬於哪個版型（外框、格子、版型裡的文字貼圖都算），而且使用者沒有在分頁裡關掉「加到版型裡」：
+ * 新增文字、貼圖、音效就加進這個版型（成員軌、時間夾在版型範圍內）。沒有就是 null（照一般流程）。
+ */
+export function addTargetGroup(): string | null {
+  if (useUI.getState().addToGroupOff) return null;
+  const p = store().project;
+  const id = store().selectedId;
+  const f = p && id ? findItem(p, id) : null;
+  const g = f?.item.group;
+  return g && p && groupFrame(p, g) ? g : null;
+}
+
 export function addText(t: number, shape = false): string {
   const item = shape ? createShapeItem(t) : createTextItem(t);
+  const target = addTargetGroup();
+  if (target) {
+    // 加進版型：樣式一樣沿用上一次的
+    const last = store().project?.lastTextStyle;
+    if (!shape && last) Object.assign(item.card.runs[0]!, JSON.parse(JSON.stringify(last)) as TextStyle);
+    return addGroupMember(target, item) ?? item.id;
+  }
   store().apply((d) => {
     // 新文字沿用上一次的樣式（字體、大小、顏色、透明度、描邊、陰影…），內容與位置照預設
     if (!shape && d.lastTextStyle)
@@ -913,6 +1672,9 @@ export function editText(id: string, recipe: (card: Draft<TextItem['card']>) => 
       if (it.type === 'text') {
         recipe(it.card);
         const run = it.card.runs[0];
+        // 打了字就不再是提示狀態；全部刪光（不是獨立圖形）又變回提示
+        if (run && run.text !== '') delete it.placeholder;
+        else if (run && !it.card.box) it.placeholder = true;
         // 獨立圖形（沒有文字）的樣式不算
         if (run && run.text !== '') d.lastTextStyle = pickTextStyle(run as TextRun);
       }
@@ -950,10 +1712,13 @@ export function removeAnyItem(id: string): boolean {
   const f = p && findItem(p, id);
   if (!p || !f) return false;
   // 版型的外框＝整個版型：刪掉就是整個拿掉
-  if (f.track.groupRole === 'frame' && f.item.type !== 'text' && f.item.group) {
-    removeGroup(f.item.group);
+  if (isFrameItem(f.item)) {
+    removeGroup(f.item.group!);
     return true;
   }
+  // 格子素材：色塊上的文字一起刪；依序時後面的往前補
+  const cur = f.item as Item;
+  if (cur.type !== 'text' && cur.type !== 'audio' && cur.cell && cur.group && removeCellItem(id)) return true;
   store().apply(
     (d) => {
       const tr = d.tracks[f.trackIndex]!;
@@ -994,6 +1759,10 @@ export function splitAny(id: string, t: number): string | null {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f) return null;
+  if (isFrameItem(f.item)) {
+    toast('版型不能分割，可以拖尾端改長度');
+    return null;
+  }
   const out = splitFree(f.track.items, id, t);
   if (!out) return null;
   const right = out[out.findIndex((x) => x.id === id) + 1]!;
@@ -1037,6 +1806,102 @@ export function shiftTrackLayer(trackId: string, dir: -1 | 1) {
   });
 }
 
+/**
+ * 版型裡的文字／貼圖軌道往上（dir=1）或往下（-1）一層：可以跟同一個版型的其他成員軌（含不同種類，
+ * 版型裡的文字可以在貼圖下面）換位置，不會跑到版型外面的圖層上。已經在最上面／最下面回傳 false。一步復原。
+ */
+export function shiftMemberLayer(trackId: string, dir: -1 | 1): boolean {
+  const p = store().project;
+  const i = p ? p.tracks.findIndex((t) => t.id === trackId) : -1;
+  const t = p?.tracks[i];
+  if (!p || !t || t.groupRole !== 'member' || !t.group) return false;
+  const o = p.tracks[i + dir];
+  if (!o || o.group !== t.group || o.groupRole !== 'member' || (o.kind === 'audio') !== (t.kind === 'audio'))
+    return false;
+  store().apply((d) => {
+    const a = d.tracks[i]!;
+    d.tracks[i] = d.tracks[i + dir]!;
+    d.tracks[i + dir] = a;
+  });
+  return true;
+}
+
+/** 播放軸用：同類換一層（往上／往下一條同種類的軌道，跨過中間別種類的軌道）。沒有同類鄰居回傳 false。一步復原 */
+export function shiftTrackInKind(trackId: string, dir: -1 | 1): boolean {
+  const p = store().project;
+  if (!p) return false;
+  const next = moveTrackInKind(p.tracks as Track[], trackId, dir);
+  if (next === p.tracks) return false;
+  store().apply((d) => void (d.tracks = next as never));
+  return true;
+}
+
+/** 播放軸拖軌道圖示：搬到同種類裡的第 toKindIndex 條（0＝同類最下面）。一步復原 */
+export function moveTrackInKindTo(trackId: string, toKindIndex: number) {
+  store().apply((d) => {
+    d.tracks = reorderInKind(d.tracks as Track[], trackId, toKindIndex) as never;
+  });
+}
+
+/**
+ * 圖層分頁用：把軌道搬到另一條軌道的上面（above=true）或下面，可以跨類別（文字夾在兩個影像中間）。
+ * 一般軌整塊搬（版型的格子、成員跟著外框）；版型成員只能在同一個版型的成員之間。
+ * 搬不動回傳 false。一步復原
+ */
+export function moveTrackPast(trackId: string, otherId: string, above: boolean): boolean {
+  const p = store().project;
+  if (!p) return false;
+  const tracks = p.tracks as Track[];
+  const from = tracks.findIndex((t) => t.id === trackId);
+  const to = tracks.findIndex((t) => t.id === otherId);
+  const t = tracks[from];
+  const o = tracks[to];
+  if (!t || !o || from === to) return false;
+  if (t.groupRole === 'member') {
+    if (o.groupRole !== 'member' || o.group !== t.group || (o.kind === 'audio') !== (t.kind === 'audio'))
+      return false;
+    const next = tracks.slice();
+    next.splice(from, 1);
+    next.splice(next.findIndex((x) => x.id === otherId) + (above ? 1 : 0), 0, t);
+    store().apply((d) => void (d.tracks = next as never));
+    return true;
+  }
+  if (t.groupRole) return false; // 版型的格子不在這裡換
+  const units = trackUnits(tracks);
+  const k = units.findIndex((u) => u.lo <= from && from <= u.hi);
+  // 對方如果是版型的成員／格子：以它所屬的那一整塊為準
+  const j = units.findIndex((u) => u.lo <= to && to <= u.hi);
+  if (k < 0 || j < 0 || k === j || (units[k]!.kind === 'audio') !== (units[j]!.kind === 'audio'))
+    return false;
+  const order = units.map((_, n) => n).filter((n) => n !== k);
+  order.splice(order.indexOf(j) + (above ? 1 : 0), 0, k);
+  if (order.every((v, n) => v === n)) return false;
+  const next = order.flatMap((n) => tracks.slice(units[n]!.lo, units[n]!.hi + 1));
+  store().apply((d) => void (d.tracks = next as never));
+  return true;
+}
+
+/**
+ * 圖層分頁「移到最上層／最下層」：一般軌搬到所有畫面圖層的最上面／最下面（整塊）；
+ * 版型成員搬到那個版型成員的最上面／最下面。已經在那裡回傳 false。一步復原
+ */
+export function moveTrackToEdge(trackId: string, edge: 'top' | 'bottom'): boolean {
+  const p = store().project;
+  const t = p?.tracks.find((x) => x.id === trackId);
+  if (!p || !t || t.groupRole === 'cell') return false;
+  if (t.groupRole === 'member') {
+    const mates = p.tracks.filter(
+      (x) => x.group === t.group && x.groupRole === 'member' && (x.kind === 'audio') === (t.kind === 'audio'),
+    );
+    const end = edge === 'top' ? mates[mates.length - 1] : mates[0];
+    return !!end && end.id !== trackId && moveTrackPast(trackId, end.id, edge === 'top');
+  }
+  const next = reorderTrack(p.tracks as Track[], trackId, edge === 'top' ? Number.MAX_SAFE_INTEGER : 0);
+  if (next === p.tracks) return false;
+  store().apply((d) => void (d.tracks = next as never));
+  return true;
+}
+
 /** 直接把軌道搬到新的圖層位置（拖時間軸左邊的軌道圖示）；一步復原 */
 export function moveTrackTo(trackId: string, toIndex: number) {
   store().apply((d) => {
@@ -1075,7 +1940,11 @@ export function mergeTracksMulti(ids: string[]): { merged: number; kept: number 
 
 export function removeTrack(trackId: string) {
   const t0 = store().project?.tracks.find((t) => t.id === trackId);
-  if (t0?.group) return removeGroup(t0.group); // 版型的軌道：整個版型一起拿掉
+  if (t0?.group) return removeGroup(t0.group); // 版型的格子軌：整個版型一起拿掉
+  // 軌道上有版型的外框：那些版型一起拿掉（格子軌留著會變孤兒）
+  const frameGroups = [...new Set((t0?.items ?? []).filter(isFrameItem).map((x) => x.group!))];
+  for (const g of frameGroups) removeGroup(g);
+  if (frameGroups.length && !store().project?.tracks.some((t) => t.id === trackId)) return;
   store().apply(
     (d) => {
       const i = d.tracks.findIndex((t) => t.id === trackId);
@@ -1094,10 +1963,42 @@ export function removeTrack(trackId: string) {
 export function moveItemTo(id: string, target: DropTarget, start: number): boolean {
   const p = store().project;
   if (!p) return false;
-  const next = moveItemToTrack(p.tracks, id, target, start, createTrack, p.assets);
+  const cur = findItem(p, id)?.item;
+  const at = cur ? clampToGroup(p, cur, start, cur.duration).start : start; // 版型裡的東西時間夾在版型範圍內
+  // 版型格子裡的素材只能在同一個版型的格子之間移動（搬到別格要重新填滿那一格）；一般素材也不能放進格子軌
+  const dstTrack = target.type === 'track' ? p.tracks.find((t) => t.id === target.trackId) : undefined;
+  const isCellItem =
+    !!cur && cur.type !== 'text' && cur.type !== 'audio' && !!cur.cell && !!cur.group && !isFrameItem(cur);
+  if (isCellItem || dstTrack?.groupRole === 'cell') {
+    const srcTrack = cur ? findItem(p, id)?.track : undefined;
+    if (
+      !isCellItem ||
+      !dstTrack ||
+      dstTrack.groupRole !== 'cell' ||
+      dstTrack.group !== (cur as VideoItem).group
+    ) {
+      toast('版型裡的素材只能移到同一個版型的格子');
+      return false;
+    }
+    if (srcTrack && dstTrack.id !== srcTrack.id) {
+      const moved = moveToCellTracks(p.tracks as Track[], p.assets, p.width, p.height, id, dstTrack.id, at);
+      if (!moved) return false;
+      store().apply((d) => void (d.tracks = moved as never));
+      return true;
+    }
+  }
+  const next = moveItemToTrack(p.tracks, id, target, at, createTrack, p.assets);
   if (!next) return false;
+  const moved = findItem({ ...p, tracks: next }, id)?.item;
+  const old = findItem(p, id)?.item;
+  // 版型的外框換列、換時間：格子與版型裡的文字跟著（時間一起位移；格子軌由 apply 貼回外框那一列下面）
+  const shift = moved && old && isFrameItem(moved) ? moved.start - old.start : 0;
   store().apply((d) => {
     d.tracks = next as never;
+    if (shift && moved && isFrameItem(moved))
+      for (const tr of d.tracks)
+        for (const it of tr.items)
+          if (it.type !== 'audio' && it.group === moved.group && it.id !== moved.id) it.start += shift;
   });
   return true;
 }
@@ -1134,11 +2035,16 @@ export function placeItem(id: string, start: number, opts?: Opts) {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f) return;
-  if (f.track.groupRole === 'frame' && f.item.type !== 'text' && f.item.group) {
-    moveGroupTo(f.item.group, start);
+  if (isFrameItem(f.item)) {
+    moveGroupTo(f.item.group!, start);
     return;
   }
-  const s = findFreeStart(f.track.items, start, f.item.duration, id);
+  let s = findFreeStart(f.track.items, start, f.item.duration, id);
+  if (f.item.group && !isFrameItem(f.item)) {
+    // 版型裡的東西：時間不能跑出版型的範圍
+    const span = groupSpan(p, f.item.group);
+    if (span) s = Math.min(Math.max(s, span.start), span.end - f.item.duration);
+  }
   editItem(id, (it) => void (it.start = s), opts);
 }
 
@@ -1148,17 +2054,41 @@ export { isVideoItem };
  * 改專案比例。choice='auto'＝照第一個影片／照片的形狀決定，並維持「自動」（沒有片段就維持現在的比例）。
  * 手動選比例後 aspectAuto 會關掉。可以復原。
  */
-export function setProjectAspect(choice: Aspect | 'auto'): Aspect | null {
+export function setProjectAspect(
+  choice: Aspect | 'auto',
+  /** keep＝物件在預覽上看起來的位置大小不變（超出的在斜線區）；fill＝座標照新畫面比例（影片填滿新畫面） */
+  mode: 'keep' | 'fill' = 'keep',
+): Aspect | null {
   const p = store().project;
   if (!p) return null;
   let aspect: Aspect;
   if (choice === 'auto') {
     const first = mediaItems(p)[0];
     const asset = first && p.assets.find((a) => a.id === first.assetId);
-    aspect = asset ? pickAspect(asset.width, asset.height) : p.aspect;
+    aspect = asset ? pickAspect(asset.width, asset.height) : p.aspect === 'custom' ? '9:16' : p.aspect;
   } else aspect = choice;
   store().apply((d) => {
+    const oldW = d.width;
+    const oldH = d.height;
     assignAspect(d, aspect, choice === 'auto');
+    if (mode === 'keep' && (oldW !== d.width || oldH !== d.height))
+      remapKeepOnStage(d, oldW, oldH, d.width, d.height, (w, h) => geoCtx(d as Project, w, h));
   });
   return aspect;
+}
+
+/** 自訂比例（寬／高）：長邊 1920；一步復原 */
+export function setProjectCustomRatio(ratio: number, mode: 'keep' | 'fill' = 'keep'): void {
+  if (!store().project) return;
+  const { width, height } = customSize(ratio);
+  store().apply((d) => {
+    const oldW = d.width;
+    const oldH = d.height;
+    d.aspect = 'custom';
+    d.width = width;
+    d.height = height;
+    delete d.aspectAuto;
+    if (mode === 'keep' && (oldW !== width || oldH !== height))
+      remapKeepOnStage(d, oldW, oldH, width, height, (w, h) => geoCtx(d as Project, w, h));
+  });
 }

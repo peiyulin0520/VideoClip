@@ -9,8 +9,7 @@ async function setup(page: Page) {
   await openTab(page, '剪輯');
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
   await page.getByRole('button', { name: '裁切' }).tap();
-  await page.getByRole('switch', { name: '自由形狀' }).tap();
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByTestId('crop-tool-lasso').tap();
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;
   const cy = fr.y + fr.height / 2;
@@ -22,7 +21,7 @@ async function setup(page: Page) {
   }
   await page.mouse.up();
   await expect(page.getByTestId('crop-polygon')).toBeVisible();
-  await page.getByRole('switch', { name: '橡皮擦' }).tap();
+  await page.getByTestId('crop-tool-erase').tap();
   await expect(page.getByTestId('paint-bar')).toBeVisible();
 }
 
@@ -97,13 +96,17 @@ test('按下去先不畫：快速點一下不會留下一點；移動超過 4px 
   await page.mouse.down();
   await page.mouse.up();
   expect(await erasedAt(page, 0.5, 0.5)).toBe(false);
-  await expect(page.getByRole('button', { name: '復原筆畫' })).toBeDisabled();
   // 按住不動 250ms 以上：開始畫（畫一個點）
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.waitForTimeout(400);
   await page.mouse.up();
   expect(await erasedAt(page, 0.5, 0.5)).toBe(true);
-  await expect(page.getByRole('button', { name: '復原筆畫' })).toBeEnabled();
+  // 復原一步：只有「按住」的那一筆（快速點的那下沒有留下筆畫），所以復原一次就乾淨了
+  await page.getByTestId('crop-undo').tap();
+  await expect.poll(() => erasedAt(page, 0.5, 0.5)).toBe(false);
+  await expect(page.getByTestId('crop-polygon')).toBeVisible(); // 圈選的形狀還在
+  await page.getByTestId('crop-redo').tap();
+  await expect.poll(() => erasedAt(page, 0.5, 0.5)).toBe(true);
   await page.screenshot({ path: `${SHOT}/hold-dot.png` });
 });

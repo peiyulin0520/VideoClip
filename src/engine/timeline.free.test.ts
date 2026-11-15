@@ -155,27 +155,29 @@ describe('圖層與軌道', () => {
     ).toEqual(['o2']);
   });
 
-  it('moveTrack 換圖層順序：同一種類的軌道之間可以換（包含最下面那條影像軌），不能跨種類', () => {
+  it('moveTrack（圖層分頁用）：跨類別換一層，可以換過字卡（X9）；音訊不參與', () => {
     const p = proj(); // [影像0, 影像1(o1), 影像2(o2), 文字]
     const ids = p.tracks.map((t) => t.id);
     const up = moveTrack(p.tracks, ids[1]!, 1);
     expect(up.map((t) => t.id)).toEqual([ids[0], ids[2], ids[1], ids[3]]);
     const down = moveTrack(p.tracks, ids[1]!, -1); // 最下面那條影像軌也能換（沒有固定的主軌了）
     expect(down.map((t) => t.id)).toEqual([ids[1], ids[0], ids[2], ids[3]]);
-    expect(moveTrack(p.tracks, ids[2]!, 1)).toBe(p.tracks); // 影像不能換到字卡上面
-    expect(moveTrack(p.tracks, ids[3]!, -1)).toBe(p.tracks); // 字卡不能換到影像下面
+    // 影像可以換到字卡上面、字卡可以夾進影像中間
+    expect(moveTrack(p.tracks, ids[2]!, 1).map((t) => t.id)).toEqual([ids[0], ids[1], ids[3], ids[2]]);
+    expect(moveTrack(p.tracks, ids[3]!, -1).map((t) => t.id)).toEqual([ids[0], ids[1], ids[3], ids[2]]);
     expect(moveTrack(p.tracks, ids[0]!, -1)).toBe(p.tracks); // 已經最下面
+    expect(moveTrack(p.tracks, ids[3]!, 1)).toBe(p.tracks); // 已經最上面
     const layers = visibleLayers({ ...p, tracks: up }, 2.2).map((l) => l.item.id);
     expect(layers.slice(1)).toEqual(['o2', 'o1']);
   });
 
-  it('reorderTrack：直接搬到指定位置，夾在同一種類的範圍內，不能跨種類', () => {
+  it('reorderTrack：直接搬到指定位置，整塊搬，畫面軌夾在畫面軌範圍（X9）', () => {
     const p = proj();
     const ids = p.tracks.map((t) => t.id); // [影像 a, 影像 b, 影像 c, 文字]
     expect(reorderTrack(p.tracks, ids[0]!, 2).map((t) => t.id)).toEqual([ids[1], ids[2], ids[0], ids[3]]);
     expect(reorderTrack(p.tracks, ids[2]!, 0).map((t) => t.id)).toEqual([ids[2], ids[0], ids[1], ids[3]]);
-    expect(reorderTrack(p.tracks, ids[0]!, 99).map((t) => t.id)).toEqual([ids[1], ids[2], ids[0], ids[3]]); // 夾在影像區最上面，不會跑到字卡上面
-    expect(reorderTrack(p.tracks, ids[3]!, 0)).toBe(p.tracks); // 字卡只有一條，沒地方動
+    expect(reorderTrack(p.tracks, ids[0]!, 99).map((t) => t.id)).toEqual([ids[1], ids[2], ids[3], ids[0]]); // 可以排到字卡上面
+    expect(reorderTrack(p.tracks, ids[3]!, 0).map((t) => t.id)).toEqual([ids[3], ids[0], ids[1], ids[2]]); // 字卡可以排到最下面
     expect(reorderTrack(p.tracks, ids[1]!, 1)).toBe(p.tracks); // 位置沒變
     expect(reorderTrack(p.tracks, 'nope', 2)).toBe(p.tracks);
   });

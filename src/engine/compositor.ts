@@ -60,7 +60,12 @@ export type SceneLayer = {
   cornerRadius: number; // 0–0.5
   outline?: Outline;
   /** 轉場：只畫這個範圍裡面的（畫布像素；矩形可以有好幾塊，或一個圓） */
-  clip?: { rects?: [number, number, number, number][]; circle?: { cx: number; cy: number; r: number } };
+  clip?: {
+    rects?: [number, number, number, number][];
+    circle?: { cx: number; cy: number; r: number };
+    /** 多邊形（畫布座標，例如旋轉過的版型範圍）：每個是一圈頂點 */
+    poly?: [number, number][][];
+  };
   /** 轉場：模糊程度（畫布像素） */
   blur?: number;
   /** 色調（亮度、飽和度、色溫、色調）；沒有或全是 0＝不加濾鏡 */
@@ -100,22 +105,36 @@ export class Compositor {
   private objs = new Map<string, Obj>();
   /** 這一輪合成裡，影片貼圖上傳（update）花的毫秒；Player 讀走後歸零 */
   private uploadMs = 0;
+  /** 所有圖層放在這裡面；預覽時整個往右下移 offset，讓輸出範圍（版面）置中、範圍外的東西也畫得出來 */
+  private world = new Container();
   private constructor(
     private app: Application,
+    /** 輸出範圍（版面）的寬高，場景的座標都是以它為準 */
     readonly width: number,
     readonly height: number,
-  ) {}
+    /** 版面左上角在 canvas 上的位置（匯出時是 0,0） */
+    readonly offsetX = 0,
+    readonly offsetY = 0,
+  ) {
+    this.world.position.set(offsetX, offsetY);
+    app.stage.addChild(this.world);
+  }
 
   static async create(opts: {
     width: number;
     height: number;
     canvas?: HTMLCanvasElement;
+    /** 預覽用：canvas 比版面大（版面外面也畫）。沒給＝跟版面一樣大 */
+    canvasWidth?: number;
+    canvasHeight?: number;
+    offsetX?: number;
+    offsetY?: number;
   }): Promise<Compositor> {
     const app = new Application();
     await app.init({
       canvas: opts.canvas,
-      width: opts.width,
-      height: opts.height,
+      width: opts.canvasWidth ?? opts.width,
+      height: opts.canvasHeight ?? opts.height,
       background: 0x000000,
       antialias: true,
       resolution: 1,
@@ -125,7 +144,7 @@ export class Compositor {
       preserveDrawingBuffer: true,
     });
     app.ticker.stop();
-    return new Compositor(app, opts.width, opts.height);
+    return new Compositor(app, opts.width, opts.height, opts.offsetX ?? 0, opts.offsetY ?? 0);
   }
 
   takeUploadMs(): number {
@@ -139,7 +158,7 @@ export class Compositor {
   }
 
   render(layers: SceneLayer[]): void {
-    const stage = this.app.stage;
+    const stage = this.world;
     const seen = new Set<string>();
     let allReady = true;
 
@@ -454,8 +473,10 @@ export class Compositor {
         o.clip.clear();
         if (c.circle) o.clip.circle(c.circle.cx, c.circle.cy, Math.max(c.circle.r, 0.5)).fill(0xffffff);
         for (const [x, y, w, h] of c.rects ?? []) o.clip.rect(x, y, w, h).fill(0xffffff);
+        for (const pts of c.poly ?? []) o.clip.poly(pts.flat()).fill(0xffffff);
         // 一塊都沒有：遮罩要有東西，不然 Pixi 會當作沒有遮罩 → 畫一個看不到的小點
-        if (!c.circle && (c.rects ?? []).length === 0) o.clip.rect(-10, -10, 1, 1).fill(0xffffff);
+        if (!c.circle && (c.rects ?? []).length === 0 && (c.poly ?? []).length === 0)
+          o.clip.rect(-10, -10, 1, 1).fill(0xffffff);
         o.clipKey = key;
       }
       o.holder.mask = o.clip;
@@ -496,7 +517,7 @@ export class Compositor {
   samplePixel(x: number, y: number): [number, number, number, number] {
     const { pixels } = this.app.renderer.extract.pixels({
       target: this.app.stage,
-      frame: new Rectangle(Math.floor(x), Math.floor(y), 1, 1),
+      frame: new Rectangle(Math.floor(x) + this.offsetX, Math.floor(y) + this.offsetY, 1, 1),
     });
     return [pixels[0]!, pixels[1]!, pixels[2]!, pixels[3]!];
   }
@@ -506,8 +527,8 @@ export class Compositor {
     const { pixels } = this.app.renderer.extract.pixels({
       target: this.app.stage,
       frame: new Rectangle(
-        Math.floor(x),
-        Math.floor(y),
+        Math.floor(x) + this.offsetX,
+        Math.floor(y) + this.offsetY,
         Math.max(Math.floor(w), 1),
         Math.max(Math.floor(h), 1),
       ),
@@ -519,7 +540,7 @@ export class Compositor {
     // 明確指定 (0,0,寬,高)：不然 Pixi 會用內容的外框，內容超出畫面（例如填滿的影片）時尺寸和位置都會跑掉
     return this.app.renderer.extract.canvas({
       target: this.app.stage,
-      frame: new Rectangle(0, 0, this.width, this.height),
+      frame: new Rectangle(this.offsetX, this.offsetY, this.width, this.height),
     }) as HTMLCanvasElement;
   }
 

@@ -100,7 +100,7 @@ test('標記軸：白線在已選範圍裡不能新增；取消不改任何東�
   await page.getByTestId('range-add').tap();
   await expect(page.locator('.toast').filter({ hasText: '白線在已選的範圍裡' })).toBeVisible();
   await expect(page.getByTestId('range-flag-start-1')).toHaveCount(0);
-  await page.getByRole('button', { name: '取消' }).tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
   expect((await audioItems(page))[0]!.audioRanges).toBeUndefined();
 });
 

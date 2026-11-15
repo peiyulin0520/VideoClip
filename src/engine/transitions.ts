@@ -106,9 +106,104 @@ export function transitionSpan(items: Item[], it: Item): TransitionSpan | null {
   return d > 0.05 ? { cut: it.start, d, before, after, prev } : null;
 }
 
+// ---------- 轉場時的聲音 ----------
+
+export type TransitionAudioMode = NonNullable<NonNullable<Item['transitionIn']>['audio']>;
+
+/** 六種轉場聲音（名稱簡短）：預設交叉淡化 */
+export const TRANSITION_AUDIO: { id: TransitionAudioMode; name: string; hint: string }[] = [
+  { id: 'cross', name: '交叉淡化', hint: '前一段聲音漸弱、後一段漸強，中間兩段都聽得到' },
+  { id: 'cut', name: '直接切換', hint: '不淡化，在你選的那一刻直接換成後一段的聲音' },
+  { id: 'custom', name: '自訂起迄', hint: '前一段標聲音迄、後一段標聲音起，中間可以沒聲音' },
+  { id: 'prev', name: '只要前段', hint: '轉場期間只聽前一段，轉場結束才換後一段' },
+  { id: 'next', name: '只要後段', hint: '轉場一開始就換成後一段的聲音' },
+  { id: 'mute', name: '靜音', hint: '轉場期間沒有聲音' },
+];
+
+/**
+ * 轉場裡前一段（a）、後一段（b）的聲音倍數（0–1）。t＝時間軸秒數。
+ * 前一段在轉場開始前一定是 1、後一段在轉場結束後一定是 1（custom 的後段起點可以晚於轉場結束）。
+ */
+export function seamGains(
+  tr: NonNullable<Item['transitionIn']>,
+  span: Pick<TransitionSpan, 'cut' | 'before' | 'after' | 'd'>,
+  t: number,
+): { a: number; b: number } {
+  const start = span.cut - span.before;
+  const end = span.cut + span.after;
+  switch (tr.audio ?? 'cross') {
+    case 'cross': {
+      const p = Math.min(Math.max((t - start) / span.d, 0), 1);
+      return { a: Math.cos((p * Math.PI) / 2), b: Math.sin((p * Math.PI) / 2) };
+    }
+    case 'cut': {
+      const at = span.cut + (tr.audioCut ?? 0);
+      return t < at ? { a: 1, b: 0 } : { a: 0, b: 1 };
+    }
+    case 'custom':
+      return {
+        a: t < span.cut + (tr.audioOutA ?? 0) ? 1 : 0,
+        b: t >= span.cut + (tr.audioInB ?? 0) ? 1 : 0,
+      };
+    case 'prev':
+      return t < end ? { a: 1, b: 0 } : { a: 0, b: 1 };
+    case 'next':
+      return t < start ? { a: 1, b: 0 } : { a: 0, b: 1 };
+    case 'mute':
+      return { a: t < start ? 1 : 0, b: t >= end ? 1 : 0 };
+  }
+}
+
+/** 這個片段在 t 秒因為「前後轉場」該乘上多少聲音倍數（沒有轉場＝1）。同一軌的 items 要完整給 */
+export function transitionAudioGain(items: Item[], item: Item, t: number): number {
+  if (item.type === 'audio' || !items.some((x) => x.transitionIn)) return 1;
+  let g = 1;
+  for (const b of items) {
+    if (!b.transitionIn) continue;
+    const span = transitionSpan(items, b);
+    if (!span) continue;
+    if (b.id === item.id) g *= seamGains(b.transitionIn, span, t).b;
+    else if (span.prev.id === item.id) g *= seamGains(b.transitionIn, span, t).a;
+  }
+  return g;
+}
+
+/**
+ * 轉場讓這個片段的聲音多出來／要調整音量的時間範圍：{ before＝開頭之前多放幾秒（B）, after＝結尾之後多放幾秒（A）, windows＝音量要逐格調整的時間範圍 }。
+ * 匯出混音用（預覽是即時算 transitionAudioGain）。
+ */
+export function seamAudioExtent(
+  items: Item[],
+  item: Item,
+): { before: number; after: number; windows: [number, number][] } {
+  let before = 0;
+  let after = 0;
+  const windows: [number, number][] = [];
+  if (item.type === 'audio') return { before, after, windows };
+  for (const b of items) {
+    if (!b.transitionIn) continue;
+    const span = transitionSpan(items, b);
+    if (!span) continue;
+    const start = span.cut - span.before;
+    const end = span.cut + span.after;
+    if (b.id === item.id) {
+      before = Math.max(before, span.before);
+      windows.push([
+        start,
+        Math.max(end, span.cut + (b.transitionIn.audioInB ?? 0), span.cut + (b.transitionIn.audioCut ?? 0)),
+      ]);
+    } else if (span.prev.id === item.id) {
+      after = Math.max(after, span.after);
+      windows.push([start, end]);
+    }
+  }
+  return { before, after, windows };
+}
+
 /** 一軌上緊接在一起的同類片段（接縫處）：可以在這裡加轉場 */
 export function seamsOf(items: Item[]): { prev: Item; next: Item }[] {
-  const vids = items.filter((x) => x.type !== 'audio' && !x.group);
+  // 版型的外框跟一般片段一樣可以接轉場；格子、版型裡的文字不行
+  const vids = items.filter((x) => x.type !== 'audio' && (!x.group || (x.type !== 'text' && !x.cell)));
   const out: { prev: Item; next: Item }[] = [];
   for (const next of vids) {
     const prev = vids.find(
@@ -420,6 +515,47 @@ export type ActiveTransition = {
 /** 虛擬物件不出聲（真的在播的那一個才出聲） */
 const silent = (x: Item): Item =>
   x.type === 'text' ? x : { ...x, volume: 0, fadeIn: undefined, fadeOut: undefined };
+
+/**
+ * 版型整組參加轉場時，版型裡的東西（格子、文字…）也要跟外框一起提早出現／延長：
+ * early＝B 版型提早幾秒（t 在 [frameStart − early, frameStart) 時，各東西停在開頭那一格）；
+ * late＝A 版型延長幾秒（t 在 [frameEnd, frameEnd + late) 時，延續到結尾的東西停在最後一格）。
+ * 回傳 t 這一刻這個東西要畫的（虛擬）物件；不在範圍內就是 null。
+ */
+export function extendForGroupTransition(
+  items: Item[],
+  ext: { frameStart: number; frameEnd: number; early: number; late: number },
+  t: number,
+): Item | null {
+  const EPS = 0.05;
+  if (t < ext.frameStart) {
+    if (t < ext.frameStart - ext.early) return null;
+    const it = [...items]
+      .sort((a, b) => a.start - b.start)
+      .find((x) => x.start <= ext.frameStart + EPS && x.start + x.duration > ext.frameStart);
+    if (!it) return null;
+    const shift = it.start - (ext.frameStart - ext.early);
+    return it.type === 'text'
+      ? { ...it, start: it.start - shift, duration: it.duration + shift }
+      : silent({
+          ...it,
+          start: it.start - shift,
+          trimIn: it.trimIn - shift * it.speed,
+          duration: it.duration + shift,
+        });
+  }
+  if (t >= ext.frameEnd && t < ext.frameEnd + ext.late) {
+    const it = [...items]
+      .sort((a, b) => b.start - a.start)
+      .find((x) => x.start + x.duration >= ext.frameEnd - EPS);
+    if (!it) return null;
+    const extra = ext.frameEnd + ext.late - (it.start + it.duration);
+    return it.type === 'text'
+      ? { ...it, duration: it.duration + extra }
+      : silent({ ...it, duration: it.duration + extra });
+  }
+  return null;
+}
 
 /**
  * 這個時間點、這一軌有沒有轉場正在進行；有的話回傳 A、B 要怎麼畫。

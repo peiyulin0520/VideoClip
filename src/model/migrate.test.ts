@@ -124,7 +124,7 @@ describe('migrateProject v1 → v2', () => {
     );
     const t = m.project.tracks;
     expect(t[t.length - 1]!.id).toBe('f');
-    expect(t[t.length - 1]!.groupRole).toBe('frame'); // G4：外框改成版型的代表列，不再鎖住
+    expect(t[t.length - 1]!.groupRole).toBeUndefined(); // 版型 v2：外框是一般影像軌上的片段
     expect(t.every((x) => x.kind === 'media')).toBe(true);
   });
 
@@ -160,7 +160,7 @@ describe('markLegacyGroups', () => {
     const [c, f] = r.project.tracks;
     expect(c!.groupRole).toBe('cell');
     expect(c!.fill).toBe('black');
-    expect(f!.groupRole).toBe('frame');
+    expect(f!.groupRole).toBeUndefined();
     expect(f!.locked).toBe(false);
     expect(markLegacyGroups(r.project).changed).toBe(false);
   });
@@ -289,5 +289,74 @@ describe('migrateStickers：貼圖自成一類', () => {
       tracks: [track('m1', '影像 1', [it_('i1', 's', 0)])],
     } as never;
     expect(migrateStickers(p).project.tracks[0]!.kind).toBe('media');
+  });
+});
+
+describe('migratePlaceholders：舊的「點兩下編輯文字」改成還沒輸入', () => {
+  const text = (t: string) => ({
+    id: 'a',
+    type: 'text',
+    start: 0,
+    duration: 3,
+    transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
+    card: { align: 'center', runs: [{ text: t, fontId: 'system', size: 96, color: '#fff' }] },
+  });
+  const proj = (t: string) =>
+    ({
+      version: 2,
+      assets: [],
+      tracks: [{ id: 't', kind: 'text', name: '字卡', items: [text(t)] }],
+    }) as never;
+  it('內容剛好是預設提示字 → 空內容＋placeholder', async () => {
+    const { migratePlaceholders } = await import('./migrate');
+    const r = migratePlaceholders(proj('點兩下編輯文字'));
+    const it = r.project.tracks[0]!.items[0] as { placeholder?: boolean; card: { runs: { text: string }[] } };
+    expect(r.changed).toBe(true);
+    expect(it.placeholder).toBe(true);
+    expect(it.card.runs[0]!.text).toBe('');
+  });
+  it('使用者自己寫的字不動', async () => {
+    const { migratePlaceholders } = await import('./migrate');
+    const p = proj('你好');
+    const r = migratePlaceholders(p);
+    expect(r.changed).toBe(false);
+    expect(r.project).toBe(p);
+  });
+});
+
+describe('migrateLayoutTracks（版型 v2）', () => {
+  it('外框軌變一般影像軌；格子軌記下自己的位置並貼在外框下面；再跑一次不再改', async () => {
+    const { migrateLayoutTracks } = await import('./migrate');
+    const cellBox = { x: 0.1, y: 0.1, w: 0.4, h: 0.4 };
+    const p = {
+      tracks: [
+        {
+          id: 'f',
+          kind: 'media',
+          group: 'g',
+          groupRole: 'frame',
+          hidden: false,
+          locked: false,
+          items: [{ id: 'fi', type: 'image', group: 'g' }],
+        },
+        {
+          id: 'c',
+          kind: 'media',
+          group: 'g',
+          groupRole: 'cell',
+          hidden: false,
+          locked: false,
+          items: [{ id: 'ci', type: 'image', group: 'g', cell: cellBox }],
+        },
+      ],
+    } as never;
+    const r = migrateLayoutTracks(p);
+    expect(r.changed).toBe(true);
+    const [c, f] = r.project.tracks;
+    expect(c!.id).toBe('c');
+    expect(c!.cell).toEqual(cellBox);
+    expect(f!.groupRole).toBeUndefined();
+    expect(f!.group).toBeUndefined();
+    expect(migrateLayoutTracks(r.project).changed).toBe(false);
   });
 });

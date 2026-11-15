@@ -53,7 +53,7 @@ test('修剪面板：沒有兩側拉霸，上方有小旗標（1起／1迄）；
   await showTimeline(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '修剪', exact: true }).tap();
+  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
   await expect(page.getByTestId('range-flag-start-0')).toBeVisible();
   await expect(page.getByTestId('range-flag-end-0')).toBeVisible();
   await expect(page.getByTestId('range-flag-start-0')).toContainText('1起');
@@ -82,7 +82,7 @@ test('修剪面板：再加一段（多段）→ 完成後拆成兩個片段，�
   await showTimeline(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '修剪', exact: true }).tap();
+  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
   await drag(page, 'range-flag-end-0', -strip.width * 0.75); // 留 [0, 1]
   await clickStrip(page, 0.5); // 白線移到 2 秒

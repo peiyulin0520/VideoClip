@@ -66,7 +66,7 @@ export function MuteSheet({ item, asset, onClose }: { item: VideoItem; asset: As
         isAudio && player
           ? (srcT) => {
               player.peek(Math.max(0, item.start + (srcT - item.trimIn) / item.speed));
-              return player.compositor.canvas;
+              return player.compositor.toCanvas();
             }
           : undefined
       }

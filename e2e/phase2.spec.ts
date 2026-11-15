@@ -276,7 +276,7 @@ test('圖層屬性：透明度、混合模式、圓角、外框、裁切', async
   await page.mouse.move(hl.x + hl.width / 2 + fr.width / 4, hl.y + hl.height / 2, { steps: 4 });
   await page.mouse.move(hl.x + hl.width / 2 + fr.width / 2, hl.y + hl.height / 2, { steps: 4 });
   await page.mouse.up();
-  await page.getByRole('button', { name: '完成' }).tap();
+  await page.getByTestId('crop-apply').tap();
   const p = await project(page);
   expect(p.tracks[1]!.items[0]!.crop!.l).toBeCloseTo(0.5, 1);
   await expect.poll(async () => isRed(await samplePreview(page, 0.27, 0.5))).toBe(true);
@@ -313,18 +313,14 @@ test('文字：新增、改內容與顏色、在預覽上可拖移，也能分�
   await expect(clips(page)).toHaveCount(3);
 });
 
-test('底部分頁：點目前的分頁會收合／展開面板，預覽大小永遠不變（使用者：預覽不能被擠小）', async ({
-  page,
-}) => {
+test('底部分頁：再點目前的分頁面板不會收合，預覽大小永遠不變（使用者：預覽不能被擠小）', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '文字');
   const stage = page.getByTestId('stage');
   const h1 = (await stage.boundingBox())!.height;
   const w1 = (await stage.boundingBox())!.width;
-  await page.getByRole('tab', { name: '文字' }).tap(); // 再點一次：收合
-  await expect(page.getByRole('button', { name: /新增文字/ })).toHaveCount(0);
+  await page.getByRole('tab', { name: '文字' }).tap(); // 再點一次：面板不會收合
+  await expect(page.getByRole('button', { name: /新增文字/ })).toBeVisible();
   expect((await stage.boundingBox())!.height).toBeCloseTo(h1, 0);
   expect((await stage.boundingBox())!.width).toBeCloseTo(w1, 0);
-  await page.getByRole('tab', { name: '文字' }).tap(); // 展開
-  await expect(page.getByRole('button', { name: /新增文字/ })).toBeVisible();
 });

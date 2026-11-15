@@ -9,7 +9,14 @@ import {
   placeSequential,
   totalDuration,
 } from '../../engine/timeline';
-import { ASPECTS, assignAspect, createProject, nextProjectName, pickAspect } from '../../model/defaults';
+import {
+  ASPECTS,
+  aspectLabel,
+  assignAspect,
+  createProject,
+  nextProjectName,
+  pickAspect,
+} from '../../model/defaults';
 import type { Aspect, Project } from '../../model/types';
 import { requestPersistence } from '../../storage/media';
 import {
@@ -58,6 +65,8 @@ export function Home() {
   const [deleteFor, setDeleteFor] = useState<Project | null>(null);
   const [coverFor, setCoverFor] = useState<Project | null>(null);
   const coverFileRef = useRef<HTMLInputElement>(null);
+  /** 更換封面：先選（草稿），按「套用」才真的換；按 ✕ 就不換 */
+  const [coverDraft, setCoverDraft] = useState<{ key: string; cover: string | undefined } | null>(null);
   const [tipHidden, setTipHidden] = useState(() => safeGet('tip-ios-a2hs') === '1');
   const pickRef = useRef<HTMLInputElement>(null);
   const fontCount = useFonts((st) => st.installed.size + st.userFonts.length);
@@ -176,7 +185,7 @@ export function Home() {
                 </div>
                 <div className="card-name">{p.name}</div>
                 <div className="card-sub">
-                  {p.aspect} ·{' '}
+                  {aspectLabel(p)} ·{' '}
                   {new Date(p.updatedAt).toLocaleString('zh-TW', {
                     month: 'numeric',
                     day: 'numeric',
@@ -262,6 +271,7 @@ export function Home() {
         <button
           className="menu-item"
           onClick={() => {
+            setCoverDraft(null);
             setCoverFor(menuFor);
             setMenuFor(null);
           }}
@@ -300,7 +310,7 @@ export function Home() {
       </Sheet>
 
       <Sheet open={!!coverFor} title="更換封面" onClose={() => setCoverFor(null)}>
-        <p className="hint">從專案裡的影片或照片選一張，或從相簿選一張照片。</p>
+        <p className="hint">選一張當封面，按「套用」才會換；按 ✕ 關閉就不換。</p>
         {coverFor && (
           <div className="cover-strip" data-testid="cover-strip">
             {coverFor.assets
@@ -308,31 +318,46 @@ export function Home() {
               .map((a) => (
                 <button
                   key={a.id}
-                  className="cover-pick"
+                  className={`cover-pick${coverDraft?.key === a.id ? ' active' : ''}`}
                   aria-label={`用 ${a.name} 當封面`}
+                  aria-pressed={coverDraft?.key === a.id}
                   style={{ backgroundImage: `url(${a.thumbs[0]})` }}
-                  onClick={async () => {
-                    const p = coverFor;
-                    setCoverFor(null);
-                    await setCover(p, await coverFromDataUrl(a.thumbs[0]!));
-                  }}
+                  onClick={async () =>
+                    setCoverDraft({ key: a.id, cover: await coverFromDataUrl(a.thumbs[0]!) })
+                  }
                 />
               ))}
           </div>
         )}
-        <button className="menu-item" onClick={() => coverFileRef.current?.click()}>
-          從相簿選照片
+        <button
+          className={`menu-item${coverDraft?.key === 'file' ? ' active' : ''}`}
+          onClick={() => coverFileRef.current?.click()}
+        >
+          從相簿選照片{coverDraft?.key === 'file' ? '（已選）' : ''}
         </button>
         <button
-          className="menu-item"
-          onClick={async () => {
-            const p = coverFor;
-            setCoverFor(null);
-            if (p) await setCover(p, undefined);
-          }}
+          className={`menu-item${coverDraft?.key === 'default' ? ' active' : ''}`}
+          aria-pressed={coverDraft?.key === 'default'}
+          onClick={() => setCoverDraft({ key: 'default', cover: undefined })}
         >
           恢復預設（第一個素材）
         </button>
+        <div className="sheet-row">
+          <button
+            className="btn primary grow"
+            data-testid="cover-apply"
+            disabled={!coverDraft}
+            onClick={async () => {
+              const p = coverFor;
+              const d = coverDraft;
+              if (!p || !d) return;
+              await setCover(p, d.cover);
+              setCoverDraft(null); // 套用過了：之後按 ✕ 不會撤銷
+            }}
+          >
+            套用
+          </button>
+        </div>
       </Sheet>
       <input
         ref={coverFileRef}
@@ -343,11 +368,9 @@ export function Home() {
         onChange={async (e) => {
           const f = e.target.files?.[0];
           e.target.value = '';
-          const p = coverFor;
-          if (!f || !p) return;
-          setCoverFor(null);
+          if (!f || !coverFor) return;
           try {
-            await setCover(p, await coverFromBlob(f));
+            setCoverDraft({ key: 'file', cover: await coverFromBlob(f) });
           } catch {
             toast('這張圖片讀不出來');
           }
@@ -364,9 +387,6 @@ export function Home() {
           autoFocus
         />
         <div className="sheet-row">
-          <button className="btn" onClick={() => setRenameFor(null)}>
-            取消
-          </button>
           <button
             className="btn primary"
             onClick={async () => {
@@ -374,11 +394,12 @@ export function Home() {
               if (renameFor && n) {
                 await renameProject(renameFor.id, n);
                 await refresh();
+                setRenameFor({ ...renameFor, name: n });
+                toast('已儲存');
               }
-              setRenameFor(null);
             }}
           >
-            確定
+            儲存
           </button>
         </div>
       </Sheet>

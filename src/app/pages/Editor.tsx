@@ -12,13 +12,15 @@ import { getProjectMigrated, saveProject } from '../../storage/projects';
 import { startAutosave } from '../../store/autosave';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
-import { ASPECTS } from '../../model/defaults';
+import { ASPECTS, ratioText } from '../../model/defaults';
+import { frameFractions } from '../../engine/stage';
 import { shortVersion } from '../pwa';
 import { QUALITY_LABELS } from '../../engine/previewQuality';
 import { useQuality } from '../../store/qualityStore';
 import type { Aspect } from '../../model/types';
 import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
+import { CropEditor } from '../editor/CropEditor';
 import { ExportSheet } from '../editor/ExportSheet';
 import { GradePeekButton } from '../editor/GradePeekButton';
 import { KeyframeButton } from '../editor/KeyframeButton';
@@ -126,6 +128,9 @@ function EditorBody() {
   const [playing, setPlaying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [ratioOpen, setRatioOpen] = useState(false);
+  const [ratioDraft, setRatioDraft] = useState<'auto' | Aspect | 'custom'>('auto');
+  const [coverDraft, setCoverDraft] = useState(false);
+  const [ratioFill, setRatioFill] = useState(false); // false＝保持原樣；true＝影片填滿新畫面
   const quality = useQuality((s) => s.q);
   const setQuality = useQuality((s) => s.set);
   const [exportOpen, setExportOpen] = useState(false);
@@ -188,64 +193,84 @@ function EditorBody() {
   return (
     <main className={`editor${previewFull ? ' preview-full' : ''}`}>
       <header className="ed-top">
-        <Link className="icon-btn" to="/" aria-label="回首頁">
-          <ChevronLeft />
-        </Link>
-        <button
-          className="name-btn"
-          aria-label="專案名稱"
-          onClick={() => {
-            setNameDraft(project.name);
-            setRenaming(true);
-          }}
-        >
-          {project.name}
-          <span className="proj-ver" data-testid="proj-ver">
-            {shortVersion()}
-          </span>
-        </button>
-        <button className="ratio-btn" aria-label="畫面比例" onClick={() => setRatioOpen(true)}>
-          {project.aspect}
-        </button>
-        <button
-          className="ratio-btn"
-          aria-label={`預覽畫質 ${QUALITY_LABELS[quality]}（點一下切換）`}
-          data-testid="quality-btn"
-          onClick={() => setQuality(quality === 'smooth' ? 'clear' : 'smooth')}
-        >
-          {quality === 'clear' ? '高清' : quality === 'smooth' ? '順暢' : '自動'}
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="復原"
-          aria-disabled={!canUndo}
-          onClick={() => {
-            if (!useProjectStore.getState().undo()) toast('沒有可復原的動作');
-          }}
-        >
-          <Undo2 size={22} />
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="重做"
-          aria-disabled={!canRedo}
-          onClick={() => {
-            if (!useProjectStore.getState().redo()) toast('沒有可重做的動作');
-          }}
-        >
-          <Redo2 size={22} />
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="匯出影片"
-          onClick={() => {
-            useUI.getState().player?.pause();
-            useUI.setState({ gradePeek: false });
-            setExportOpen(true);
-          }}
-        >
-          <Share size={22} />
-        </button>
+        <div className="btn-zone grow" data-testid="zone-nav">
+          <Link className="icon-btn" to="/" aria-label="回首頁">
+            <ChevronLeft />
+          </Link>
+          <button
+            className="name-btn"
+            aria-label="專案名稱"
+            onClick={() => {
+              setNameDraft(project.name);
+              setCoverDraft(false);
+              setRenaming(true);
+            }}
+          >
+            {project.name}
+            <span className="proj-ver" data-testid="proj-ver">
+              {shortVersion()}
+            </span>
+          </button>
+        </div>
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-view">
+          <button
+            className="ratio-btn"
+            aria-label="畫面比例"
+            onClick={() => {
+              setRatioDraft(project.aspectAuto ? 'auto' : project.aspect);
+              setRatioFill(false);
+              setRatioOpen(true);
+            }}
+          >
+            {project.aspect === 'custom' ? ratioText(project.width, project.height) : project.aspect}
+          </button>
+          <button
+            className="ratio-btn"
+            aria-label={`預覽畫質 ${QUALITY_LABELS[quality]}（點一下切換）`}
+            data-testid="quality-btn"
+            onClick={() => setQuality(quality === 'smooth' ? 'clear' : 'smooth')}
+          >
+            {quality === 'clear' ? '高清' : quality === 'smooth' ? '順暢' : '自動'}
+          </button>
+        </div>
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-history">
+          <button
+            className="icon-btn"
+            aria-label="復原"
+            aria-disabled={!canUndo}
+            onClick={() => {
+              if (!useProjectStore.getState().undo()) toast('沒有可復原的動作');
+            }}
+          >
+            <Undo2 size={22} />
+          </button>
+          <button
+            className="icon-btn"
+            aria-label="重做"
+            aria-disabled={!canRedo}
+            onClick={() => {
+              if (!useProjectStore.getState().redo()) toast('沒有可重做的動作');
+            }}
+          >
+            <Redo2 size={22} />
+          </button>
+        </div>
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-export">
+          <button
+            className="icon-btn export-btn"
+            aria-label="匯出影片"
+            onClick={() => {
+              useUI.getState().player?.pause();
+              useUI.setState({ gradePeek: false });
+              setExportOpen(true);
+            }}
+          >
+            <Share size={22} />
+          </button>
+        </div>
       </header>
 
       <Preview
@@ -256,31 +281,39 @@ function EditorBody() {
       />
 
       <div className="playbar">
-        <PlaybarButton
-          icon={playing ? Pause : Play}
-          ariaLabel={playing ? '暫停' : '播放'}
-          fill
-          onClick={() => {
-            if (total <= 0) return toast('先匯入影片或照片');
-            player?.toggle();
-          }}
-        />
-        <TimeText total={total} />
+        <div className="btn-zone" data-testid="zone-play">
+          <PlaybarButton
+            icon={playing ? Pause : Play}
+            ariaLabel={playing ? '暫停' : '播放'}
+            fill
+            onClick={() => {
+              if (total <= 0) return toast('先匯入影片或照片');
+              player?.toggle();
+            }}
+          />
+          <TimeText total={total} />
+        </div>
         <span className="spacer" />
-        <KeyframeButton />
-        <GradePeekButton />
-        <PlaybarButton
-          icon={ZoomOut}
-          label="縮小"
-          ariaLabel="縮小時間軸"
-          onClick={() => setPps(Math.max(pps / 1.5, MIN_PPS))}
-        />
-        <PlaybarButton
-          icon={ZoomIn}
-          label="放大"
-          ariaLabel="放大時間軸"
-          onClick={() => setPps(Math.min(pps * 1.5, MAX_PPS))}
-        />
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-fx">
+          <KeyframeButton />
+          <GradePeekButton />
+        </div>
+        <span className="zone-sep" aria-hidden="true" />
+        <div className="btn-zone" data-testid="zone-zoom">
+          <PlaybarButton
+            icon={ZoomOut}
+            label="縮小"
+            ariaLabel="縮小時間軸"
+            onClick={() => setPps(Math.max(pps / 1.5, MIN_PPS))}
+          />
+          <PlaybarButton
+            icon={ZoomIn}
+            label="放大"
+            ariaLabel="放大時間軸"
+            onClick={() => setPps(Math.min(pps * 1.5, MAX_PPS))}
+          />
+        </div>
       </div>
 
       <Timeline pps={pps} setPps={setPps} onAdd={() => pick('main')} />
@@ -297,19 +330,18 @@ function EditorBody() {
       />
 
       <ExportSheet project={project} open={exportOpen} onClose={() => setExportOpen(false)} />
+      <CropEditor />
 
       <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
-        <p className="hint">改了之後，影片和文字的位置、大小會跟著新的畫面。可以按「復原」改回來。</p>
+        <p className="hint">
+          預覽的底不會變，框內是影片輸出的範圍，框外（斜線）不會輸出。按「套用」才會改；按 ✕ 關閉就不改。
+        </p>
         <div className="chips" role="radiogroup" aria-label="選擇畫面比例">
           <button
             role="radio"
-            aria-checked={!!project.aspectAuto}
-            className={`chip${project.aspectAuto ? ' active' : ''}`}
-            onClick={() => {
-              const a = setProjectAspect('auto');
-              if (a) toast(`已設成自動（目前是 ${a}）`);
-              setRatioOpen(false);
-            }}
+            aria-checked={ratioDraft === 'auto'}
+            className={`chip${ratioDraft === 'auto' ? ' active' : ''}`}
+            onClick={() => setRatioDraft('auto')}
           >
             自動（跟第一支影片）
           </button>
@@ -317,16 +349,71 @@ function EditorBody() {
             <button
               key={a}
               role="radio"
-              aria-checked={!project.aspectAuto && project.aspect === a}
-              className={`chip${!project.aspectAuto && project.aspect === a ? ' active' : ''}`}
-              onClick={() => {
-                setProjectAspect(a);
-                setRatioOpen(false);
-              }}
+              aria-checked={ratioDraft === a}
+              className={`chip${ratioDraft === a ? ' active' : ''}`}
+              onClick={() => setRatioDraft(a)}
             >
               {ASPECTS[a].label}
             </button>
           ))}
+          <button
+            role="radio"
+            aria-checked={ratioDraft === 'custom'}
+            className={`chip${ratioDraft === 'custom' ? ' active' : ''}`}
+            data-testid="ratio-custom"
+            onClick={() => setRatioDraft('custom')}
+          >
+            自訂
+          </button>
+        </div>
+        {ratioDraft === 'custom' && <p className="hint">按「套用」後，在預覽上拖框的四邊或四角調整比例。</p>}
+        <div className="slider-label">改了之後</div>
+        <div className="chips" role="radiogroup" aria-label="改比例之後">
+          <button
+            role="radio"
+            aria-checked={!ratioFill}
+            className={`chip${!ratioFill ? ' active' : ''}`}
+            data-testid="ratio-keep"
+            onClick={() => setRatioFill(false)}
+          >
+            保持原樣
+          </button>
+          <button
+            role="radio"
+            aria-checked={ratioFill}
+            className={`chip${ratioFill ? ' active' : ''}`}
+            data-testid="ratio-fill"
+            onClick={() => setRatioFill(true)}
+          >
+            影片填滿畫面
+          </button>
+        </div>
+        <p className="hint">
+          {ratioFill
+            ? '位置、大小照新畫面的比例重新算，主要影片會填滿。'
+            : '每個東西在預覽上的位置、大小不變，超出框的部分留在斜線區。'}
+        </p>
+        <div className="sheet-row">
+          <button
+            className="btn primary grow"
+            data-testid="ratio-apply"
+            onClick={() => {
+              const now: 'auto' | Aspect | 'custom' = project.aspectAuto ? 'auto' : project.aspect;
+              if (ratioDraft === 'custom') {
+                // 自訂：關掉視窗，在預覽上拖版面的邊（那邊也有「套用」和 ✕）
+                const f = frameFractions(project.width, project.height);
+                useUI.getState().player?.pause();
+                useUI.setState({ frameEdit: { fx: f.fx, fy: f.fy, fill: ratioFill } });
+                setRatioOpen(false);
+              } else if (ratioDraft !== now) {
+                const a = setProjectAspect(ratioDraft, ratioFill ? 'fill' : 'keep');
+                if (ratioDraft === 'auto' && a) toast(`已設成自動（目前是 ${a}）`);
+                else toast('已套用');
+              }
+            }}
+          >
+            套用
+          </button>
         </div>
       </Sheet>
 
@@ -340,40 +427,40 @@ function EditorBody() {
           autoFocus
         />
         <button
-          className="menu-item"
-          onClick={async () => {
-            const p = useProjectStore.getState().project;
-            if (!p) return;
-            setRenaming(false);
-            try {
-              const cover = await coverFromProject(p, useUI.getState().player?.time ?? 0);
-              useProjectStore.getState().apply((d) => {
-                d.cover = cover;
-              });
-              toast('已用目前預覽畫面當封面');
-            } catch {
-              toast('抓不到預覽畫面');
-            }
-          }}
+          role="switch"
+          aria-checked={coverDraft}
+          className={`chip${coverDraft ? ' active' : ''}`}
+          data-testid="cover-now"
+          onClick={() => setCoverDraft((v) => !v)}
         >
           用目前預覽畫面當封面
         </button>
         <div className="sheet-row">
-          <button className="btn" onClick={() => setRenaming(false)}>
-            取消
-          </button>
           <button
             className="btn primary"
-            onClick={() => {
+            onClick={async () => {
               const n = nameDraft.trim();
               if (n)
                 useProjectStore.getState().apply((d) => {
                   d.name = n;
                 });
-              setRenaming(false);
+              const withCover = coverDraft;
+              setCoverDraft(false);
+              if (!withCover) return toast('已儲存');
+              const p = useProjectStore.getState().project;
+              if (!p) return;
+              try {
+                const cover = await coverFromProject(p, useUI.getState().player?.time ?? 0);
+                useProjectStore.getState().apply((d) => {
+                  d.cover = cover;
+                });
+                toast('已儲存，並用目前預覽畫面當封面');
+              } catch {
+                toast('已儲存名稱，但抓不到預覽畫面當封面');
+              }
             }}
           >
-            確定
+            儲存
           </button>
         </div>
       </Sheet>

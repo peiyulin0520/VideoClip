@@ -78,7 +78,7 @@ test('每個主題下的編輯器：文字看得清楚（對比夠）、預覽�
     // 預覽畫面永遠是黑底（才看得出影片真正的顏色）
     expect(
       await page.evaluate(
-        () => getComputedStyle(document.querySelector('.stage') as HTMLElement).backgroundColor,
+        () => getComputedStyle(document.querySelector('.stage-base') as HTMLElement).backgroundColor,
       ),
     ).toBe('rgb(0, 0, 0)');
     await page.screenshot({ path: `${SHOT}/editor-${id}.png` });

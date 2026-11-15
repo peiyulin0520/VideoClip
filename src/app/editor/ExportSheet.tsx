@@ -1,3 +1,4 @@
+import { emptyCellCount, placeholderCount } from '../../engine/placeholder';
 import { Download, Share2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
@@ -124,6 +125,16 @@ export function ExportSheet({
             <p className="hint">還沒有內容可以匯出，先匯入影片或照片。</p>
           ) : (
             <>
+              {placeholderCount(project) > 0 && (
+                <p className="hint" data-testid="export-placeholder-note">
+                  有 {placeholderCount(project)} 個文字還沒輸入內容，不會出現在影片中。
+                </p>
+              )}
+              {emptyCellCount(project) > 0 && (
+                <p className="hint" data-testid="export-empty-cells-note">
+                  版型有 {emptyCellCount(project)} 格還沒放素材，匯出會是黑色。
+                </p>
+              )}
               <div className="panel-head">
                 <span>解析度</span>
               </div>
@@ -176,9 +187,6 @@ export function ExportSheet({
             </>
           )}
           <div className="sheet-row">
-            <button className="btn" onClick={finish}>
-              關閉
-            </button>
             <button className="btn primary" disabled={total <= 0} onClick={() => void start()}>
               開始匯出
             </button>
@@ -211,7 +219,7 @@ export function ExportSheet({
           <p className="hint">過程中請不要切到別的 App 或關螢幕，不然 iPhone 會暫停匯出。</p>
           <div className="sheet-row">
             <button className="btn" onClick={() => abort.current?.abort()}>
-              取消
+              停止匯出
             </button>
           </div>
         </div>
@@ -237,9 +245,6 @@ export function ExportSheet({
             <button className="btn" onClick={() => download(state.result)}>
               <Download size={18} /> 下載檔案
             </button>
-            <button className="btn" onClick={finish}>
-              關閉
-            </button>
           </div>
         </div>
       )}
@@ -248,9 +253,6 @@ export function ExportSheet({
         <div data-testid="export-error">
           <p className="sheet-msg">匯出失敗：{state.message}</p>
           <div className="sheet-row">
-            <button className="btn" onClick={finish}>
-              關閉
-            </button>
             <button className="btn primary" onClick={() => setState({ kind: 'options' })}>
               再試一次
             </button>

@@ -39,7 +39,6 @@ export function BottomBar({
   const selectedId = useProjectStore((s) => s.selectedId);
   const [tab, setTab] = useState<Tab>('edit');
   const [panel, setPanel] = useState<Panel>(null);
-  const [collapsed, setCollapsed] = useState(false);
 
   const found = findItem(project, selectedId);
   const barRef = useRef<HTMLDivElement>(null);
@@ -80,7 +79,6 @@ export function BottomBar({
       tabRef.current = want;
       setTab(want);
       setPanel(null);
-      setCollapsed(false);
       cancelCrop();
     }, 250);
   }, [requestTab]);
@@ -89,11 +87,8 @@ export function BottomBar({
   const switchTab = (t: Tab) => {
     setPanel(null);
     cancelCrop(); // 離開剪輯分頁就結束裁切模式（不套用）
-    if (t === tab) setCollapsed((c) => !c);
-    else {
-      setTab(t);
-      setCollapsed(false);
-    }
+    // 再點一次目前的分頁：什麼都不做（面板不收合）
+    if (t !== tab) setTab(t);
     // 分頁列黏在頂端時（已經往下捲過），切分頁後停在分頁列的位置，不要停在新面板的一半
     const el = barRef.current;
     if (el) {
@@ -118,7 +113,6 @@ export function BottomBar({
             key={t.id}
             role="tab"
             aria-selected={tab === t.id}
-            aria-expanded={tab === t.id ? !collapsed : undefined}
             className={`tab${tab === t.id ? ' active' : ''}`}
             onClick={() => switchTab(t.id)}
           >
@@ -127,14 +121,14 @@ export function BottomBar({
         ))}
       </div>
       {tab === 'edit' && <EditTab panel={panel} setPanel={setPanel} onImport={onImportMain} found={found} />}
-      {!collapsed && tab === 'overlay' && <OverlayTab onImportOverlay={onImportOverlay} />}
-      {!collapsed && tab === 'text' && <TextTab found={found} />}
-      {!collapsed && tab === 'layers' && <LayersTab />}
-      {!collapsed && tab === 'layout' && <LayoutTab found={found} />}
-      {!collapsed && tab === 'effect' && <EffectTab found={found} />}
-      {!collapsed && tab === 'color' && <ColorTab found={found} />}
-      {!collapsed && tab === 'assets' && <AssetsTab />}
-      {!collapsed && tab === 'audio' && <AudioTab found={found} panel={panel} setPanel={setPanel} />}
+      {tab === 'overlay' && <OverlayTab onImportOverlay={onImportOverlay} />}
+      {tab === 'text' && <TextTab found={found} />}
+      {tab === 'layers' && <LayersTab />}
+      {tab === 'layout' && <LayoutTab found={found} />}
+      {tab === 'effect' && <EffectTab found={found} />}
+      {tab === 'color' && <ColorTab found={found} />}
+      {tab === 'assets' && <AssetsTab />}
+      {tab === 'audio' && <AudioTab found={found} panel={panel} setPanel={setPanel} />}
     </div>
   );
 }

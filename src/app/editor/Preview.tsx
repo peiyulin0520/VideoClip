@@ -1,3 +1,6 @@
+import { cellTracksOf, frameOfGroup, isFrameItem } from '../../engine/layoutTracks';
+import { groupClipArea } from '../../engine/scene';
+import { showPlaceholders } from '../../engine/placeholder';
 import { Layers, Maximize, Minimize, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { urlFor } from '../../engine/assetUrls';
@@ -14,11 +17,14 @@ import {
   type Box,
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
+import { aspectLabel } from '../../model/defaults';
+import { stageLayout } from '../../engine/stage';
 import { useSmooth } from '../../engine/previewQuality';
 import { useQuality } from '../../store/qualityStore';
+import { AspectOverlay } from './AspectOverlay';
+import { LayoutResize } from './LayoutResize';
 import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
-import { CropOverlay } from './CropOverlay';
 import { useCrop } from '../../store/cropStore';
 import { geoCtx } from '../../engine/scene';
 import { hasKeyframes, timeResolved } from '../../engine/keyframes';
@@ -69,13 +75,14 @@ export function Preview({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const poolRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null); // 版面（輸出範圍）
+  const baseRef = useRef<HTMLDivElement>(null); // 底：固定 9:16，手勢都在這裡收
   const [cssW, setCssW] = useState(1);
   const [safe, setSafe] = useState(readSafe);
   const [dragging, setDragging] = useState(false); // 拖移/縮放中：安全區參考線暫時出現
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [selVisible, setSelVisible] = useState(true);
-  const [kfTime, setKfTime] = useState(0); // 專案裡有定位（關鍵影格）時，跟著播放頭更新選取框與觸控區的位置
+  const [kfTime, setKfTime] = useState(0); // 專案裡有定格（關鍵影格）時，跟著播放頭更新選取框與觸控區的位置
   const [hitIds, setHitIds] = useState(''); // 這一秒可以拖的物件（逗號分隔），給觸控區用
   const [peek, setPeek] = useState(false); // 「查看圖層」清單
   const project = useProjectStore((s) => s.project)!;
@@ -141,9 +148,10 @@ export function Preview({
 
   // ---- 舞台大小（CSS px）----
   useEffect(() => {
-    const el = stageRef.current!;
-    const ro = new ResizeObserver(() => setCssW(el.clientWidth || 1));
-    ro.observe(el);
+    const el = baseRef.current!;
+    const frame = stageRef.current!;
+    const ro = new ResizeObserver(() => setCssW(frame.clientWidth || 1));
+    ro.observe(frame);
     // iOS Safari：雙指在預覽上不要變成整頁縮放（touch-action 之外的保險）
     const stop = (e: Event) => e.preventDefault();
     el.addEventListener('gesturestart', stop);
@@ -163,7 +171,7 @@ export function Preview({
       const p = useProjectStore.getState().project;
       const id = useProjectStore.getState().selectedId;
       const f = p && findItem(p, id);
-      // 播放中，有定位時選取框最多每秒更新約 15 次（每一格都重畫會拖慢預覽）
+      // 播放中，有定格時選取框最多每秒更新約 15 次（每一格都重畫會拖慢預覽）
       const now = performance.now();
       if (!playing || now - lastKf >= 66) {
         lastKf = now;
@@ -185,13 +193,23 @@ export function Preview({
   }, [player, selectedId, project]);
 
   const k = cssW / width; // 專案座標 → CSS px
+  const shown = useMemo(() => showPlaceholders(project), [project]); // 還沒輸入的文字也有框可以選
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const geo = useMemo(() => geoCtx(project, width, height), [project, width, height, fontEpoch]);
-  // 有定位的物件：選取框、觸控區用「播放頭這個時間」的位置
-  const rproject = useMemo(() => timeResolved(project, kfTime), [project, kfTime]);
+  const geo = useMemo(() => geoCtx(shown, width, height), [shown, width, height, fontEpoch]);
+  // 有定格的物件：選取框、觸控區用「播放頭這個時間」的位置
+  const rproject = useMemo(() => timeResolved(shown, kfTime), [shown, kfTime]);
   const sel = findItem(rproject, selectedId);
   const box = sel && selVisible ? selectionBox(sel.item, geo) : null;
   const selLocked = !!sel?.track.locked || !!sel?.track.hidden;
+  const layoutEdit = useUI((s) => s.layoutEdit);
+  const lrFrame = layoutEdit ? (frameOfGroup(rproject.tracks, layoutEdit.group)?.item ?? null) : null;
+  // 選到版型裡的素材（素材層）：把「畫面只露出來的範圍」畫成虛線框（版型旋轉也跟著轉），知道超出去的部分不會出現
+  const clipPts = useMemo(() => {
+    if (!sel || !selVisible || sel.item.type === 'audio' || !sel.item.group || isFrameItem(sel.item))
+      return undefined;
+    const fr = frameOfGroup(rproject.tracks, sel.item.group);
+    return fr ? groupClipArea(sel.item, fr.item, geo, width, height, { x: 0, y: 0 }, true) : undefined;
+  }, [sel, selVisible, rproject, geo, width, height]);
 
   const pointers = useRef(new Map<number, Pt>());
   const gesture = useRef<Gesture | null>(null);
@@ -202,7 +220,7 @@ export function Preview({
     return { x: ((e.clientX - r.left) / r.width) * width, y: ((e.clientY - r.top) / r.height) * height };
   };
 
-  /** 現在這個時間的物件（有定位的換成這個時間的位置、大小） */
+  /** 現在這個時間的物件（有定格的換成這個時間的位置、大小） */
   const findNow = (id: string | null) => {
     const t = useUI.getState().player?.time ?? 0;
     return findItem(timeResolved(useProjectStore.getState().project!, t), id);
@@ -230,7 +248,8 @@ export function Preview({
 
   const onPointerDown = (e: RPointerEvent) => {
     if ((e.target as HTMLElement).closest('[data-handle]')) return;
-    stageRef.current!.setPointerCapture(e.pointerId);
+    if (useUI.getState().frameEdit || useUI.getState().layoutEdit) return; // 正在調自訂比例／版型大小：預覽上的東西先不能動
+    baseRef.current!.setPointerCapture(e.pointerId);
     const pt = toProj(e);
     pointers.current.set(e.pointerId, pt);
     const st = useProjectStore.getState();
@@ -390,14 +409,21 @@ export function Preview({
     hitBoxes.sort((a, b) => Number(a.id === selectedId) - Number(b.id === selectedId));
   // 從時間軸選了一個現在不在畫面上的物件：沒有觸控區（選取框也不會顯示）
   const minHit = 44 / k;
+  // 預覽的底固定 9:16；版面在底裡面置中，外面蓋斜線（範圍外的東西也看得到、可以拖）
+  const lay = stageLayout(width, height);
+  const hasOut = lay.fx < 0.999 || lay.fy < 0.999;
+  const pc = (n: number) => `${(n * 100).toFixed(4)}%`;
+  const fl = (lay.offX / lay.baseW) * 100;
+  const ft = (lay.offY / lay.baseH) * 100;
+  const fr = fl + lay.fx * 100;
+  const fb = ft + lay.fy * 100;
 
   return (
-    <div className="stage-wrap" style={{ ['--inv-ratio' as string]: `${height / width}` }}>
+    <div className="stage-wrap">
       <div
-        ref={stageRef}
-        className="stage"
-        style={{ ['--ratio' as string]: `${width} / ${height}` }}
-        data-testid="stage"
+        ref={baseRef}
+        className="stage-base"
+        data-testid="stage-base"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -416,59 +442,115 @@ export function Preview({
             原色預覽中
           </div>
         )}
-
-        {(safe || dragging) && (
-          <div className="safe" aria-hidden="true" data-testid="safe-zone">
-            <div className="safe-bottom" style={{ height: `${SAFE_BOTTOM * 100}%` }}>
-              <span>IG／抖音按鈕區</span>
+        <AspectOverlay baseRef={baseRef} />
+        {hasOut && (
+          <>
+            <div
+              className="out-hatch"
+              data-testid="out-hatch"
+              aria-hidden="true"
+              style={{
+                clipPath: `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${fl}% ${ft}%, ${fl}% ${fb}%, ${fr}% ${fb}%, ${fr}% ${ft}%, ${fl}% ${ft}%)`,
+              }}
+            />
+            <div className="out-label" aria-hidden="true">
+              框內是影片輸出範圍 · {aspectLabel(project)}
             </div>
-            <div className="safe-right" style={{ width: `${SAFE_RIGHT * 100}%` }}>
-              <span>按鈕</span>
+          </>
+        )}
+        <div
+          ref={stageRef}
+          className={`stage${hasOut ? ' has-out' : ''}`}
+          data-testid="stage"
+          style={{
+            left: pc(lay.offX / lay.baseW),
+            top: pc(lay.offY / lay.baseH),
+            width: pc(lay.fx),
+            height: pc(lay.fy),
+          }}
+        >
+          {(safe || dragging) && (
+            <div className="safe" aria-hidden="true" data-testid="safe-zone">
+              <div className="safe-bottom" style={{ height: `${SAFE_BOTTOM * 100}%` }}>
+                <span>IG／抖音按鈕區</span>
+              </div>
+              <div className="safe-right" style={{ width: `${SAFE_RIGHT * 100}%` }}>
+                <span>按鈕</span>
+              </div>
             </div>
-          </div>
-        )}
-        {guides.x !== null && <div className="guide v" style={{ left: guides.x * k }} />}
-        {guides.y !== null && <div className="guide h" style={{ top: guides.y * k }} />}
+          )}
+          {guides.x !== null && <div className="guide v" style={{ left: guides.x * k }} />}
+          {guides.y !== null && <div className="guide h" style={{ top: guides.y * k }} />}
 
-        {box && sel && !cropping && (
-          <div
-            className={`selbox${selLocked ? ' locked' : ''}`}
-            data-testid="selbox"
-            style={{
-              left: box.cx * k,
-              top: box.cy * k,
-              width: box.w * k,
-              height: box.h * k,
-              transform: `translate(-50%, -50%) rotate(${box.rotation}deg)`,
-            }}
-          />
-        )}
-        {!cropping &&
-          hitBoxes.map(({ id, b }) => {
-            const pad = id === selectedId ? 40 / k : 0; // 選取中的物件觸控區外擴 40px，雙指比較好放（再大就擋住預覽上的捲頁面）
-            const w = Math.max(b.w, minHit) + pad * 2;
-            const h = Math.max(b.h, minHit) + pad * 2;
-            // 沒選取的大物件（滿版影片）：觸控區不擋捲動，只靠輕點選取；選取中的、小的物件：可以直接拖
-            const large = (b.w * b.h) / (width * height) >= LARGE_AREA;
-            const eager = id === selectedId || !large;
-            return (
-              <div
-                key={id}
-                className={`hit${eager ? '' : ' soft'}`}
-                data-hit={id}
-                data-eager={eager ? '1' : '0'}
+          {clipPts && !cropping && (
+            <>
+              <svg
+                className="clip-area"
+                data-testid="clip-area"
+                viewBox={`0 0 ${width} ${height}`}
+                preserveAspectRatio="none"
                 aria-hidden="true"
+              >
+                <polygon points={clipPts.map((p) => p.join(',')).join(' ')} />
+              </svg>
+              <span
+                className="clip-tag"
                 style={{
-                  left: b.cx * k,
-                  top: b.cy * k,
-                  width: w * k,
-                  height: h * k,
-                  transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
+                  left: Math.min(...clipPts.map((p) => p[0])) * k + 4,
+                  top: Math.min(...clipPts.map((p) => p[1])) * k + 4,
                 }}
-              />
-            );
-          })}
-        {cropping && <CropOverlay project={project} k={k} width={width} height={height} />}
+              >
+                {sel &&
+                sel.item.type !== 'text' &&
+                sel.item.type !== 'audio' &&
+                sel.item.cell &&
+                sel.item.group
+                  ? `第 ${cellTracksOf(rproject.tracks, sel.item.group).findIndex((t) => t.id === sel.track.id) + 1} 格`
+                  : '只露出這個範圍'}
+              </span>
+            </>
+          )}
+          {lrFrame && <LayoutResize frame={lrFrame} geo={geo} k={k} />}
+          {box && sel && !cropping && (
+            <div
+              className={`selbox${selLocked ? ' locked' : ''}${sel.item.group && !isFrameItem(sel.item) ? ' member' : ''}`}
+              data-level={sel.item.group ? (isFrameItem(sel.item) ? 'group' : 'member') : undefined}
+              data-testid="selbox"
+              style={{
+                left: box.cx * k,
+                top: box.cy * k,
+                width: box.w * k,
+                height: box.h * k,
+                transform: `translate(-50%, -50%) rotate(${box.rotation}deg)`,
+              }}
+            />
+          )}
+          {!cropping &&
+            hitBoxes.map(({ id, b }) => {
+              const pad = id === selectedId ? 40 / k : 0; // 選取中的物件觸控區外擴 40px，雙指比較好放（再大就擋住預覽上的捲頁面）
+              const w = Math.max(b.w, minHit) + pad * 2;
+              const h = Math.max(b.h, minHit) + pad * 2;
+              // 沒選取的大物件（滿版影片）：觸控區不擋捲動，只靠輕點選取；選取中的、小的物件：可以直接拖
+              const large = (b.w * b.h) / (width * height) >= LARGE_AREA;
+              const eager = id === selectedId || !large;
+              return (
+                <div
+                  key={id}
+                  className={`hit${eager ? '' : ' soft'}`}
+                  data-hit={id}
+                  data-eager={eager ? '1' : '0'}
+                  aria-hidden="true"
+                  style={{
+                    left: b.cx * k,
+                    top: b.cy * k,
+                    width: w * k,
+                    height: h * k,
+                    transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
+                  }}
+                />
+              );
+            })}
+        </div>
       </div>
       {emptyAction && (
         <button className="empty-import" onClick={emptyAction}>
