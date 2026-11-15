@@ -58,8 +58,12 @@ import { frameOfGroup, isFrameItem } from '../engine/layoutTracks';
 import { remapKeepOnStage } from '../engine/aspectRemap';
 import { geoCtx } from '../engine/scene';
 import {
+  buildIn,
   cellItem,
   cellRect,
+  cellTransform,
+  coverCrop,
+  defOf,
   inkFor,
   MAX_CELL_VIDEOS,
   planCell,
@@ -73,7 +77,7 @@ import {
   seamsOf,
   type TransitionAudioMode,
 } from '../engine/transitions';
-import { groupPatch, transformAbout } from '../engine/groupTransform';
+import { composeWith, groupPatch, transformAbout } from '../engine/groupTransform';
 import { DEFAULT_PULSE, type Pulse } from '../engine/pulse';
 import {
   hasKeyframes,
@@ -902,6 +906,96 @@ export function fillEmptyCells(group: string, assets: Asset[]): number {
     if (a && importIntoCell(t.id, a)) n++;
   });
   return n;
+}
+
+/**
+ * 版型改形狀（自訂格數的列欄、版型的長寬）：新的外框圖（已經重畫好）換掉外框素材，格子依新的排版換位置，
+ * 多出來的格子新增（空的）、少掉的格子拿掉（呼叫端要先確認）；格子裡的素材重新裁成填滿新的格子，版型裡的文字貼圖照比例換位置。
+ * 一步復原。
+ */
+export function applyLayoutShape(
+  group: string,
+  asset: Asset,
+  style: NonNullable<VideoItem['frameStyle']>,
+): void {
+  const p = store().project;
+  const fr = p && groupFrame(p, group);
+  if (!p || !fr) return;
+  const W = p.width;
+  const H = p.height;
+  const oldBox = fr.item.frameStyle?.box ?? { w: 1, h: 1 };
+  const newBox = style.box ?? { w: 1, h: 1 };
+  const b = buildIn(defOf(style), W, H, style.box);
+  const rs = b.panels.length ? b.panels : b.windows;
+  const l = Math.min(...rs.map((r) => r.x));
+  const tp = Math.min(...rs.map((r) => r.y));
+  const visible = {
+    x: l / W,
+    y: tp / H,
+    w: (Math.max(...rs.map((r) => r.x + r.w)) - l) / W,
+    h: (Math.max(...rs.map((r) => r.y + r.h)) - tp) / H,
+  };
+  const frac = (r: Rect) => ({ x: r.x / W, y: r.y / H, w: r.w / W, h: r.h / H });
+  store().apply((d) => {
+    if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    const frameTrack = d.tracks.find((t) => t.id === fr.track.id)!;
+    const frameItem = frameTrack.items.find((x) => x.id === fr.item.id) as VideoItem;
+    const cells = d.tracks.filter((t) => t.group === group && t.groupRole === 'cell');
+    b.windows.forEach((win, i) => {
+      let tr = cells[i];
+      if (!tr) {
+        tr = createTrack('media', d.tracks as Track[]);
+        tr.group = group;
+        tr.groupRole = 'cell';
+        tr.fill = '#000000';
+        d.tracks.splice(
+          d.tracks.findIndex((t) => t.id === frameTrack.id),
+          0,
+          tr,
+        );
+        tr = d.tracks.find((t) => t.id === tr!.id)!;
+        cells.push(tr);
+      }
+      tr.cell = frac(win);
+      for (const it of tr.items) {
+        if (it.type === 'text' || it.type === 'audio' || !it.cell) continue;
+        const a = d.assets.find((x) => x.id === it.assetId);
+        if (!a) continue;
+        // 自己裁切過（筆刷、自由形狀）的保留裁切；其他的重新裁成填滿新的格子
+        if (!it.cropEdit && !it.mask && !it.maskBitmap) {
+          const crop = coverCrop(a as Asset, win);
+          if (crop) it.crop = crop;
+          else delete it.crop;
+        }
+        const base = cellTransform(a as Asset, it.crop, win, W, H);
+        it.transform = {
+          ...composeWith(base, frameItem.transform as Transform, W, H),
+          opacity: it.transform.opacity,
+        };
+        it.cell = frac(win);
+        delete it.cellEdit;
+      }
+    });
+    // 少掉的格子：拿掉（連素材）
+    d.tracks = d.tracks.filter(
+      (t) => !(t.group === group && t.groupRole === 'cell' && cells.indexOf(t) >= b.windows.length),
+    ) as never;
+    // 版型的大小變了：版型裡的文字、貼圖照比例換位置（版型在畫面正中央排版）
+    if (Math.abs(newBox.w - oldBox.w) > 1e-6 || Math.abs(newBox.h - oldBox.h) > 1e-6) {
+      const kx = newBox.w / oldBox.w;
+      const ky = newBox.h / oldBox.h;
+      for (const t of d.tracks)
+        for (const it of t.items) {
+          if (it.group !== group || it.id === frameItem.id || it.type === 'audio') continue;
+          if (it.type !== 'text' && it.cell) continue;
+          it.transform.x = 0.5 + (it.transform.x - 0.5) * kx;
+          it.transform.y = 0.5 + (it.transform.y - 0.5) * ky;
+        }
+    }
+    frameItem.assetId = asset.id;
+    frameItem.frameStyle = { ...style };
+    frameItem.visible = visible;
+  });
 }
 
 /**

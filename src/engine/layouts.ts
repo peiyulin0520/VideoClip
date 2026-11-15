@@ -9,7 +9,16 @@ import { croppedSource, fittedSize } from './geometry';
 
 export type Rect = { x: number; y: number; w: number; h: number };
 export type LayoutId =
-  'booth-strip' | 'booth-2x2' | 'film-h' | 'film-v' | 'polaroid' | 'split-2' | 'split-3' | 'grid-9';
+  | 'booth-strip'
+  | 'booth-2x2'
+  | 'film-h'
+  | 'film-v'
+  | 'polaroid'
+  | 'split-2'
+  | 'split-1x2'
+  | 'split-3'
+  | 'grid-9'
+  | 'grid';
 
 export type FrameColor = { id: string; name: string; color: string };
 export const FRAME_COLORS: FrameColor[] = [
@@ -278,6 +287,18 @@ const RAW_LAYOUTS: LayoutDef[] = [
     },
   },
   {
+    id: 'split-1x2',
+    name: '左右雙格',
+    hint: '畫面切成左右兩格，中間細白線',
+    cells: 2,
+    build(W, H) {
+      const m = W * 0.015;
+      const gap = W * 0.012;
+      const wins = gridIn(rect(m, m, W - 2 * m, H - 2 * m), 2, 1, gap);
+      return { windows: wins, panels: [rect(0, 0, W, H)], holes: [], radius: m * 0.6 };
+    },
+  },
+  {
     id: 'split-3',
     name: '三格',
     hint: '上面 1 大格、下面 2 小格',
@@ -352,6 +373,64 @@ export const LAYOUTS: LayoutDef[] = RAW_LAYOUTS.map((d) => ({
 
 export const layoutById = (id: LayoutId): LayoutDef => LAYOUTS.find((l) => l.id === id)!;
 
+/** 自訂格數：rows 列 × cols 欄，格子填滿整個版型範圍（格子形狀跟著版型的長寬） */
+export const GRID_MAX = 4;
+export function gridDef(rows: number, cols: number): LayoutDef {
+  const r = Math.min(Math.max(Math.round(rows), 1), GRID_MAX);
+  const c = Math.min(Math.max(Math.round(cols), 1), GRID_MAX);
+  return {
+    id: 'grid',
+    name: `自訂 ${r}×${c}`,
+    hint: `${r} 列 × ${c} 欄，共 ${r * c} 格`,
+    cells: r * c,
+    build: (W: number, H: number) =>
+      fitInCanvas(
+        (() => {
+          const m = W * 0.02;
+          const gap = W * 0.012;
+          const wins = gridIn(rect(m, m, W - 2 * m, H - 2 * m), c, r, gap);
+          return { windows: wins, panels: [rect(0, 0, W, H)], holes: [], radius: m * 0.4 };
+        })(),
+        W,
+        H,
+      ),
+  };
+}
+
+/** 版型的形狀（存在外框的 frameStyle 裡）：哪個版型、自訂格數的列欄、版型占畫面的寬高比例（沒有＝整個畫面） */
+export type LayoutShape = {
+  layout: string;
+  rows?: number;
+  cols?: number;
+  box?: { w: number; h: number };
+};
+
+/** 照形狀找出版型定義（自訂格數＝依列欄產生） */
+export function defOf(shape: LayoutShape): LayoutDef {
+  if (shape.layout === 'grid') return gridDef(shape.rows ?? 2, shape.cols ?? 2);
+  return layoutById(shape.layout as LayoutId);
+}
+
+/**
+ * 依畫面（W×H）與版型占的比例 box 排版：先照 box 的大小排好，再整個放到畫面正中央。
+ * 沒給 box＝整個畫面（跟以前一樣）。
+ */
+export function buildIn(
+  def: LayoutDef,
+  W: number,
+  H: number,
+  box?: { w: number; h: number },
+): ReturnType<LayoutDef['build']> {
+  if (!box || (box.w >= 0.999 && box.h >= 0.999)) return def.build(W, H);
+  const bw = W * box.w;
+  const bh = H * box.h;
+  const b = def.build(bw, bh);
+  const dx = (W - bw) / 2;
+  const dy = (H - bh) / 2;
+  const mv = (r: Rect): Rect => ({ ...r, x: r.x + dx, y: r.y + dy });
+  return { windows: b.windows.map(mv), panels: b.panels.map(mv), holes: b.holes.map(mv), radius: b.radius };
+}
+
 /** 外框顏色（色碼）的亮度 0～1；版型文字用它挑深字或淺字 */
 export function colorLuma(hex: string): number {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
@@ -373,8 +452,9 @@ export function paintFrame(
   color: string,
   windowFill?: string,
   opacity = 1,
+  box?: { w: number; h: number },
 ) {
-  const b = def.build(W, H);
+  const b = buildIn(def, W, H, box);
   const rr = (r: Rect, radius: number) => {
     ctx.roundRect(r.x, r.y, r.w, r.h, Math.min(radius, r.w / 2, r.h / 2));
   };
@@ -403,11 +483,12 @@ export async function renderFramePng(
   H: number,
   color: string,
   opacity = 1,
+  box?: { w: number; h: number },
 ): Promise<Blob> {
   const c = document.createElement('canvas');
   c.width = Math.round(W);
   c.height = Math.round(H);
-  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity);
+  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity, box);
   return new Promise((ok, bad) =>
     c.toBlob((b) => (b ? ok(b) : bad(new Error('外框轉成圖片失敗'))), 'image/png'),
   );

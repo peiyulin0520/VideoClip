@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { itemTitle, thumbOf } from '../../engine/labels';
 import { frameOfGroup } from '../../engine/layoutTracks';
-import { layoutById, paintFrame, type LayoutId } from '../../engine/layouts';
+import { defOf, paintFrame } from '../../engine/layouts';
 import type { Project } from '../../model/types';
 import { cellMain } from '../../store/actions';
 
@@ -32,9 +32,19 @@ export function LayoutDiagram({
     const w = 160 * 2;
     c.width = w;
     c.height = Math.round((w * H) / W);
-    const def = layoutById(style.layout as LayoutId);
-    if (def) paintFrame(c.getContext('2d')!, def, c.width, c.height, style.color, undefined, style.opacity);
-  }, [style?.layout, style?.color, style?.opacity, W, H]); // eslint-disable-line react-hooks/exhaustive-deps
+    const def = defOf(style);
+    if (def)
+      paintFrame(
+        c.getContext('2d')!,
+        def,
+        c.width,
+        c.height,
+        style.color,
+        undefined,
+        style.opacity,
+        style.box,
+      );
+  }, [style, W, H]);
 
   return (
     <div className="layout-diagram" data-testid="layout-diagram" style={{ aspectRatio: `${W} / ${H}` }}>

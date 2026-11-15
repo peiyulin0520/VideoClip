@@ -1,11 +1,14 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { Project } from '../../../model/types';
+import { GRID_MAX } from '../../../engine/layouts';
+import type { Project, VideoItem } from '../../../model/types';
+import { useUI } from '../../../store/uiStore';
+import { ConfirmSheet } from '../../../ui/Sheet';
 import { removeGroup } from '../../../store/actions';
 import { FrameStyleControls } from '../FrameStyleControls';
-import { restyleFrame } from '../frameRestyle';
+import { reshapeLayout, restyleFrame } from '../frameRestyle';
 import { useProjectStore } from '../../../store/projectStore';
-import { frameOfGroup } from '../../../engine/layoutTracks';
+import { cellTracksOf, frameOfGroup } from '../../../engine/layoutTracks';
 import { CellSheet } from '../CellSheet';
 import { LayoutDiagram } from '../LayoutDiagram';
 import { LayoutPicker } from '../LayoutPicker';
@@ -64,6 +67,77 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
           opacity={frame.frameStyle.opacity}
         />
       )}
+      {frame.frameStyle && <ShapeControls project={project} group={group} frame={frame} />}
+    </div>
+  );
+}
+
+/** 版型的大小（預覽上拖邊）與自訂格數的列、欄（加減）。舊版型（沒有記錄用哪個版型）沒有 */
+function ShapeControls({ project, group, frame }: { project: Project; group: string; frame: VideoItem }) {
+  const style = frame.frameStyle!;
+  const cells = cellTracksOf(project.tracks, group);
+  const [ask, setAsk] = useState<{ rows: number; cols: number; lost: number } | null>(null);
+  const player = useUI((s) => s.player);
+  const rows = style.rows ?? 2;
+  const cols = style.cols ?? 2;
+  const setGrid = (r: number, c: number) => {
+    const lost = cells.slice(r * c).filter((t) => t.items.length > 0).length;
+    if (lost > 0) setAsk({ rows: r, cols: c, lost });
+    else void reshapeLayout(group, { rows: r, cols: c });
+  };
+  const box = style.box ?? { w: 1, h: 1 };
+  return (
+    <div className="zone-soft" data-testid="layout-shape">
+      <div className="slider-label">版型的大小與格數</div>
+      <button
+        className="btn"
+        data-testid="layout-resize"
+        onClick={() => {
+          player?.pause();
+          useUI.setState({ layoutEdit: { group, sx: 1, sy: 1 } });
+        }}
+      >
+        調整版型大小（在預覽上拖邊，現在 {Math.round(box.w * 100)}% × {Math.round(box.h * 100)}%）
+      </button>
+      {style.layout === 'grid' && (
+        <div className="grid-steppers" data-testid="shape-steppers">
+          {(
+            [
+              ['rows', '列數', rows],
+              ['cols', '欄數', cols],
+            ] as const
+          ).map(([key, name, val]) => (
+            <div className="stepper" key={key} role="group" aria-label={`這個版型的${name}`}>
+              <span>{name}</span>
+              <button
+                className="chip"
+                aria-label={`這個版型的${name} 減 1`}
+                disabled={val <= 1}
+                onClick={() => setGrid(key === 'rows' ? rows - 1 : rows, key === 'cols' ? cols - 1 : cols)}
+              >
+                －
+              </button>
+              <b data-testid={`shape-${key}`}>{val}</b>
+              <button
+                className="chip"
+                aria-label={`這個版型的${name} 加 1`}
+                disabled={val >= GRID_MAX}
+                onClick={() => setGrid(key === 'rows' ? rows + 1 : rows, key === 'cols' ? cols + 1 : cols)}
+              >
+                ＋
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <ConfirmSheet
+        open={!!ask}
+        title="格數變少"
+        message={`多出來的格子會拿掉，裡面的 ${ask?.lost ?? 0} 個素材也會一起拿掉。要繼續嗎？`}
+        confirmText="拿掉，改格數"
+        onConfirm={() => ask && void reshapeLayout(group, { rows: ask.rows, cols: ask.cols })}
+        onClose={() => setAsk(null)}
+      />
     </div>
   );
 }

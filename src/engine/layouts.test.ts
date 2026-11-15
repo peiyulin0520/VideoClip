@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { Asset } from '../model/types';
 import { itemBox, type GeoCtx } from './geometry';
-import { cellItem, cellRect, cellTransform, coverCrop, LAYOUTS, planCell, type Rect } from './layouts';
+import {
+  buildIn,
+  cellItem,
+  cellRect,
+  cellTransform,
+  coverCrop,
+  defOf,
+  GRID_MAX,
+  gridDef,
+  LAYOUTS,
+  layoutById,
+  planCell,
+  type Rect,
+} from './layouts';
 
 const SIZES: [string, number, number][] = [
   ['9:16', 1080, 1920],
@@ -130,5 +143,44 @@ describe('planCell', () => {
   });
   it('素材比格子長：keep 只用前面', () => {
     expect(planCell(10, 3, 'keep')).toEqual({ speed: 1, duration: 3, offset: 0, blank: null });
+  });
+});
+
+describe('版型 v2：左右雙格、自訂格數、版型大小', () => {
+  it('左右雙格：兩格左右並排、同高', () => {
+    const b = layoutById('split-1x2').build(1080, 1920);
+    expect(b.windows).toHaveLength(2);
+    expect(b.windows[0]!.y).toBeCloseTo(b.windows[1]!.y, 6);
+    expect(b.windows[0]!.x + b.windows[0]!.w).toBeLessThan(b.windows[1]!.x);
+  });
+  it('gridDef：列×欄格數、不重疊、都在版型範圍內；超出範圍的列欄被夾住', () => {
+    const d = gridDef(3, 2);
+    const b = d.build(1000, 1000);
+    expect(b.windows).toHaveLength(6);
+    for (const w of b.windows) {
+      expect(w.x).toBeGreaterThanOrEqual(0);
+      expect(w.x + w.w).toBeLessThanOrEqual(1000.001);
+      expect(w.y + w.h).toBeLessThanOrEqual(1000.001);
+    }
+    expect(gridDef(9, 9).cells).toBe(GRID_MAX * GRID_MAX);
+    expect(gridDef(0, 0).cells).toBe(1);
+  });
+  it('buildIn：沒給大小＝整個畫面；給大小＝縮小後置中，格子長寬比例跟著版型', () => {
+    const d = gridDef(1, 2);
+    const full = buildIn(d, 1000, 2000);
+    expect(full.windows[0]!.h).toBeGreaterThan(1500);
+    const small = buildIn(d, 1000, 2000, { w: 0.5, h: 0.25 });
+    // 版型寬 500、高 500，放在畫面正中央（x 從 250、y 從 750）
+    const xs = small.windows.map((w) => w.x);
+    const ys = small.windows.map((w) => w.y);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(250);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(750);
+    expect(Math.max(...small.windows.map((w) => w.x + w.w))).toBeLessThanOrEqual(750.001);
+    expect(Math.max(...small.windows.map((w) => w.y + w.h))).toBeLessThanOrEqual(1250.001);
+    expect(small.panels[0]).toMatchObject({ x: 250, y: 750, w: 500, h: 500 });
+  });
+  it('defOf：自訂格數依列欄產生，其他依 id', () => {
+    expect(defOf({ layout: 'grid', rows: 2, cols: 3 }).cells).toBe(6);
+    expect(defOf({ layout: 'booth-2x2' }).cells).toBe(4);
   });
 });

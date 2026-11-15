@@ -3875,3 +3875,52 @@ button:not(:disabled):active,
   pointer-events: none;
   white-space: nowrap;
 }
+/* 自訂格數：列數、欄數的加減 */
+.grid-steppers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em 1.4em;
+  margin: 6px 0;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.stepper b {
+  min-width: 1.2em;
+  text-align: center;
+}
+/* 調整版型大小：版型現在占的範圍（跟著版型旋轉）＋把手；框貼到邊時把手往框內縮 */
+.lr-frame {
+  position: absolute;
+  outline: 2px dashed var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  z-index: 9;
+}
+.lr-frame .crop-h {
+  pointer-events: auto;
+}
+.lr-frame .crop-h.l,
+.lr-frame .crop-h.tl,
+.lr-frame .crop-h.bl {
+  left: 22px;
+}
+.lr-frame .crop-h.r,
+.lr-frame .crop-h.tr,
+.lr-frame .crop-h.br {
+  left: calc(100% - 22px);
+}
+.lr-frame .crop-h.t,
+.lr-frame .crop-h.tl,
+.lr-frame .crop-h.tr {
+  top: 22px;
+}
+.lr-frame .crop-h.b,
+.lr-frame .crop-h.bl,
+.lr-frame .crop-h.br {
+  top: calc(100% - 22px);
+}
+.lr-card {
+  z-index: 10;
+}

@@ -111,3 +111,87 @@ test('L5 選到版型裡的素材時，預覽上有一個虛線框＋「只露�
   await selectFrame(page);
   await expect(page.getByTestId('clip-area')).toHaveCount(0);
 });
+
+test('L7 版型格式：有「左右雙格」「上下雙格」和「自訂格數」；自訂 3 列 × 2 欄 → 6 格；選到後可以加減列欄（少格要確認）', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await createProjectWith(page, ['solid-blue.webm']);
+  await openTab(page, '版型');
+  await expect(page.getByRole('button', { name: '版型 左右雙格', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '版型 上下雙格', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '版型 自訂格數', exact: true }).tap();
+  await expect(page.getByTestId('grid-rows')).toHaveText('2');
+  await page.getByRole('button', { name: '列數 加 1' }).tap();
+  await page.getByTestId('layout-confirm').tap();
+  await expect(page.getByTestId('layout-options')).toHaveCount(0, { timeout: 30_000 });
+  const cellsOf = async () => (await tracks(page)).filter((t) => t.groupRole === 'cell');
+  expect(await cellsOf()).toHaveLength(6); // 3 列 × 2 欄
+  // 選到的版型：加欄 → 9 格；放一個素材到最後一格後減欄 → 要確認
+  await expect(page.getByTestId('shape-rows')).toHaveText('3');
+  await page.getByRole('button', { name: '這個版型的欄數 加 1' }).tap();
+  await expect.poll(async () => (await cellsOf()).length).toBe(9);
+  await page.getByTestId('ld-cell').nth(8).tap();
+  await page.getByTestId('cell-assets').getByRole('button').first().tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
+  await page.getByRole('button', { name: '這個版型的欄數 減 1' }).tap();
+  await expect(page.getByRole('dialog', { name: '格數變少' })).toBeVisible();
+  await page.getByRole('button', { name: '拿掉，改格數' }).tap();
+  await expect.poll(async () => (await cellsOf()).length).toBe(6);
+  await page.screenshot({ path: `${SHOT}/layout-custom-grid.png` });
+});
+
+test('L7 調整版型大小：預覽上拖右邊把手往左 → 套用 → 版型變窄（外框 box、格子都變）；一步復原', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await createProjectWith(page, ['solid-blue.webm']);
+  await openTab(page, '版型');
+  await page.getByRole('button', { name: '版型 上下雙格', exact: true }).tap();
+  await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]);
+  await selectFrame(page);
+  await openTab(page, '版型');
+  const frameOf = async () =>
+    (await tracks(page))
+      .flatMap((t) => t.items)
+      .find((i) => i.group && !i.cell && i.type !== 'text') as unknown as {
+      frameStyle?: { box?: { w: number; h: number } };
+    };
+  expect(frameOf().then((f) => f.frameStyle?.box)).resolves.toBeUndefined();
+  const w0 = (await tracks(page)).filter((t) => t.groupRole === 'cell')[0]!.items[0]!.cell!.w;
+  await page.getByTestId('layout-resize').tap();
+  await expect(page.getByTestId('layout-resize-frame')).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const h = (await page.getByTestId('layout-h-r').boundingBox())!;
+  const x = h.x + h.width / 2;
+  const y = h.y + h.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - 60, y, { steps: 6 });
+  await page.mouse.move(x - 120, y, { steps: 6 });
+  await page.mouse.up();
+  await expect(page.getByTestId('layout-resize-text')).toContainText('高 100%');
+  const txt = await page.getByTestId('layout-resize-text').innerText();
+  const wPct = Number(/寬 (\d+)%/.exec(txt)![1]);
+  expect(wPct).toBeLessThan(90);
+  await page.getByTestId('layout-resize-apply').tap();
+  await expect
+    .poll(async () => (await frameOf()).frameStyle?.box?.w ?? 1, { timeout: 15_000 })
+    .toBeLessThan(0.9);
+  const cells = (await tracks(page)).filter((t) => t.groupRole === 'cell');
+  expect(cells[0]!.items[0]!.cell!.w).toBeLessThan(w0);
+  // 每一格還是被素材填滿（格子中心看得到紅、綠）
+  const c0 = cells[0]!.items[0]!.cell!;
+  const c1 = cells[1]!.items[0]!.cell!;
+  await seekTo(page, 1);
+  await expect
+    .poll(async () => isRed(await samplePreview(page, c0.x + c0.w / 2, c0.y + c0.h / 2)))
+    .toBe(true);
+  await expect
+    .poll(async () => isGreen(await samplePreview(page, c1.x + c1.w / 2, c1.y + c1.h / 2)))
+    .toBe(true);
+  await page.screenshot({ path: `${SHOT}/layout-resized.png` });
+  // 復原 → 回到整個畫面
+  await page.getByRole('button', { name: '復原' }).tap();
+  await expect.poll(async () => (await frameOf()).frameStyle?.box).toBeUndefined();
+});

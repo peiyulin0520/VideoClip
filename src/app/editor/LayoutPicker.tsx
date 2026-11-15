@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ensureUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { formatTime } from '../../engine/timeline';
-import { LAYOUTS, paintFrame, renderFramePng, type LayoutDef } from '../../engine/layouts';
+import { GRID_MAX, LAYOUTS, gridDef, paintFrame, renderFramePng, type LayoutDef } from '../../engine/layouts';
 import { addLayout } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
@@ -66,6 +66,7 @@ export function LayoutPicker() {
   const [frameColor, setFrameColor] = useState('#ffffff');
   const [frameOpacity, setFrameOpacity] = useState(1);
   const [withText, setWithText] = useState(true);
+  const [grid, setGrid] = useState({ rows: 2, cols: 2 }); // 自訂格數
   const W = project.width;
   const H = project.height;
 
@@ -102,7 +103,12 @@ export function LayoutPicker() {
           w: Math.max(...rs.map((r) => r.x + r.w)) - l,
           h: Math.max(...rs.map((r) => r.y + r.h)) - tp,
         },
-        frameStyle: { layout: def.id, color, opacity: frameOpacity },
+        frameStyle: {
+          layout: def.id,
+          color,
+          opacity: frameOpacity,
+          ...(def.id === 'grid' ? { rows: grid.rows, cols: grid.cols } : {}),
+        },
         texts: withText ? def.texts?.(b, W, todayText()) : undefined,
       });
       setDef(null);
@@ -121,17 +127,17 @@ export function LayoutPicker() {
         <span>新增版型（拍貼機、膠卷…）</span>
       </div>
       <div className="layout-grid" data-testid="layout-grid">
-        {LAYOUTS.map((l) => (
+        {[...LAYOUTS, gridDef(grid.rows, grid.cols)].map((l) => (
           <button
             key={l.id}
             className={`layout-card${def?.id === l.id ? ' active' : ''}`}
-            aria-label={`版型 ${l.name}`}
+            aria-label={l.id === 'grid' ? '版型 自訂格數' : `版型 ${l.name}`}
             aria-pressed={def?.id === l.id}
             data-layout={l.id}
-            onClick={() => setDef(l)}
+            onClick={() => setDef(l.id === 'grid' ? gridDef(grid.rows, grid.cols) : l)}
           >
             <LayoutThumb def={l} W={W} H={H} color={frameColor} opacity={frameOpacity} />
-            <span>{l.name}</span>
+            <span>{l.id === 'grid' ? '自訂格數' : l.name}</span>
           </button>
         ))}
       </div>
@@ -140,6 +146,45 @@ export function LayoutPicker() {
           <p className="hint">
             {def.name}（{def.cells} 格）：{def.hint}。
           </p>
+          {def.id === 'grid' && (
+            <div className="grid-steppers" data-testid="grid-steppers">
+              {(
+                [
+                  ['rows', '列數'],
+                  ['cols', '欄數'],
+                ] as const
+              ).map(([key, name]) => (
+                <div className="stepper" key={key} role="group" aria-label={name}>
+                  <span>{name}</span>
+                  <button
+                    className="chip"
+                    aria-label={`${name} 減 1`}
+                    disabled={grid[key] <= 1}
+                    onClick={() => {
+                      const g = { ...grid, [key]: grid[key] - 1 };
+                      setGrid(g);
+                      setDef(gridDef(g.rows, g.cols));
+                    }}
+                  >
+                    －
+                  </button>
+                  <b data-testid={`grid-${key}`}>{grid[key]}</b>
+                  <button
+                    className="chip"
+                    aria-label={`${name} 加 1`}
+                    disabled={grid[key] >= GRID_MAX}
+                    onClick={() => {
+                      const g = { ...grid, [key]: grid[key] + 1 };
+                      setGrid(g);
+                      setDef(gridDef(g.rows, g.cols));
+                    }}
+                  >
+                    ＋
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="panel-head">
             <span>外框顏色</span>
           </div>

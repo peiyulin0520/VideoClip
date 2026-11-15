@@ -26,6 +26,8 @@ type UI = {
   frameEdit: { fx: number; fy: number; fill: boolean } | null;
   /** 選到版型（或版型裡的東西）時，新增文字／貼圖／音效預設加進那個版型；使用者在各分頁關掉＝這個旗標 true */
   addToGroupOff: boolean;
+  /** 調整版型大小：預覽上正在拖版型的邊（sx、sy＝相對於開始時的寬、高倍數）；沒有＝沒在調 */
+  layoutEdit: { group: string; sx: number; sy: number } | null;
 };
 
 export const useUI = create<UI>((set, get) => ({
@@ -46,6 +48,7 @@ export const useUI = create<UI>((set, get) => ({
   gradeScope: null,
   frameEdit: null,
   addToGroupOff: false,
+  layoutEdit: null,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

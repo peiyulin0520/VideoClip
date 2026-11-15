@@ -179,7 +179,16 @@ export type VideoItem = ItemBase & {
   /** 版型外框專用：看得到的範圍（佔整張外框圖的比例）；選取框、點選範圍用它，不用整張透明的圖 */
   visible?: { x: number; y: number; w: number; h: number };
   /** 版型外框專用：用哪個版型、外框的顏色與透明度（之後改顏色要重畫外框圖用；舊專案沒有） */
-  frameStyle?: { layout: string; color: string; opacity: number };
+  frameStyle?: {
+    layout: string;
+    color: string;
+    opacity: number;
+    /** 自訂格數（layout==='grid'）的列、欄 */
+    rows?: number;
+    cols?: number;
+    /** 版型占畫面的寬、高比例（沒有＝整個畫面）；調整版型大小會改它 */
+    box?: { w: number; h: number };
+  };
   /** 版型外框專用：整個版型的動畫（捲動＝由下往上捲過畫面；滑入滑出＝開頭從右邊滑進來、結尾往左滑出去） */
   motion?: 'drift' | 'slide';
   /** 動態模板的格子：格子的範圍從 from（佔畫面寬、高的比例）在 t0–t1 秒（片段開始後）滑到 cell；之前停在 from */

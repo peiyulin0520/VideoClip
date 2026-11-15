@@ -53,7 +53,7 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
 }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '版型');
-  await expect(page.getByTestId('layout-grid').locator('.layout-card')).toHaveCount(8);
+  await expect(page.getByTestId('layout-grid').locator('.layout-card')).toHaveCount(10);
   await page.screenshot({ path: `${SHOT}/picker.png` });
   await addLayout(page, '拍貼機直條', '黑', ['solid-red.webm', 'solid-green.webm']);
 

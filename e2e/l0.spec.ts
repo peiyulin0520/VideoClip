@@ -142,7 +142,7 @@ test('L2 版型分頁只挑版型：沒有特效／動畫／長度；按鈕寫�
   await showTimeline(page);
   await seekTo(page, 2);
   await openTab(page, '版型');
-  await expect(page.getByTestId('layout-grid').locator('.layout-card')).toHaveCount(8);
+  await expect(page.getByTestId('layout-grid').locator('.layout-card')).toHaveCount(10);
   await page.getByRole('button', { name: '版型 三格', exact: true }).tap();
   // 版型自己才有的設定在這裡；特效、動畫、長度不在
   await expect(page.getByTestId('layout-options')).toBeVisible();

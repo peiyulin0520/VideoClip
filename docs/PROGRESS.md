@@ -81,6 +81,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 版型 v2 · L7 版型長寬可調、左右雙格、自訂格數（Sonnet 實作）
+  - 做了什麼：①新版型「**左右雙格**」（原本的「上下雙格」就是 2×1）；②「**自訂格數**」卡片：挑版型時選 1～4 列 × 1～4 欄（`gridDef`，格子填滿整個版型範圍），已加入的自訂版型在版型分頁也能加減列欄（`這個版型的列數／欄數 加減`；少格時 `ConfirmSheet`「多出來的格子會拿掉，裡面的 N 個素材也會一起拿掉」）；③**版型長寬可調**：選到整個版型 → 版型分頁「調整版型大小」→ 預覽上出現虛線框（版型現在的範圍，版型旋轉也跟著轉）＋四邊四角把手，寬、高可以分開拉（以版型中心對稱，最小 25%），中間小卡顯示「寬 N% × 高 N%」、右上 ✕、「套用」才重排；④重排的做法：`frameStyle` 多存 `rows`、`cols`、`box`（版型占畫面的比例）；`buildIn(def, W, H, box)` 先照 box 排版再置中；`applyLayoutShape`（store）一次換外框素材、格子位置（多的新增空格、少的拿掉）、格子素材重新裁成填滿新格子（自己裁切過的保留裁切）、版型裡的文字貼圖照比例換位置，一步復原；`reshapeLayout`（`frameRestyle.ts`）負責重畫外框 PNG
+  - 動了哪些檔：`engine/layouts.ts`（`split-1x2`、`gridDef`、`defOf`、`buildIn`、`paintFrame／renderFramePng` 多 box 參數）、`model/types.ts`、`store/{actions,uiStore}.ts`、新 `app/editor/LayoutResize.tsx`、`app/editor/{LayoutPicker,LayoutDiagram,frameRestyle,Preview}.tsx`、`app/editor/tabs/LayoutTab.tsx`、`styles.css`；測試 `engine/layouts.test.ts`（新版型、gridDef、buildIn）、`store/layoutEmpty.test.ts`（applyLayoutShape）、`e2e/l5.spec.ts` 加自訂格數／調整大小，`layout.spec`／`l0.spec` 卡片數 8→10
+  - 驗證：✅ 單元（左右雙格、自訂格數、buildIn、applyLayoutShape 含復原）、e2e（自訂 3×2→6 格；選到後加欄→9 格；放素材後減欄要確認；拖右邊把手往左→套用→版型變窄、每格仍有紅／綠、復原回整個畫面）、全部 e2e 279 個、`npm run check`  🟡 沒在真 iPhone 驗（把手好不好抓、版型旋轉時的虛線框）
+  - 跟規劃不同：①自訂格數的列、欄最多各 4（`GRID_MAX`）；②舊版型（沒有 `frameStyle`）不能調整大小／格數；③調整大小時被單獨放大／平移過的格子（`cellEdit`）會重新填滿格子（那些調整會清掉）
+  - 下一步：L8 版型內圖層順序（成員軌可換上下、只在版型範圍內）；L6 按鈕分區
 - 2026-11-15 版型 v2 · L5 補充：旋轉也有範圍、顯示「只露出這個範圍」（Sonnet 實作）
   - 使用者回饋：①文字／貼圖不是只能放在「外框範圍」，而是外框線以內的**所有**範圍（含邊框、格子），不能碰到版型以外的地方（現在就是這樣：遮罩＝外框線以內）；②問「歸位」是什麼（＝圖層分頁的「位置、大小、旋轉歸位」按鈕）；③**版型旋轉時也要有範圍，或留下版型框**，讓人知道留下的畫面會怎樣
   - 做了什麼：`groupClipArea`（四個頂點，含旋轉）取代矩形版；遮罩支援多邊形（`SceneLayer.clip.poly`），版型旋轉時文字、貼圖、單獨動過的格子也只露出轉過的範圍；選到版型裡的素材時，預覽上畫**虛線框＋「只露出這個範圍」**（`.clip-area`、`.clip-tag`，版型旋轉也跟著轉；格子＝那一格，文字／貼圖＝外框線以內）；選整個版型時不顯示

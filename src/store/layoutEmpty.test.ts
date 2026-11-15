@@ -135,3 +135,62 @@ describe('版型成員（文字、音效）', () => {
     expect(s().project!.tracks.filter((t) => t.group === g)).toHaveLength(0);
   });
 });
+
+describe('applyLayoutShape（版型長寬、自訂格數）', () => {
+  it('縮小版型：格子換位置、格子裡的素材重新裡成填滿；加一格變 3 格；少掉的格子拿掉；一步復原', async () => {
+    const { applyLayoutShape } = await import('./actions');
+    const g = mk(wins.slice(0, 2).map((win, i) => ({ asset: asset(`a${i}`), win })));
+    s().apply((d) => {
+      const fr = frameOfGroup(d.tracks as Track[], g)!;
+      (
+        d.tracks.find((t) => t.id === fr.track.id)!.items.find((x) => x.id === fr.item.id) as {
+          frameStyle?: unknown;
+        }
+      ).frameStyle = {
+        layout: 'grid',
+        rows: 1,
+        cols: 2,
+        color: '#ffffff',
+        opacity: 1,
+      };
+    });
+    const before = cellTracks().map((t) => t.cell!);
+    // 版型縮到 50% × 50%，改成 1×3
+    applyLayoutShape(g, asset('f2'), {
+      layout: 'grid',
+      rows: 1,
+      cols: 3,
+      color: '#ffffff',
+      opacity: 1,
+      box: { w: 0.5, h: 0.5 },
+    });
+    const cs = cellTracks();
+    expect(cs).toHaveLength(3);
+    // 格子都排進畫面正中央 50% 的範圍裡
+    for (const t of cs) {
+      expect(t.cell!.x).toBeGreaterThanOrEqual(0.25 - 1e-6);
+      expect(t.cell!.x + t.cell!.w).toBeLessThanOrEqual(0.75 + 1e-6);
+    }
+    expect(cs[2]!.items).toHaveLength(0); // 新增的格子是空的
+    const it = cs[0]!.items[0]! as { cell: unknown; transform: { scale: number } };
+    expect(it.cell).toEqual(cs[0]!.cell);
+    const fr = frameOfGroup(s().project!.tracks, g)!.item;
+    expect(fr.frameStyle!.box).toEqual({ w: 0.5, h: 0.5 });
+    expect(fr.visible!.w).toBeCloseTo(0.5, 6); // 版型看得到的範圍＝畫面一半
+    // 改成 1×1：多的格子（含素材）拿掉
+    applyLayoutShape(g, asset('f3'), {
+      layout: 'grid',
+      rows: 1,
+      cols: 1,
+      color: '#ffffff',
+      opacity: 1,
+      box: { w: 0.5, h: 0.5 },
+    });
+    expect(cellTracks()).toHaveLength(1);
+    // 復原兩次回到原本 2 格
+    s().undo();
+    s().undo();
+    expect(cellTracks()).toHaveLength(2);
+    expect(cellTracks()[0]!.cell).toEqual(before[0]);
+  });
+});
