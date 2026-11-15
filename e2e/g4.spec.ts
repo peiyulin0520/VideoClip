@@ -13,6 +13,8 @@ import {
   selectedItemId,
   showTimeline,
   isFrameTrack,
+  finishLayout,
+  trimClipEnd,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g4';
@@ -35,10 +37,8 @@ async function addLayout(page: Page, name: string, files: string[], motion?: str
   const more = page.getByTestId('layout-add-more');
   if (await more.isVisible()) await more.tap();
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
-  await expect(page.getByTestId('layout-sheet')).toBeVisible();
-  if (motion) await page.getByRole('radio', { name: `動畫 ${motion}` }).tap();
-  await page.getByTestId('layout-input').setInputFiles(files.map(fixture));
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByTestId('layout-options')).toBeVisible();
+  await finishLayout(page, files.map(fixture), { motion });
 }
 const members = (tr: Tr[]) => tr.filter((t) => t.groupRole).flatMap((t) => t.items);
 
@@ -110,11 +110,12 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   await expect.poll(() => selectedItemId(page)).toBe(cell2.id);
   await page.screenshot({ path: `${SHOT}/group-panel.png` });
 
-  // 版型多 1 秒
+  // 拖版型尾端拉長 1 秒
   const d0 = frame.duration;
-  await page.getByRole('button', { name: '版型 多 1 秒' }).tap();
-  const frame2 = (await tracks(page)).find(isFrameTrack)!.items[0]!;
-  expect(frame2.duration).toBeCloseTo(d0 + 1, 3);
+  const d1 = await trimClipEnd(page, frame.id, 1);
+  expect(d1).toBeGreaterThan(d0 + 0.5);
+  expect((await tracks(page)).find(isFrameTrack)!.items[0]!.duration).toBeCloseTo(d1, 3);
+  await openTab(page, '版型');
 
   // 刪掉外框＝整個版型拿掉（復原回來）
   await page.getByRole('button', { name: '移除版型' }).tap();
@@ -181,9 +182,10 @@ test('版型動畫：捲動——不同時間整組的位置不同；選「不�
   // 開頭整組被推到畫面下方，同一個點看到的不是紅色
   expect(isRed(a)).toBe(false);
   await page.screenshot({ path: `${SHOT}/drift.png` });
-  await openTab(page, '版型');
-  await page.getByTestId('ld-cell').first().tap();
-  await page.getByRole('button', { name: '關閉', exact: true }).tap();
+  // 動畫在特效分頁：選到整個版型（時間軸上的版型片段）→ 動畫選「不動」
+  await showTimeline(page);
+  await page.locator(`[data-testid="clip"][data-item-id="${frame.id}"]`).tap();
+  await openTab(page, '特效');
   await page.getByRole('radio', { name: '動畫 不動' }).tap();
   const frame2 = (await tracks(page)).find(isFrameTrack)!.items[0]!;
   expect(frame2.motion).toBeUndefined();

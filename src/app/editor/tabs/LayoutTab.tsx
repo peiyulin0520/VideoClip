@@ -1,22 +1,15 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Project } from '../../../model/types';
-import { removeGroup, setGroupDuration, setGroupMotion, setItemEffect } from '../../../store/actions';
+import { removeGroup } from '../../../store/actions';
 import { FrameStyleControls } from '../FrameStyleControls';
 import { restyleFrame } from '../frameRestyle';
-import { GroupFxSelect } from '../GroupFxSelect';
 import { useProjectStore } from '../../../store/projectStore';
 import { frameOfGroup } from '../../../engine/layoutTracks';
 import { CellSheet } from '../CellSheet';
 import { LayoutDiagram } from '../LayoutDiagram';
 import { LayoutPicker } from '../LayoutPicker';
 import { ToolButton, type Found } from './shared';
-
-const MOTIONS = [
-  { id: undefined, name: '不動' },
-  { id: 'drift', name: '捲動' },
-  { id: 'slide', name: '滑入滑出' },
-] as const;
 
 /** 外框顏色、透明度：換顏色立刻重畫；透明度滑桿停下來 0.4 秒才重畫（每次重畫都是一張新的外框圖） */
 function FrameStyleEditor({ group, color, opacity }: { group: string; color: string; opacity: number }) {
@@ -37,21 +30,20 @@ function FrameStyleEditor({ group, color, opacity }: { group: string; color: str
   );
 }
 
-/** 一個版型的整體設定：整組長度、動畫、每一格要用的片段與湊秒數的色塊 */
+/** 一個版型自己才有的設定：示意圖（點格子改那一格）、外框顏色與透明度。特效、動畫、轉場在「特效」分頁；長度在播放軸 */
 function GroupPanel({ project, group }: { project: Project; group: string }) {
   const selectedId = useProjectStore((s) => s.selectedId);
   const select = useProjectStore((s) => s.select);
   const [cell, setCell] = useState<{ id: string; index: number } | null>(null);
   const frame = frameOfGroup(project.tracks, group)?.item;
   if (!frame) return null;
-  const dur = (n: number) => setGroupDuration(group, Math.max(frame.duration + n, 1));
   return (
     <div className="panel group-panel" data-testid="group-panel">
       <div className="panel-head">
         <span>整個版型 · {frame.label}</span>
       </div>
       <p className="hint">
-        在預覽上拖移、縮放整個版型（格子會一起動）。點下面示意圖的格子，可以改那一格的名稱、素材、片段、空白畫面。
+        在預覽上拖移、縮放整個版型（格子會一起動）。點下面示意圖的格子，可以改那一格的名稱、素材、片段、空白畫面。進場、出場、動畫、轉場到「特效」分頁；長度在播放軸拖尾端。
       </p>
       <LayoutDiagram
         project={project}
@@ -72,43 +64,6 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
           opacity={frame.frameStyle.opacity}
         />
       )}
-      <div className="group-fx-row">
-        <GroupFxSelect
-          label="版型進場特效"
-          value={frame.inEffect?.kind && frame.inEffect.kind !== 'typewriter' ? frame.inEffect.kind : ''}
-          onChange={(v) => setItemEffect(frame.id, 'in', v || null)}
-        />
-        <GroupFxSelect
-          label="版型出場特效"
-          value={frame.outEffect?.kind && frame.outEffect.kind !== 'typewriter' ? frame.outEffect.kind : ''}
-          onChange={(v) => setItemEffect(frame.id, 'out', v || null)}
-        />
-      </div>
-      <div className="chips" role="radiogroup" aria-label="版型動畫">
-        {MOTIONS.map((m) => (
-          <button
-            key={m.name}
-            role="radio"
-            aria-checked={frame.motion === m.id}
-            aria-label={`動畫 ${m.name}`}
-            className={`chip${frame.motion === m.id ? ' active' : ''}`}
-            onClick={() => setGroupMotion(group, m.id)}
-          >
-            {m.name}
-          </button>
-        ))}
-      </div>
-      <div className="chips" aria-label="版型長度">
-        <button className="chip" aria-label="版型 少 1 秒" onClick={() => dur(-1)}>
-          － 1 秒
-        </button>
-        <span className="chip-static" data-testid="group-duration">
-          共 {frame.duration.toFixed(1)} 秒
-        </span>
-        <button className="chip" aria-label="版型 多 1 秒" onClick={() => dur(1)}>
-          ＋ 1 秒
-        </button>
-      </div>
     </div>
   );
 }

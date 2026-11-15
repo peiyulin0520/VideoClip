@@ -9,6 +9,7 @@ import {
   project,
   showTimeline,
   isFrameTrack,
+  finishLayout,
 } from './helpers';
 
 type Tf = { x: number; y: number; scale: number; rotation: number; opacity: number };
@@ -19,8 +20,7 @@ const tracks = async (page: Page) => (await project(page)).tracks as unknown as 
 async function addLayout(page: Page, name: string, files: string[]) {
   await openTab(page, '版型');
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
-  await page.getByTestId('layout-input').setInputFiles(files.map(fixture));
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, files.map(fixture));
 }
 
 test('「刪除並補齊」刪掉版型的外框＝整個版型（含各格）拿掉，不會留下看不到卻還在畫的格子', async ({

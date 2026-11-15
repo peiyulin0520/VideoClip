@@ -268,3 +268,54 @@ export const isFrameTrack = (t: { items: object[] }): boolean =>
     const i = x as { group?: string; cell?: unknown; type?: string };
     return !!i.group && !i.cell && i.type !== 'text';
   });
+
+/**
+ * 版型 v2：已經在「版型」分頁點了某個版型（可選外框顏色等）→ 按「確定」新增空版型，
+ * 再依序把素材放進各格（素材比格子少就輪流重複，跟舊版一樣；files 是檔案路徑）。
+ * 結束時選到第 1 格。`motion` 是版型動畫（到特效分頁設）。
+ */
+export async function finishLayout(page: Page, files: string[], opts: { motion?: string } = {}) {
+  await page.getByTestId('layout-confirm').tap();
+  // 選項區收起來＝新版型已經加好、而且選到它了（不然讀到的是上一個版型的示意圖）
+  await expect(page.getByTestId('layout-options')).toHaveCount(0, { timeout: 30_000 });
+  const cells = page.getByTestId('ld-cell');
+  await expect(cells.first()).toBeVisible({ timeout: 30_000 });
+  const n = await cells.count();
+  if (opts.motion) {
+    await openTab(page, '特效');
+    await page.getByRole('radio', { name: `動畫 ${opts.motion}` }).tap();
+    await openTab(page, '版型');
+  }
+  for (let i = 0; i < n; i++) {
+    await cells.nth(i).tap();
+    await page.getByTestId('cell-file').setInputFiles(files[i % files.length]!);
+    await expect(page.getByTestId('cell-sheet')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: '關閉', exact: true }).last().tap();
+  }
+  await cells.first().tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).last().tap();
+}
+
+/** 時間軸上選到一個片段，把尾端的把手拖 seconds 秒（正＝拉長）；回傳拖完後它的長度 */
+export async function trimClipEnd(page: Page, itemId: string, seconds: number): Promise<number> {
+  await showTimeline(page);
+  const clip = page.locator(`[data-testid="clip"][data-item-id="${itemId}"]`);
+  await clip.tap();
+  const p0 = await project(page);
+  const dur0 = (p0.tracks.flatMap((t) => t.items) as unknown as { id: string; duration: number }[]).find(
+    (i) => i.id === itemId,
+  )!.duration;
+  const pps = (await clip.boundingBox())!.width / dur0;
+  const h = (await page.getByTestId('trim-end').boundingBox())!;
+  const x = h.x + h.width / 2;
+  const y = h.y + h.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + (seconds * pps) / 2, y, { steps: 5 });
+  await page.mouse.move(x + seconds * pps, y, { steps: 5 });
+  await page.mouse.up();
+  const p1 = await project(page);
+  return (p1.tracks.flatMap((t) => t.items) as unknown as { id: string; duration: number }[]).find(
+    (i) => i.id === itemId,
+  )!.duration;
+}

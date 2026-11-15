@@ -10,6 +10,7 @@ import {
   samplePreview,
   selectedItemId,
   isFrameTrack,
+  finishLayout,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-5/layout';
@@ -36,13 +37,12 @@ async function addLayout(page: Page, name: string, color: string, files: string[
   const more = page.getByTestId('layout-add-more');
   if (await more.isVisible()) await more.tap();
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
-  await expect(page.getByTestId('layout-sheet')).toBeVisible();
+  await expect(page.getByTestId('layout-options')).toBeVisible();
   await page
-    .getByTestId('layout-sheet')
+    .getByTestId('layout-options')
     .getByRole('radio', { name: `外框 ${color}` })
     .tap();
-  await page.getByTestId('layout-input').setInputFiles(files.map(fixture));
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, files.map(fixture));
 }
 const center = (c: Cell): [number, number] => [c.x + c.w / 2, c.y + c.h / 2];
 const near = (c: number[] | null, want: number[], tol = 40) =>
@@ -135,19 +135,12 @@ test('版型：每個版型都做得出來，格子數對、素材輪流或只�
   }
 });
 
-test('版型：素材比格子多只用前面的；同時超過 5 支影片會提醒；照片裁成格子的比例', async ({ page }) => {
+test('版型：同時超過 5 支影片會提醒；照片裁成格子的比例', async ({ page }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-blue.webm']);
-  // 3 格的版型放 4 個素材：只用前 3 個
-  await addLayout(page, '三格', '白', [
-    'solid-red.webm',
-    'solid-green.webm',
-    'solid-blue.webm',
-    'clip-a.webm',
-  ]);
+  await addLayout(page, '三格', '白', ['solid-red.webm', 'solid-green.webm', 'solid-blue.webm']);
   const cells = (await tracks(page)).filter((t) => t.items[0]?.cell);
   expect(cells).toHaveLength(3);
-  await expect(page.locator('.toast').filter({ hasText: '只用了前 3 個素材' })).toBeVisible();
 
   // 九宮格放 6 支影片：提醒同時播放太多
   const six = Array.from({ length: 6 }, () => 'solid-red.webm');

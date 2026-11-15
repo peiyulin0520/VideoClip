@@ -59,6 +59,7 @@ import {
   cellItem,
   cellRect,
   inkFor,
+  MAX_CELL_VIDEOS,
   planCell,
   type CellMode,
   type LayoutText,
@@ -739,6 +740,12 @@ export function importIntoCell(trackId: string, asset: Asset): string | null {
     tr.cell = { ...box };
     tr.items = [fresh] as never;
   });
+  // 同時播放的影片太多（手機解不動）：剛好超過的那一次提醒
+  const videos = store()
+    .project!.tracks.filter((t) => t.group === group && t.groupRole === 'cell')
+    .filter((t) => cellMain(t)?.type === 'video').length;
+  if (asset.kind === 'video' && videos === MAX_CELL_VIDEOS + 1)
+    toast(`同時播放超過 ${MAX_CELL_VIDEOS} 支影片，手機可能會卡，建議多放照片`, 9000);
   return id || null;
 }
 

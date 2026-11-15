@@ -14,6 +14,7 @@ import {
 import type { EffectKind, Item, TextFxKind, VideoItem } from '../../../model/types';
 import {
   editItem,
+  setGroupMotion,
   setItemEffect,
   setTextFx,
   setTransition,
@@ -53,12 +54,37 @@ export function EffectTab({ found }: { found: Found }) {
       </div>
       {!item || !track ? (
         <p className="hint">
-          先在時間軸點一個素材（選進場、出場特效），或點兩個素材中間的小圓圈（選轉場），再選特效。版型整體的特效請到「版型」分頁。
+          先在時間軸點一個素材（選進場、出場特效），或點兩個素材中間的小圓圈（選轉場），再選特效。整個版型的特效：點時間軸上的版型那一條；版型裡的格子、文字目前請到「版型」分頁改。
         </p>
       ) : item.type === 'audio' ? (
         <AudioFx item={item as VideoItem} />
       ) : (
         <>
+          {isFrameItem(item) && (
+            <div className="zone-soft" data-testid="layout-motion">
+              <div className="slider-label">整個版型的動畫</div>
+              <div className="chips" role="radiogroup" aria-label="版型動畫">
+                {(
+                  [
+                    [undefined, '不動'],
+                    ['drift', '捲動'],
+                    ['slide', '滑入滑出'],
+                  ] as const
+                ).map(([id, name]) => (
+                  <button
+                    key={name}
+                    role="radio"
+                    aria-checked={item.motion === id}
+                    aria-label={`動畫 ${name}`}
+                    className={`chip${item.motion === id ? ' active' : ''}`}
+                    onClick={() => setGroupMotion(item.group!, id)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="chips cat-chips" role="tablist" aria-label="特效位置">
             {(
               [

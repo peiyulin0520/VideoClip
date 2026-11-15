@@ -8,6 +8,7 @@ import {
   openTab,
   project,
   seekTo,
+  finishLayout,
 } from './helpers';
 
 test('播放列：播放鍵只有圖示；定格、縮小、放大是圖示加中文；按住時有顏色回饋；定格開著時是主題色', async ({
@@ -90,8 +91,7 @@ async function makeBooth(
   if (opts.black) await page.getByRole('radio', { name: '外框 黑' }).tap();
   if (opts.opacity !== undefined)
     await page.getByLabel('外框透明度').fill(String(Math.round(opts.opacity * 100)));
-  await page.getByTestId('layout-input').setInputFiles([fixture('solid-green.webm')]);
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, [fixture('solid-green.webm')]);
   await expect(page.getByTestId('group-panel')).toBeVisible();
 }
 
@@ -163,8 +163,7 @@ test('版型可以選「不附版型文字」', async ({ page }) => {
   await openTab(page, '版型');
   await page.getByRole('button', { name: '版型 拍貼機直條', exact: true }).tap();
   await page.getByRole('switch', { name: '附上版型文字' }).tap();
-  await page.getByTestId('layout-input').setInputFiles([fixture('solid-green.webm')]);
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, [fixture('solid-green.webm')]);
   expect((await allItems(page)).filter((i) => i.type === 'text')).toHaveLength(0);
 });
 

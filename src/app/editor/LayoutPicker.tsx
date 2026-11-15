@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { ensureUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
-import { enqueueThumbs } from '../../engine/thumbs';
-import { LAYOUTS, MAX_CELL_VIDEOS, paintFrame, renderFramePng, type LayoutDef } from '../../engine/layouts';
+import { formatTime } from '../../engine/timeline';
+import { LAYOUTS, paintFrame, renderFramePng, type LayoutDef } from '../../engine/layouts';
 import { addLayout } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
-import { Sheet } from '../../ui/Sheet';
-import type { TransitionKind } from '../../model/types';
 import { FrameStyleControls } from './FrameStyleControls';
-import { GroupFxSelect } from './GroupFxSelect';
+import { usePlayheadTime } from './usePlayheadTime';
 
 /** 版型文字裡的日期：今天，YYYY.MM.DD */
 const todayText = () => {
@@ -53,60 +51,50 @@ function LayoutThumb({
   return <canvas ref={ref} className="layout-thumb" aria-hidden="true" />;
 }
 
-/** 疊加分頁的「版型」：拍貼機、膠卷、拍立得、分割、九宮格。點一個 → 選外框顏色 → 從相簿選照片或影片放進格子 */
+/** 新增版型預設長度（秒）；加進去之後在播放軸拖尾端改整組長度、拖各素材改各自秒數 */
+export const LAYOUT_DEFAULT_SECONDS = 5;
+
+/**
+ * 版型分頁的「新增版型」：只挑版型的格式、外框顏色、要不要附文字，按「確定」就在播放線那一秒新增一個空的版型
+ * （素材到播放軸上展開版型、各格按 ＋ 匯入）。進出場特效、動畫、轉場都到「特效」分頁設。
+ */
 export function LayoutPicker() {
   const project = useProjectStore((s) => s.project)!;
+  const player = useUI((s) => s.player);
+  const time = usePlayheadTime(player);
   const [def, setDef] = useState<LayoutDef | null>(null);
   const [frameColor, setFrameColor] = useState('#ffffff');
   const [frameOpacity, setFrameOpacity] = useState(1);
   const [withText, setWithText] = useState(true);
-  const [motion, setMotion] = useState<'' | 'drift' | 'slide'>('');
-  const [inFx, setInFx] = useState<TransitionKind | ''>('');
-  const [outFx, setOutFx] = useState<TransitionKind | ''>('');
-  const input = useRef<HTMLInputElement>(null);
   const W = project.width;
   const H = project.height;
 
-  const onFiles = async (list: FileList | null) => {
-    const files = list ? Array.from(list) : [];
-    if (input.current) input.current.value = '';
-    if (!files.length || !def) return;
+  const confirm = async () => {
+    if (!def) return;
+    const start = useUI.getState().player?.time ?? 0;
     const color = frameColor;
-    const { setBusy, player } = useUI.getState();
+    const { setBusy } = useUI.getState();
     const pid = useProjectStore.getState().project!.id;
     setBusy('做版型中…');
     try {
-      const res = await importFiles(pid, files);
-      const media = res.assets.filter((a) => a.kind !== 'audio');
-      if (res.failed.length)
-        toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`, 7000);
-      if (media.length === 0) return;
       const b = def.build(W, H);
-      // 素材比格子少：輪流重複使用；比格子多：只用前面幾個
-      const cells = b.windows.map((win, i) => ({ asset: media[i % media.length]!, win }));
       const frameFile = new File(
         [await renderFramePng(def, W, H, color, frameOpacity)],
         `版型-${def.name}.png`,
-        {
-          type: 'image/png',
-        },
+        { type: 'image/png' },
       );
       const fr = await importFiles(pid, [frameFile]);
       const frame = fr.assets[0];
       if (!frame) return toast('外框做不出來', 6000);
-      await ensureUrls(pid, [...media, frame]);
-      enqueueThumbs(pid, media); // 版型裡的影片：背景補滿時間軸縮圖
-      const videoCells = cells.filter((c) => c.asset.kind === 'video').length;
-      const maxVideo = Math.max(0, ...media.filter((a) => a.kind === 'video').map((a) => a.duration));
-      const duration = maxVideo > 0 ? Math.min(Math.max(maxVideo, 1), 15) : 3;
+      await ensureUrls(pid, [frame]);
       const rs = b.panels.length ? b.panels : b.windows;
       const l = Math.min(...rs.map((r) => r.x));
       const tp = Math.min(...rs.map((r) => r.y));
       addLayout({
-        cells,
+        cells: b.windows.map((win) => ({ win })),
         frame,
-        start: player?.time ?? 0,
-        duration,
+        start,
+        duration: LAYOUT_DEFAULT_SECONDS,
         frameName: def.name,
         frameVisible: {
           x: l,
@@ -114,21 +102,11 @@ export function LayoutPicker() {
           w: Math.max(...rs.map((r) => r.x + r.w)) - l,
           h: Math.max(...rs.map((r) => r.y + r.h)) - tp,
         },
-        motion: motion || undefined,
-        inEffect: inFx || undefined,
-        outEffect: outFx || undefined,
         frameStyle: { layout: def.id, color, opacity: frameOpacity },
         texts: withText ? def.texts?.(b, W, todayText()) : undefined,
       });
       setDef(null);
-      toast(
-        videoCells > MAX_CELL_VIDEOS
-          ? `版型加好了。同時播放超過 ${MAX_CELL_VIDEOS} 支影片，手機可能會卡，建議多放照片`
-          : media.length > cells.length
-            ? `版型加好了（有 ${cells.length} 格，只用了前 ${cells.length} 個素材）`
-            : `版型加好了。整個版型一起縮放移動；點版型分頁裡示意圖的格子，可以改那一格的名稱、素材、片段`,
-        6000,
-      );
+      toast(`已加入「${def.name}」（${def.cells} 格）。點示意圖的格子放素材；特效到「特效」分頁設定`, 6000);
     } finally {
       setBusy(null);
     }
@@ -137,14 +115,15 @@ export function LayoutPicker() {
   return (
     <>
       <div className="panel-head">
-        <span>版型（拍貼機、膠卷…）</span>
+        <span>新增版型（拍貼機、膠卷…）</span>
       </div>
       <div className="layout-grid" data-testid="layout-grid">
         {LAYOUTS.map((l) => (
           <button
             key={l.id}
-            className="layout-card"
+            className={`layout-card${def?.id === l.id ? ' active' : ''}`}
             aria-label={`版型 ${l.name}`}
+            aria-pressed={def?.id === l.id}
             data-layout={l.id}
             onClick={() => setDef(l)}
           >
@@ -153,87 +132,39 @@ export function LayoutPicker() {
           </button>
         ))}
       </div>
-      <Sheet
-        open={!!def}
-        title={def ? `版型：${def.name}（${def.cells} 格）` : ''}
-        onClose={() => setDef(null)}
-      >
-        {def && (
-          <div data-testid="layout-sheet">
-            <p className="hint">{def.hint}。選好外框顏色，再從相簿選照片或影片放進格子。</p>
-            <div className="panel-head">
-              <span>外框顏色</span>
-            </div>
-            <div className="layout-preview">
-              <LayoutThumb def={def} W={W} H={H} color={frameColor} opacity={frameOpacity} />
-            </div>
-            <FrameStyleControls
-              color={frameColor}
-              opacity={frameOpacity}
-              onColor={setFrameColor}
-              onOpacity={setFrameOpacity}
-            />
-            {def.texts && (
-              <button
-                role="switch"
-                aria-checked={withText}
-                aria-label="附上版型文字"
-                className={`btn${withText ? ' primary' : ''}`}
-                onClick={() => setWithText((v) => !v)}
-              >
-                {withText ? '✓ 附上版型文字（可以改字、改字體）' : '不附版型文字'}
-              </button>
-            )}
-            <div className="panel-head">
-              <span>進場、出場特效（整個版型一起）</span>
-            </div>
-            <div className="group-fx-row">
-              <GroupFxSelect label="版型進場特效" value={inFx} onChange={setInFx} />
-              <GroupFxSelect label="版型出場特效" value={outFx} onChange={setOutFx} />
-            </div>
-            <div className="panel-head">
-              <span>動畫</span>
-            </div>
-            <div className="chips" role="radiogroup" aria-label="版型動畫">
-              {(
-                [
-                  ['', '不動'],
-                  ['drift', '捲動'],
-                  ['slide', '滑入滑出'],
-                ] as const
-              ).map(([id, name]) => (
-                <button
-                  key={id}
-                  role="radio"
-                  aria-checked={motion === id}
-                  aria-label={`動畫 ${name}`}
-                  className={`chip${motion === id ? ' active' : ''}`}
-                  onClick={() => setMotion(id)}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-            <p className="hint">
-              選的照片、影片比格子少會輪流重複使用；同時播放的影片太多手機會卡，格子多的版型（例如九宮格）建議放照片。
-            </p>
-            <div className="sheet-row">
-              <button className="btn primary" onClick={() => input.current?.click()}>
-                套用，選照片或影片
-              </button>
-            </div>
+      {def && (
+        <div className="layout-options" data-testid="layout-options">
+          <p className="hint">
+            {def.name}（{def.cells} 格）：{def.hint}。
+          </p>
+          <div className="panel-head">
+            <span>外框顏色</span>
           </div>
-        )}
-      </Sheet>
-      <input
-        ref={input}
-        type="file"
-        accept="video/*,image/*"
-        multiple
-        hidden
-        data-testid="layout-input"
-        onChange={(e) => void onFiles(e.target.files)}
-      />
+          <FrameStyleControls
+            color={frameColor}
+            opacity={frameOpacity}
+            onColor={setFrameColor}
+            onOpacity={setFrameOpacity}
+          />
+          {def.texts && (
+            <button
+              role="switch"
+              aria-checked={withText}
+              aria-label="附上版型文字"
+              className={`btn${withText ? ' primary' : ''}`}
+              onClick={() => setWithText((v) => !v)}
+            >
+              {withText ? '✓ 附上版型文字（可以改字、改字體）' : '不附版型文字'}
+            </button>
+          )}
+          <div className="sheet-row">
+            <button className="btn primary grow" data-testid="layout-confirm" onClick={() => void confirm()}>
+              確定，加在 {formatTime(time)}
+            </button>
+          </div>
+          <p className="hint">拖播放線選秒數；加好後在播放軸展開版型，各格按 ＋ 放素材。</p>
+        </div>
+      )}
     </>
   );
 }

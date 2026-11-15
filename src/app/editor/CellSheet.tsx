@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRef } from 'react';
-import { urlFor } from '../../engine/assetUrls';
+import { ensureUrls, urlFor } from '../../engine/assetUrls';
+import { enqueueThumbs } from '../../engine/thumbs';
 import { importFiles } from '../../engine/importMedia';
 import { frameOfGroup } from '../../engine/layoutTracks';
 import {
@@ -55,9 +56,14 @@ export function CellSheet({
       useUI.getState().setBusy('匯入中…');
       try {
         const res = await importFiles(project.id, files);
+        if (res.failed.length)
+          toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`, 7000);
         const a = res.assets.find((x) => x.kind !== 'audio');
-        if (a) importIntoCell(trackId, a);
-        else toast('這個檔案放不進來');
+        if (a) {
+          await ensureUrls(project.id, [a]);
+          enqueueThumbs(project.id, [a]); // 影片：背景補滿時間軸縮圖
+          importIntoCell(trackId, a);
+        } else if (!res.failed.length) toast('這個檔案放不進來');
       } finally {
         useUI.getState().setBusy(null);
       }

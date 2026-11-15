@@ -12,6 +12,7 @@ import {
   samplePreview,
   seekTo,
   showTimeline,
+  finishLayout,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
@@ -24,8 +25,7 @@ async function addLayout(page: Page, name: string, files: string[]) {
   const more = page.getByTestId('layout-add-more');
   if (await more.isVisible()) await more.tap();
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
-  await page.getByTestId('layout-input').setInputFiles(files.map(fixture));
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, files.map(fixture));
 }
 
 test('L0 版型是一個片段：放在播放線那一秒、跟主軌影片同一列，接縫有轉場圓圈；疊化時整個版型（含格子）一起淡入', async ({
@@ -132,4 +132,42 @@ test('L1 空的格子：刪掉格子素材 → 格子還在（示意圖虛線、
   await page.screenshot({ path: `${SHOT}/cell-empty.png` });
   await page.getByTestId('cell-assets').getByRole('button').first().tap();
   expect((await tracks(page)).filter((t) => t.groupRole === 'cell' && t.items.length === 0)).toHaveLength(0);
+});
+
+test('L2 版型分頁只挑版型：沒有特效／動畫／長度；按鈕寫著播放線的秒數；確定＝在那一秒加空版型（預設 5 秒），一步復原', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await createProjectWith(page, ['solid-red.webm']);
+  await showTimeline(page);
+  await seekTo(page, 2);
+  await openTab(page, '版型');
+  await expect(page.getByTestId('layout-grid').locator('.layout-card')).toHaveCount(8);
+  await page.getByRole('button', { name: '版型 三格', exact: true }).tap();
+  // 版型自己才有的設定在這裡；特效、動畫、長度不在
+  await expect(page.getByTestId('layout-options')).toBeVisible();
+  await expect(page.getByLabel('外框透明度')).toBeVisible();
+  for (const t of ['版型進場特效', '版型出場特效', '版型動畫'])
+    await expect(page.getByLabel(t)).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: /^動畫/ })).toHaveCount(0);
+  await expect(page.getByTestId('layout-confirm')).toContainText('確定，加在 0:02');
+  await page.screenshot({ path: `${SHOT}/layout-tab-v2.png` });
+  await page.getByTestId('layout-confirm').tap();
+  await expect(page.getByTestId('layout-options')).toHaveCount(0, { timeout: 30_000 });
+  const tr = await tracks(page);
+  const cells = tr.filter((t) => t.groupRole === 'cell');
+  expect(cells).toHaveLength(3);
+  expect(cells.every((t) => t.items.length === 0)).toBe(true); // 空版型：還沒放素材
+  const frame = tr.find(isFrameTrack)!.items.find((i) => i.group && !i.cell) as unknown as {
+    start: number;
+    duration: number;
+  };
+  expect(frame.start).toBeGreaterThan(1.9);
+  expect(frame.start).toBeLessThan(2.1);
+  expect(frame.duration).toBe(5);
+  // 特效分頁選到整個版型：有版型動畫
+  await openTab(page, '特效');
+  await expect(page.getByTestId('layout-motion')).toBeVisible();
+  await page.getByRole('button', { name: '復原' }).tap();
+  expect((await tracks(page)).filter((t) => t.groupRole === 'cell')).toHaveLength(0);
 });

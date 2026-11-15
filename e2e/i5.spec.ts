@@ -9,6 +9,8 @@ import {
   samplePreview,
   seekTo,
   isFrameTrack,
+  finishLayout,
+  showTimeline,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-9/i5';
@@ -317,28 +319,32 @@ test('轉場分配：起（A 結尾前幾秒）、迄（B 開頭後幾秒）各�
   await expect.poll(async () => (await samplePreview(page, 0.5, 0.5))?.[0]).toBeLessThan(15);
 });
 
-test('版型：選版型時可以選進場、出場特效（整個版型一起動）；整體面板也能改；時間軸外框那一條有代表字', async ({
+test('版型：選到版型那一條，到特效分頁選進場、出場（整個版型一起動）；時間軸外框那一條有代表字', async ({
   page,
 }) => {
   test.setTimeout(150_000);
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '版型');
   await page.getByRole('button', { name: '版型 九宮格', exact: true }).tap();
-  await page.getByLabel('版型進場特效').selectOption('dissolve');
-  await page.getByLabel('版型出場特效').selectOption('moveL');
-  await page.getByTestId('layout-input').setInputFiles([fixture('solid-green.webm')]);
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  // 版型分頁沒有特效設定（交給特效分頁）
+  await expect(page.getByLabel('版型進場特效')).toHaveCount(0);
+  await finishLayout(page, [fixture('solid-green.webm')]);
   type Tr = { groupRole?: string; items: (It & { group?: string })[] };
   const frameItem = async () =>
-    ((await project(page)).tracks as unknown as Tr[]).find(isFrameTrack)!.items[0]!;
+    ((await project(page)).tracks as unknown as Tr[]).find(isFrameTrack)!.items.find((i) => !!i.group)!;
+  // 選到整個版型 → 特效分頁
+  await showTimeline(page);
+  await page.locator(`[data-testid="clip"][data-item-id="${(await frameItem()).id}"]`).tap();
+  await openTab(page, '特效');
+  await page.getByRole('radio', { name: '進場 疊化' }).tap();
+  await page.getByTestId('fx-part-out').tap();
+  await page.getByRole('radio', { name: '出場 左移' }).tap();
   const f = await frameItem();
   expect(f.inEffect).toMatchObject({ kind: 'dissolve' });
   expect(f.outEffect).toMatchObject({ kind: 'moveL' });
-  // 整體面板可以改
-  await expect(page.getByTestId('group-panel')).toBeVisible();
-  await page.getByLabel('版型進場特效').selectOption('');
-  expect((await frameItem()).inEffect).toBeUndefined();
-  await page.getByLabel('版型進場特效').selectOption('moveR');
+  // 換成右移
+  await page.getByTestId('fx-part-in').tap();
+  await page.getByRole('radio', { name: '進場 右移' }).tap();
   expect((await frameItem()).inEffect).toMatchObject({ kind: 'moveR' });
   // 時間軸：外框那一條的開頭／結尾有代表字
   await expect(page.getByTestId('fx-circle-in')).toHaveText('右');
@@ -352,9 +358,15 @@ test('版型進場「左移」：第 0 秒整個版型在畫面外，進場結�
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '版型');
   await page.getByRole('button', { name: '版型 九宮格', exact: true }).tap();
-  await page.getByLabel('版型進場特效').selectOption('fastL');
-  await page.getByTestId('layout-input').setInputFiles([fixture('solid-green.webm')]);
-  await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
+  await finishLayout(page, [fixture('solid-green.webm')]);
+  await showTimeline(page);
+  await page
+    .locator(
+      `[data-testid="clip"][data-item-id="${(await project(page)).tracks.flatMap((t) => t.items as unknown as { id: string; group?: string; cell?: unknown }[]).find((i) => i.group && !i.cell)!.id}"]`,
+    )
+    .tap();
+  await openTab(page, '特效');
+  await page.getByRole('radio', { name: '進場 左移' }).tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   // 開頭：版型整個還在畫面右邊外面 → 畫面中央看到的是底下的影片（紅色）
   await seekTo(page, 0.02);
