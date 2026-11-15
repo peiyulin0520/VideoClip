@@ -317,8 +317,16 @@ export class Player {
       fadeGain(t - orig.start, orig.duration, orig.fadeIn, orig.fadeOut) *
       (audioRetained(orig, s) ? 1 : 0) *
       tg;
-    this.gains.set(item.id, vol);
-    this.audio.apply(el, vol, !!track.muted || !asset.hasAudio);
+    // 版型格子空檔裡的停格：沒有聲音、暫停在那一格（不 play()）
+    const held = !!item.hold;
+    const vol2 = held ? 0 : vol;
+    this.gains.set(item.id, vol2);
+    this.audio.apply(el, vol2, !!track.muted || !asset.hasAudio);
+    if (held) {
+      if (!el.paused) el.pause();
+      if (!el.seeking && Math.abs(el.currentTime - s) > 0.05) el.currentTime = s;
+      return;
+    }
     if (this.playing) {
       const transitioning = this.transIds.has(item.id);
       const plan = videoSyncPlan({

@@ -71,6 +71,9 @@ export function LayoutDiagram({
             }}
             onClick={() => onPick(t.id, i)}
           >
+            <i className="ld-no" aria-hidden="true">
+              {i + 1}
+            </i>
             <small>{name}</small>
           </button>
         );

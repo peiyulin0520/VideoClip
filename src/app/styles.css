@@ -4099,3 +4099,115 @@ button:not(:disabled):active,
 .layer-meta > span {
   white-space: nowrap;
 }
+
+/* X6：版型的格子列——軌道圖示是格子編號；列尾的＋加素材 */
+.cell-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  border-radius: 999px;
+  font-size: var(--fs-note);
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.cell-add {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  min-width: 28px;
+  min-height: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.ld-no {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: var(--fs-note);
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.toolbar .tool-sep {
+  flex: none;
+  margin: 10px 4px;
+}
+.menu-item.active {
+  color: var(--accent);
+}
+
+/* X6：這一格視窗的素材清單 */
+.cell-items {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cell-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-ctl);
+}
+.cell-item.selected {
+  outline: 1px solid var(--accent);
+}
+.cell-item-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  background: transparent;
+  font-size: var(--fs-body);
+}
+.cell-thumb {
+  flex: none;
+  width: 2.2em;
+  height: 2.2em;
+  border-radius: 6px;
+  background-color: var(--btn2);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
+}
+.cell-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.cell-item-dur {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--fs-note);
+  white-space: nowrap;
+}
+.cell-item-edit {
+  flex-basis: 100%;
+}

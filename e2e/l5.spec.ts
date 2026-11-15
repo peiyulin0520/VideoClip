@@ -97,14 +97,16 @@ test('L5 版型層與素材層：選整個版型縮小＝格子一起縮；選�
   expect(text2.transform.scale).toBeLessThan(text1.transform.scale * 0.8);
 });
 
-test('L5 選到版型裡的素材時，預覽上有一個虛線框＋「只露出這個範圍」；選整個版型就沒有', async ({ page }) => {
+test('L5 選到版型裡的素材時，預覽上有一個虛線框（格子素材標「第 N 格」）；選整個版型就沒有', async ({
+  page,
+}) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '版型');
   await page.getByRole('button', { name: '版型 上下雙格', exact: true }).tap();
   await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]); // 選到第 1 格
   await expect(page.getByTestId('clip-area')).toBeVisible();
-  await expect(page.getByText('只露出這個範圍')).toBeVisible();
+  await expect(page.locator('.clip-tag')).toHaveText('第 1 格');
   expect(await page.getByTestId('clip-area').locator('polygon').getAttribute('points')).toMatch(
     /^[\d.,\s-]+$/,
   );

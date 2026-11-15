@@ -5,7 +5,7 @@ import { Slider } from '../../../ui/Slider';
 import type { Project, VideoItem } from '../../../model/types';
 import { useUI } from '../../../store/uiStore';
 import { ConfirmSheet } from '../../../ui/Sheet';
-import { removeGroup } from '../../../store/actions';
+import { arrangeGroup, removeGroup, setGapMode } from '../../../store/actions';
 import { FrameStyleControls } from '../FrameStyleControls';
 import { reshapeLayout, restyleFrame } from '../frameRestyle';
 import { useProjectStore } from '../../../store/projectStore';
@@ -59,6 +59,7 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
           setCell({ id, index: i });
         }}
       />
+      <PlayControls frame={frame} />
       {cell && <CellSheet key={cell.id} trackId={cell.id} index={cell.index} onClose={() => setCell(null)} />}
       {frame.frameStyle && (
         <FrameStyleEditor
@@ -69,6 +70,58 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
         />
       )}
       {frame.frameStyle && <ShapeControls project={project} group={group} frame={frame} />}
+    </div>
+  );
+}
+
+/** 版型才有的兩個設定：播放方式（同步／依序）、空檔（停格／色塊／透明）。立刻生效、可以復原 */
+function PlayControls({ frame }: { frame: VideoItem }) {
+  const group = frame.group!;
+  const play = frame.layoutPlay ?? 'sync';
+  const gap = frame.gapMode ?? 'fill';
+  return (
+    <div className="zone-soft" data-testid="layout-play">
+      <div className="slider-label">播放方式</div>
+      <div className="chips" role="radiogroup" aria-label="播放方式">
+        {(
+          [
+            ['sync', '同步'],
+            ['seq', '依序'],
+          ] as const
+        ).map(([id, name]) => (
+          <button
+            key={id}
+            className={`chip${play === id ? ' active' : ''}`}
+            role="radio"
+            aria-checked={play === id}
+            aria-label={`播放方式 ${name}`}
+            onClick={() => play !== id && arrangeGroup(group, id)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <div className="slider-label">空檔</div>
+      <div className="chips" role="radiogroup" aria-label="空檔">
+        {(
+          [
+            ['hold', '停格'],
+            ['fill', '色塊'],
+            ['none', '透明'],
+          ] as const
+        ).map(([id, name]) => (
+          <button
+            key={id}
+            className={`chip${gap === id ? ' active' : ''}`}
+            role="radio"
+            aria-checked={gap === id}
+            aria-label={`空檔 ${name}`}
+            onClick={() => gap !== id && setGapMode(group, id)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

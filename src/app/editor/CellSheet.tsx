@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { useRef } from 'react';
+import { Trash2 } from 'lucide-react';
+import { cellItems } from '../../engine/cellGap';
+import { itemTitle, thumbOf } from '../../engine/labels';
+import { textsOnItem } from '../../engine/cellOps';
 import { urlFor } from '../../engine/assetUrls';
 import { importFilesIntoCell } from './cellImport';
 import { frameOfGroup } from '../../engine/layoutTracks';
@@ -8,7 +12,10 @@ import {
   cellAvailable,
   cellMain,
   importIntoCell,
+  removeAnyItem,
+  setCellCaption,
   setCellTrim,
+  setColorItem,
   type CellDraft,
 } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
@@ -16,6 +23,8 @@ import { toast, useUI } from '../../store/uiStore';
 import { ColorPicker } from '../../ui/ColorPicker';
 import { Sheet } from '../../ui/Sheet';
 import { RangeMarkerSheet } from './RangeMarkerSheet';
+import { CellAddSheet } from './CellAddSheet';
+import { ensureColorAsset } from './cellColor';
 
 const FILL_HEX: Record<string, string> = { black: '#000000', white: '#ffffff' };
 
@@ -41,12 +50,16 @@ export function CellSheet({
     .find((x) => x.type === 'text' && x.cellFor === trackId);
   const [draft, setDraft] = useState<CellDraft | null>(null);
   const [ranging, setRanging] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [edit, setEdit] = useState<{ id: string; color: string; text: string } | null>(null);
+  const selectedId = useProjectStore((s) => s.selectedId);
   const fileRef = useRef<HTMLInputElement>(null);
   if (!track || !frameItem) return null;
   if (!item) {
     // 這一格還是空的：選一個專案裡已有的素材，或從相簿匯入新的
     const choices = project.assets.filter(
-      (a) => (a.kind === 'video' || a.kind === 'image') && !a.name.startsWith('版型-'),
+      (a) =>
+        (a.kind === 'video' || a.kind === 'image') && !a.name.startsWith('版型-') && a.origin !== 'color',
     );
     const onFiles = async (list: FileList | null) => {
       const files = list ? Array.from(list) : [];
@@ -91,21 +104,27 @@ export function CellSheet({
   const asset = project.assets.find((a) => a.id === item.assetId);
   const S = cellAvailable(item, asset);
   const isVideo = item.type === 'video' && Number.isFinite(S);
-  const short = isVideo && S < L - 0.05;
-  const long = isVideo && S > L + 0.05;
+  const all = cellItems(track);
+  // 一格有多個素材、或空檔設成「停格」時，不用「素材比這一格短／長」那一套（空檔由版型的「空檔」決定）
+  const legacy = all.length === 1 && frameItem.gapMode !== 'hold';
+  const short = legacy && isVideo && S < L - 0.05;
+  const long = legacy && isVideo && S > L + 0.05;
   const init: CellDraft = {
     name: item.label ?? '',
     assetId: item.assetId,
     mode:
       item.speed !== 1 ? 'fit' : textNow || item.start > frameItem.start + 0.05 || short ? 'blank' : 'keep',
     pos: item.start > frameItem.start + 0.05 ? 'before' : 'after',
-    color: FILL_HEX[track.fill ?? 'black'] ?? track.fill ?? '#000000',
+    color:
+      FILL_HEX[track.fill ?? 'black'] ??
+      track.fill ??
+      (frameItem.gapMode === 'fill' ? (frameItem.frameStyle?.color ?? '#000000') : '#000000'),
     text: textNow && textNow.type === 'text' ? (textNow.card.runs[0]?.text ?? '') : '',
   };
   const d = draft ?? init;
   const set = (patch: Partial<CellDraft>) => setDraft({ ...d, ...patch });
   const choices = project.assets.filter(
-    (a) => (a.kind === 'video' || a.kind === 'image') && !a.name.startsWith('版型-'),
+    (a) => (a.kind === 'video' || a.kind === 'image') && !a.name.startsWith('版型-') && a.origin !== 'color',
   );
   const sameAsset = d.assetId === item.assetId;
   const slowFast = short ? '慢動作' : '快動作';
@@ -126,7 +145,97 @@ export function CellSheet({
             onChange={(e) => set({ name: e.target.value })}
           />
           <div className="panel-head">
-            <span>素材</span>
+            <span>這一格的素材（{all.length} 段）</span>
+          </div>
+          <ul className="cell-items" data-testid="cell-items">
+            {all.map((it, n) => {
+              const a = project.assets.find((x) => x.id === it.assetId);
+              const isColor = a?.origin === 'color';
+              const thumb = thumbOf(it, a);
+              const open = edit?.id === it.id;
+              return (
+                <li key={it.id} className={`cell-item${it.id === selectedId ? ' selected' : ''}`}>
+                  <button
+                    className="cell-item-main"
+                    aria-label={`第 ${n + 1} 段 ${itemTitle(it, a)}`}
+                    onClick={() => {
+                      useProjectStore.getState().select(it.id);
+                      useUI.getState().player?.seek(it.start + 0.02);
+                      if (isColor) {
+                        const cap = textsOnItem(project.tracks, it.id)[0];
+                        setEdit(
+                          open
+                            ? null
+                            : {
+                                id: it.id,
+                                color: a?.color ?? '#ffd23f',
+                                text: cap && cap.type === 'text' ? (cap.card.runs[0]?.text ?? '') : '',
+                              },
+                        );
+                      }
+                    }}
+                  >
+                    <span
+                      className="cell-thumb"
+                      style={{
+                        background: isColor ? a?.color : undefined,
+                        backgroundImage: !isColor && thumb ? `url(${thumb})` : undefined,
+                      }}
+                    />
+                    <span className="cell-item-name">
+                      {n + 1}. {isColor ? '色塊' : itemTitle(it, a)}
+                    </span>
+                    <span className="cell-item-dur">{it.duration.toFixed(1)} 秒</span>
+                  </button>
+                  <button
+                    className="icon-btn sm"
+                    aria-label={`刪除第 ${n + 1} 段`}
+                    onClick={() => {
+                      removeAnyItem(it.id);
+                      setEdit(null);
+                    }}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                  {open && edit && (
+                    <div className="zone-soft cell-item-edit" data-testid="cell-color-edit">
+                      <ColorPicker
+                        label="色塊顏色"
+                        value={edit.color}
+                        onPick={(c) => setEdit({ ...edit, color: c })}
+                      />
+                      <input
+                        className="text-input"
+                        aria-label="色塊上的文字"
+                        value={edit.text}
+                        maxLength={40}
+                        placeholder="色塊上的文字（可以不寫）"
+                        onChange={(e) => setEdit({ ...edit, text: e.target.value })}
+                      />
+                      <button
+                        className="btn primary"
+                        data-testid="cell-color-apply"
+                        onClick={async () => {
+                          const asset = await ensureColorAsset(project.id, edit.color);
+                          if (asset) setColorItem(it.id, asset);
+                          setCellCaption(it.id, edit.text);
+                          useUI.getState().player?.refresh();
+                          toast('已套用');
+                        }}
+                      >
+                        套用
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <button className="btn" data-testid="cell-add-open" onClick={() => setAdding(true)}>
+            ＋ 加素材
+          </button>
+          <div className="panel-head">
+            <span>換第 1 段的素材</span>
           </div>
           <div className="cover-strip" data-testid="cell-assets">
             {choices.map((a) => (
@@ -225,6 +334,9 @@ export function CellSheet({
               )}
             </>
           )}
+          {frameItem.gapMode === 'fill' && !(short && d.mode === 'blank') && (
+            <ColorPicker label="空檔顏色" value={d.color} onPick={(c) => set({ color: c })} />
+          )}
           <div className="sheet-row">
             <button
               className="btn primary grow"
@@ -242,6 +354,14 @@ export function CellSheet({
           </div>
         </div>
       </Sheet>
+      {adding && (
+        <CellAddSheet
+          projectId={project.id}
+          trackId={trackId}
+          index={index}
+          onClose={() => setAdding(false)}
+        />
+      )}
       {ranging && isVideo && asset && (
         <RangeMarkerSheet
           title={`第 ${index + 1} 格：選片段`}

@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-12：X1、X2（含 X2b/X2c）、X3、X4、X5、X7、版型 v2 L0～L8（含 L6）、**X9 圖層跨類別排序（X9-1～X9-4，版型裡子標題仍分類，見日誌）** 都做完（待使用者在 iPhone 驗收、開 PR）；接著 **X6 版型一格多素材＋同步／依序（計畫第二版：`docs/plans/2026-11-15-x6-sequence.md`，待 Sonnet 實作 X6-1～X6-4）** → X8 畫畫
+- **下一步**：feedback-12：X1、X2（含 X2b/X2c）、X3、X4、X5、X7、版型 v2 L0～L8（含 L6）、**X9 圖層跨類別排序（X9-1～X9-4，版型裡子標題仍分類，見日誌）** 都做完（待使用者在 iPhone 驗收、開 PR）；**X6 版型一格多素材＋同步／依序（`docs/plans/2026-11-15-x6-sequence.md`）已做完**；接著 → X8 畫畫
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -84,6 +84,14 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 X6 版型一格多素材＋同步／依序（Sonnet 實作）
+  - 使用者需求：播放軸要分得出素材屬於哪一格、可以在格子中穿插色塊 → 一格可放多個素材；用詞［同步］［依序］、空檔［停格］［色塊］［透明］、［移至格子］
+  - 做了什麼：**資料**：外框 `layoutPlay`（sync／seq）、`gapMode`（hold／fill／none，新版型預設 hold＋sync，舊版型沒有＝照舊）；`Asset.origin:'color'`＋`color`（色塊＝16×16 純色照片素材）；`TextItem.onItem`（色塊上的文字跟著那一段）。**引擎**：`engine/cellGap.ts`（`cellAt` 空檔停格：回傳「前一段最後一格」的虛擬物件，`start` 調成讓 t 剛好落在裡面、`hold:'after'|'before'` 標記，預覽、單格輸出、匯出都照 `sourceTimeClamped` 自然停住；`gapFillColor`）、`engine/cellOps.ts`（`arrangeCells` 同步／依序排好、`rippleAfter` 依序漣漪、`fitFrameToCells`、`moveToCellTracks`）、`layersAt` 格子軌改用 `cellAt`、scene 的空檔色塊改用 `gapFillColor`、`player.syncVideo` 遇到 `hold` 暫停＋靜音。**動作**（store）：`addToCell`、`moveToCell`、`arrangeGroup`、`setGapMode`、`trimCellEnd`（依序時尾端往後推）、`removeCellItem`（`removeAnyItem` 會轉過去）、`setColorItem`、`setCellCaption`；`moveItemTo` 限制格子素材只能移到同版型的格子軌；`applyCell` 在「一格多素材或停格」時只改名稱與空檔顏色。**介面**：版型分頁「播放方式」「空檔」（`.zone-soft`）、示意圖格子編號；播放軸格子列圖示＝編號、列尾 ＋（`CellAddSheet`：影片／照片、色塊＋顏色）、格子素材尾端用 `trimCellEnd`；剪輯分頁［移至格子］（跟其他工具用線隔開）；預覽格子素材虛線框標「第 N 格」；這一格視窗多了素材清單（縮圖或色塊色、秒數、刪除、點色塊可改顏色＋文字按套用）、「＋ 加素材」、空檔為色塊時的「空檔顏色」；舊的「素材比這一格短／長」只在「一格一個素材且空檔不是停格」時出現
+  - 動了哪些檔：`model/types.ts`、`engine/{cellGap,cellOps,timeline,scene,player}.ts`、`store/actions.ts`、`app/editor/{Timeline,CellSheet,CellAddSheet,cellColor,cellImport,LayoutDiagram,Preview}.tsx/ts`、`app/editor/tabs/{LayoutTab,EditTab}.tsx`、`app/styles.css`；測試 `engine/{cellGap,cellOps}.test.ts`、`store/cellMulti.test.ts`、`e2e/x6-cells.spec.ts`（4 個）、改 `e2e/{g4,x5,l5,helpers}`；截圖 `docs/screenshots/feedback-12/x6-*.png`
+  - 驗證：✅ 單元 1043、e2e 293、`npm run check`  🟡 沒在真 iPhone 驗（停格第一次 seek 到最後一格可能閃一下）
+  - 踩到的坑與已知限制：①新版型空檔預設「停格」，所以以前「素材比版型短→剩下顯示黑色」要先把空檔改成「色塊」（g4／x5 測試已照改）②停格的格子沒有 keyframe（`timeResolved` 只處理範圍內的物件）③依序的漣漪只在加素材／拖尾端／刪除時發生，自己拖素材本體或［移至格子］不推別格 ④色塊上的文字在「移至格子」時跟著搬、依序重排時跟著平移；但單獨拖色塊本體時文字不會跟（待觀察）⑤`trimClipEnd` 測試 helper 第一下點下去時間軸會自動捲動，要等 `trim-end` 出現
+  - 下一步：使用者 iPhone 驗收；X8 畫畫
+
 - 2026-11-15 X6 計畫第二版：一格多素材＋同步／依序（Opus 規劃）
   - 使用者原話：「如果是輪流播…播放軸中各影像又無法區分對應格子…若穿插色塊，該怎麼知道我是穿插在哪一個格子中？…同一格可以有多個素材，或許是靠點選後，一個格子可以被多個素材選擇要在該格子」；用詞：「排成輪流太難懂」「太白話、字太多」→ 定案［同步］［依序］、空檔［停格］［色塊］［透明］、［移至格子］
   - 做了什麼：重寫 `docs/plans/2026-11-15-x6-sequence.md`：一格＝小軌道可放多個素材（影片、照片、色塊）；色塊＝`origin:'color'` 的純色照片素材；色塊文字 `onItem` 跟著色塊；空檔 `gapMode`（停格／色塊／透明，`cellAt` 推算）；同步／依序是「排好」動作＋依序時加素材／改尾端／刪除會推後面各格；播放軸格子列顯示編號、列尾 ＋、可拖到同版型別格；預覽框出格子；剪輯分頁［移至格子］；這一格視窗改成素材清單

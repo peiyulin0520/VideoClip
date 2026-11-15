@@ -5,6 +5,7 @@ import { effectiveAdjust } from './grade';
 import { timeResolved } from './keyframes';
 import { renderText, measureTextItem, uiScale } from './textRender';
 import { applyTextFx, typingCount } from './textFx';
+import { gapFillColor } from './cellGap';
 import { visibleLayers } from './timeline';
 import { frameOfGroup, isFrameItem } from './layoutTracks';
 import { composeWith, motionOffset } from './groupTransform';
@@ -273,7 +274,7 @@ export function buildScene(
         if (gt) applyGroupLook(layer, gt.look, canvasW, canvasH);
         emit(group, layer, track.groupRole === 'cell');
       }
-    } else if (track.groupRole === 'cell' && track.fill && !track.hidden && frame) {
+    } else if (track.groupRole === 'cell' && !track.hidden && frame && gapFillColor(track, frame.item)) {
       // 這一格沒有素材可播（放完了或空位）：顯示色塊，湊滿版型的秒數
       const fr = frame.item;
       const gtf = group ? gts.get(group) : undefined;
@@ -291,7 +292,8 @@ export function buildScene(
         canvasW,
         canvasH,
       );
-      const color = FILL_COLORS[track.fill as keyof typeof FILL_COLORS] ?? track.fill;
+      const fillRaw = gapFillColor(track, frame.item)!;
+      const color = FILL_COLORS[fillRaw as keyof typeof FILL_COLORS] ?? fillRaw;
       const fillLayer: SceneLayer = {
         id: `fill-${track.id}`,
         kind: 'text',

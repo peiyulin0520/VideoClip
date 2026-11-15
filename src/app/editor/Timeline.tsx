@@ -3,6 +3,7 @@ import { useGroupOpen } from '../../store/groupOpenStore';
 import { EmptyCellSlot } from './EmptyCellSlot';
 import { CellSheet } from './CellSheet';
 import { importFilesIntoCell } from './cellImport';
+import { CellAddSheet } from './CellAddSheet';
 import { createAudioClip, createTextItem } from '../../model/defaults';
 import { ensureUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
@@ -50,7 +51,7 @@ import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemHasGrade } from '../../engine/grade';
-import { addGroupMember, keyframeTarget, shiftMemberLayer } from '../../store/actions';
+import { addGroupMember, keyframeTarget, shiftMemberLayer, trimCellEnd } from '../../store/actions';
 import { KeyframeDot } from './KeyframeDot';
 import { itemTitle, ordinalIn } from '../../engine/labels';
 import { textFxCode, textFxName } from '../../engine/textFx';
@@ -274,6 +275,7 @@ export function Timeline({
   const [renameItemId, setRenameItemId] = useState<string | null>(null);
   // 展開的版型：點格子開「這一格」視窗、空格子「＋ 匯入」、版型尾端「＋」加文字／音效
   const [cellSheet, setCellSheet] = useState<{ id: string; index: number } | null>(null);
+  const [cellAdd, setCellAdd] = useState<{ id: string; index: number } | null>(null);
   const cellFileRef = useRef<HTMLInputElement>(null);
   const cellImportFor = useRef<string | null>(null);
   const audioFileRef = useRef<HTMLInputElement>(null);
@@ -703,8 +705,10 @@ export function Timeline({
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     // 版型裡的文字、貼圖、音效：頭尾不能超出版型的時間範圍
+    const isCellItem = item.type !== 'text' && item.type !== 'audio' && !!item.cell && !!item.group;
+    const snapshot = useProjectStore.getState().project!;
     const frameSpan =
-      item.group && !isFrameItem(item)
+      item.group && !isFrameItem(item) && !(isCellItem && side === 'end')
         ? (() => {
             const fr = frameOfGroup(useProjectStore.getState().project!.tracks, item.group!);
             return fr ? { start: fr.item.start, end: fr.item.start + fr.item.duration } : null;
@@ -717,6 +721,12 @@ export function Timeline({
           side === 'end'
             ? Math.min(delta, frameSpan.end - (item.start + item.duration))
             : Math.max(delta, frameSpan.start - item.start);
+      // 版型格子素材的尾端：依序時後面的素材、各格跟著推，超出版型就把外框拉長
+      if (isCellItem && side === 'end') {
+        trimCellEnd(snapshot, item.id, item.duration + delta, { coalesce: `trim:${item.id}` });
+        player?.peek(item.start + Math.max(item.duration + delta, 0.2) - 0.05);
+        return;
+      }
       if (isFrameItem(item)) {
         // 版型：改整組的長度（各格超出的部分切掉）
         setGroupDuration(item.group!, item.duration + delta, { coalesce: `trim:${item.id}` });
@@ -977,7 +987,11 @@ export function Timeline({
                   }}
                   aria-pressed={multi ? multi.includes(track.id) : undefined}
                 >
-                  {track.kind === 'media' ? (
+                  {sub && track.groupRole === 'cell' ? (
+                    <span className="cell-no" data-testid="cell-no">
+                      {cellTracksOf(project.tracks, track.group!).indexOf(track) + 1}
+                    </span>
+                  ) : track.kind === 'media' ? (
                     <Film size={16} />
                   ) : track.kind === 'text' ? (
                     <Type size={16} />
@@ -1112,6 +1126,26 @@ export function Timeline({
                     </div>
                   );
                 })}
+
+                {sub && track.groupRole === 'cell' && track.items.length > 0 && (
+                  <button
+                    className="cell-add"
+                    data-testid="cell-add"
+                    aria-label={`第 ${cellTracksOf(project.tracks, track.group!).indexOf(track) + 1} 格 加素材`}
+                    style={{
+                      left: half + Math.max(...track.items.map((x) => x.start + x.duration)) * pps + 6,
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() =>
+                      setCellAdd({
+                        id: track.id,
+                        index: cellTracksOf(project.tracks, track.group!).indexOf(track),
+                      })
+                    }
+                  >
+                    <Plus size={14} />
+                  </button>
+                )}
 
                 {track.kind !== 'audio' &&
                   !track.groupRole &&
@@ -1335,6 +1369,15 @@ export function Timeline({
           </>
         )}
       </Sheet>
+      {cellAdd && (
+        <CellAddSheet
+          key={cellAdd.id}
+          projectId={project.id}
+          trackId={cellAdd.id}
+          index={cellAdd.index}
+          onClose={() => setCellAdd(null)}
+        />
+      )}
       {cellSheet && (
         <CellSheet
           key={cellSheet.id}

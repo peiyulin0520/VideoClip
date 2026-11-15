@@ -301,6 +301,15 @@ export async function trimClipEnd(page: Page, itemId: string, seconds: number): 
   await showTimeline(page);
   const clip = page.locator(`[data-testid="clip"][data-item-id="${itemId}"]`);
   await clip.tap();
+  // 第一下點下去時時間軸會自動捲動，收尾的 click 有時落在背景上又取消選取：沒選到就再點一次
+  const shown = await page
+    .getByTestId('trim-end')
+    .waitFor({ timeout: 1500 })
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!shown) await clip.tap();
   const p0 = await project(page);
   const dur0 = (p0.tracks.flatMap((t) => t.items) as unknown as { id: string; duration: number }[]).find(
     (i) => i.id === itemId,

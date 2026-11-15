@@ -134,6 +134,8 @@ test('版型：素材比版型短，剩下的秒數顯示色塊——反黑，�
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-blue.webm']); // 4 秒
   await addLayout(page, '上下雙格', ['clip-a.webm', 'solid-red.webm']); // clip-a 2 秒；紅 4 秒 → 版型 4 秒
+  await openTab(page, '版型');
+  await page.getByRole('radio', { name: '空檔 色塊' }).tap(); // 這幾個測試要的是「空檔畫色塊」那一套
   const tr = await tracks(page);
   const cell0 = tr.filter((t) => t.groupRole === 'cell')[0]!;
   const cell = cell0.items[0]!.cell!;

@@ -14,7 +14,9 @@ export type Asset = {
   height: number;
   hasAudio: boolean;
   /** 貼圖（內建貼圖、GIPHY、我的貼圖）加進專案時記下來：時間軸上自成一類「貼圖」，放在貼圖軌 */
-  origin?: 'sticker';
+  origin?: 'sticker' | 'color';
+  /** 色塊素材（origin==='color'）：純色照片，版型格子裡穿插用的色塊；不列在素材庫 */
+  color?: string;
   /** 小縮圖（JPEG dataURL），沿著素材時間平均取樣，用於時間軸與專案封面 */
   thumbs: string[];
   /** 縮圖已經補滿（每 2 秒一張）；沒有這個欄位的舊素材會在背景補（見 engine/thumbs.ts） */
@@ -193,6 +195,12 @@ export type VideoItem = ItemBase & {
   };
   /** 版型外框專用：整個版型的動畫（捲動＝由下往上捲過畫面；滑入滑出＝開頭從右邊滑進來、結尾往左滑出去） */
   motion?: 'drift' | 'slide';
+  /** 版型外框專用：最後選的排法（同步＝各格都從版型開頭；依序＝一格接一格，之後加素材／改長度會把後面的格子往後推）。沒有＝同步 */
+  layoutPlay?: 'sync' | 'seq';
+  /** 版型外框專用：格子沒素材可播的空檔——停格＝停在前一段最後一格、色塊＝格子的 fill 色、透明＝不畫。沒有＝舊版型的行為（有 fill 才畫色塊） */
+  gapMode?: 'hold' | 'fill' | 'none';
+  /** 只在計算畫面時暫時出現（不存檔）：這個格子素材是空檔裡的停格，before＝停在第一格、after＝停在最後一格，不 play()、沒有聲音 */
+  hold?: 'before' | 'after';
   /** 動態模板的格子：格子的範圍從 from（佔畫面寬、高的比例）在 t0–t1 秒（片段開始後）滑到 cell；之前停在 from */
   cellAnim?: { from: { x: number; y: number; w: number; h: number }; t0: number; t1: number };
   /** 動態模板外框：這個版型是哪一種動態模板（有整套的時間表，見 engine/story.ts） */
@@ -383,6 +391,8 @@ export type TextItem = ItemBase & {
   type: 'text';
   /** 版型某一格的「空白畫面」上的文字：那一格的軌道 id（「這一格」視窗用它找回來） */
   cellFor?: string;
+  /** 色塊素材（格子裡穿插的色塊）上的文字：那一段色塊的物件 id；色塊移動、改長度、刪除時文字跟著 */
+  onItem?: string;
   card: TextCard;
   /** 屬於哪個動態模板（標題、副標）：模板整個移動、拿掉、改長度時它們跟著 */
   group?: string;

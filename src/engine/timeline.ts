@@ -1,3 +1,4 @@
+import { cellAt } from './cellGap';
 import { isFrameItem } from './layoutTracks';
 import { MAX_SPEED, MIN_CLIP_DURATION, MIN_SPEED, newId } from '../model/defaults';
 import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../model/types';
@@ -192,7 +193,11 @@ export function layersAt(p: Project, t: number, includeHidden: boolean): Layer[]
   p.tracks.forEach((track, trackIndex) => {
     if (track.kind === 'audio') return; // 音樂沒有畫面
     if (track.hidden && !includeHidden) return;
-    const item = track.items.find((x) => tt >= x.start && tt < x.start + x.duration);
+    // 版型的格子：一格可以有多個素材，空檔照外框的「停格」設定畫前一段的最後一格（cellGap.cellAt）
+    const item =
+      track.groupRole === 'cell'
+        ? cellAt(p, track, tt)
+        : track.items.find((x) => tt >= x.start && tt < x.start + x.duration);
     if (item) out.push({ item, track, trackIndex });
   });
   return out;

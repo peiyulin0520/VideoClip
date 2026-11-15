@@ -86,6 +86,8 @@ test('X5-2 這一格視窗：改名套用（視窗不關）、❌ 不存；換�
   test.setTimeout(180_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '上下雙格', ['clip-a.webm', 'solid-red.webm']); // clip-a 2 秒、紅 4 秒；版型預設 5 秒
+  await openTab(page, '版型');
+  await page.getByRole('radio', { name: '空檔 色塊' }).tap(); // 這幾個測試要的是「空檔畫色塊」那一套
   const cell1 = async () => (await cellTracks(page))[0]!;
 
   // 名稱：改了按 ❌ → 沒變；改了按套用 → 變，視窗還開著
@@ -133,6 +135,8 @@ test('X5-2 素材比這一格長：選片段範圍（只拖起點）、快動作
   test.setTimeout(180_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '上下雙格', ['solid-red.webm', 'solid-green.webm']); // 各 4 秒；版型預設 5 秒
+  await openTab(page, '版型');
+  await page.getByRole('radio', { name: '空檔 色塊' }).tap(); // 這幾個測試要的是「空檔畫色塊」那一套
   // 拖版型尾端縮短到比素材（4 秒）短
   const frameId = (await tracks(page)).find(isFrameTrack)!.items.find((i) => i.group && !i.cell)!.id;
   const L = await trimClipEnd(page, frameId, -2);

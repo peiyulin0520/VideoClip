@@ -1,4 +1,4 @@
-import { frameOfGroup, isFrameItem } from '../../engine/layoutTracks';
+import { cellTracksOf, frameOfGroup, isFrameItem } from '../../engine/layoutTracks';
 import { groupClipArea } from '../../engine/scene';
 import { showPlaceholders } from '../../engine/placeholder';
 import { Layers, Maximize, Minimize, ShieldCheck } from 'lucide-react';
@@ -500,7 +500,13 @@ export function Preview({
                   top: Math.min(...clipPts.map((p) => p[1])) * k + 4,
                 }}
               >
-                只露出這個範圍
+                {sel &&
+                sel.item.type !== 'text' &&
+                sel.item.type !== 'audio' &&
+                sel.item.cell &&
+                sel.item.group
+                  ? `第 ${cellTracksOf(rproject.tracks, sel.item.group).findIndex((t) => t.id === sel.track.id) + 1} 格`
+                  : '只露出這個範圍'}
               </span>
             </>
           )}
