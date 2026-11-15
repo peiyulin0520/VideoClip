@@ -5,7 +5,14 @@ import { ArrowDown, ArrowUp, Eye, EyeOff, Layers, Lock, Type } from 'lucide-reac
 import { BLEND_LABELS } from '../../../engine/geometry';
 import { timeResolved } from '../../../engine/keyframes';
 import { findItem, isVideoItem, layersAt } from '../../../engine/timeline';
-import { editItem, patchTrack, resetTransform, setTransform, shiftTrackLayer } from '../../../store/actions';
+import {
+  editItem,
+  patchTrack,
+  resetTransform,
+  setTransform,
+  shiftMemberLayer,
+  shiftTrackLayer,
+} from '../../../store/actions';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
@@ -86,22 +93,26 @@ export function LayersTab() {
               <button
                 className="icon-btn sm"
                 aria-label={`${track.name} 往上一層`}
-                onClick={() =>
-                  project.tracks[trackIndex + 1]?.kind !== track.kind
-                    ? toast('已經是這一類最上面的圖層（影像、特效、字卡不能互相穿插）')
-                    : shiftTrackLayer(track.id, 1)
-                }
+                onClick={() => {
+                  if (track.groupRole === 'member') {
+                    if (!shiftMemberLayer(track.id, 1)) toast('已經是版型裡最上面的圖層');
+                  } else if (project.tracks[trackIndex + 1]?.kind !== track.kind)
+                    toast('已經是這一類最上面的圖層（影像、特效、字卡不能互相穿插）');
+                  else shiftTrackLayer(track.id, 1);
+                }}
               >
                 <ArrowUp size={18} />
               </button>
               <button
                 className="icon-btn sm"
                 aria-label={`${track.name} 往下一層`}
-                onClick={() =>
-                  project.tracks[trackIndex - 1]?.kind !== track.kind
-                    ? toast('已經是這一類最下面的圖層（影像、特效、字卡不能互相穿插）')
-                    : shiftTrackLayer(track.id, -1)
-                }
+                onClick={() => {
+                  if (track.groupRole === 'member') {
+                    if (!shiftMemberLayer(track.id, -1)) toast('已經是版型裡最下面的圖層');
+                  } else if (project.tracks[trackIndex - 1]?.kind !== track.kind)
+                    toast('已經是這一類最下面的圖層（影像、特效、字卡不能互相穿插）');
+                  else shiftTrackLayer(track.id, -1);
+                }}
               >
                 <ArrowDown size={18} />
               </button>

@@ -188,6 +188,8 @@ export type VideoItem = ItemBase & {
     cols?: number;
     /** 版型占畫面的寬、高比例（沒有＝整個畫面）；調整版型大小會改它 */
     box?: { w: number; h: number };
+    /** 格子之間框線的粗細倍數（沒有＝1，原本的粗細；0＝沒有框線，最大 3） */
+    line?: number;
   };
   /** 版型外框專用：整個版型的動畫（捲動＝由下往上捲過畫面；滑入滑出＝開頭從右邊滑進來、結尾往左滑出去） */
   motion?: 'drift' | 'slide';

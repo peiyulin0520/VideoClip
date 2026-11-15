@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { GRID_MAX } from '../../../engine/layouts';
+import { GRID_MAX, LINE_MAX, buildIn, cellGap, defOf } from '../../../engine/layouts';
+import { Slider } from '../../../ui/Slider';
 import type { Project, VideoItem } from '../../../model/types';
 import { useUI } from '../../../store/uiStore';
 import { ConfirmSheet } from '../../../ui/Sheet';
@@ -72,6 +73,28 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
   );
 }
 
+/** 格子之間框線的粗細：0%（沒有框線）～300%；停下來 0.4 秒才重畫外框（每次重畫都是一張新的外框圖） */
+function LineSlider({ group, line }: { group: string; line: number }) {
+  const [v, setV] = useState(Math.round(line * 100));
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  return (
+    <Slider
+      label="格子之間的框線粗細"
+      value={v}
+      min={0}
+      max={LINE_MAX * 100}
+      step={10}
+      format={(n) => `${n}%`}
+      onChange={(n) => {
+        setV(n);
+        window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => void reshapeLayout(group, { line: n / 100 }), 400);
+      }}
+    />
+  );
+}
+
 /** 版型的大小（預覽上拖邊）與自訂格數的列、欄（加減）。舊版型（沒有記錄用哪個版型）沒有 */
 function ShapeControls({ project, group, frame }: { project: Project; group: string; frame: VideoItem }) {
   const style = frame.frameStyle!;
@@ -86,6 +109,9 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
     else void reshapeLayout(group, { rows: r, cols: c });
   };
   const box = style.box ?? { w: 1, h: 1 };
+  // 格子之間的框線粗細：只有一格的版型（拍立得）沒有格子間框線
+  const hasGap =
+    cellGap(buildIn(defOf(style), project.width, project.height, style.box).windows) !== undefined;
   return (
     <div className="zone-soft" data-testid="layout-shape">
       <div className="slider-label">版型的大小與格數</div>
@@ -99,6 +125,7 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
       >
         調整版型大小（在預覽上拖邊，現在 {Math.round(box.w * 100)}% × {Math.round(box.h * 100)}%）
       </button>
+      {hasGap && <LineSlider key={`${style.line ?? 1}`} group={group} line={style.line ?? 1} />}
       {style.layout === 'grid' && (
         <div className="grid-steppers" data-testid="shape-steppers">
           {(

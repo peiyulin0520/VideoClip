@@ -43,6 +43,7 @@ export function LayoutDiagram({
         undefined,
         style.opacity,
         style.box,
+        style.line,
       );
   }, [style, W, H]);
 

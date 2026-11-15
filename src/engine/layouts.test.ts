@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 import type { Asset } from '../model/types';
 import { itemBox, type GeoCtx } from './geometry';
 import {
+  applyLineScale,
   buildIn,
+  cellGap,
   cellItem,
   cellRect,
   cellTransform,
   coverCrop,
   defOf,
   GRID_MAX,
+  LINE_MAX,
   gridDef,
   LAYOUTS,
   layoutById,
@@ -182,5 +185,31 @@ describe('版型 v2：左右雙格、自訂格數、版型大小', () => {
   it('defOf：自訂格數依列欄產生，其他依 id', () => {
     expect(defOf({ layout: 'grid', rows: 2, cols: 3 }).cells).toBe(6);
     expect(defOf({ layout: 'booth-2x2' }).cells).toBe(4);
+  });
+});
+
+describe('格子之間的框線粗細', () => {
+  const b0 = gridDef(1, 2).build(1000, 1000);
+  const gapOf = (b: typeof b0) => b.windows[1]!.x - (b.windows[0]!.x + b.windows[0]!.w);
+  it('cellGap：兩格之間的空隙；只有一格沒有', () => {
+    expect(cellGap(b0.windows)).toBeCloseTo(gapOf(b0), 3);
+    expect(cellGap(gridDef(1, 1).build(1000, 1000).windows)).toBeUndefined();
+  });
+  it('applyLineScale：2 倍＝空隙變 2 倍、0＝格子貼在一起、1＝不動；格子仍在原範圍內', () => {
+    const g = gapOf(b0);
+    expect(gapOf(applyLineScale(b0, 2))).toBeCloseTo(g * 2, 3);
+    expect(gapOf(applyLineScale(b0, 0))).toBeCloseTo(0, 3);
+    expect(applyLineScale(b0, 1)).toBe(b0);
+    expect(gapOf(applyLineScale(b0, 99))).toBeCloseTo(g * LINE_MAX, 3); // 上限 3 倍
+    for (const w of applyLineScale(b0, 3).windows) expect(w.w).toBeGreaterThan(0);
+  });
+  it('buildIn 帶 line；每個內建多格版型都有框線可調，拍立得（一格）沒有', () => {
+    for (const d of LAYOUTS) {
+      const gap = cellGap(d.build(1080, 1920).windows);
+      if (d.cells === 1) expect(gap).toBeUndefined();
+      else expect(gap).toBeGreaterThan(0);
+    }
+    const thick = buildIn(gridDef(1, 2), 1000, 1000, undefined, 2);
+    expect(gapOf(thick)).toBeCloseTo(gapOf(b0) * 2, 3);
   });
 });

@@ -195,3 +195,85 @@ test('L7 調整版型大小：預覽上拖右邊把手往左 → 套用 → 版�
   await page.getByRole('button', { name: '復原' }).tap();
   await expect.poll(async () => (await frameOf()).frameStyle?.box).toBeUndefined();
 });
+
+test('L7 格子之間的框線粗細：滑桿 0%＝格子貼在一起、300%＝框線變粗；拍立得（一格）沒有這個滑桿；一步復原', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await createProjectWith(page, ['solid-blue.webm']);
+  await openTab(page, '版型');
+  await page.getByRole('button', { name: '版型 左右雙格', exact: true }).tap();
+  await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]);
+  await selectFrame(page);
+  await openTab(page, '版型');
+  const gap = async () => {
+    const cs = (await tracks(page)).filter((t) => t.groupRole === 'cell');
+    const a = cs[0]!.items[0]!.cell!;
+    const b = cs[1]!.items[0]!.cell!;
+    return b.x - (a.x + a.w);
+  };
+  const g1 = await gap();
+  expect(g1).toBeGreaterThan(0);
+  const slider = page.getByLabel('格子之間的框線粗細');
+  await expect(slider).toHaveValue('100');
+  await slider.fill('300');
+  await expect.poll(gap, { timeout: 15_000 }).toBeGreaterThan(g1 * 2.5);
+  await slider.fill('0');
+  await expect.poll(gap, { timeout: 15_000 }).toBeLessThan(0.002);
+  // 格子貼在一起後每格仍有素材（沒有露出藍色底）
+  const cs = (await tracks(page)).filter((t) => t.groupRole === 'cell');
+  const c0 = cs[0]!.items[0]!.cell!;
+  await seekTo(page, 1);
+  await expect
+    .poll(async () => isRed(await samplePreview(page, c0.x + c0.w / 2, c0.y + c0.h / 2)))
+    .toBe(true);
+  await page.screenshot({ path: `${SHOT}/layout-line-0.png` });
+  // 一步復原（滑桿的連續調整合併成一步）→ 回到 300% 或原本；再復原到原本粗細
+  await page.getByRole('button', { name: '復原' }).tap();
+  await page.getByRole('button', { name: '復原' }).tap();
+  await expect.poll(gap, { timeout: 5000 }).toBeCloseTo(g1, 3);
+});
+
+test('L7 拍立得（只有一格）沒有框線粗細滑桿', async ({ page }) => {
+  test.setTimeout(120_000);
+  await createProjectWith(page, ['solid-blue.webm']);
+  await openTab(page, '版型');
+  await page.getByRole('button', { name: '版型 拍立得', exact: true }).tap();
+  await finishLayout(page, [fixture('photo.png')]);
+  await selectFrame(page);
+  await openTab(page, '版型');
+  await expect(page.getByTestId('layout-shape')).toBeVisible();
+  await expect(page.getByLabel('格子之間的框線粗細')).toHaveCount(0);
+});
+
+test('L8 版型裡的文字有上下圖層：兩個文字各一條成員軌，選單「往上一層」只在版型裡換；到頂有提示', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await createProjectWith(page, ['solid-blue.webm']);
+  await openTab(page, '版型');
+  await page.getByRole('button', { name: '版型 三格', exact: true }).tap();
+  await page.getByTestId('layout-confirm').tap();
+  await expect(page.getByTestId('layout-options')).toHaveCount(0, { timeout: 30_000 });
+  await showTimeline(page);
+  for (let i = 0; i < 2; i++) {
+    await page.getByTestId('group-add').tap();
+    await page.getByTestId('group-add-text').tap(); // 同一秒的兩個文字 → 兩條成員軌
+  }
+  const members = async () =>
+    (await tracks(page)).filter((t) => t.groupRole === 'member' && t.kind === 'text');
+  expect(await members()).toHaveLength(2);
+  const [low, high] = await members();
+  // 最上面那條再往上 → 提示
+  const chips = page.locator('.track.sub-row[data-kind="text"] [data-testid="track-chip"]');
+  await expect(chips).toHaveCount(2);
+  await chips.first().tap(); // 畫面上最上面那條＝陣列最後（最上層）
+  await page.getByRole('button', { name: /往上一層/ }).tap();
+  await expect(page.locator('.toast').filter({ hasText: '已經是版型裡最上面' })).toBeVisible();
+  // 最下面那條往上一層 → 兩條換位置
+  await chips.last().tap();
+  await page.getByRole('button', { name: /往上一層/ }).tap();
+  const after = await members();
+  expect(after[0]!.id).toBe(high!.id);
+  expect(after[1]!.id).toBe(low!.id);
+});

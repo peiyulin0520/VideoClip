@@ -50,7 +50,7 @@ import { toast, useUI } from '../../store/uiStore';
 import { Sheet } from '../../ui/Sheet';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { itemHasGrade } from '../../engine/grade';
-import { addGroupMember, keyframeTarget } from '../../store/actions';
+import { addGroupMember, keyframeTarget, shiftMemberLayer } from '../../store/actions';
 import { KeyframeDot } from './KeyframeDot';
 import { itemTitle, ordinalIn } from '../../engine/labels';
 import { textFxCode, textFxName } from '../../engine/textFx';
@@ -1269,7 +1269,9 @@ export function Timeline({
                     <button
                       className="menu-item"
                       onClick={() => {
-                        if (project.tracks[menuIndex + 1]?.kind !== menuTrack.kind)
+                        if (menuTrack.groupRole === 'member') {
+                          if (!shiftMemberLayer(menuTrack.id, 1)) toast('已經是版型裡最上面的圖層');
+                        } else if (project.tracks[menuIndex + 1]?.kind !== menuTrack.kind)
                           toast('已經是這一類最上面的軌道（影像、特效、字卡不能互相穿插）');
                         else shiftTrackLayer(menuTrack.id, 1);
                         setMenuTrackId(null);
@@ -1280,7 +1282,9 @@ export function Timeline({
                     <button
                       className="menu-item"
                       onClick={() => {
-                        if (project.tracks[menuIndex - 1]?.kind !== menuTrack.kind)
+                        if (menuTrack.groupRole === 'member') {
+                          if (!shiftMemberLayer(menuTrack.id, -1)) toast('已經是版型裡最下面的圖層');
+                        } else if (project.tracks[menuIndex - 1]?.kind !== menuTrack.kind)
                           toast('已經是這一類最下面的軌道（影像、特效、字卡不能互相穿插）');
                         else shiftTrackLayer(menuTrack.id, -1);
                         setMenuTrackId(null);

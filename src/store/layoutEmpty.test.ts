@@ -194,3 +194,36 @@ describe('applyLayoutShape（版型長寬、自訂格數）', () => {
     expect(cellTracks()[0]!.cell).toEqual(before[0]);
   });
 });
+
+describe('版型裡的圖層順序（shiftMemberLayer）', () => {
+  it('同一個版型、同一種類的成員軌才互相換；不會換到版型外面的圖層', async () => {
+    const { createTextItem } = await import('../model/defaults');
+    const { addGroupMember, shiftMemberLayer } = await import('./actions');
+    const g = mk([{ win: wins[0]! }]);
+    // 版型外面的一般字卡軌
+    s().apply((d) => {
+      const tr = {
+        id: 'plain',
+        kind: 'text',
+        name: '字卡 1',
+        hidden: false,
+        locked: false,
+        items: [],
+      } as unknown as Track;
+      d.tracks.push(tr as never);
+    });
+    addGroupMember(g, createTextItem(0, 'A'));
+    addGroupMember(g, createTextItem(0, 'B')); // 同時間 → 另一條成員軌
+    const members = () => s().project!.tracks.filter((t) => t.groupRole === 'member' && t.kind === 'text');
+    expect(members()).toHaveLength(2);
+    const [low, high] = members();
+    expect(shiftMemberLayer(high!.id, 1)).toBe(false); // 已經最上面
+    expect(shiftMemberLayer(low!.id, -1)).toBe(false); // 已經最下面
+    expect(shiftMemberLayer(low!.id, 1)).toBe(true);
+    const after = members();
+    expect(after[0]!.id).toBe(high!.id);
+    expect(after[1]!.id).toBe(low!.id);
+    s().undo();
+    expect(members()[0]!.id).toBe(low!.id);
+  });
+});

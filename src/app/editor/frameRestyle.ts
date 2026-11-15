@@ -17,7 +17,15 @@ export async function restyleFrame(group: string, patch: Partial<{ color: string
   const def = defOf(style);
   if (!def) return;
   try {
-    const blob = await renderFramePng(def, p.width, p.height, style.color, style.opacity, style.box);
+    const blob = await renderFramePng(
+      def,
+      p.width,
+      p.height,
+      style.color,
+      style.opacity,
+      style.box,
+      style.line,
+    );
     const file = new File([blob], `版型-${def.name}.png`, { type: 'image/png' });
     const res = await importFiles(p.id, [file]);
     const asset = res.assets[0];
@@ -35,7 +43,7 @@ export async function restyleFrame(group: string, patch: Partial<{ color: string
  */
 export async function reshapeLayout(
   group: string,
-  patch: Partial<{ rows: number; cols: number; box: { w: number; h: number } }>,
+  patch: Partial<{ rows: number; cols: number; box: { w: number; h: number }; line: number }>,
 ) {
   const p = useProjectStore.getState().project;
   if (!p) return;
@@ -46,13 +54,21 @@ export async function reshapeLayout(
   const style = { ...frame.frameStyle, ...patch };
   const def = defOf(style);
   try {
-    const blob = await renderFramePng(def, p.width, p.height, style.color, style.opacity, style.box);
+    const blob = await renderFramePng(
+      def,
+      p.width,
+      p.height,
+      style.color,
+      style.opacity,
+      style.box,
+      style.line,
+    );
     const file = new File([blob], `版型-${def.name}.png`, { type: 'image/png' });
     const res = await importFiles(p.id, [file]);
     const asset = res.assets[0];
     if (!asset) return toast('版型重畫失敗', 4000);
     await ensureUrls(p.id, [asset]);
-    applyLayoutShape(group, asset, style);
+    applyLayoutShape(group, asset, style, { coalesce: `shape:${group}` });
   } catch {
     toast('版型重畫失敗', 4000);
   }

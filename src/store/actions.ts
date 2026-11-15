@@ -917,6 +917,7 @@ export function applyLayoutShape(
   group: string,
   asset: Asset,
   style: NonNullable<VideoItem['frameStyle']>,
+  opts?: Opts,
 ): void {
   const p = store().project;
   const fr = p && groupFrame(p, group);
@@ -925,7 +926,7 @@ export function applyLayoutShape(
   const H = p.height;
   const oldBox = fr.item.frameStyle?.box ?? { w: 1, h: 1 };
   const newBox = style.box ?? { w: 1, h: 1 };
-  const b = buildIn(defOf(style), W, H, style.box);
+  const b = buildIn(defOf(style), W, H, style.box, style.line);
   const rs = b.panels.length ? b.panels : b.windows;
   const l = Math.min(...rs.map((r) => r.x));
   const tp = Math.min(...rs.map((r) => r.y));
@@ -995,7 +996,7 @@ export function applyLayoutShape(
     frameItem.assetId = asset.id;
     frameItem.frameStyle = { ...style };
     frameItem.visible = visible;
-  });
+  }, opts);
 }
 
 /**
@@ -1550,6 +1551,31 @@ export function shiftTrackLayer(trackId: string, dir: -1 | 1) {
   store().apply((d) => {
     d.tracks = moveTrack(d.tracks as Track[], trackId, dir) as never;
   });
+}
+
+/**
+ * 版型裡的文字／貼圖軌道往上（dir=1）或往下（-1）一層：只跟「同一個版型、同一種類」的鄰居換位置，
+ * 不會跑到版型外面的圖層上。已經在最上面／最下面回傳 false。一步復原。
+ */
+export function shiftMemberLayer(trackId: string, dir: -1 | 1): boolean {
+  const p = store().project;
+  const i = p ? p.tracks.findIndex((t) => t.id === trackId) : -1;
+  const t = p?.tracks[i];
+  if (!p || !t || t.groupRole !== 'member' || !t.group) return false;
+  let j = i + dir;
+  while (j >= 0 && j < p.tracks.length) {
+    const o = p.tracks[j]!;
+    if (o.group === t.group && o.groupRole === 'member' && o.kind === t.kind) break;
+    if (o.kind !== t.kind) return false; // 到了別的類別（字卡、貼圖、影像不能互相穿插）
+    j += dir;
+  }
+  if (j < 0 || j >= p.tracks.length) return false;
+  store().apply((d) => {
+    const a = d.tracks[i]!;
+    d.tracks[i] = d.tracks[j]!;
+    d.tracks[j] = a;
+  });
+  return true;
 }
 
 /** 直接把軌道搬到新的圖層位置（拖時間軸左邊的軌道圖示）；一步復原 */

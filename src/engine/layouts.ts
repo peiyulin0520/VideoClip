@@ -403,7 +403,48 @@ export type LayoutShape = {
   rows?: number;
   cols?: number;
   box?: { w: number; h: number };
+  /** 格子之間框線的粗細倍數（沒有＝1） */
+  line?: number;
 };
+
+export const LINE_MAX = 3;
+
+/** 格子之間原本的空隙（px，也就是格子間框線的粗細）；只有一格、或格子都不相鄰時沒有（回傳 undefined） */
+export function cellGap(windows: Rect[]): number | undefined {
+  let best: number | undefined;
+  for (let i = 0; i < windows.length; i++)
+    for (let j = i + 1; j < windows.length; j++) {
+      const a = windows[i]!;
+      const b = windows[j]!;
+      const overlapY = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      const overlapX = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      const gaps: number[] = [];
+      if (overlapY > 1) gaps.push(Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w));
+      if (overlapX > 1) gaps.push(Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h));
+      for (const g of gaps) if (g > 0.5 && (best === undefined || g < best)) best = g;
+    }
+  return best;
+}
+
+/**
+ * 格子之間框線粗細改成原本的 scale 倍：每一格往內縮（變粗）或往外長（變細，0＝貼在一起）。
+ * 沒有相鄰格子（只有一格）就不動。
+ */
+export function applyLineScale(b: ReturnType<LayoutDef['build']>, scale: number) {
+  const gap = cellGap(b.windows);
+  const s = Math.min(Math.max(scale, 0), LINE_MAX);
+  if (gap === undefined || Math.abs(s - 1) < 1e-3) return b;
+  const d = (gap * (s - 1)) / 2;
+  return {
+    ...b,
+    windows: b.windows.map((w) => ({
+      x: w.x + d,
+      y: w.y + d,
+      w: Math.max(w.w - 2 * d, 1),
+      h: Math.max(w.h - 2 * d, 1),
+    })),
+  };
+}
 
 /** 照形狀找出版型定義（自訂格數＝依列欄產生） */
 export function defOf(shape: LayoutShape): LayoutDef {
@@ -416,6 +457,17 @@ export function defOf(shape: LayoutShape): LayoutDef {
  * 沒給 box＝整個畫面（跟以前一樣）。
  */
 export function buildIn(
+  def: LayoutDef,
+  W: number,
+  H: number,
+  box?: { w: number; h: number },
+  line?: number,
+): ReturnType<LayoutDef['build']> {
+  const b0 = buildBox(def, W, H, box);
+  return line === undefined ? b0 : applyLineScale(b0, line);
+}
+
+function buildBox(
   def: LayoutDef,
   W: number,
   H: number,
@@ -453,8 +505,9 @@ export function paintFrame(
   windowFill?: string,
   opacity = 1,
   box?: { w: number; h: number },
+  line?: number,
 ) {
-  const b = buildIn(def, W, H, box);
+  const b = buildIn(def, W, H, box, line);
   const rr = (r: Rect, radius: number) => {
     ctx.roundRect(r.x, r.y, r.w, r.h, Math.min(radius, r.w / 2, r.h / 2));
   };
@@ -484,11 +537,12 @@ export async function renderFramePng(
   color: string,
   opacity = 1,
   box?: { w: number; h: number },
+  line?: number,
 ): Promise<Blob> {
   const c = document.createElement('canvas');
   c.width = Math.round(W);
   c.height = Math.round(H);
-  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity, box);
+  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity, box, line);
   return new Promise((ok, bad) =>
     c.toBlob((b) => (b ? ok(b) : bad(new Error('外框轉成圖片失敗'))), 'image/png'),
   );
