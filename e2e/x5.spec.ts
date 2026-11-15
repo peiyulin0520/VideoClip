@@ -71,8 +71,8 @@ test('X5-1 示意圖：每一格有按鈕和縮圖；外框畫成實際的顏色
   const diagram = page.getByTestId('layout-diagram');
   await expect(diagram).toBeVisible();
   await expect(page.getByTestId('ld-cell')).toHaveCount(2);
-  await expect(page.getByRole('button', { name: /^第 1 格/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /^第 2 格/ })).toBeVisible();
+  await expect(page.getByTestId('ld-cell').nth(0)).toHaveAttribute('aria-label', /^第 1 格/);
+  await expect(page.getByTestId('ld-cell').nth(1)).toHaveAttribute('aria-label', /^第 2 格/);
   // 外框那層畫成粉色
   const ex = await pixel(diagram.locator('.ld-frame'), 0.5, 0.01);
   expect(ex[0]).toBeGreaterThan(200);

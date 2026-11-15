@@ -170,6 +170,8 @@ export type VideoItem = ItemBase & {
   cropEdit?: { crop: Crop; mask: [number, number][] | null; strokes: CropStroke[] };
   /** 多格版型：這個物件所在的格子（佔畫面寬、高的比例）。裁切模式完成時，畫面會填滿這個格子 */
   cell?: { x: number; y: number; w: number; h: number };
+  /** 版型裡的貼圖／音效（不是外框、不是格子）：有 group 又沒有 cell 的影像物件預設會被當成外框，所以要標記 */
+  member?: true;
   /** 同一個版型的物件（外框與各格）共用的 id：一起縮放、移動、同一段時間，也用來「刪除整個版型」 */
   group?: string;
   /** 版型外框專用：看得到的範圍（佔整張外框圖的比例）；選取框、點選範圍用它，不用整張透明的圖 */
@@ -404,8 +406,8 @@ export type Track = {
    * 各格的軌道藏起來；在預覽上點格子可以個別選片段。
    */
   group?: string;
-  /** 'cell'＝版型的格子軌（藏起來、貼在外框那一列下面）。'frame' 是舊資料（外框自己一條軌），載入時會轉成一般影像軌 */
-  groupRole?: 'frame' | 'cell';
+  /** 'cell'＝版型的格子軌（貼在外框那一列下面）；'member'＝版型裡的文字／貼圖／音效軌（只在版型展開時看得到）。'frame' 是舊資料（外框自己一條軌），載入時會轉成一般影像軌 */
+  groupRole?: 'frame' | 'cell' | 'member';
   /** 格子軌：這一格的位置（佔畫面寬、高的比例）。格子還沒放素材時靠它知道在哪 */
   cell?: { x: number; y: number; w: number; h: number };
   /** 格子軌道：素材放完（或這段時間沒有素材）時，格子顯示的色塊顏色 */

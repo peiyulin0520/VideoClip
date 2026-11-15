@@ -95,8 +95,11 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '三格', ['solid-red.webm', 'solid-green.webm', 'solid-blue.webm']);
   await showTimeline(page);
-  // 時間軸上：主軌 1 + 版型代表列 1（格子的軌道藏起來）
+  // 時間軸上：新版型預設展開，影像下面是各格一列；收合後只剩主軌 1 + 版型那一列
+  await expect(page.locator('.track.sub-row[data-kind="media"]')).toHaveCount(3);
+  await page.getByTestId('group-toggle').tap();
   await expect(page.getByTestId('track')).toHaveCount(2);
+  await expect(page.locator('.track.sub-row')).toHaveCount(0);
   const tr = await tracks(page);
   const frame = tr.find(isFrameTrack)!.items[0]!;
   // 版型分頁列出每一格；點「選第 2 格」選到那一格

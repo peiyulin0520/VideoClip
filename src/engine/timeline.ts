@@ -1,3 +1,4 @@
+import { isFrameItem } from './layoutTracks';
 import { MAX_SPEED, MIN_CLIP_DURATION, MIN_SPEED, newId } from '../model/defaults';
 import type { Asset, Item, Project, Track, TrackKind, VideoItem } from '../model/types';
 import { shiftKeyframes, splitKeyframes } from './keyframes';
@@ -344,7 +345,9 @@ export function reorderTrack(tracks: Track[], id: string, toIndex: number): Trac
 
 /** 在哪一條同類型軌道的 [start, start+duration) 是空的；找不到回傳 -1（呼叫端要新增軌道） */
 export function firstFreeTrack(p: Project, kind: Track['kind'], start: number, duration: number): number {
-  return p.tracks.findIndex((t) => t.kind === kind && !t.locked && canPlace(t.items, start, duration));
+  return p.tracks.findIndex(
+    (t) => t.kind === kind && !t.groupRole && !t.locked && canPlace(t.items, start, duration),
+  );
 }
 
 // ---------- 長按拖移素材：拖到別的軌道、別的時間 ----------
@@ -381,10 +384,13 @@ export function dropTarget(
   assets?: Pick<Asset, 'id' | 'origin'>[],
 ): DropTarget | null {
   const kind = trackKindOf(item, assets);
-  if (hover.newEdge) return { type: 'new', edge: hover.newEdge };
+  // 版型裡的東西（格子、文字、貼圖、音效）只能待在自己版型的軌道裡；版型外框跟一般片段一樣可以換列
+  const inGroup = !!item.group && !isFrameItem(item);
+  if (hover.newEdge) return inGroup ? null : { type: 'new', edge: hover.newEdge };
   if (!hover.trackId) return null;
   const tr = tracks.find((t) => t.id === hover.trackId);
   if (!tr) return null;
+  if (inGroup ? tr.group !== item.group || !tr.groupRole : !!tr.groupRole) return { type: 'invalid', kind };
   if (tr.kind !== kind) return { type: 'invalid', kind };
   if (tr.locked) return { type: 'invalid', kind };
   return { type: 'track', trackId: tr.id };

@@ -88,3 +88,50 @@ describe('空的版型格子', () => {
     expect(mediaRows).toHaveLength(2);
   });
 });
+
+describe('版型成員（文字、音效）', () => {
+  it('addGroupMember：放進版型自己的成員軌；時間夾在版型範圍裡', async () => {
+    const { createTextItem, createAudioClip } = await import('../model/defaults');
+    const { addGroupMember, clampToGroup } = await import('./actions');
+    const g = mk([{ win: wins[0]! }], 2, 5); // 版型 2～7 秒
+    const t1 = createTextItem(0, '嗨'); // 播放線在版型之前 → 夾到版型開始
+    addGroupMember(g, t1);
+    const p = s().project!;
+    const mt = p.tracks.find((t) => t.groupRole === 'member')!;
+    expect(mt.kind).toBe('text');
+    expect(mt.group).toBe(g);
+    expect(mt.items[0]!.start).toBe(2);
+    // 太靠後：長度被截到版型結束
+    const t2 = createTextItem(6.5, '尾');
+    addGroupMember(g, t2);
+    const tail = s()
+      .project!.tracks.flatMap((t) => t.items)
+      .find((x) => x.id === t2.id)!;
+    expect(tail.start + tail.duration).toBeLessThanOrEqual(7.0001);
+    // 同一段時間放不下就開新的成員軌
+    addGroupMember(g, createTextItem(2, '疊'));
+    expect(
+      s().project!.tracks.filter((t) => t.groupRole === 'member' && t.kind === 'text').length,
+    ).toBeGreaterThan(1);
+    // 音效：成員軌是 audio，物件標成版型成員
+    const a = asset('snd', 'video', 10);
+    addGroupMember(g, createAudioClip({ ...a, kind: 'audio' }, 3));
+    const at = s().project!.tracks.find((t) => t.groupRole === 'member' && t.kind === 'audio')!;
+    expect(at.items[0]!.group).toBe(g);
+    expect(at.items[0]!.start + at.items[0]!.duration).toBeLessThanOrEqual(7.0001);
+    // clampToGroup：拖到版型外面會被夾回來
+    const item = at.items[0]!;
+    expect(clampToGroup(s().project!, item, 20, item.duration).start + item.duration).toBeLessThanOrEqual(
+      7.0001,
+    );
+    expect(clampToGroup(s().project!, item, -5, item.duration).start).toBeGreaterThanOrEqual(2);
+  });
+  it('刪掉版型：成員軌一起拿掉', async () => {
+    const { createTextItem } = await import('../model/defaults');
+    const { addGroupMember, removeGroup } = await import('./actions');
+    const g = mk([{ win: wins[0]! }]);
+    addGroupMember(g, createTextItem(0, '字'));
+    removeGroup(g);
+    expect(s().project!.tracks.filter((t) => t.group === g)).toHaveLength(0);
+  });
+});

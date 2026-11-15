@@ -35,7 +35,9 @@ import {
   type Range,
   findItem,
   findFreeStart,
+  canPlace,
   firstFreeTrack,
+  trackKindOf,
   insertIndexFor,
   isVideoItem,
   mediaItems,
@@ -84,6 +86,7 @@ import {
   usesKeyframeLook,
   withTime,
 } from '../engine/keyframes';
+import { useGroupOpen } from './groupOpenStore';
 import { useProjectStore } from './projectStore';
 import { toast, useUI } from './uiStore';
 
@@ -699,13 +702,83 @@ export function addLayout(o: {
       run.color = ink;
       run.lineHeight = 1.3;
       delete run.shadow;
-      const ki = trackIndexFor(d.tracks as Track[], 'text', ti.start, ti.duration);
-      d.tracks[ki]!.items.push(ti);
+      memberTrackFor(d as { tracks: Track[] }, group, 'text', ti.start, ti.duration).items.push(ti as never);
     }
   });
   const pick = firstId ?? frameId;
+  useGroupOpen.getState().openGroup(group); // 新版型在播放軸上預設展開
   if (pick) store().select(pick);
   return pick || null;
+}
+
+/**
+ * 版型的成員軌：這個版型裡同種類、這段時間放得下的那一條；沒有就新增一條（放在該種類那一區的最上面）。
+ * 直接改傳進來的草稿。
+ */
+function memberTrackFor(
+  d: { tracks: Track[] },
+  group: string,
+  kind: Track['kind'],
+  start: number,
+  duration: number,
+): Track {
+  const free = d.tracks.find(
+    (t) =>
+      t.group === group &&
+      t.groupRole === 'member' &&
+      t.kind === kind &&
+      !t.locked &&
+      canPlace(t.items, start, duration),
+  );
+  if (free) return free;
+  const tr = createTrack(kind, d.tracks);
+  tr.group = group;
+  tr.groupRole = 'member';
+  const at = insertIndexFor(d.tracks, kind);
+  d.tracks.splice(at, 0, tr);
+  return d.tracks[at]!;
+}
+
+/** 版型的時間範圍（外框的開始與結束） */
+function groupSpan(p: Project, group: string): { start: number; end: number } | null {
+  const f = groupFrame(p, group);
+  return f ? { start: f.item.start, end: f.item.start + f.item.duration } : null;
+}
+
+/**
+ * 把文字／貼圖／音效加進版型（放在版型自己的成員軌）：開始時間＝播放線，夾在版型的時間範圍裡，
+ * 長度最多到版型結束。回傳物件 id；找不到版型回傳 null。
+ */
+export function addGroupMember(group: string, item: Item): string | null {
+  const p = store().project;
+  const span = p && groupSpan(p, group);
+  if (!p || !span) return null;
+  const kind = trackKindOf(item, p.assets);
+  const start = Math.min(Math.max(item.start, span.start), Math.max(span.end - 0.2, span.start));
+  item.start = start;
+  item.duration = Math.max(Math.min(item.duration, span.end - start), 0.2);
+  item.group = group;
+  if (item.type !== 'text') (item as VideoItem).member = true;
+  store().apply((d) => {
+    memberTrackFor(d as { tracks: Track[] }, group, kind, item.start, item.duration).items.push(
+      item as never,
+    );
+  });
+  store().select(item.id);
+  return item.id;
+}
+
+/** 版型成員的時間夾在版型範圍裡（拖移、修剪用）：回傳夾好的 start、duration */
+export function clampToGroup(
+  p: Project,
+  item: Item,
+  start: number,
+  duration: number,
+): { start: number; duration: number } {
+  const span = item.group && !isFrameItem(item) ? groupSpan(p, item.group) : null;
+  if (!span) return { start, duration };
+  const d = Math.min(duration, span.end - span.start);
+  return { start: Math.min(Math.max(start, span.start), span.end - d), duration: d };
 }
 
 /**
@@ -803,8 +876,7 @@ export function moveGroupTo(group: string, start: number) {
   const shift = Math.max(delta, -minStart);
   if (Math.abs(shift) < 1e-9) return;
   store().apply((d) => {
-    for (const track of d.tracks)
-      for (const it of track.items) if (it.type !== 'audio' && it.group === group) it.start += shift;
+    for (const track of d.tracks) for (const it of track.items) if (it.group === group) it.start += shift;
   });
 }
 
@@ -822,7 +894,7 @@ export function setGroupDuration(group: string, duration: number, opts?: Opts) {
     for (const track of d.tracks) {
       const keep: Item[] = [];
       for (const it of track.items) {
-        if (it.type === 'audio' || it.group !== group) {
+        if (it.group !== group) {
           keep.push(it as Item);
           continue;
         }
@@ -1358,7 +1430,9 @@ export function removeTrack(trackId: string) {
 export function moveItemTo(id: string, target: DropTarget, start: number): boolean {
   const p = store().project;
   if (!p) return false;
-  const next = moveItemToTrack(p.tracks, id, target, start, createTrack, p.assets);
+  const cur = findItem(p, id)?.item;
+  const at = cur ? clampToGroup(p, cur, start, cur.duration).start : start; // 版型裡的東西時間夾在版型範圍內
+  const next = moveItemToTrack(p.tracks, id, target, at, createTrack, p.assets);
   if (!next) return false;
   const moved = findItem({ ...p, tracks: next }, id)?.item;
   const old = findItem(p, id)?.item;
@@ -1410,7 +1484,12 @@ export function placeItem(id: string, start: number, opts?: Opts) {
     moveGroupTo(f.item.group!, start);
     return;
   }
-  const s = findFreeStart(f.track.items, start, f.item.duration, id);
+  let s = findFreeStart(f.track.items, start, f.item.duration, id);
+  if (f.item.group && !isFrameItem(f.item)) {
+    // 版型裡的東西：時間不能跑出版型的範圍
+    const span = groupSpan(p, f.item.group);
+    if (span) s = Math.min(Math.max(s, span.start), span.end - f.item.duration);
+  }
   editItem(id, (it) => void (it.start = s), opts);
 }
 

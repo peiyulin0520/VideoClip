@@ -81,6 +81,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 版型 v2 · L3 播放軸展開版型（Sonnet 實作）
+  - 做了什麼：①**版型可以在播放軸展開**：版型片段左上有 ▸／▾ 小鈕（`clip-group-toggle`），展開後它所在那一列下面多一塊（左邊主題色線圈起來）：「▾ 版型：三格 · 3 格（3 格空）」標題列＋「＋ 加入」→ 分類標題列「文字／貼圖／影像／音效」（有東西才出現、各自可收合）→ 各分類的列；影像分類每一格一列，空格子是虛線「＋ 匯入 第 N 格」（`EmptyCellSlot`，選相簿檔案直接放進那一格；`cellImport.ts`），點格子軌的圖示開「這一格」視窗；新加的版型預設展開，展開／收合與分類收合記在這台手機（`store/groupOpenStore.ts`）；②**版型裡的文字／貼圖／音效有自己的成員軌**（`groupRole:'member'`，貼圖與音效的物件標 `member:true` 才不會被當成外框）：不再混在一般「字卡」類，舊專案的版型文字載入時搬進去（`migrateLayoutTracks`）；版型尾端「＋ 加入」→ 文字／音效（`addGroupMember`：開始＝播放線、夾在版型範圍內、長度最多到版型結束）；③**版型裡的東西時間不能超出版型**：拖移（`placeItem`／`moveItemTo` 用 `clampToGroup`）與拉兩端修剪都夾住；它們只能待在自己版型的軌道（`dropTarget`：版型成員不能拖出去、一般素材不能拖進版型軌道，版型外框跟一般片段一樣可以換列）；`firstFreeTrack` 跳過版型軌道；移動版型時間／改長度／刪版型連音效成員一起處理；④點展開裡的任何片段＝選到那個素材，文字分頁等照一般素材用
+  - 動了哪些檔：新 `store/groupOpenStore.ts`、`app/editor/{EmptyCellSlot.tsx,cellImport.ts}`；`engine/{layoutTracks,timeline}.ts`、`model/{types,migrate}.ts`、`store/actions.ts`、`app/editor/{Timeline,CellSheet,LayoutPicker}.tsx`、`styles.css`；測試新 `e2e/l3.spec.ts`、`store/layoutEmpty.test.ts` 加成員案例，改 g4／h1／x5
+  - 驗證：✅ 單元（成員放置、夾時間、刪版型）、e2e（展開／收合、空格子匯入、版型尾端加文字、一般字卡類不出現版型文字）、全部 e2e 273 個、`npm run check`  🟡 沒在真 iPhone 驗
+  - 跟規劃不同：①版型尾端「＋ 加入」目前只有**文字、音效**，**貼圖**要等 L4（疊加分頁「加到版型裡」）；②音效加入沒有 e2e（只有單元測試）；③「版型：名稱」標題列、分類列在手機上要驗收擠不擠
+  - 下一步：L4 從分頁新增時「加到版型裡」（文字／疊加貼圖／音訊分頁的切換）→ L5 定格兩層 → L7 長寬可調／1×2／2×1／自訂格數 → L8 版型內圖層順序；L6 按鈕分區穿插
 - 2026-11-15 版型 v2 · L2 版型分頁只挑版型（Sonnet 實作）
   - 做了什麼：版型分頁改成分頁內直接選（不再開視窗、不再開相簿）：點版型縮圖→外框顏色／透明度、附版型文字→最下面「確定，加在 0:02.0」（秒數跟著播放線 `usePlayheadTime`）→ 在播放線那一秒新增**空的版型**（預設 **5 秒**，`LAYOUT_DEFAULT_SECONDS`），選到新版型、可以再按「＋ 再新增一個版型」。版型縮圖跟著外框顏色。**拿掉版型分頁的**：進場／出場特效、動畫、長度 ±1 秒（原則：別的頁籤做得到的事交給那個頁籤）。特效分頁：選到整個版型（時間軸上版型那一條）時，進場、出場、轉場照一般素材用，並多一塊「整個版型的動畫」（不動／捲動／滑入滑出，`.zone-soft` 淡底區塊跟下面分開）。長度：時間軸拖版型尾端。素材：點示意圖格子 → 這一格視窗（選專案已有的或從相簿匯入，匯入後 `ensureUrls`＋補縮圖）；同時超過 5 支影片時在放進去那一刻提醒（`importIntoCell`）
   - 動了哪些檔：`app/editor/LayoutPicker.tsx`（重寫）、`app/editor/tabs/{LayoutTab,EffectTab}.tsx`、`app/editor/CellSheet.tsx`、`store/actions.ts`、`styles.css`；測試 helpers 新 `finishLayout`（確定→逐格放素材）、`trimClipEnd`（拖尾端），改 layout／g4／h1／h3／i5／i7／v／x5／l0，新增 L2 測試

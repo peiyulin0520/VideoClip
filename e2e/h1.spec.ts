@@ -28,7 +28,7 @@ test('「刪除並補齊」刪掉版型的外框＝整個版型（含各格）�
 }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '拍貼機直條', ['solid-red.webm', 'solid-green.webm']);
-  expect((await tracks(page)).filter((t) => t.groupRole)).toHaveLength(4);
+  expect((await tracks(page)).filter((t) => t.groupRole === 'cell')).toHaveLength(4);
   await showTimeline(page);
   // 時間軸上的版型代表列（外框）：點它、剪輯 → 刪除並補齊
   const frameId = (await tracks(page)).find(isFrameTrack)!.items[0]!.id;

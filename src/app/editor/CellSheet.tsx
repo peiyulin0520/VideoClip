@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useRef } from 'react';
-import { ensureUrls, urlFor } from '../../engine/assetUrls';
-import { enqueueThumbs } from '../../engine/thumbs';
-import { importFiles } from '../../engine/importMedia';
+import { urlFor } from '../../engine/assetUrls';
+import { importFilesIntoCell } from './cellImport';
 import { frameOfGroup } from '../../engine/layoutTracks';
 import {
   applyCell,
@@ -52,21 +51,7 @@ export function CellSheet({
     const onFiles = async (list: FileList | null) => {
       const files = list ? Array.from(list) : [];
       if (fileRef.current) fileRef.current.value = '';
-      if (!files.length) return;
-      useUI.getState().setBusy('匯入中…');
-      try {
-        const res = await importFiles(project.id, files);
-        if (res.failed.length)
-          toast(`無法匯入：${res.failed.map((f) => `${f.name}（${f.reason}）`).join('、')}`, 7000);
-        const a = res.assets.find((x) => x.kind !== 'audio');
-        if (a) {
-          await ensureUrls(project.id, [a]);
-          enqueueThumbs(project.id, [a]); // 影片：背景補滿時間軸縮圖
-          importIntoCell(trackId, a);
-        } else if (!res.failed.length) toast('這個檔案放不進來');
-      } finally {
-        useUI.getState().setBusy(null);
-      }
+      await importFilesIntoCell(project.id, trackId, files);
     };
     return (
       <Sheet open title={`第 ${index + 1} 格`} onClose={onClose}>

@@ -106,7 +106,10 @@ export function LayoutPicker() {
         texts: withText ? def.texts?.(b, W, todayText()) : undefined,
       });
       setDef(null);
-      toast(`已加入「${def.name}」（${def.cells} 格）。點示意圖的格子放素材；特效到「特效」分頁設定`, 6000);
+      toast(
+        `已加入「${def.name}」（${def.cells} 格）。在播放軸的版型下面各格按 ＋ 匯入；特效到「特效」分頁設定`,
+        6000,
+      );
     } finally {
       setBusy(null);
     }

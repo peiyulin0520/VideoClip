@@ -69,6 +69,48 @@ export function migrateLayoutTracks(p: Project): { project: Project; changed: bo
     }
     return tr;
   });
+  // ④版型的文字（在一般文字軌、有 group）搬到該版型自己的成員文字軌
+  const memberOf = new Map<string, Track>();
+  const keep: Track[] = [];
+  for (const t of tracks) {
+    if (t.groupRole || t.kind !== 'text') {
+      keep.push(t);
+      continue;
+    }
+    const mine = t.items.filter((x) => x.type === 'text' && x.group);
+    if (mine.length === 0) {
+      keep.push(t);
+      continue;
+    }
+    changed = true;
+    for (const it of mine) {
+      const g = it.group!;
+      let mt = memberOf.get(g);
+      if (
+        !mt ||
+        mt.items.some(
+          (x) => x.start < it.start + it.duration - 1e-6 && x.start + x.duration > it.start + 1e-6,
+        )
+      ) {
+        mt = {
+          id: newId('t_'),
+          kind: 'text',
+          name: `版型文字 ${memberOf.size + 1}`,
+          hidden: false,
+          locked: false,
+          group: g,
+          groupRole: 'member',
+          items: [],
+        } as Track;
+        memberOf.set(g, mt);
+        keep.push(mt);
+      }
+      mt.items.push(it);
+    }
+    const rest = t.items.filter((x) => !(x.type === 'text' && x.group));
+    if (rest.length) keep.push({ ...t, items: rest });
+  }
+  tracks = keep;
   const next = normalizeGroupTracks(tracks);
   if (next !== tracks) {
     tracks = next;

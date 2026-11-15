@@ -6,7 +6,19 @@ import type { Item, Track, VideoItem } from '../model/types';
 
 /** 版型的外框物件：有 group、不是格子裡的素材（沒有 cell）的影像／照片 */
 export function isFrameItem(it: Item): it is VideoItem {
-  return it.type !== 'text' && it.type !== 'audio' && !!it.group && !it.cell;
+  return it.type !== 'text' && it.type !== 'audio' && !!it.group && !it.cell && !it.member;
+}
+
+/** 版型裡的文字、貼圖、音效（不是外框、不是格子素材） */
+export function isMemberItem(it: Item): boolean {
+  if (!it.group) return false;
+  if (it.type === 'text' || it.type === 'audio') return true;
+  return !!it.member;
+}
+
+/** 版型的成員軌（文字、貼圖、音效各自的軌道），照陣列順序 */
+export function memberTracksOf(tracks: Track[], group: string, kind?: Track['kind']): Track[] {
+  return tracks.filter((t) => t.group === group && t.groupRole === 'member' && (!kind || t.kind === kind));
 }
 
 /** 這個版型的外框與它所在的軌道 */

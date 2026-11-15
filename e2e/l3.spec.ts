@@ -1,0 +1,99 @@
+import { expect, test, type Page } from '@playwright/test';
+import {
+  createProjectWith,
+  fixture,
+  isRed,
+  openTab,
+  project,
+  samplePreview,
+  seekTo,
+  showTimeline,
+} from './helpers';
+
+const SHOT = 'docs/screenshots/feedback-12';
+type It = {
+  id: string;
+  type: string;
+  group?: string;
+  cell?: { x: number; y: number; w: number; h: number };
+  start: number;
+  duration: number;
+};
+type Tr = {
+  id: string;
+  kind: string;
+  groupRole?: string;
+  group?: string;
+  cell?: { x: number; y: number; w: number; h: number };
+  items: It[];
+};
+const tracks = async (page: Page) => (await project(page)).tracks as unknown as Tr[];
+
+async function addEmptyLayout(page: Page, name: string) {
+  await openTab(page, '版型');
+  await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
+  await page.getByTestId('layout-confirm').tap();
+  await expect(page.getByTestId('layout-options')).toHaveCount(0, { timeout: 30_000 });
+}
+
+test('L3 播放軸展開版型：新版型預設展開；影像分類下每格一列、空格子「＋ 匯入」；匯入後那一格有素材、預覽看得到', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await createProjectWith(page, ['solid-blue.webm']);
+  await addEmptyLayout(page, '三格');
+  await showTimeline(page);
+  await expect(page.getByTestId('group-head')).toContainText('3 格');
+  await expect(page.getByTestId('group-head')).toContainText('3 格空');
+  await expect(page.getByTestId('sub-head').filter({ hasText: '影像' })).toContainText('影像 0');
+  await expect(page.getByTestId('empty-cell-slot')).toHaveCount(3);
+  await page.screenshot({ path: `${SHOT}/timeline-group-open.png` });
+  // 第 2 格 ＋ 匯入
+  await page.getByRole('button', { name: '第 2 格 匯入素材' }).tap();
+  // 選檔案（隱藏的 input）
+  await page.getByTestId('cell-file-timeline').setInputFiles(fixture('solid-red.webm'));
+  await expect(page.getByTestId('empty-cell-slot')).toHaveCount(2, { timeout: 30_000 });
+  const cells = (await tracks(page)).filter((t) => t.groupRole === 'cell');
+  expect(cells[1]!.items).toHaveLength(1);
+  expect(cells[0]!.items).toHaveLength(0);
+  const c = cells[1]!.cell!;
+  await seekTo(page, 1);
+  await expect.poll(async () => isRed(await samplePreview(page, c.x + c.w / 2, c.y + c.h / 2))).toBe(true);
+  // 收合／展開（記在這台手機）
+  await page.getByTestId('group-toggle').tap();
+  await expect(page.locator('.track.sub-row')).toHaveCount(0);
+  await page.getByTestId('clip-group-toggle').tap();
+  await expect(page.locator('.track.sub-row[data-kind="media"]')).toHaveCount(3);
+  // 分類收合：影像
+  await page.getByTestId('sub-toggle').filter({ hasText: '影像' }).tap();
+  await expect(page.locator('.track.sub-row[data-kind="media"]')).toHaveCount(0);
+});
+
+test('L3 版型尾端「加入」→ 文字：進版型自己的文字軌（不在一般「字卡」類），分類「文字」出現；時間在版型範圍內；點它可以用文字分頁', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await createProjectWith(page, ['solid-blue.webm']);
+  await addEmptyLayout(page, '三格');
+  await showTimeline(page);
+  await expect(page.getByTestId('sub-head').filter({ hasText: '文字' })).toHaveCount(0); // 還沒有文字
+  await page.getByTestId('group-add').tap();
+  await page.getByTestId('group-add-text').tap();
+  const tr = await tracks(page);
+  const member = tr.find((t) => t.groupRole === 'member')!;
+  expect(member.kind).toBe('text');
+  const frame = tr.flatMap((t) => t.items).find((i) => i.group && !i.cell && i.type !== 'text')!;
+  const text = member.items[0]!;
+  expect(text.group).toBe(frame.group);
+  expect(text.start).toBeGreaterThanOrEqual(frame.start - 1e-6);
+  expect(text.start + text.duration).toBeLessThanOrEqual(frame.start + frame.duration + 1e-6);
+  await expect(page.getByTestId('sub-head').filter({ hasText: '文字' })).toContainText('文字 1');
+  // 一般「字卡」類沒有（版型文字不佔一般類別）
+  await expect(page.getByTestId('cat-head').filter({ hasText: '字卡' })).toHaveCount(0);
+  // 點展開裡的文字片段：文字分頁看得到它
+  await page.locator(`[data-testid="clip"][data-item-id="${text.id}"]`).tap();
+  await openTab(page, '文字');
+  await expect(page.getByLabel('文字內容')).toBeVisible();
+  // 時間軸上拖到版型外面：被夾住
+  await showTimeline(page);
+});
