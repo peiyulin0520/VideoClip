@@ -211,3 +211,38 @@ export function moveToCellTracks(
     return t;
   });
 }
+
+/**
+ * 色塊（格子素材）上的文字（TextItem.onItem）永遠跟著那一段：開始時間、長度跟它一樣；那一段不在了（刪掉、整條軌道拿掉）文字也拿掉。
+ * 在「文字」分頁自己加的文字（沒有 onItem）不受影響。每次改專案（`projectStore.apply`）都會跑；已經一致就回傳同一個陣列。
+ */
+export function syncCaptions(tracks: Track[]): Track[] {
+  if (!tracks.some((t) => t.items.some((x) => x.type === 'text' && x.onItem))) return tracks;
+  const at = new Map<string, { start: number; duration: number }>();
+  for (const t of tracks)
+    for (const x of t.items)
+      if (x.type !== 'text' && x.type !== 'audio') at.set(x.id, { start: x.start, duration: x.duration });
+  let changed = false;
+  const next = tracks.map((t) => {
+    if (!t.items.some((x) => x.type === 'text' && x.onItem)) return t;
+    const items: Item[] = [];
+    for (const x of t.items) {
+      if (x.type !== 'text' || !x.onItem) {
+        items.push(x);
+        continue;
+      }
+      const host = at.get(x.onItem);
+      if (!host) {
+        changed = true;
+        continue;
+      }
+      if (Math.abs(x.start - host.start) < 1e-9 && Math.abs(x.duration - host.duration) < 1e-9) items.push(x);
+      else {
+        changed = true;
+        items.push({ ...x, start: host.start, duration: host.duration });
+      }
+    }
+    return { ...t, items } as Track;
+  });
+  return changed ? next : tracks;
+}

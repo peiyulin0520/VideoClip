@@ -84,12 +84,19 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 色塊上的字跟著色塊（Sonnet）
+  - 使用者回饋（iPhone 截圖：色塊的「色塊上的文字」欄）：「如果字是在色塊的字框中設定，則需要跟著色塊移動、刪除等；如果在色塊的秒數、文字設在文字圖層，則不需要跟著色塊移動」
+  - 做了什麼：新增不變式 `engine/cellOps.syncCaptions`，`projectStore.apply` 每次都跑：有 `onItem` 的文字（色塊欄位設的字）開始時間、長度永遠＝那一段色塊；那一段不在了（任何路徑刪掉）文字一起拿掉。在「文字」分頁自己加的字沒有 `onItem`，完全不受影響。所以單獨拖色塊本體、拖頭尾改長度、依序漣漪、移至格子、刪除都會讓字跟著
+  - 動了哪些檔：`engine/cellOps.ts`、`store/projectStore.ts`；測試 `engine/cellOps.test.ts`、`store/cellMulti.test.ts`
+  - 驗證：✅ 單元 1045、`npm run check`、e2e  🟡 沒在真 iPhone 驗
+  - 備註：切割色塊時文字留在前半段（跟著同一個 id）；複製色塊不複製字
+
 - 2026-11-15 X6 版型一格多素材＋同步／依序（Sonnet 實作）
   - 使用者需求：播放軸要分得出素材屬於哪一格、可以在格子中穿插色塊 → 一格可放多個素材；用詞［同步］［依序］、空檔［停格］［色塊］［透明］、［移至格子］
   - 做了什麼：**資料**：外框 `layoutPlay`（sync／seq）、`gapMode`（hold／fill／none，新版型預設 hold＋sync，舊版型沒有＝照舊）；`Asset.origin:'color'`＋`color`（色塊＝16×16 純色照片素材）；`TextItem.onItem`（色塊上的文字跟著那一段）。**引擎**：`engine/cellGap.ts`（`cellAt` 空檔停格：回傳「前一段最後一格」的虛擬物件，`start` 調成讓 t 剛好落在裡面、`hold:'after'|'before'` 標記，預覽、單格輸出、匯出都照 `sourceTimeClamped` 自然停住；`gapFillColor`）、`engine/cellOps.ts`（`arrangeCells` 同步／依序排好、`rippleAfter` 依序漣漪、`fitFrameToCells`、`moveToCellTracks`）、`layersAt` 格子軌改用 `cellAt`、scene 的空檔色塊改用 `gapFillColor`、`player.syncVideo` 遇到 `hold` 暫停＋靜音。**動作**（store）：`addToCell`、`moveToCell`、`arrangeGroup`、`setGapMode`、`trimCellEnd`（依序時尾端往後推）、`removeCellItem`（`removeAnyItem` 會轉過去）、`setColorItem`、`setCellCaption`；`moveItemTo` 限制格子素材只能移到同版型的格子軌；`applyCell` 在「一格多素材或停格」時只改名稱與空檔顏色。**介面**：版型分頁「播放方式」「空檔」（`.zone-soft`）、示意圖格子編號；播放軸格子列圖示＝編號、列尾 ＋（`CellAddSheet`：影片／照片、色塊＋顏色）、格子素材尾端用 `trimCellEnd`；剪輯分頁［移至格子］（跟其他工具用線隔開）；預覽格子素材虛線框標「第 N 格」；這一格視窗多了素材清單（縮圖或色塊色、秒數、刪除、點色塊可改顏色＋文字按套用）、「＋ 加素材」、空檔為色塊時的「空檔顏色」；舊的「素材比這一格短／長」只在「一格一個素材且空檔不是停格」時出現
   - 動了哪些檔：`model/types.ts`、`engine/{cellGap,cellOps,timeline,scene,player}.ts`、`store/actions.ts`、`app/editor/{Timeline,CellSheet,CellAddSheet,cellColor,cellImport,LayoutDiagram,Preview}.tsx/ts`、`app/editor/tabs/{LayoutTab,EditTab}.tsx`、`app/styles.css`；測試 `engine/{cellGap,cellOps}.test.ts`、`store/cellMulti.test.ts`、`e2e/x6-cells.spec.ts`（4 個）、改 `e2e/{g4,x5,l5,helpers}`；截圖 `docs/screenshots/feedback-12/x6-*.png`
   - 驗證：✅ 單元 1043、e2e 293、`npm run check`  🟡 沒在真 iPhone 驗（停格第一次 seek 到最後一格可能閃一下）
-  - 踩到的坑與已知限制：①新版型空檔預設「停格」，所以以前「素材比版型短→剩下顯示黑色」要先把空檔改成「色塊」（g4／x5 測試已照改）②停格的格子沒有 keyframe（`timeResolved` 只處理範圍內的物件）③依序的漣漪只在加素材／拖尾端／刪除時發生，自己拖素材本體或［移至格子］不推別格 ④色塊上的文字在「移至格子」時跟著搬、依序重排時跟著平移；但單獨拖色塊本體時文字不會跟（待觀察）⑤`trimClipEnd` 測試 helper 第一下點下去時間軸會自動捲動，要等 `trim-end` 出現
+  - 踩到的坑與已知限制：①新版型空檔預設「停格」，所以以前「素材比版型短→剩下顯示黑色」要先把空檔改成「色塊」（g4／x5 測試已照改）②停格的格子沒有 keyframe（`timeResolved` 只處理範圍內的物件）③依序的漣漪只在加素材／拖尾端／刪除時發生，自己拖素材本體或［移至格子］不推別格 ④色塊上的文字（色塊欄位設的）永遠跟著那一段（見下一筆 `syncCaptions`）⑤`trimClipEnd` 測試 helper 第一下點下去時間軸會自動捲動，要等 `trim-end` 出現
   - 下一步：使用者 iPhone 驗收；X8 畫畫
 
 - 2026-11-15 X6 計畫第二版：一格多素材＋同步／依序（Opus 規劃）

@@ -9,8 +9,10 @@ import {
   addToCell,
   arrangeGroup,
   moveToCell,
+  placeItem,
   removeAnyItem,
   setGapMode,
+  setGroupDuration,
   trimCellEnd,
   importIntoCell,
 } from './actions';
@@ -162,5 +164,46 @@ describe('版型一格多素材', () => {
     setGapMode(g, 'none');
     expect(at(5)).toBe(0);
     expect(at(1)).toBe(1);
+  });
+
+  it('色塊上的字（onItem）跟著色塊：拖時間、改長度；「文字」分頁自己加的字不跟', () => {
+    const g = setup(5);
+    importIntoCell(cells()[0]!.id, asset('a'));
+    const colorId = addToCell(cells()[0]!.id, asset('color1'))!;
+    const cap = createTextItem(5, '字') as TextItem;
+    cap.group = g;
+    cap.onItem = colorId;
+    const free = createTextItem(5, '自由') as TextItem;
+    free.group = g;
+    s().apply((d) => {
+      d.tracks.push({
+        id: 't_tx',
+        kind: 'text',
+        name: '字',
+        hidden: false,
+        locked: false,
+        group: g,
+        groupRole: 'member',
+        items: [cap as Item, free as Item],
+      } as never);
+    });
+    const textAt = (id: string) =>
+      s()
+        .project!.tracks.flatMap((t) => t.items)
+        .find((x) => x.id === id)!;
+    setGroupDuration(g, 10);
+    // 拖色塊本體往後 1 秒：字跟著，自己加的字不動
+    placeItem(colorId, 6);
+    expect(textAt(cap.id).start).toBeCloseTo(6, 5);
+    expect(textAt(free.id).start).toBe(5);
+    // 改色塊長度：字的長度跟著
+    s().apply((d) => {
+      const it = d.tracks.flatMap((t) => t.items).find((x) => x.id === colorId)!;
+      it.duration = 1;
+    });
+    expect(textAt(cap.id).duration).toBeCloseTo(1, 5);
+    expect(textAt(free.id).duration).toBe(free.duration);
+    s().undo();
+    expect(textAt(cap.id).duration).toBeCloseTo(2, 5);
   });
 });

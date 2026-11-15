@@ -7,6 +7,7 @@ import {
   fitFrameToCells,
   moveToCellTracks,
   rippleAfter,
+  syncCaptions,
 } from './cellOps';
 
 const base = {
@@ -146,5 +147,25 @@ describe('cellOps：一格多素材的排時間', () => {
         .items.map((i) => i.start)
         .sort(),
     ).toEqual([0, 2]);
+  });
+
+  it('syncCaptions：色塊上的文字（onItem）時間跟著那一段；那一段不在了就拿掉；自己加的文字（沒有 onItem）不動', () => {
+    const t = [
+      cell('c1', 0, [vid('b1', 3, 2)]),
+      frame(),
+      tr('tx', [text('cap', 1, 1, 'b1'), text('free', 1, 1)], {
+        group: 'g',
+        groupRole: 'member',
+        kind: 'text',
+      }),
+    ];
+    const out = syncCaptions(t);
+    const items = out.find((x) => x.id === 'tx')!.items;
+    expect(items.find((i) => i.id === 'cap')).toMatchObject({ start: 3, duration: 2 });
+    expect(items.find((i) => i.id === 'free')).toMatchObject({ start: 1, duration: 1 });
+    expect(syncCaptions(out)).toBe(out);
+    const gone = syncCaptions([cell('c1', 0, []), frame(), t[2]!]);
+    expect(gone.find((x) => x.id === 'tx')!.items.map((i) => i.id)).toEqual(['free']);
+    expect(syncCaptions([cell('c1', 0, [vid('b1', 0, 1)])])).toHaveLength(1);
   });
 });
