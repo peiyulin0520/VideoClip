@@ -52,6 +52,7 @@ import {
   totalDuration,
   trackEnd,
 } from '../engine/timeline';
+import { frameOfGroup, isFrameItem } from '../engine/layoutTracks';
 import { remapKeepOnStage } from '../engine/aspectRemap';
 import { geoCtx } from '../engine/scene';
 import {
@@ -168,11 +169,7 @@ export function resetTransform(id: string): void {
 
 /** 版型（同一個 group）的外框與各格：外框的 transform 就是整組的 transform */
 function groupFrame(p: Project, group: string): { item: VideoItem; track: Track } | null {
-  for (const track of p.tracks)
-    for (const item of track.items)
-      if (item.type !== 'text' && item.group === group && (track.groupRole === 'frame' || !item.cell))
-        return { item: item as VideoItem, track };
-  return null;
+  return frameOfGroup(p.tracks, group);
 }
 
 function groupItems(p: Project, group: string): VideoItem[] {
@@ -602,7 +599,8 @@ export function setAllVideoMuted(muted: boolean) {
  * 再點一下格子才會選到那一格（可以個別選片段，但不能單獨縮放）。只有第 1 格預設出聲。一步復原整個拿掉。
  */
 export function addLayout(o: {
-  cells: { asset: Asset; win: Rect }[];
+  /** asset 沒給＝空的格子（之後再匯入素材） */
+  cells: { asset?: Asset; win: Rect }[];
   frame: Asset;
   start: number;
   duration: number;
@@ -623,21 +621,11 @@ export function addLayout(o: {
   const { width: W, height: H } = proj;
   const group = newId('g_');
   let firstId: string | null = null;
+  let frameId = '';
   store().apply((d) => {
     for (const a of [...o.cells.map((c) => c.asset), o.frame])
-      if (!d.assets.some((x) => x.id === a.id)) d.assets.push(a);
-    o.cells.forEach((c, i) => {
-      const dur = c.asset.kind === 'image' ? o.duration : Math.min(c.asset.duration, o.duration);
-      const item = cellItem(c.asset, c.win, W, H, o.start, dur, group);
-      if (i > 0) item.volume = 0; // 只有第 1 格出聲
-      const tr = createTrack('media', d.tracks as Track[]);
-      tr.group = group;
-      tr.groupRole = 'cell';
-      tr.fill = 'black';
-      tr.items.push(item);
-      d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, tr);
-      firstId ??= item.id;
-    });
+      if (a && !d.assets.some((x) => x.id === a.id)) d.assets.push(a);
+    // 外框是一個普通的影像片段：放在最下面（主軌）那段時間有空的影像列，沒有就開新的一列
     const frame = createOverlayClip(o.frame, o.start);
     frame.duration = o.duration;
     frame.fit = 'contain';
@@ -657,12 +645,44 @@ export function addLayout(o: {
         w: o.frameVisible.w / W,
         h: o.frameVisible.h / H,
       };
-    const ft = createTrack('media', d.tracks as Track[]);
-    ft.name = o.frameName;
-    ft.group = group;
-    ft.groupRole = 'frame';
-    ft.items.push(frame);
-    d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, ft);
+    frameId = frame.id;
+    const free = (d.tracks as Track[]).find(
+      (t) =>
+        t.kind === 'media' &&
+        !t.groupRole &&
+        !t.locked &&
+        !t.items.some((x) => x.start < o.start + o.duration - 1e-6 && x.start + x.duration > o.start + 1e-6),
+    );
+    let ft: Track;
+    if (free) {
+      ft = d.tracks.find((t) => t.id === free.id) as Track;
+      ft.items.push(frame);
+      ft.items.sort((x, y) => x.start - y.start);
+    } else {
+      ft = createTrack('media', d.tracks as Track[]);
+      ft.items.push(frame);
+      d.tracks.splice(insertIndexFor(d.tracks as Track[], 'media'), 0, ft);
+    }
+    // 各格：版型自己的格子軌（藏起來），一律貼在外框那一列的正下面
+    o.cells.forEach((c, i) => {
+      const tr = createTrack('media', d.tracks as Track[]);
+      tr.group = group;
+      tr.groupRole = 'cell';
+      tr.fill = '#000000';
+      tr.cell = { x: c.win.x / W, y: c.win.y / H, w: c.win.w / W, h: c.win.h / H };
+      if (c.asset) {
+        const dur = c.asset.kind === 'image' ? o.duration : Math.min(c.asset.duration, o.duration);
+        const item = cellItem(c.asset, c.win, W, H, o.start, dur, group);
+        if (i > 0) item.volume = 0; // 只有第 1 格出聲
+        tr.items.push(item);
+        firstId ??= item.id;
+      }
+      d.tracks.splice(
+        d.tracks.findIndex((t) => t.id === ft.id),
+        0,
+        tr,
+      );
+    });
     // 版型的文字：普通的字卡，但 group 跟版型一樣——跟著整個版型移動、縮放、進出場，一起刪除
     const ink = inkFor(o.frameStyle?.color ?? '#ffffff');
     for (const lt of o.texts ?? []) {
@@ -682,8 +702,57 @@ export function addLayout(o: {
       d.tracks[ki]!.items.push(ti);
     }
   });
-  if (firstId) store().select(firstId);
-  return firstId;
+  const pick = firstId ?? frameId;
+  if (pick) store().select(pick);
+  return pick || null;
+}
+
+/**
+ * 把素材放進版型的某一格（空格或換掉原本的素材）。素材比版型長只用前面（版型長度不變）。
+ * 名稱、音量保留。回傳這一格的物件 id。
+ */
+export function importIntoCell(trackId: string, asset: Asset): string | null {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  const frame = p && track?.group ? groupFrame(p, track.group) : null;
+  const box = track?.cell ?? (track && cellMain(track)?.cell);
+  if (!p || !track || !frame || !box) return null;
+  const group = track.group!;
+  const old = cellMain(track);
+  let id = '';
+  store().apply((d) => {
+    if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
+    const tr = d.tracks.find((t) => t.id === trackId)!;
+    const L = frame.item.duration;
+    const rect = cellRect(box, d.width, d.height);
+    const dur = asset.kind === 'image' ? L : Math.min(asset.duration, L);
+    const fresh = cellItem(asset, rect, d.width, d.height, frame.item.start, dur, group);
+    if (old) {
+      fresh.volume = old.volume;
+      if (old.label) fresh.label = old.label;
+      fresh.id = old.id;
+    } else if (
+      d.tracks.filter((t) => t.group === group && t.groupRole === 'cell').some((t) => t.items.length > 0)
+    )
+      fresh.volume = 0; // 只有第一個放進去的出聲
+    id = fresh.id;
+    tr.cell = { ...box };
+    tr.items = [fresh] as never;
+  });
+  return id || null;
+}
+
+/** 依序把素材放進版型還空著的格子（素材比空格少就留空，比空格多就只用前面的） */
+export function fillEmptyCells(group: string, assets: Asset[]): number {
+  const p = store().project;
+  if (!p) return 0;
+  const empty = p.tracks.filter((t) => t.group === group && t.groupRole === 'cell' && !cellMain(t));
+  let n = 0;
+  empty.forEach((t, i) => {
+    const a = assets[i];
+    if (a && importIntoCell(t.id, a)) n++;
+  });
+  return n;
 }
 
 /**
@@ -770,8 +839,10 @@ export function removeGroup(group: string) {
     (d) => {
       for (const t of d.tracks) t.items = t.items.filter((x) => (x as VideoItem).group !== group) as never;
       // 空掉的軌道拿掉；至少留一條影像軌
-      const keep = d.tracks.find((t) => t.kind === 'media')?.id;
-      d.tracks = d.tracks.filter((t) => t.id === keep || t.items.length > 0) as never;
+      const keep = d.tracks.find((t) => t.kind === 'media' && !t.groupRole)?.id;
+      d.tracks = d.tracks.filter(
+        (t) => t.id === keep || t.items.length > 0 || (t.groupRole === 'cell' && t.group !== group),
+      ) as never;
     },
     { select: null },
   );
@@ -1128,8 +1199,8 @@ export function removeAnyItem(id: string): boolean {
   const f = p && findItem(p, id);
   if (!p || !f) return false;
   // 版型的外框＝整個版型：刪掉就是整個拿掉
-  if (f.track.groupRole === 'frame' && f.item.type !== 'text' && f.item.group) {
-    removeGroup(f.item.group);
+  if (isFrameItem(f.item)) {
+    removeGroup(f.item.group!);
     return true;
   }
   store().apply(
@@ -1172,6 +1243,10 @@ export function splitAny(id: string, t: number): string | null {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f) return null;
+  if (isFrameItem(f.item)) {
+    toast('版型不能分割，可以拖尾端改長度');
+    return null;
+  }
   const out = splitFree(f.track.items, id, t);
   if (!out) return null;
   const right = out[out.findIndex((x) => x.id === id) + 1]!;
@@ -1253,7 +1328,11 @@ export function mergeTracksMulti(ids: string[]): { merged: number; kept: number 
 
 export function removeTrack(trackId: string) {
   const t0 = store().project?.tracks.find((t) => t.id === trackId);
-  if (t0?.group) return removeGroup(t0.group); // 版型的軌道：整個版型一起拿掉
+  if (t0?.group) return removeGroup(t0.group); // 版型的格子軌：整個版型一起拿掉
+  // 軌道上有版型的外框：那些版型一起拿掉（格子軌留著會變孤兒）
+  const frameGroups = [...new Set((t0?.items ?? []).filter(isFrameItem).map((x) => x.group!))];
+  for (const g of frameGroups) removeGroup(g);
+  if (frameGroups.length && !store().project?.tracks.some((t) => t.id === trackId)) return;
   store().apply(
     (d) => {
       const i = d.tracks.findIndex((t) => t.id === trackId);
@@ -1274,8 +1353,16 @@ export function moveItemTo(id: string, target: DropTarget, start: number): boole
   if (!p) return false;
   const next = moveItemToTrack(p.tracks, id, target, start, createTrack, p.assets);
   if (!next) return false;
+  const moved = findItem({ ...p, tracks: next }, id)?.item;
+  const old = findItem(p, id)?.item;
+  // 版型的外框換列、換時間：格子與版型裡的文字跟著（時間一起位移；格子軌由 apply 貼回外框那一列下面）
+  const shift = moved && old && isFrameItem(moved) ? moved.start - old.start : 0;
   store().apply((d) => {
     d.tracks = next as never;
+    if (shift && moved && isFrameItem(moved))
+      for (const tr of d.tracks)
+        for (const it of tr.items)
+          if (it.type !== 'audio' && it.group === moved.group && it.id !== moved.id) it.start += shift;
   });
   return true;
 }
@@ -1312,8 +1399,8 @@ export function placeItem(id: string, start: number, opts?: Opts) {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f) return;
-  if (f.track.groupRole === 'frame' && f.item.type !== 'text' && f.item.group) {
-    moveGroupTo(f.item.group, start);
+  if (isFrameItem(f.item)) {
+    moveGroupTo(f.item.group!, start);
     return;
   }
   const s = findFreeStart(f.track.items, start, f.item.duration, id);

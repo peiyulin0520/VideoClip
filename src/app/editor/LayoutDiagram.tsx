@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { itemTitle, thumbOf } from '../../engine/labels';
+import { frameOfGroup } from '../../engine/layoutTracks';
 import { layoutById, paintFrame, type LayoutId } from '../../engine/layouts';
 import type { Project } from '../../model/types';
 import { cellMain } from '../../store/actions';
@@ -19,9 +20,8 @@ export function LayoutDiagram({
   selectedId: string | null;
   onPick: (trackId: string, index: number) => void;
 }) {
-  const frameTrack = project.tracks.find((t) => t.group === group && t.groupRole === 'frame');
-  const frame = frameTrack?.items[0];
-  const style = frame && frame.type !== 'text' && frame.type !== 'audio' ? frame.frameStyle : undefined;
+  const frame = frameOfGroup(project.tracks, group)?.item;
+  const style = frame?.frameStyle;
   const cells = project.tracks.filter((t) => t.group === group && t.groupRole === 'cell');
   const W = project.width;
   const H = project.height;
@@ -40,21 +40,22 @@ export function LayoutDiagram({
     <div className="layout-diagram" data-testid="layout-diagram" style={{ aspectRatio: `${W} / ${H}` }}>
       {cells.map((t, i) => {
         const it = cellMain(t);
-        if (!it?.cell) return null;
-        const asset = project.assets.find((a) => a.id === it.assetId);
-        const thumb = thumbOf(it, asset);
-        const name = it.label?.trim() || `第 ${i + 1} 格`;
+        const box = t.cell ?? it?.cell;
+        if (!box) return null;
+        const asset = it ? project.assets.find((a) => a.id === it.assetId) : undefined;
+        const thumb = it ? thumbOf(it, asset) : undefined;
+        const name = it?.label?.trim() || `第 ${i + 1} 格`;
         return (
           <button
             key={t.id}
-            className={`ld-cell${it.id === selectedId ? ' active' : ''}`}
-            aria-label={`第 ${i + 1} 格 ${itemTitle(it, asset)}`}
+            className={`ld-cell${it && it.id === selectedId ? ' active' : ''}${it ? '' : ' empty'}`}
+            aria-label={`第 ${i + 1} 格 ${it ? itemTitle(it, asset) : '（空）'}`}
             data-testid="ld-cell"
             style={{
-              left: `${it.cell.x * 100}%`,
-              top: `${it.cell.y * 100}%`,
-              width: `${it.cell.w * 100}%`,
-              height: `${it.cell.h * 100}%`,
+              left: `${box.x * 100}%`,
+              top: `${box.y * 100}%`,
+              width: `${box.w * 100}%`,
+              height: `${box.h * 100}%`,
               backgroundImage: thumb ? `url(${thumb})` : undefined,
             }}
             onClick={() => onPick(t.id, i)}

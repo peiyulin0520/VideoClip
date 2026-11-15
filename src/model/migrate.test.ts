@@ -124,7 +124,7 @@ describe('migrateProject v1 → v2', () => {
     );
     const t = m.project.tracks;
     expect(t[t.length - 1]!.id).toBe('f');
-    expect(t[t.length - 1]!.groupRole).toBe('frame'); // G4：外框改成版型的代表列，不再鎖住
+    expect(t[t.length - 1]!.groupRole).toBeUndefined(); // 版型 v2：外框是一般影像軌上的片段
     expect(t.every((x) => x.kind === 'media')).toBe(true);
   });
 
@@ -160,7 +160,7 @@ describe('markLegacyGroups', () => {
     const [c, f] = r.project.tracks;
     expect(c!.groupRole).toBe('cell');
     expect(c!.fill).toBe('black');
-    expect(f!.groupRole).toBe('frame');
+    expect(f!.groupRole).toBeUndefined();
     expect(f!.locked).toBe(false);
     expect(markLegacyGroups(r.project).changed).toBe(false);
   });
@@ -321,5 +321,42 @@ describe('migratePlaceholders：舊的「點兩下編輯文字」改成還沒輸
     const r = migratePlaceholders(p);
     expect(r.changed).toBe(false);
     expect(r.project).toBe(p);
+  });
+});
+
+describe('migrateLayoutTracks（版型 v2）', () => {
+  it('外框軌變一般影像軌；格子軌記下自己的位置並貼在外框下面；再跑一次不再改', async () => {
+    const { migrateLayoutTracks } = await import('./migrate');
+    const cellBox = { x: 0.1, y: 0.1, w: 0.4, h: 0.4 };
+    const p = {
+      tracks: [
+        {
+          id: 'f',
+          kind: 'media',
+          group: 'g',
+          groupRole: 'frame',
+          hidden: false,
+          locked: false,
+          items: [{ id: 'fi', type: 'image', group: 'g' }],
+        },
+        {
+          id: 'c',
+          kind: 'media',
+          group: 'g',
+          groupRole: 'cell',
+          hidden: false,
+          locked: false,
+          items: [{ id: 'ci', type: 'image', group: 'g', cell: cellBox }],
+        },
+      ],
+    } as never;
+    const r = migrateLayoutTracks(p);
+    expect(r.changed).toBe(true);
+    const [c, f] = r.project.tracks;
+    expect(c!.id).toBe('c');
+    expect(c!.cell).toEqual(cellBox);
+    expect(f!.groupRole).toBeUndefined();
+    expect(f!.group).toBeUndefined();
+    expect(migrateLayoutTracks(r.project).changed).toBe(false);
   });
 });

@@ -1,5 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, fixture, isRed, openTab, project, samplePreview, seekTo } from './helpers';
+import {
+  clips,
+  createProjectWith,
+  fixture,
+  isRed,
+  openTab,
+  project,
+  samplePreview,
+  seekTo,
+  isFrameTrack,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-9/i5';
 type Fx = { kind: string; duration: number };
@@ -320,7 +330,7 @@ test('版型：選版型時可以選進場、出場特效（整個版型一起�
   await expect(page.getByTestId('layout-sheet')).toHaveCount(0, { timeout: 30_000 });
   type Tr = { groupRole?: string; items: (It & { group?: string })[] };
   const frameItem = async () =>
-    ((await project(page)).tracks as unknown as Tr[]).find((t) => t.groupRole === 'frame')!.items[0]!;
+    ((await project(page)).tracks as unknown as Tr[]).find(isFrameTrack)!.items[0]!;
   const f = await frameItem();
   expect(f.inEffect).toMatchObject({ kind: 'dissolve' });
   expect(f.outEffect).toMatchObject({ kind: 'moveL' });

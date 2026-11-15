@@ -1,6 +1,16 @@
 import { useState } from 'react';
+import { useRef } from 'react';
 import { urlFor } from '../../engine/assetUrls';
-import { applyCell, cellAvailable, cellMain, setCellTrim, type CellDraft } from '../../store/actions';
+import { importFiles } from '../../engine/importMedia';
+import { frameOfGroup } from '../../engine/layoutTracks';
+import {
+  applyCell,
+  cellAvailable,
+  cellMain,
+  importIntoCell,
+  setCellTrim,
+  type CellDraft,
+} from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { ColorPicker } from '../../ui/ColorPicker';
@@ -25,15 +35,66 @@ export function CellSheet({
   const project = useProjectStore((s) => s.project)!;
   const track = project.tracks.find((t) => t.id === trackId);
   const item = track && cellMain(track);
-  const frameItem = track?.group
-    ? project.tracks.find((t) => t.group === track.group && t.groupRole === 'frame')?.items[0]
-    : undefined;
+  const frameItem = track?.group ? frameOfGroup(project.tracks, track.group)?.item : undefined;
   const textNow = project.tracks
     .flatMap((t) => t.items)
     .find((x) => x.type === 'text' && x.cellFor === trackId);
   const [draft, setDraft] = useState<CellDraft | null>(null);
   const [ranging, setRanging] = useState(false);
-  if (!track || !item || !frameItem) return null;
+  const fileRef = useRef<HTMLInputElement>(null);
+  if (!track || !frameItem) return null;
+  if (!item) {
+    // 這一格還是空的：選一個專案裡已有的素材，或從相簿匯入新的
+    const choices = project.assets.filter(
+      (a) => (a.kind === 'video' || a.kind === 'image') && !a.name.startsWith('版型-'),
+    );
+    const onFiles = async (list: FileList | null) => {
+      const files = list ? Array.from(list) : [];
+      if (fileRef.current) fileRef.current.value = '';
+      if (!files.length) return;
+      useUI.getState().setBusy('匯入中…');
+      try {
+        const res = await importFiles(project.id, files);
+        const a = res.assets.find((x) => x.kind !== 'audio');
+        if (a) importIntoCell(trackId, a);
+        else toast('這個檔案放不進來');
+      } finally {
+        useUI.getState().setBusy(null);
+      }
+    };
+    return (
+      <Sheet open title={`第 ${index + 1} 格`} onClose={onClose}>
+        <div data-testid="cell-sheet-empty">
+          <p className="hint">這一格還沒放素材。選一個專案裡已有的，或從相簿匯入。</p>
+          <div className="cover-strip" data-testid="cell-assets">
+            {choices.map((a) => (
+              <button
+                key={a.id}
+                className="cover-pick"
+                aria-label={`放入 ${a.name}`}
+                style={{ backgroundImage: a.thumbs[0] ? `url(${a.thumbs[0]})` : undefined }}
+                onClick={() => {
+                  importIntoCell(trackId, a);
+                  useUI.getState().player?.refresh();
+                }}
+              />
+            ))}
+          </div>
+          <button className="btn" data-testid="cell-import" onClick={() => fileRef.current?.click()}>
+            從相簿選照片或影片
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="video/*,image/*"
+            hidden
+            data-testid="cell-file"
+            onChange={(e) => void onFiles(e.target.files)}
+          />
+        </div>
+      </Sheet>
+    );
+  }
 
   const L = frameItem.duration;
   const asset = project.assets.find((a) => a.id === item.assetId);

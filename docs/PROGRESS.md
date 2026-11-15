@@ -81,6 +81,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 版型 v2 · L0＋L1（Sonnet 實作）
+  - 做了什麼：①**版型是一個片段**（L0）：外框物件是一般影像軌上的片段（`groupRole:'frame'` 拿掉，載入時 `migrateLayoutTracks` 轉換），可以跟主軌影片同一列、接縫有轉場圓圈、特效分頁可以設進出場與轉場（`EffectTab` 放行外框）；新版型的外框放在「最下面那條那段時間有空的影像列」（主軌優先），沒有就開新列；版型不能分割（提示）；外框拖到別列時格子與版型文字的時間一起位移；②**整個版型一起轉場**：`groupTransitions`／`extendForGroupTransition`——外框是轉場的 A 或 B 時，格子、空白色塊、版型文字都套同一個 look（位移／縮放／透明度／裁切／模糊），B 版型提早出現、A 版型延長（格子停在第一格／最後一格）；參加轉場的格子疊在外框之前（`deferred`），不會被 A 蓋住；預覽與匯出同一套（`sceneItems` 也含延長的格子）；③**格子軌記自己的位置**（L1）：`Track.cell`，格子空了也知道在哪；`normalizeGroupTracks`（`engine/layoutTracks.ts`）在 `projectStore.apply` 裡自動把格子軌貼回外框那一列正下方；④**空的格子**：`addLayout` 的格子可以不給素材；預覽畫「第 N 格」提示（`showPlaceholders`，匯出不畫、匯出是黑色或 `track.fill`）、匯出視窗提醒「版型有 N 格還沒放素材」；示意圖空格是虛線；點空格開「這一格」視窗選素材或從相簿匯入（`importIntoCell`、`fillEmptyCells`）
+  - 另外：`Track.fill` 已是任何色碼（X5）；`baseMediaTrack` 跳過格子軌；`removeTrack` 刪到有外框的軌道會連版型一起拿掉
+  - 動了哪些檔：新 `engine/layoutTracks.ts`（＋test）、`store/layoutEmpty.test.ts`；`engine/{scene,transitions,placeholder,timeline}.ts`、`model/{types,migrate}.ts`（＋test）、`store/{actions,projectStore}.ts`、`app/editor/{Timeline,LayoutDiagram,CellSheet,ExportSheet}.tsx`、`app/editor/tabs/{EffectTab,LayoutTab}.tsx`、`styles.css`；測試新 `e2e/l0.spec.ts`，改 `e2e/helpers.ts`（`isFrameTrack`）與 g4／h1／i5／i7／layout／x5
+  - 驗證：✅ 單元（layoutTracks、空格子／放置、遷移）、e2e（版型接在主軌影片後面做疊化：接縫格子是紅綠混色、預覽與單格輸出一致；不能分割；空格子→匯出提醒→放素材）、全部 e2e 270 個、`npm run check`  🟡 沒在真 iPhone 驗
+  - 跟規劃不同：版型裡的**文字成員軌（`groupRole:'member'`）與 `AudioItem.group` 留到 L3**（要展開時才需要分開放）；現在版型文字仍在一般文字軌（有 `group`）。版型分頁還在，L2 才改成「只挑版型＋確定」
+  - 下一步：L2（版型分頁只挑版型、確定加在播放線、預設 5 秒）→ L3 播放軸展開
 - 2026-11-15 版型 v2 規劃再修訂（Opus）：加 L0——外框物件是普通影像片段，可放任何影像列（含主軌）、跟前後片段做轉場（轉場整組套用、前半段成員提早出現）、不能分割；附屬軌道（格子、成員）用 `normalizeGroupTracks` 貼在外框那一列旁邊；新版型預設放主軌；L0＋L1 一起做
 - 2026-11-15 版型 v2 規劃修訂（Opus）：照使用者補充改 L2（版型分頁只留版型才有的：格式、外框顏色透明度、版型文字；進出場／動畫／轉場搬到特效分頁）、L5（素材層移動放大不夾，畫面用遮罩只露出格子／版型範圍）、預設 5 秒；新增 L7（版型寬高可分開拉、1×2／2×1、自訂列欄）、L8（版型裡成員軌可換上下、只在版型範圍內）
 - 2026-11-15 版型 v2 規劃（Opus）

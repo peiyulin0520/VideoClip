@@ -1,11 +1,12 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { Project, VideoItem } from '../../../model/types';
+import type { Project } from '../../../model/types';
 import { removeGroup, setGroupDuration, setGroupMotion, setItemEffect } from '../../../store/actions';
 import { FrameStyleControls } from '../FrameStyleControls';
 import { restyleFrame } from '../frameRestyle';
 import { GroupFxSelect } from '../GroupFxSelect';
 import { useProjectStore } from '../../../store/projectStore';
+import { frameOfGroup } from '../../../engine/layoutTracks';
 import { CellSheet } from '../CellSheet';
 import { LayoutDiagram } from '../LayoutDiagram';
 import { LayoutPicker } from '../LayoutPicker';
@@ -41,14 +42,13 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
   const selectedId = useProjectStore((s) => s.selectedId);
   const select = useProjectStore((s) => s.select);
   const [cell, setCell] = useState<{ id: string; index: number } | null>(null);
-  const frameTrack = project.tracks.find((t) => t.group === group && t.groupRole === 'frame');
-  const frame = frameTrack?.items[0] as VideoItem | undefined;
+  const frame = frameOfGroup(project.tracks, group)?.item;
   if (!frame) return null;
   const dur = (n: number) => setGroupDuration(group, Math.max(frame.duration + n, 1));
   return (
     <div className="panel group-panel" data-testid="group-panel">
       <div className="panel-head">
-        <span>整個版型 · {frame.label ?? frameTrack?.name}</span>
+        <span>整個版型 · {frame.label}</span>
       </div>
       <p className="hint">
         在預覽上拖移、縮放整個版型（格子會一起動）。點下面示意圖的格子，可以改那一格的名稱、素材、片段、空白畫面。

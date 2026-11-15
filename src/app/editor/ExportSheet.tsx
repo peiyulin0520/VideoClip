@@ -1,4 +1,4 @@
-import { placeholderCount } from '../../engine/placeholder';
+import { emptyCellCount, placeholderCount } from '../../engine/placeholder';
 import { Download, Share2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
@@ -128,6 +128,11 @@ export function ExportSheet({
               {placeholderCount(project) > 0 && (
                 <p className="hint" data-testid="export-placeholder-note">
                   有 {placeholderCount(project)} 個文字還沒輸入內容，不會出現在影片中。
+                </p>
+              )}
+              {emptyCellCount(project) > 0 && (
+                <p className="hint" data-testid="export-empty-cells-note">
+                  版型有 {emptyCellCount(project)} 格還沒放素材，匯出會是黑色。
                 </p>
               )}
               <div className="panel-head">

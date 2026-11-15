@@ -3709,3 +3709,8 @@ button:not(:disabled):active,
 .layout-preview .layout-thumb {
   width: min(160px, 60%);
 }
+.ld-cell.empty {
+  background: repeating-linear-gradient(135deg, #5a5a62 0 6px, #4a4a52 6px 12px);
+  outline: 1.5px dashed rgba(255, 255, 255, 0.55);
+  outline-offset: -3px;
+}

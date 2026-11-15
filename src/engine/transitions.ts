@@ -202,7 +202,8 @@ export function seamAudioExtent(
 
 /** 一軌上緊接在一起的同類片段（接縫處）：可以在這裡加轉場 */
 export function seamsOf(items: Item[]): { prev: Item; next: Item }[] {
-  const vids = items.filter((x) => x.type !== 'audio' && !x.group);
+  // 版型的外框跟一般片段一樣可以接轉場；格子、版型裡的文字不行
+  const vids = items.filter((x) => x.type !== 'audio' && (!x.group || (x.type !== 'text' && !x.cell)));
   const out: { prev: Item; next: Item }[] = [];
   for (const next of vids) {
     const prev = vids.find(
@@ -514,6 +515,47 @@ export type ActiveTransition = {
 /** 虛擬物件不出聲（真的在播的那一個才出聲） */
 const silent = (x: Item): Item =>
   x.type === 'text' ? x : { ...x, volume: 0, fadeIn: undefined, fadeOut: undefined };
+
+/**
+ * 版型整組參加轉場時，版型裡的東西（格子、文字…）也要跟外框一起提早出現／延長：
+ * early＝B 版型提早幾秒（t 在 [frameStart − early, frameStart) 時，各東西停在開頭那一格）；
+ * late＝A 版型延長幾秒（t 在 [frameEnd, frameEnd + late) 時，延續到結尾的東西停在最後一格）。
+ * 回傳 t 這一刻這個東西要畫的（虛擬）物件；不在範圍內就是 null。
+ */
+export function extendForGroupTransition(
+  items: Item[],
+  ext: { frameStart: number; frameEnd: number; early: number; late: number },
+  t: number,
+): Item | null {
+  const EPS = 0.05;
+  if (t < ext.frameStart) {
+    if (t < ext.frameStart - ext.early) return null;
+    const it = [...items]
+      .sort((a, b) => a.start - b.start)
+      .find((x) => x.start <= ext.frameStart + EPS && x.start + x.duration > ext.frameStart);
+    if (!it) return null;
+    const shift = it.start - (ext.frameStart - ext.early);
+    return it.type === 'text'
+      ? { ...it, start: it.start - shift, duration: it.duration + shift }
+      : silent({
+          ...it,
+          start: it.start - shift,
+          trimIn: it.trimIn - shift * it.speed,
+          duration: it.duration + shift,
+        });
+  }
+  if (t >= ext.frameEnd && t < ext.frameEnd + ext.late) {
+    const it = [...items]
+      .sort((a, b) => b.start - a.start)
+      .find((x) => x.start + x.duration >= ext.frameEnd - EPS);
+    if (!it) return null;
+    const extra = ext.frameEnd + ext.late - (it.start + it.duration);
+    return it.type === 'text'
+      ? { ...it, duration: it.duration + extra }
+      : silent({ ...it, duration: it.duration + extra });
+  }
+  return null;
+}
 
 /**
  * 這個時間點、這一軌有沒有轉場正在進行；有的話回傳 A、B 要怎麼畫。

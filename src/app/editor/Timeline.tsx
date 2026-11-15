@@ -1,3 +1,4 @@
+import { isFrameItem } from '../../engine/layoutTracks';
 import { Eye, EyeOff, Film, Lock, Music, Plus, Sparkles, Type, Volume2, VolumeX } from 'lucide-react';
 import {
   useCallback,
@@ -599,12 +600,7 @@ export function Timeline({
         if (cancelled) return;
         const start = item.start + snapStart(dx).dx / pps;
         const target = targetFor(resolveHover(ev.clientY));
-        if (
-          !target ||
-          (target.type === 'track' && target.trackId === track.id) ||
-          track.groupRole === 'frame'
-        )
-          placeItem(item.id, start); // 版型只能左右移動（換時間），不換軌道
+        if (!target || (target.type === 'track' && target.trackId === track.id)) placeItem(item.id, start);
         else if (target.type === 'invalid')
           toast(`${KIND_LABEL[target.kind]}只能放在${KIND_LABEL[target.kind]}的軌道上，已放回原位`);
         else moveItemTo(item.id, target, start);
@@ -629,9 +625,9 @@ export function Timeline({
     target.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
       const delta = (ev.clientX - startX) / pps;
-      if (track.groupRole === 'frame' && isVideoItem(item) && item.group) {
+      if (isFrameItem(item)) {
         // 版型：改整組的長度（各格超出的部分切掉）
-        setGroupDuration(item.group, item.duration + delta, { coalesce: `trim:${item.id}` });
+        setGroupDuration(item.group!, item.duration + delta, { coalesce: `trim:${item.id}` });
         player?.peek(item.start + Math.max(item.duration + delta, 0.5) - 0.05);
         return;
       }
@@ -906,7 +902,7 @@ export function Timeline({
                       </div>
                       {selected && !dragging && !track.locked && (
                         <>
-                          {track.groupRole !== 'frame' && (
+                          {!isFrameItem(it) && (
                             <div
                               className="handle left"
                               data-testid="trim-start"
@@ -978,7 +974,7 @@ export function Timeline({
                               e.stopPropagation();
                               useProjectStore.getState().select(it.id);
                               useUI.setState({
-                                requestTab: track.groupRole === 'frame' ? 'layout' : 'effect',
+                                requestTab: 'effect',
                                 fxFocus: { id: it.id, role },
                               });
                               player?.seek(it.start + (role === 'in' ? 0.02 : it.duration - 0.05));

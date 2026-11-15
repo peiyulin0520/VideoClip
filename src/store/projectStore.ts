@@ -1,3 +1,4 @@
+import { normalizeGroupTracks } from '../engine/layoutTracks';
 import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
 import type { Asset, Item, Project } from '../model/types';
@@ -42,9 +43,12 @@ export const useProjectStore = create<State>((set, get) => ({
   apply: (recipe, opts = {}) => {
     const { project, past, lastEdit, revision } = get();
     if (!project) return;
-    const next = produce(project, (d) => {
+    let next = produce(project, (d) => {
       recipe(d);
     });
+    // 版型的格子軌永遠貼在外框那一列的正下方（外框被搬到別列、軌道順序改了之後也一樣）
+    const fixed = normalizeGroupTracks(next.tracks);
+    if (fixed !== next.tracks) next = { ...next, tracks: fixed };
     if (next === project) return;
     const stamped = { ...next, updatedAt: Date.now() };
     const now = Date.now();

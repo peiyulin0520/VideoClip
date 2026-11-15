@@ -12,6 +12,7 @@ import {
   seekTo,
   selectedItemId,
   showTimeline,
+  isFrameTrack,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g4';
@@ -97,7 +98,7 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   // 時間軸上：主軌 1 + 版型代表列 1（格子的軌道藏起來）
   await expect(page.getByTestId('track')).toHaveCount(2);
   const tr = await tracks(page);
-  const frame = tr.find((t) => t.groupRole === 'frame')!.items[0]!;
+  const frame = tr.find(isFrameTrack)!.items[0]!;
   // 版型分頁列出每一格；點「選第 2 格」選到那一格
   await openTab(page, '版型');
   await expect(page.getByTestId('group-panel')).toBeVisible();
@@ -112,7 +113,7 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   // 版型多 1 秒
   const d0 = frame.duration;
   await page.getByRole('button', { name: '版型 多 1 秒' }).tap();
-  const frame2 = (await tracks(page)).find((t) => t.groupRole === 'frame')!.items[0]!;
+  const frame2 = (await tracks(page)).find(isFrameTrack)!.items[0]!;
   expect(frame2.duration).toBeCloseTo(d0 + 1, 3);
 
   // 刪掉外框＝整個版型拿掉（復原回來）
@@ -168,7 +169,7 @@ test('版型動畫：捲動——不同時間整組的位置不同；選「不�
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '三格', ['solid-red.webm', 'solid-green.webm', 'solid-blue.webm'], '捲動');
   const tr = await tracks(page);
-  const frame = tr.find((t) => t.groupRole === 'frame')!.items[0]!;
+  const frame = tr.find(isFrameTrack)!.items[0]!;
   expect(frame.motion).toBe('drift');
   const cell = tr.filter((t) => t.groupRole === 'cell')[0]!.items[0]!.cell!;
   const nx = cell.x + cell.w / 2;
@@ -184,7 +185,7 @@ test('版型動畫：捲動——不同時間整組的位置不同；選「不�
   await page.getByTestId('ld-cell').first().tap();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
   await page.getByRole('radio', { name: '動畫 不動' }).tap();
-  const frame2 = (await tracks(page)).find((t) => t.groupRole === 'frame')!.items[0]!;
+  const frame2 = (await tracks(page)).find(isFrameTrack)!.items[0]!;
   expect(frame2.motion).toBeUndefined();
   void clips;
 });

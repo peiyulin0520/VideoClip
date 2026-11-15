@@ -1,5 +1,6 @@
 import { newId, TRACK_NAMES } from './defaults';
 import type { Project, Track, TrackKind } from './types';
+import { isFrameItem, normalizeGroupTracks } from '../engine/layoutTracks';
 import { normalizeZones } from '../engine/timeline';
 import { LEGACY_TRANSITIONS } from '../engine/transitions';
 
@@ -31,15 +32,49 @@ export function markLegacyGroups(p: Project): { project: Project; changed: boole
     if (t.groupRole || t.items.length === 0) return t;
     const first = t.items[0]!;
     if (first.type === 'text' || first.type === 'audio' || !first.group) return t;
+    if (!first.cell && !t.locked) return t; // 外框在一般影像軌上（版型 v2），不是舊的鎖住的外框軌
     changed = true;
     return first.cell
       ? { ...t, group: first.group, groupRole: 'cell' as const, fill: 'black' as const }
-      : { ...t, group: first.group, groupRole: 'frame' as const, locked: false };
+      : { ...t, locked: false }; // 外框軌：現在外框就是一般影像軌上的片段
   });
   const marked = changed ? { ...p, tracks } : p;
   const fixed = repairGroups(marked);
   const stk = migrateStickers(fixed.project);
-  return { project: stk.project, changed: changed || fixed.changed || stk.changed };
+  const v2 = migrateLayoutTracks(stk.project);
+  return { project: v2.project, changed: changed || fixed.changed || stk.changed || v2.changed };
+}
+
+/**
+ * 版型 v2（2026-11-15）：①外框軌（groupRole:'frame'）變成一般影像軌（外框是普通片段，可以跟別的片段同一列）；
+ * ②格子軌記下自己的格子位置（track.cell，格子空了也知道在哪）；③格子軌搬到外框那一列的正下方。
+ */
+export function migrateLayoutTracks(p: Project): { project: Project; changed: boolean } {
+  let changed = false;
+  let tracks = p.tracks.map((t) => {
+    let tr = t;
+    if (t.groupRole === 'frame') {
+      const { groupRole: _r, group: _g, ...rest } = t;
+      void _r;
+      void _g;
+      tr = rest as Track;
+      changed = true;
+    }
+    if (tr.groupRole === 'cell' && !tr.cell) {
+      const it = tr.items.find((x) => x.type !== 'text' && x.type !== 'audio' && x.cell);
+      if (it && it.type !== 'text' && it.type !== 'audio' && it.cell) {
+        tr = { ...tr, cell: { ...it.cell } };
+        changed = true;
+      }
+    }
+    return tr;
+  });
+  const next = normalizeGroupTracks(tracks);
+  if (next !== tracks) {
+    tracks = next;
+    changed = true;
+  }
+  return { project: changed ? { ...p, tracks } : p, changed };
 }
 
 /**
@@ -106,9 +141,7 @@ export function migrateStickers(p: Project): { project: Project; changed: boolea
 export function repairGroups(p: Project): { project: Project; changed: boolean } {
   let changed = false;
   const hasFrame = new Set<string>();
-  for (const t of p.tracks)
-    if (t.groupRole === 'frame')
-      for (const it of t.items) if (it.type !== 'text' && it.group) hasFrame.add(it.group);
+  for (const t of p.tracks) for (const it of t.items) if (isFrameItem(it)) hasFrame.add(it.group!);
   const tracks = p.tracks.map((t) => {
     let tr = t;
     const orphan = t.groupRole === 'cell' && !!t.group && !hasFrame.has(t.group);

@@ -9,6 +9,7 @@ import {
   project,
   samplePreview,
   selectedItemId,
+  isFrameTrack,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-5/layout';
@@ -58,7 +59,7 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
 
   const tr = await tracks(page);
   const cellTracks = tr.filter((t) => t.items[0]?.cell);
-  const frameTrack = tr.find((t) => t.groupRole === 'frame')!;
+  const frameTrack = tr.find(isFrameTrack)!;
   expect(cellTracks).toHaveLength(4);
   expect(frameTrack.locked).toBeFalsy(); // 外框不鎖：它代表整個版型，可以整體縮放移動
   expect(tr.indexOf(frameTrack)).toBe(tr.length - 1); // 在最上層

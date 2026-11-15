@@ -404,7 +404,10 @@ export type Track = {
    * 各格的軌道藏起來；在預覽上點格子可以個別選片段。
    */
   group?: string;
+  /** 'cell'＝版型的格子軌（藏起來、貼在外框那一列下面）。'frame' 是舊資料（外框自己一條軌），載入時會轉成一般影像軌 */
   groupRole?: 'frame' | 'cell';
+  /** 格子軌：這一格的位置（佔畫面寬、高的比例）。格子還沒放素材時靠它知道在哪 */
+  cell?: { x: number; y: number; w: number; h: number };
   /** 格子軌道：素材放完（或這段時間沒有素材）時，格子顯示的色塊顏色 */
   fill?: string; // 'black'／'white'（舊值）或任何色碼
   items: Item[];

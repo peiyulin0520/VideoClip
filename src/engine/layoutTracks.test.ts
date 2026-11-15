@@ -1,0 +1,57 @@
+import { describe, expect, it } from 'vitest';
+import type { Item, Track } from '../model/types';
+import { cellTracksOf, frameOfGroup, isFrameItem, normalizeGroupTracks } from './layoutTracks';
+
+const base = { start: 0, duration: 3, trimIn: 0, speed: 1, volume: 1, fit: 'cover', transform: {} };
+const vid = (id: string, extra: Record<string, unknown> = {}) =>
+  ({ id, type: 'video', assetId: 'a', ...base, ...extra }) as unknown as Item;
+const tr = (id: string, items: Item[], extra: Partial<Track> = {}) =>
+  ({ id, kind: 'media', name: id, hidden: false, locked: false, items, ...extra }) as Track;
+const cell = (id: string, g: string) =>
+  tr(id, [], { group: g, groupRole: 'cell', cell: { x: 0, y: 0, w: 1, h: 1 } });
+
+describe('layoutTracks', () => {
+  it('外框物件：有 group、沒有 cell', () => {
+    expect(isFrameItem(vid('f', { group: 'g' }))).toBe(true);
+    expect(isFrameItem(vid('c', { group: 'g', cell: { x: 0, y: 0, w: 1, h: 1 } }))).toBe(false);
+    expect(isFrameItem(vid('v'))).toBe(false);
+  });
+  it('外框跟別的片段在同一條軌道也找得到', () => {
+    const tracks = [tr('main', [vid('v1'), vid('f', { group: 'g', start: 3 })])];
+    expect(frameOfGroup(tracks, 'g')?.track.id).toBe('main');
+  });
+  it('格子軌搬到外框那一列的正下方；已經對了就回傳同一個陣列', () => {
+    const tracks = [
+      cell('c1', 'g'),
+      tr('main', [vid('v')]),
+      tr('up', [vid('f', { group: 'g' })]),
+      cell('c2', 'g'),
+    ];
+    const out = normalizeGroupTracks(tracks);
+    expect(out.map((t) => t.id)).toEqual(['main', 'c1', 'c2', 'up']);
+    expect(normalizeGroupTracks(out)).toBe(out);
+  });
+  it('外框在主軌（最下面）：格子軌在最下面', () => {
+    const tracks = [
+      tr('main', [vid('v'), vid('f', { group: 'g', start: 3 })]),
+      cell('c1', 'g'),
+      cell('c2', 'g'),
+    ];
+    const out = normalizeGroupTracks(tracks);
+    expect(out.map((t) => t.id)).toEqual(['c1', 'c2', 'main']);
+    expect(cellTracksOf(out, 'g')).toHaveLength(2);
+  });
+  it('兩個版型各自貼著自己的外框', () => {
+    const tracks = [
+      tr('a', [vid('f1', { group: 'g1' })]),
+      tr('b', [vid('f2', { group: 'g2' })]),
+      cell('c2', 'g2'),
+      cell('c1', 'g1'),
+    ];
+    expect(normalizeGroupTracks(tracks).map((t) => t.id)).toEqual(['c1', 'a', 'c2', 'b']);
+  });
+  it('沒有外框的格子軌不動', () => {
+    const tracks = [cell('c1', 'g'), tr('main', [vid('v')])];
+    expect(normalizeGroupTracks(tracks)).toBe(tracks);
+  });
+});

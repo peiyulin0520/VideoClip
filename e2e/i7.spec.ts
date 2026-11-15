@@ -9,6 +9,7 @@ import {
   project,
   samplePreview,
   seekTo as rawSeekTo,
+  isFrameTrack,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-9/i7';
@@ -171,16 +172,12 @@ test('版型：定格打在外框＝整組一起動（各格不用單獨打）�
   const before = await cellsX();
   await seekTo(page, 0.02);
   await page.getByTestId('kf-btn').tap();
-  await expect
-    .poll(async () => (await tracks()).find((t) => t.groupRole === 'frame')!.items[0]!.keyframes?.length)
-    .toBe(1);
+  await expect.poll(async () => (await tracks()).find(isFrameTrack)!.items[0]!.keyframes?.length).toBe(1);
   await seekTo(page, 2);
   await openTab(page, '圖層');
   const cur = Number(await page.getByLabel('X 位置').inputValue());
   await page.getByLabel('X 位置').fill(String(cur + 40));
-  await expect
-    .poll(async () => (await tracks()).find((t) => t.groupRole === 'frame')!.items[0]!.keyframes?.length)
-    .toBe(2);
+  await expect.poll(async () => (await tracks()).find(isFrameTrack)!.items[0]!.keyframes?.length).toBe(2);
   expect(await cellsX()).toEqual(before); // 各格本身的位置沒動（由外框算出來）
   await expect(page.getByTestId('kf-dot')).toHaveCount(2);
   await page.evaluate(() => window.scrollTo(0, 0));

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, fixture, openTab, project } from './helpers';
+import { createProjectWith, fixture, openTab, project, isFrameTrack } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
 type It = {
@@ -102,7 +102,7 @@ test('X5-2 這一格視窗：改名套用（視窗不關）、❌ 不存；換�
   await page.getByRole('button', { name: '空白畫面顏色 #ff4d8d' }).tap();
   await page.getByLabel('空白畫面文字').fill('END');
   await page.getByTestId('cell-apply').tap();
-  const g = (await tracks(page)).find((t) => t.groupRole === 'frame')!.items[0]!;
+  const g = (await tracks(page)).find(isFrameTrack)!.items[0]!;
   const c1 = await cell1();
   expect(c1.fill).toBe('#ff4d8d');
   expect(c1.items[0]!.start).toBeCloseTo(g.start + 2, 2); // 前面空白 2 秒，素材從第 2 秒開始

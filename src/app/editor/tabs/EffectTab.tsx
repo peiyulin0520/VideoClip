@@ -22,6 +22,7 @@ import {
 } from '../../../store/actions';
 import { TEXT_FXS, textFxName } from '../../../engine/textFx';
 import { useProjectStore } from '../../../store/projectStore';
+import { isFrameItem } from '../../../engine/layoutTracks';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
 import { EffectTimingSheet } from '../EffectTimingSheet';
@@ -37,7 +38,9 @@ export function EffectTab({ found }: { found: Found }) {
   useProjectStore((s) => s.project); // 專案變了要重畫
   const fxFocus = useUI((s) => s.fxFocus);
   const [cat, setCat] = useState<CatKey | null>(null);
-  const item: Item | null = found && !('group' in found.item && found.item.group) ? found.item : null;
+  // 版型：只有外框（整個版型）能在這裡設特效與轉場；格子、版型裡的文字各自走版型分頁
+  const item: Item | null =
+    found && (isFrameItem(found.item) || !('group' in found.item && found.item.group)) ? found.item : null;
   const track = item ? found!.track : null;
   const part: Part = item && fxFocus?.id === item.id ? fxFocus.role : 'in';
   const setPart = (role: Part) => item && useUI.setState({ fxFocus: { id: item.id, role } });

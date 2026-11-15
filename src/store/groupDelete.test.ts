@@ -19,7 +19,12 @@ const mk = () => {
     frameName: '測試版型',
   });
 };
-const frameId = () => s().project!.tracks.find((t: Track) => t.groupRole === 'frame')!.items[0]!.id;
+const frameTrack = () =>
+  s().project!.tracks.find((t: Track) =>
+    t.items.some((x) => x.type !== 'text' && x.type !== 'audio' && !!x.group && !x.cell),
+  )!;
+const frameId = () =>
+  frameTrack().items.find((x) => x.type !== 'text' && x.type !== 'audio' && !!x.group && !x.cell)!.id;
 const groupLeft = () =>
   s()
     .project!.tracks.flatMap((t) => t.items)
@@ -38,8 +43,7 @@ describe('刪除版型：不能留下孤兒格子', () => {
     expect(groupLeft()).toBe(0);
   });
   it('刪外框的軌道（軌道選單）＝整個版型拿掉；刪格子的軌道也一樣', () => {
-    const frameTrack = s().project!.tracks.find((t) => t.groupRole === 'frame')!;
-    removeTrack(frameTrack.id);
+    removeTrack(frameTrack().id);
     expect(groupLeft()).toBe(0);
     mk();
     const cellTrack = s().project!.tracks.find((t) => t.groupRole === 'cell')!;

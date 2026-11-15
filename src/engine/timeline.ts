@@ -36,7 +36,7 @@ export function zoneRange(tracks: Track[], kind: TrackKind): [number, number] | 
 
 /** 最下面那條影像軌（匯入的影片放這裡）；沒有就是 undefined */
 export function baseMediaTrack(p: { tracks: Track[] }): Track | undefined {
-  return p.tracks.find((t) => t.kind === 'media');
+  return p.tracks.find((t) => t.kind === 'media' && !t.groupRole);
 }
 
 /** 所有影像軌上的影片／照片，依開始時間排好（找第一個素材、決定比例、首頁縮圖用） */

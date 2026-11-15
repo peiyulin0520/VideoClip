@@ -261,3 +261,10 @@ export async function legacyBox(page: Page) {
   await setSwitch(page, '填滿', true);
   await setSwitch(page, '框線', false);
 }
+
+/** 版型 v2：外框是一般影像軌上的片段（有 group、沒有 cell）；這條軌道就是「外框所在的軌道」 */
+export const isFrameTrack = (t: { items: object[] }): boolean =>
+  t.items.some((x) => {
+    const i = x as { group?: string; cell?: unknown; type?: string };
+    return !!i.group && !i.cell && i.type !== 'text';
+  });
