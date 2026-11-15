@@ -10,6 +10,7 @@ import {
   showTimeline,
   isFrameTrack,
   finishLayout,
+  selectFrame,
 } from './helpers';
 
 type Tf = { x: number; y: number; scale: number; rotation: number; opacity: number };
@@ -44,6 +45,7 @@ test('「刪除並補齊」刪掉版型的外框＝整個版型（含各格）�
 test('圖層分頁「位置、大小、旋轉歸位」＝整個版型歸位；整個圖層透明度也是整組一起', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '拍貼機直條', ['solid-red.webm', 'solid-green.webm']);
+  await selectFrame(page); // 版型層（整個版型）
   const members = async () =>
     (await tracks(page))
       .filter((t) => t.groupRole)

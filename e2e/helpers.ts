@@ -319,3 +319,16 @@ export async function trimClipEnd(page: Page, itemId: string, seconds: number): 
     (i) => i.id === itemId,
   )!.duration;
 }
+
+/** 版型 v2：選到「整個版型」（版型層）——點時間軸上的版型片段；之後移動、縮放、定格都是整組一起 */
+export async function selectFrame(page: Page) {
+  await showTimeline(page);
+  const tr = (await project(page)).tracks as unknown as {
+    items: { id: string; group?: string; cell?: unknown; type: string; member?: boolean }[];
+  }[];
+  const id = tr
+    .flatMap((t) => t.items)
+    .find((i) => i.group && !i.cell && i.type !== 'text' && i.type !== 'audio' && !i.member)!.id;
+  await page.locator(`[data-testid="clip"][data-item-id="${id}"]`).tap();
+  await page.evaluate(() => window.scrollTo(0, 0));
+}

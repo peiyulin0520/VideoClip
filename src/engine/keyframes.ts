@@ -1,6 +1,7 @@
 import type { Adjust, Item, Keyframe, Project, Transform } from '../model/types';
 import { ADJUST_KEYS, effectiveFull, fullAdjust, isNeutral as isZeroAdjust, ZERO_ADJUST } from './grade';
 import { transformAbout } from './groupTransform';
+import { isFrameItem } from './layoutTracks';
 import { applyPulse, pulseAt } from './pulse';
 
 export { ADJUST_KEYS, fullAdjust, ZERO_ADJUST };
@@ -117,6 +118,17 @@ export function timeResolved(project: Project, t: number): Project {
   const resolve = (it: Item): Item => {
     const g = it.type !== 'audio' ? it.group : undefined;
     const f = g ? frames.get(g) : undefined;
+    // 版型裡的素材自己有定格：先算它自己這個時間的樣子，再套上整組的變化
+    if (f && hasKeyframes(it) && it.type !== 'audio' && !isFrameItem(it)) {
+      const own = withTime(it, t);
+      return {
+        ...own,
+        transform: {
+          ...transformAbout(own.transform, f.base, f.now, W, H),
+          opacity: own.transform.opacity * f.now.opacity,
+        },
+      } as Item;
+    }
     if (f && !hasKeyframes(it))
       return {
         ...it,

@@ -3817,3 +3817,7 @@ button:not(:disabled):active,
 .clip.is-frame .clip-label {
   padding-left: 26px;
 }
+/* 選到版型裡的某個素材（素材層）：框線用虛線，跟「整個版型」（實線）分得出來 */
+.selbox.member {
+  border-style: dashed;
+}

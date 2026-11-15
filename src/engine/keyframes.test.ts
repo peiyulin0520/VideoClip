@@ -300,3 +300,51 @@ describe('定格上的色調組合（色調漂移）', () => {
     expect(rc.adjust!.saturation).toBeCloseTo(-0.5, 3);
   });
 });
+
+describe('timeResolved：版型素材自己的定格＋整組的定格（L5 兩層）', () => {
+  const kf = (t: number, x: number) => ({ t, x, y: 0.5, scale: 1, rotation: 0, opacity: 1 });
+  const W = 1000;
+  const H = 1000;
+  const mk = (): Project => {
+    const frame = {
+      ...clip({ id: 'f', start: 0, duration: 4 }),
+      group: 'g',
+      transform: { ...base },
+      keyframes: [kf(0, 0.5), kf(2, 0.7)],
+    } as VideoItem;
+    const cell = {
+      ...clip({ id: 'c', start: 0, duration: 4 }),
+      group: 'g',
+      cell: { x: 0, y: 0, w: 0.5, h: 0.5 },
+      transform: { ...base, x: 0.3 },
+      keyframes: [kf(0, 0.3), kf(2, 0.4)],
+    } as VideoItem;
+    const plain = {
+      ...clip({ id: 'p', start: 0, duration: 4 }),
+      group: 'g',
+      cell: { x: 0.5, y: 0.5, w: 0.5, h: 0.5 },
+      transform: { ...base, x: 0.6 },
+    } as VideoItem;
+    return {
+      width: W,
+      height: H,
+      tracks: [
+        { id: 't1', kind: 'media', items: [frame] },
+        { id: 't2', kind: 'media', items: [cell, plain] },
+      ],
+    } as unknown as Project;
+  };
+  const get = (p: Project, id: string) =>
+    p.tracks.flatMap((t) => t.items).find((i) => i.id === id)!.transform;
+  it('整組往右移 0.2：自己有定格的格子＝自己的值 + 0.2；沒有定格的格子也 + 0.2', () => {
+    const r = timeResolved(mk(), 2);
+    expect(get(r, 'f').x).toBeCloseTo(0.7, 6);
+    expect(get(r, 'c').x).toBeCloseTo(0.4 + 0.2, 6);
+    expect(get(r, 'p').x).toBeCloseTo(0.6 + 0.2, 6);
+  });
+  it('整組沒動（第 0 秒）：格子只有自己的定格值', () => {
+    const r = timeResolved(mk(), 0);
+    expect(get(r, 'c').x).toBeCloseTo(0.3, 6);
+    expect(get(r, 'p').x).toBeCloseTo(0.6, 6);
+  });
+});

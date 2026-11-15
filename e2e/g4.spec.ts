@@ -15,6 +15,7 @@ import {
   isFrameTrack,
   finishLayout,
   trimClipEnd,
+  selectFrame,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g4';
@@ -45,6 +46,7 @@ const members = (tr: Tr[]) => tr.filter((t) => t.groupRole).flatMap((t) => t.ite
 test('版型整組移動：拖其中一格，外框與所有格子一起動，相對位置不變', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '拍貼機直條', ['solid-red.webm', 'solid-green.webm']);
+  await selectFrame(page); // 版型層：整組一起動（選到單一格子只會動那一格）
   const before = members(await tracks(page));
   const box = await previewBox(page);
   const c = before.find((m) => m.cell)!.cell!;
@@ -70,6 +72,7 @@ test('版型整組移動：拖其中一格，外框與所有格子一起動，�
 test('版型整組縮放：雙指縮小，格子大小與間距按比例一起縮小（不跑版）', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '拍貼機直條', ['solid-red.webm', 'solid-green.webm']);
+  await selectFrame(page);
   const before = members(await tracks(page));
   const s = await previewBox(page);
   await pinch(page, { cx: s.x + s.width / 2, cy: s.y + s.height / 2, from: 160, to: 80 });

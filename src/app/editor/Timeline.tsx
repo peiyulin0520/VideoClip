@@ -1184,20 +1184,19 @@ export function Timeline({
                   })}
 
                 {/* 定格（關鍵影格）：物件開始後 t 秒的位置放一個小菱形；點一下＝播放頭跳過去並選取 */}
-                {track.groupRole !== 'cell' &&
-                  track.items.flatMap((it) =>
-                    (it.keyframes ?? []).map((k, i) => (
-                      <KeyframeDot
-                        key={`kf-${it.id}-${i}`}
-                        item={it}
-                        index={i}
-                        k={k}
-                        left={half + (it.start + k.t) * pps}
-                        active={kfTargetId === it.id}
-                        pps={pps}
-                      />
-                    )),
-                  )}
+                {track.items.flatMap((it) =>
+                  (it.keyframes ?? []).map((k, i) => (
+                    <KeyframeDot
+                      key={`kf-${it.id}-${i}`}
+                      item={it}
+                      index={i}
+                      k={k}
+                      left={half + (it.start + k.t) * pps}
+                      active={kfTargetId === it.id}
+                      pps={pps}
+                    />
+                  )),
+                )}
 
                 {track.id === baseId && (
                   <button

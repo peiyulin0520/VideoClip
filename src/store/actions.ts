@@ -212,6 +212,40 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   const p = store().project;
   const f = p && findItem(p, id);
   const frame = p && f && f.item.type !== 'audio' && f.item.group ? groupFrame(p, f.item.group) : null;
+  // 選到的是版型裡的某個素材（格子、文字、貼圖）：只動它自己（素材層）；選到外框才是整組一起動（版型層）
+  if (p && f && frame && f.item.type !== 'audio' && !isFrameItem(f.item)) {
+    const group = f.item.group!;
+    let stored: Partial<Transform> = patch;
+    if (hasKeyframes(frame.item)) {
+      // 整組有定格：畫面上看到的是「素材自己的值」套上整組的變化；存回去要反過來換算
+      const t = useUI.getState().player?.time ?? 0;
+      const pr = timeResolved(p, t);
+      const rf = groupFrame(pr, group);
+      const rm = findItem(pr, id);
+      if (rf && rm) {
+        const merged = { ...(rm.item.transform as Transform), ...patch };
+        const s = transformAbout(merged, rf.item.transform, frame.item.transform, p.width, p.height);
+        stored = {
+          x: s.x,
+          y: s.y,
+          scale: s.scale,
+          rotation: s.rotation,
+          ...(patch.opacity !== undefined ? { opacity: patch.opacity } : {}),
+        };
+      }
+    }
+    editItem(
+      id,
+      (it) => {
+        if (it.type !== 'text' && it.type !== 'audio' && it.cell) it.cellEdit = true;
+        if (hasKeyframes(it as Item))
+          it.keyframes = upsertKeyframe(it as Item, keyframeLocal(it as Item), stored);
+        else Object.assign(it.transform, stored);
+      },
+      { coalesce },
+    );
+    return;
+  }
   if (p && f && frame && f.item.type !== 'audio') {
     // 版型裡的任何物件：移動、縮放、旋轉都變成「整組」一起動（格子不會單獨跑掉）
     const group = f.item.group!;
@@ -247,6 +281,13 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
                 ? { ...T1 }
                 : { ...transformAbout(it.transform as Transform, T0, T1, W, H), opacity: op };
             it.transform.opacity = op;
+            // 素材自己的定格也要跟著整組換算（不然整組一動，它們的定格位置就對不上）
+            if (it.id !== frame.item.id && it.keyframes)
+              it.keyframes = it.keyframes.map((k) => ({
+                ...k,
+                ...transformAbout(k as Transform, T0, T1, W, H),
+                opacity: k.opacity,
+              }));
           }
       },
       { coalesce },
@@ -265,12 +306,11 @@ export function setTransform(id: string, patch: Partial<Transform>, coalesce = `
   );
 }
 
-/** 定格（關鍵影格）作用的物件：版型裡的任何物件＝外框（整組一起動）；音樂沒有 */
+/** 定格（關鍵影格）作用的物件：選到外框＝整個版型（整組一起動）；選到版型裡的素材＝只有它自己；音樂沒有 */
 export function keyframeTarget(p: Project, id: string | null): Item | null {
   const f = id ? findItem(p, id) : null;
   if (!f || f.item.type === 'audio') return null;
-  if (f.item.group) return groupFrame(p, f.item.group)?.item ?? f.item;
-  return f.item;
+  return f.item; // 外框＝整個版型；版型裡的素材＝它自己（素材層）
 }
 
 /** 播放頭這個時間有沒有定格：沒有就新增（值＝目前畫面上的樣子），有就刪掉。回傳做了什麼 */

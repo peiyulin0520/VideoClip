@@ -252,6 +252,11 @@ export function buildScene(
       if (layer) {
         layer.box = { ...layer.box, cx: layer.box.cx + off.x * canvasW, cy: layer.box.cy + off.y * canvasH };
         const gt = group ? gts.get(group) : undefined;
+        // 版型裡的素材可以放大、移到框外，但畫面只露出版型裡面（格子：自己那一格；文字、貼圖：版型外框的範圍）
+        if (frame && group && !layer.clip) {
+          const rect = groupClipRect(l.item, frame.item, ctx, canvasW, canvasH, off);
+          if (rect) layer.clip = { rects: [rect] };
+        }
         if (fx)
           applyGroupOrItemEffect(
             layer,
@@ -338,6 +343,47 @@ export function buildScene(
     });
   }
   return out;
+}
+
+/**
+ * 版型裡的素材「露出的範圍」（畫面像素）：被單獨動過的格子＝它自己那一格；版型裡的文字、貼圖＝外框看得到的範圍。
+ * 版型旋轉時用矩形切會切歪，先不遮；沒有需要遮的回傳 undefined。
+ */
+export function groupClipRect(
+  item: Item,
+  frame: VideoItem,
+  ctx: GeoCtx,
+  W: number,
+  H: number,
+  off: { x: number; y: number },
+): [number, number, number, number] | undefined {
+  if (item.type === 'audio' || !item.group || item.group !== frame.group) return undefined;
+  const rot = ((frame.transform.rotation % 360) + 360) % 360;
+  if (rot > 0.5 && rot < 359.5) return undefined;
+  if (item.type !== 'text' && item.cell) {
+    if (!item.cellEdit) return undefined;
+    const r = cellRect(item.cell, W, H);
+    const c = composeWith(
+      { x: (r.x + r.w / 2) / W, y: (r.y + r.h / 2) / H, scale: 1, rotation: 0, opacity: 1 },
+      frame.transform,
+      W,
+      H,
+    );
+    const w = r.w * frame.transform.scale;
+    const h = r.h * frame.transform.scale;
+    return [c.x * W - w / 2 + off.x * W, c.y * H - h / 2 + off.y * H, w, h];
+  }
+  if (frame === (item as unknown)) return undefined;
+  if (item.type !== 'text' && !item.member) return undefined; // 外框自己
+  const fb = itemBox(frame, ctx);
+  if (!fb) return undefined;
+  const v = frame.visible ?? { x: 0, y: 0, w: 1, h: 1 };
+  return [
+    fb.cx - fb.w / 2 + v.x * fb.w + off.x * W,
+    fb.cy - fb.h / 2 + v.y * fb.h + off.y * H,
+    v.w * fb.w,
+    v.h * fb.h,
+  ];
 }
 
 /** 版型參加轉場：整組都套外框的轉場（位移、放大、透明度、裁切、模糊，跟外框完全一樣所以一起動） */
@@ -452,6 +498,7 @@ export function guardCell(
 ): Item {
   if (item.type === 'text' || item.type === 'audio' || !item.cell || !frame || item.group !== frame.group)
     return item;
+  if (item.cellEdit) return item; // 使用者單獨動過這一格（素材層）：不拉回洞裡
   const asset = project.assets.find((a) => a.id === item.assetId);
   if (!asset) return item;
   const want = composeWith(

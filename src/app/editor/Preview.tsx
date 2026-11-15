@@ -1,3 +1,4 @@
+import { isFrameItem } from '../../engine/layoutTracks';
 import { showPlaceholders } from '../../engine/placeholder';
 import { Layers, Maximize, Minimize, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
@@ -472,7 +473,8 @@ export function Preview({
 
           {box && sel && !cropping && (
             <div
-              className={`selbox${selLocked ? ' locked' : ''}`}
+              className={`selbox${selLocked ? ' locked' : ''}${sel.item.group && !isFrameItem(sel.item) ? ' member' : ''}`}
+              data-level={sel.item.group ? (isFrameItem(sel.item) ? 'group' : 'member') : undefined}
               data-testid="selbox"
               style={{
                 left: box.cx * k,

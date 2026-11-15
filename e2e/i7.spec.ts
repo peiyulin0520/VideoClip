@@ -11,6 +11,7 @@ import {
   seekTo as rawSeekTo,
   isFrameTrack,
   finishLayout,
+  selectFrame,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-9/i7';
@@ -165,6 +166,7 @@ test('版型：定格打在外框＝整組一起動（各格不用單獨打）�
   await openTab(page, '版型');
   await page.getByRole('button', { name: '版型 九宮格', exact: true }).tap();
   await finishLayout(page, [fixture('solid-green.webm')]);
+  await selectFrame(page); // 定格打在整個版型（版型層）
   type Tr = { groupRole?: string; items: { keyframes?: Kf[]; transform: { x: number } }[] };
   const tracks = async () => (await project(page)).tracks as unknown as Tr[];
   const cellsX = async () =>

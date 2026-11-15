@@ -9,6 +9,7 @@ import {
   project,
   seekTo,
   finishLayout,
+  selectFrame,
 } from './helpers';
 
 test('播放列：播放鍵只有圖示；定格、縮小、放大是圖示加中文；按住時有顏色回饋；定格開著時是主題色', async ({
@@ -92,6 +93,7 @@ async function makeBooth(
   if (opts.opacity !== undefined)
     await page.getByLabel('外框透明度').fill(String(Math.round(opts.opacity * 100)));
   await finishLayout(page, [fixture('solid-green.webm')]);
+  await selectFrame(page); // 版型層：整個版型
   await expect(page.getByTestId('group-panel')).toBeVisible();
 }
 

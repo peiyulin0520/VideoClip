@@ -81,6 +81,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 版型 v2 · L5 兩層：整個版型 vs 版型裡的素材（Sonnet 實作）
+  - 做了什麼：**選到外框（時間軸上的版型片段）＝版型層**：移動、雙指縮放、定格都是整組一起（跟以前一樣）；**選到版型裡的某個素材（格子、文字、貼圖）＝素材層**：移動、縮放、旋轉、定格只動它自己（`setTransform` 對非外框的版型物件只改自己；`keyframeTarget` 回傳它自己；整組有定格時畫面是「素材自己的值」再套上整組的變化——`timeResolved` 先算素材自己的定格再 `transformAbout`；存回去時反向換算；整組移動時素材自己的定格也跟著換算）。素材層**不夾位置、可以放大超過版型**，但**畫面只露出版型裡面**：被單獨動過的格子（`cellEdit`）只露出自己那一格、版型文字／貼圖只露出外框看得到的範圍（`groupClipRect`，用圖層遮罩；版型旋轉時先不遮；效果／轉場已經有遮罩時以它們為準）；單獨動過的格子不再被「格子拉回洞裡」的保險（`guardCell`）拉回去。預覽：素材層的選取框是**虛線**（`.selbox.member`、`data-level="member"`），版型層是實線；時間軸上格子也看得到定格菱形
+  - 動了哪些檔：`model/types.ts`（`cellEdit`）、`engine/{scene,keyframes}.ts`（＋test）、`store/actions.ts`、`app/editor/{Preview,Timeline}.tsx`、`styles.css`；測試新 `e2e/l5.spec.ts`、`engine/keyframes.test.ts` 加疊加案例、`e2e/helpers.ts` 新 `selectFrame`；改 g4／h1／i7／v（選到外框再做整組操作）
+  - 驗證：✅ 單元（素材自己的定格＋整組定格＝疊加）、e2e（選到格子放大 ×3：只有那格變大、別格與整個版型不動、放大的紅色沒蓋到下面那格；選版型裡的文字縮小只動文字、選整個版型縮小連文字一起縮）、全部 e2e 275 個（`l0` 疊化在滿載時偶爾失敗，單獨跑過兩次）、`npm run check`  🟡 沒在真 iPhone 驗
+  - 跟規劃不同：①「圖層分頁的歸位」對版型裡的素材仍是整個版型歸位（還沒改成只歸位那一個）；②版型旋轉時素材不遮（矩形遮罩切不準）；③沒做預覽選取框左上角的小標籤，只用虛線／實線區分
+  - 下一步：L7 版型長寬可調＋1×2／2×1＋自訂格數 → L8 版型內圖層順序；L6 按鈕分區穿插
 - 2026-11-15 版型 v2 · L4 從各分頁新增時加進版型（Sonnet 實作）
   - 做了什麼：選到版型（外框、格子、版型裡的東西都算）時，**文字分頁、素材分頁（貼圖：內建／GIPHY／我的貼圖）、音訊分頁**最上面多一塊淡底的「新增的○○加到版型「三格」裡」切換（`AddToGroupToggle`，預設開）：開著＝新增的文字／貼圖／音效變成版型的成員（成員軌、時間夾在版型範圍內、貼圖可以放版型任何位置、可以疊在外框上，**不是填進格子**）；關掉＝照一般方式加在專案裡。邏輯集中在 `addTargetGroup()`（`addText`、`addOverlayClips(sticker)`、`addMusic` 都先問它），旗標 `useUI.addToGroupOff`。時間軸版型尾端「加入」選單也提示貼圖到素材分頁加
   - 動了哪些檔：新 `app/editor/AddToGroupToggle.tsx`；`store/{actions,uiStore}.ts`、`app/editor/tabs/{TextTab,AssetsTab,AudioTab}.tsx`、`app/editor/Timeline.tsx`；`e2e/l3.spec.ts` 加 L4 測試
