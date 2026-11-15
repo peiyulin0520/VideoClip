@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Asset } from '../model/types';
 import { itemBox, type GeoCtx } from './geometry';
-import { cellItem, cellRect, cellTransform, coverCrop, LAYOUTS, type Rect } from './layouts';
+import { cellItem, cellRect, cellTransform, coverCrop, LAYOUTS, planCell, type Rect } from './layouts';
 
 const SIZES: [string, number, number][] = [
   ['9:16', 1080, 1920],
@@ -110,5 +110,25 @@ describe('每一格的物件：素材裁好、剛好填滿格子', () => {
     expect(cellItem(a, wins[0]!, W, H, 2, 4, 'g').start).toBe(2);
     expect(cellItem(a, wins[0]!, W, H, 2, 4, 'g').duration).toBe(4);
     expect(cellItem(a, wins[0]!, W, H, 0, 0, 'g').duration).toBe(0.2);
+  });
+});
+
+describe('planCell', () => {
+  it('素材比格子短：keep 留後面空白；blank before 空白在前面', () => {
+    expect(planCell(2, 3, 'keep')).toEqual({ speed: 1, duration: 2, offset: 0, blank: [2, 3] });
+    expect(planCell(2, 3, 'blank', 'before')).toEqual({ speed: 1, duration: 2, offset: 1, blank: [0, 1] });
+  });
+  it('fit：慢動作 speed = S/L；快動作；超出範圍有限制', () => {
+    expect(planCell(2, 3, 'fit').speed).toBeCloseTo(2 / 3, 6);
+    expect(planCell(2, 3, 'fit').blank).toBeNull();
+    expect(planCell(6, 3, 'fit')).toMatchObject({ speed: 2, duration: 3, blank: null });
+    const slow = planCell(0.3, 3, 'fit');
+    expect(slow.speed).toBe(0.25);
+    expect(slow.duration).toBeCloseTo(1.2, 6);
+    expect(slow.blank![0]).toBeCloseTo(1.2, 6);
+    expect(planCell(100, 3, 'fit').speed).toBe(4);
+  });
+  it('素材比格子長：keep 只用前面', () => {
+    expect(planCell(10, 3, 'keep')).toEqual({ speed: 1, duration: 3, offset: 0, blank: null });
   });
 });

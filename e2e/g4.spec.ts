@@ -30,6 +30,9 @@ const tracks = async (page: Page) => (await project(page)).tracks as unknown as 
 
 async function addLayout(page: Page, name: string, files: string[], motion?: string) {
   await openTab(page, '版型');
+  // 已經選到某個版型時，「新增版型」收合成一顆鈕，要先展開
+  const more = page.getByTestId('layout-add-more');
+  if (await more.isVisible()) await more.tap();
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
   await expect(page.getByTestId('layout-sheet')).toBeVisible();
   if (motion) await page.getByRole('radio', { name: `動畫 ${motion}` }).tap();
@@ -98,8 +101,10 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   // 版型分頁列出每一格；點「選第 2 格」選到那一格
   await openTab(page, '版型');
   await expect(page.getByTestId('group-panel')).toBeVisible();
-  await expect(page.getByTestId('cell-row')).toHaveCount(3);
-  await page.getByRole('button', { name: '選第 2 格' }).tap();
+  await expect(page.getByTestId('ld-cell')).toHaveCount(3);
+  await page.getByTestId('ld-cell').nth(1).tap(); // 點示意圖的第 2 格：選到那一格＋開「這一格」視窗
+  await expect(page.getByRole('dialog', { name: '第 2 格' })).toBeVisible();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
   const cell2 = tr.filter((t) => t.groupRole === 'cell')[1]!.items[0]!;
   await expect.poll(() => selectedItemId(page)).toBe(cell2.id);
   await page.screenshot({ path: `${SHOT}/group-panel.png` });
@@ -144,8 +149,12 @@ test('版型：素材比版型短，剩下的秒數顯示色塊——反黑，�
   await page.screenshot({ path: `${SHOT}/fill-black.png` });
   // 改成反白
   await openTab(page, '版型');
-  await page.getByRole('radio', { name: '第 1 格 反白' }).tap();
-  expect((await tracks(page)).find((t) => t.groupRole === 'cell')!.fill).toBe('white');
+  await page.getByTestId('ld-cell').first().tap();
+  await page.getByTestId('cell-mode-blank').tap();
+  await page.getByRole('button', { name: '空白畫面顏色 #ffffff' }).tap();
+  await page.getByTestId('cell-apply').tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
+  expect((await tracks(page)).find((t) => t.groupRole === 'cell')!.fill).toBe('#ffffff');
   await expect
     .poll(async () => {
       const c = await samplePreview(page, nx, ny);
@@ -172,7 +181,8 @@ test('版型動畫：捲動——不同時間整組的位置不同；選「不�
   expect(isRed(a)).toBe(false);
   await page.screenshot({ path: `${SHOT}/drift.png` });
   await openTab(page, '版型');
-  await page.getByRole('button', { name: '選第 1 格' }).tap();
+  await page.getByTestId('ld-cell').first().tap();
+  await page.getByRole('button', { name: '關閉', exact: true }).tap();
   await page.getByRole('radio', { name: '動畫 不動' }).tap();
   const frame2 = (await tracks(page)).find((t) => t.groupRole === 'frame')!.items[0]!;
   expect(frame2.motion).toBeUndefined();

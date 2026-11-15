@@ -467,3 +467,31 @@ export const cellRect = (cell: NonNullable<VideoItem['cell']>, W: number, H: num
 
 /** 同時播放的影片超過這個數量，手機可能解不動（iPhone 同時解碼數有限） */
 export const MAX_CELL_VIDEOS = 5;
+
+// ---------- 這一格的時間安排 ----------
+
+export type CellMode = 'keep' | 'fit' | 'blank';
+export type CellPlan = {
+  speed: number;
+  /** 這一格的素材在專案裡佔幾秒 */
+  duration: number;
+  /** 素材從版型開始後第幾秒開始放 */
+  offset: number;
+  /** 沒有素材的那一段（版型開始後的秒數），沒有＝整格都有素材 */
+  blank: [number, number] | null;
+};
+
+/**
+ * 算這一格的素材怎麼放進版型的 L 秒。S＝素材（從入點算起）還有幾秒可以用。
+ * keep＝照原速（太短就留空白、太長就只用前面）；fit＝整段放進去（慢動作／快動作，速度限制 0.25～4）；
+ * blank＝照原速、空白畫面放在前面（pos='before'）或後面（'after'）。
+ */
+export function planCell(S: number, L: number, mode: CellMode, pos: 'before' | 'after' = 'after'): CellPlan {
+  const speed = mode === 'fit' ? Math.min(Math.max(S / L, 0.25), 4) : 1;
+  const duration = Math.min(S / speed, L);
+  const gap = L - duration;
+  const before = mode === 'blank' && pos === 'before';
+  const offset = before ? gap : 0;
+  const blank: [number, number] | null = gap < 0.05 ? null : before ? [0, gap] : [duration, L];
+  return { speed, duration, offset, blank };
+}

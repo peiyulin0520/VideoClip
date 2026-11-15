@@ -1,17 +1,13 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { Project, Track, VideoItem } from '../../../model/types';
-import {
-  removeGroup,
-  setCellFill,
-  setGroupDuration,
-  setGroupMotion,
-  setItemEffect,
-} from '../../../store/actions';
+import type { Project, VideoItem } from '../../../model/types';
+import { removeGroup, setGroupDuration, setGroupMotion, setItemEffect } from '../../../store/actions';
 import { FrameStyleControls } from '../FrameStyleControls';
 import { restyleFrame } from '../frameRestyle';
 import { GroupFxSelect } from '../GroupFxSelect';
 import { useProjectStore } from '../../../store/projectStore';
+import { CellSheet } from '../CellSheet';
+import { LayoutDiagram } from '../LayoutDiagram';
 import { LayoutPicker } from '../LayoutPicker';
 import { ToolButton, type Found } from './shared';
 
@@ -42,11 +38,11 @@ function FrameStyleEditor({ group, color, opacity }: { group: string; color: str
 
 /** 一個版型的整體設定：整組長度、動畫、每一格要用的片段與湊秒數的色塊 */
 function GroupPanel({ project, group }: { project: Project; group: string }) {
-  const select = useProjectStore((s) => s.select);
   const selectedId = useProjectStore((s) => s.selectedId);
+  const select = useProjectStore((s) => s.select);
+  const [cell, setCell] = useState<{ id: string; index: number } | null>(null);
   const frameTrack = project.tracks.find((t) => t.group === group && t.groupRole === 'frame');
   const frame = frameTrack?.items[0] as VideoItem | undefined;
-  const cells = project.tracks.filter((t) => t.group === group && t.groupRole === 'cell');
   if (!frame) return null;
   const dur = (n: number) => setGroupDuration(group, Math.max(frame.duration + n, 1));
   return (
@@ -55,8 +51,19 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
         <span>整個版型 · {frame.label ?? frameTrack?.name}</span>
       </div>
       <p className="hint">
-        在預覽上拖移、縮放整個版型（格子會一起動）；再點一下格子，可以到「剪輯」選那一格要用的片段。
+        在預覽上拖移、縮放整個版型（格子會一起動）。點下面示意圖的格子，可以改那一格的名稱、素材、片段、空白畫面。
       </p>
+      <LayoutDiagram
+        project={project}
+        group={group}
+        selectedId={selectedId}
+        onPick={(id, i) => {
+          const it = project.tracks.find((t) => t.id === id)?.items[0];
+          if (it) select(it.id);
+          setCell({ id, index: i });
+        }}
+      />
+      {cell && <CellSheet key={cell.id} trackId={cell.id} index={cell.index} onClose={() => setCell(null)} />}
       {frame.frameStyle && (
         <FrameStyleEditor
           key={frame.frameStyle.opacity}
@@ -102,50 +109,7 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
           ＋ 1 秒
         </button>
       </div>
-      <ul className="cell-list">
-        {cells.map((t, i) => (
-          <CellRow key={t.id} track={t} index={i} selectedId={selectedId} onSelect={select} />
-        ))}
-      </ul>
-      <p className="hint">格子的素材比版型短，剩下的秒數會顯示色塊（反黑或反白）。</p>
     </div>
-  );
-}
-
-function CellRow({
-  track,
-  index,
-  selectedId,
-  onSelect,
-}: {
-  track: Track;
-  index: number;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  const first = track.items[0] as VideoItem | undefined;
-  const active = !!first && track.items.some((x) => x.id === selectedId);
-  return (
-    <li className={`cell-row${active ? ' active' : ''}`} data-testid="cell-row">
-      <button className="btn" aria-label={`選第 ${index + 1} 格`} onClick={() => first && onSelect(first.id)}>
-        第 {index + 1} 格
-      </button>
-      <span className="grow">{track.items.length > 1 ? `${track.items.length} 段` : ''}</span>
-      <div className="chips">
-        {(['black', 'white'] as const).map((f) => (
-          <button
-            key={f}
-            role="radio"
-            aria-checked={track.fill === f}
-            aria-label={`第 ${index + 1} 格 ${f === 'black' ? '反黑' : '反白'}`}
-            className={`chip${track.fill === f ? ' active' : ''}`}
-            onClick={() => setCellFill(track.id, f)}
-          >
-            {f === 'black' ? '反黑' : '反白'}
-          </button>
-        ))}
-      </div>
-    </li>
   );
 }
 
@@ -153,6 +117,9 @@ function CellRow({
 export function LayoutTab({ found }: { found: Found }) {
   const project = useProjectStore((s) => s.project)!;
   const group = found && found.item.type !== 'audio' ? found.item.group : undefined;
+  // 選到版型時，「新增版型」收合成一顆鈕；展開只對當下這個版型有效（選到別的版型又收起來）
+  const [addingFor, setAddingFor] = useState<string | undefined>(undefined);
+  const adding = !!group && addingFor === group;
   return (
     <>
       {group && (
@@ -161,9 +128,15 @@ export function LayoutTab({ found }: { found: Found }) {
         </div>
       )}
       {group && <GroupPanel project={project} group={group} />}
-      <div className="panel">
-        <LayoutPicker />
-      </div>
+      {group && !adding ? (
+        <button className="btn" data-testid="layout-add-more" onClick={() => setAddingFor(group)}>
+          ＋ 再新增一個版型
+        </button>
+      ) : (
+        <div className="panel">
+          <LayoutPicker />
+        </div>
+      )}
     </>
   );
 }

@@ -19,7 +19,19 @@ const todayText = () => {
 };
 
 /** 版型縮圖：灰底上畫外框，格子的洞裡填淡淡的顏色，看得出哪裡放照片 */
-function LayoutThumb({ def, W, H }: { def: LayoutDef; W: number; H: number }) {
+function LayoutThumb({
+  def,
+  W,
+  H,
+  color = '#ffffff',
+  opacity = 1,
+}: {
+  def: LayoutDef;
+  W: number;
+  H: number;
+  color?: string;
+  opacity?: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const c = ref.current;
@@ -33,11 +45,11 @@ function LayoutThumb({ def, W, H }: { def: LayoutDef; W: number; H: number }) {
     const tmp = document.createElement('canvas');
     tmp.width = c.width;
     tmp.height = c.height;
-    paintFrame(tmp.getContext('2d')!, def, c.width, c.height, '#ffffff', '#8aa4b8');
+    paintFrame(tmp.getContext('2d')!, def, c.width, c.height, color, '#8aa4b8', opacity);
     ctx.fillStyle = '#4a4a50';
     ctx.fillRect(0, 0, c.width, c.height);
     ctx.drawImage(tmp, 0, 0);
-  }, [def, W, H]);
+  }, [def, W, H, color, opacity]);
   return <canvas ref={ref} className="layout-thumb" aria-hidden="true" />;
 }
 
@@ -114,7 +126,7 @@ export function LayoutPicker() {
           ? `版型加好了。同時播放超過 ${MAX_CELL_VIDEOS} 支影片，手機可能會卡，建議多放照片`
           : media.length > cells.length
             ? `版型加好了（有 ${cells.length} 格，只用了前 ${cells.length} 個素材）`
-            : `版型加好了。整個版型一起縮放移動；再點一下預覽上的格子，可以選那一格要用的片段`,
+            : `版型加好了。整個版型一起縮放移動；點版型分頁裡示意圖的格子，可以改那一格的名稱、素材、片段`,
         6000,
       );
     } finally {
@@ -136,7 +148,7 @@ export function LayoutPicker() {
             data-layout={l.id}
             onClick={() => setDef(l)}
           >
-            <LayoutThumb def={l} W={W} H={H} />
+            <LayoutThumb def={l} W={W} H={H} color={frameColor} opacity={frameOpacity} />
             <span>{l.name}</span>
           </button>
         ))}
@@ -151,6 +163,9 @@ export function LayoutPicker() {
             <p className="hint">{def.hint}。選好外框顏色，再從相簿選照片或影片放進格子。</p>
             <div className="panel-head">
               <span>外框顏色</span>
+            </div>
+            <div className="layout-preview">
+              <LayoutThumb def={def} W={W} H={H} color={frameColor} opacity={frameOpacity} />
             </div>
             <FrameStyleControls
               color={frameColor}

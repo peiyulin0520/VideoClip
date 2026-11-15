@@ -366,6 +366,8 @@ export type TextCard = {
 };
 export type TextItem = ItemBase & {
   type: 'text';
+  /** 版型某一格的「空白畫面」上的文字：那一格的軌道 id（「這一格」視窗用它找回來） */
+  cellFor?: string;
   card: TextCard;
   /** 屬於哪個動態模板（標題、副標）：模板整個移動、拿掉、改長度時它們跟著 */
   group?: string;
@@ -404,7 +406,7 @@ export type Track = {
   group?: string;
   groupRole?: 'frame' | 'cell';
   /** 格子軌道：素材放完（或這段時間沒有素材）時，格子顯示的色塊顏色 */
-  fill?: 'black' | 'white';
+  fill?: string; // 'black'／'white'（舊值）或任何色碼
   items: Item[];
 };
 

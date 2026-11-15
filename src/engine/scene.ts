@@ -197,7 +197,7 @@ export function buildScene(
         canvasW,
         canvasH,
       );
-      const color = FILL_COLORS[track.fill];
+      const color = FILL_COLORS[track.fill as keyof typeof FILL_COLORS] ?? track.fill;
       const fillLayer: SceneLayer = {
         id: `fill-${track.id}`,
         kind: 'text',

@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-12：X1、X2（含 X2b 套用／儲存規則）、X3、X4、X7 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X5 版型格子 → X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
+- **下一步**：feedback-12：X1、X2（含 X2b/X2c 套用／儲存規則）、X3、X4、X5、X7 已做完（待使用者在 iPhone 驗收、開 PR）；接著 X6 輪流播放 → X8 畫畫（`docs/plans/2026-11-14-feedback-12.md`）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -75,6 +75,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-15 feedback-12 X5 版型格子（Sonnet 實作）
+  - 做了什麼：①**示意圖** `LayoutDiagram`：版型分頁用這個版型的外框（顏色、透明度跟實際一樣）＋每一格素材縮圖畫出來，每格是按鈕（`aria-label="第 N 格 名稱"`），點了選到那一格並開「這一格」視窗；挑版型的縮圖與視窗預覽跟著外框顏色／透明度（`LayoutThumb`）；拿掉舊的「第 N 格 反黑／反白」清單；②**「這一格」視窗** `CellSheet`：名稱（寫進那一格的 `label`）、換素材（專案已有的影片／照片）、「選片段範圍」（沿用 `RangeMarkerSheet`＋新 `fixedLen`：只拖起點、迄跟著、長度固定，有 ▶ 有聲音、↩↪、灰階）、素材比這一格短→「空白畫面」（放前面／後面、顏色用 `ColorPicker`、可寫文字）或「慢動作」（整段放進去，速度限 0.25～4），素材比這一格長→「只用前面一段」或「快動作」；「套用」一次寫入（視窗不關，照 X2c 規則）；算法在 `engine/layouts.ts` 的 `planCell`（單元測試）、寫入在 `store/actions.ts` 的 `applyCell`／`setCellTrim`；資料：`Track.fill` 可以是任何色碼（舊的 black／white 照讀）、`TextItem.cellFor`（空白畫面上的字屬於哪一格）；③**多個版型**：選到某個版型時「新增版型」收合成一顆鈕（`layout-add-more`），展開才是挑版型；沒選版型直接是挑版型
+  - 另外：**所有彈出視窗**標題列（含 ✕）改成黏在最上面、內容比螢幕高就在視窗裡捲（`.sheet` max-height 94dvh）——「這一格」視窗很長，原本 ✕ 會捲出畫面
+  - 動了哪些檔：新 `app/editor/{LayoutDiagram,CellSheet}.tsx`；`app/editor/{LayoutPicker,RangeMarkerSheet}.tsx`、`app/editor/tabs/LayoutTab.tsx`、`engine/{layouts,scene}.ts`（＋test）、`store/actions.ts`、`model/types.ts`、`styles.css`；測試新 `e2e/x5.spec.ts`，改 `g4`、`layout`
+  - 驗證：✅ 單元（planCell）、e2e（示意圖與縮圖顏色、改名＋❌不存＋套用視窗不關、空白畫面前面／顏色／文字、慢動作、片段範圍＋快動作、多版型）、`npm run check`  🟡 沒在真 iPhone 驗
+  - 跟規劃不同：①示意圖固定 160px 一欄（沒做「直式版型放左邊、說明放右邊」）；②「這一格」視窗的換素材只能選專案已匯入的，沒做「從相簿匯入」；③片段範圍要先「套用」素材再選（換了素材時按鈕停用）；④時間軸上點格子展開（X6）還沒做
+  - 下一步：X6 輪流播放＋時間軸群組展開 → X8 畫畫
 - 2026-11-15 feedback-12 X2c 按「套用／儲存」後視窗不自動關（Sonnet 實作）
   - 做了什麼：使用者補充——按套用／儲存後視窗**留著**（跳「已套用／已儲存」提示），之後再按 ✕ **不會撤銷**已套用的，只放棄「套用之後」又改的。改了：畫面比例、專案名稱（含用預覽當封面開關）、字體選擇、首頁更換封面、首頁改名、片段／軌道命名（`PromptSheet`）、選色彈窗、特效時間（`EffectTimingSheet`）、轉場聲音（`TransitionAudio`，✕ 還原到最後一次套用）。**維持套用後關閉**：自訂比例（要回預覽拖框）、裁切編輯器、片段範圍視窗（套用會改變片段結構，視窗內容會失效）、版型挑素材（接著開相簿）
   - 動了哪些檔：`ui/{PromptSheet,ColorPopup,ColorPicker}.tsx`、`app/pages/{Editor,Home}.tsx`、`app/fonts/FontSelect.tsx`、`app/editor/{TransitionAudio}.tsx`、`app/editor/tabs/EffectTab.tsx`；測試改 `e2e/{x2,x1,x3,x4,x7,g1,g2,i5,phase1,phase3b,fix-aspect,fix-colors}.spec.ts`（套用後要再按 ✕ 關），x2 新增「儲存後視窗還在、改了又按 ✕ 已儲存的不變」

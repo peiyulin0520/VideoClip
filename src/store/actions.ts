@@ -54,7 +54,15 @@ import {
 } from '../engine/timeline';
 import { remapKeepOnStage } from '../engine/aspectRemap';
 import { geoCtx } from '../engine/scene';
-import { cellItem, inkFor, type LayoutText, type Rect } from '../engine/layouts';
+import {
+  cellItem,
+  cellRect,
+  inkFor,
+  planCell,
+  type CellMode,
+  type LayoutText,
+  type Rect,
+} from '../engine/layouts';
 import {
   DEFAULT_EFFECT_DURATION,
   DEFAULT_TRANSITION_DURATION,
@@ -930,10 +938,125 @@ export function setGroupMotion(group: string, motion: 'drift' | 'slide' | undefi
 }
 
 /** 版型某一格的素材放完（或這段是空位）時顯示的色塊：反黑或反白 */
-export function setCellFill(trackId: string, fill: 'black' | 'white') {
+export function setCellFill(trackId: string, fill: string) {
   store().apply((d) => {
     const t = d.tracks.find((x) => x.id === trackId);
     if (t) t.fill = fill;
+  });
+}
+
+/** 「這一格」視窗的設定（按「套用」一次寫入，一步復原） */
+export type CellDraft = {
+  name: string;
+  assetId: string;
+  mode: CellMode;
+  /** 空白畫面放在素材前面或後面 */
+  pos: 'before' | 'after';
+  color: string;
+  /** 空白畫面上的文字（空白＝沒有） */
+  text: string;
+};
+
+/** 這一格的主要素材（版型的格子軌上第一個影片／照片物件） */
+export function cellMain(track: Track): VideoItem | undefined {
+  return track.items.find((x): x is VideoItem => x.type !== 'text' && x.type !== 'audio');
+}
+
+/** 這一格素材從入點算起還能用幾秒（照片＝不限） */
+export function cellAvailable(item: VideoItem, asset: Asset | undefined): number {
+  if (item.type === 'image' || !asset) return Infinity;
+  return Math.max(asset.duration - item.trimIn, 0.2);
+}
+
+export function applyCell(trackId: string, draft: CellDraft): boolean {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  const first = track && cellMain(track);
+  const frame = p && track?.group ? groupFrame(p, track.group) : null;
+  if (!p || !track || !first || !frame || !first.cell) return false;
+  const group = track.group!;
+  const L = frame.item.duration;
+  store().apply((d) => {
+    const tr = d.tracks.find((t) => t.id === trackId)!;
+    const idx = tr.items.findIndex((x) => x.id === first.id);
+    let it = tr.items[idx] as VideoItem;
+    const asset = d.assets.find((a) => a.id === draft.assetId);
+    if (asset && asset.id !== it.assetId) {
+      // 換素材：照這一格的位置重新裁成填滿，名稱、音量保留
+      const rect = cellRect(first.cell!, d.width, d.height);
+      const fresh = cellItem(asset as Asset, rect, d.width, d.height, frame.item.start, L, group);
+      const next = { ...fresh, id: it.id, volume: it.volume } as VideoItem;
+      if (it.label) next.label = it.label;
+      tr.items[idx] = next;
+      it = tr.items[idx] as VideoItem;
+    }
+    const name = draft.name.trim();
+    if (name) it.label = name;
+    else delete it.label;
+    // 時間安排（照片沒有「太短」的問題，永遠整段）
+    const a = d.assets.find((x) => x.id === it.assetId);
+    const S = cellAvailable(it, a as Asset | undefined);
+    const plan = Number.isFinite(S)
+      ? planCell(S, L, draft.mode, draft.pos)
+      : { speed: 1, duration: L, offset: 0, blank: null };
+    it.speed = plan.speed;
+    it.duration = Math.max(plan.duration, 0.2);
+    it.start = frame.item.start + plan.offset;
+    if (draft.mode === 'blank' || plan.blank) tr.fill = draft.color;
+    // 空白畫面上的文字
+    let ti = -1;
+    let li = -1;
+    d.tracks.forEach((t, k) =>
+      t.items.forEach((x, m) => {
+        if (x.type === 'text' && x.cellFor === trackId) {
+          ti = k;
+          li = m;
+        }
+      }),
+    );
+    const wantText = draft.mode === 'blank' && plan.blank && draft.text.trim();
+    if (!wantText) {
+      if (ti >= 0) d.tracks[ti]!.items.splice(li, 1);
+      return;
+    }
+    const [b0, b1] = plan.blank!;
+    let txt = ti >= 0 ? (d.tracks[ti]!.items[li] as TextItem) : null;
+    if (!txt) {
+      txt = createTextItem(frame.item.start + b0, draft.text.trim());
+      txt.group = group;
+      txt.cellFor = trackId;
+      txt.transform = {
+        x: first.cell!.x + first.cell!.w / 2,
+        y: first.cell!.y + first.cell!.h / 2,
+        scale: 1,
+        rotation: 0,
+        opacity: 1,
+      };
+      const run = txt.card.runs[0]!;
+      run.size = 72;
+      run.weight = 'bold';
+      delete run.shadow;
+      const k = trackIndexFor(d.tracks as Track[], 'text', frame.item.start + b0, b1 - b0);
+      d.tracks[k]!.items.push(txt);
+    }
+    txt.start = frame.item.start + b0;
+    txt.duration = Math.max(b1 - b0, 0.2);
+    txt.card.runs[0]!.text = draft.text.trim();
+    txt.card.runs[0]!.color = inkFor(draft.color);
+  });
+  return true;
+}
+
+/** 這一格換入點（秒，素材時間）；長度不變 */
+export function setCellTrim(itemId: string, trimIn: number) {
+  const p = store().project;
+  const f = p && findItem(p, itemId);
+  if (!f || f.item.type === 'text' || f.item.type === 'audio') return;
+  const a = p.assets.find((x) => x.id === (f.item as VideoItem).assetId);
+  const span = f.item.duration * f.item.speed;
+  const max = a ? Math.max(a.duration - span, 0) : 0;
+  editItem(itemId, (it) => {
+    if (it.type !== 'text' && it.type !== 'audio') it.trimIn = Math.min(Math.max(trimIn, 0), max);
   });
 }
 

@@ -39,6 +39,7 @@ export function RangeMarkerSheet({
   extra,
   allowEmpty,
   onRangesChange,
+  fixedLen,
 }: {
   title: string;
   /** 整條軸的長度（秒） */
@@ -69,6 +70,8 @@ export function RangeMarkerSheet({
   allowEmpty?: boolean;
   /** 標記有變動時通知呼叫端（切換模式時要換算） */
   onRangesChange?: (ranges: Range[]) => void;
+  /** 只有一組、長度固定（版型的一格）：只能拖「起」，迄＝起＋這個長度；沒有新增／移除 */
+  fixedLen?: number;
 }) {
   const dur = Math.max(duration, 0.1);
   const [ranges, setRanges] = useState<Range[]>(initial.map((r): Range => [r[0], r[1]]));
@@ -207,7 +210,10 @@ export function RangeMarkerSheet({
       const d = ((ev.clientX - x0) / width) * dur;
       const next = base.map((r): Range => [r[0], r[1]]);
       const r = next[i]!;
-      if (side === 0) r[0] = clamp(origin + d, next[i - 1]?.[1] ?? 0, r[1] - minLen);
+      if (fixedLen !== undefined) {
+        r[0] = clamp(origin + d, 0, Math.max(dur - fixedLen, 0));
+        r[1] = r[0] + fixedLen;
+      } else if (side === 0) r[0] = clamp(origin + d, next[i - 1]?.[1] ?? 0, r[1] - minLen);
       else r[1] = clamp(origin + d, r[0] + minLen, next[i + 1]?.[0] ?? dur);
       setRanges(next);
       seek(r[side]);
@@ -359,11 +365,11 @@ export function RangeMarkerSheet({
               </button>
               <button
                 className="rm-flag end"
-                style={{ left: pct(b) }}
                 role="slider"
                 aria-label={`第 ${i + 1} 組 終點`}
                 aria-valuetext={`第 ${fmt2(b)} 秒`}
                 data-testid={`range-flag-end-${i}`}
+                style={{ left: pct(b), ...(fixedLen !== undefined ? { pointerEvents: 'none' } : {}) }}
                 onPointerDown={(e) => dragFlag(e, i, 1)}
               >
                 <i />
@@ -400,20 +406,23 @@ export function RangeMarkerSheet({
           <div className="rm-cursor" data-testid="rm-cursor" style={{ left: pct(cursor) }} />
         </div>
       </div>
-      <button className="btn rm-add" data-testid="range-add" onClick={addGroup}>
-        在白線位置新增一組起迄標記
-      </button>
+      {fixedLen === undefined && (
+        <button className="btn rm-add" data-testid="range-add" onClick={addGroup}>
+          在白線位置新增一組起迄標記
+        </button>
+      )}
       <ul className="rm-list">
-        {ranges.map(([a, b], i) => (
-          <li key={i}>
-            <span>
-              第 {i + 1} 組：{fmt2(a)}–{fmt2(b)} 秒
-            </span>
-            <button className="chip sm" data-testid={`range-remove-${i}`} onClick={() => removeGroup(i)}>
-              移除第 {i + 1} 組{mode === 'timing' ? '' : '片段'}
-            </button>
-          </li>
-        ))}
+        {fixedLen === undefined &&
+          ranges.map(([a, b], i) => (
+            <li key={i}>
+              <span>
+                第 {i + 1} 組：{fmt2(a)}–{fmt2(b)} 秒
+              </span>
+              <button className="chip sm" data-testid={`range-remove-${i}`} onClick={() => removeGroup(i)}>
+                移除第 {i + 1} 組{mode === 'timing' ? '' : '片段'}
+              </button>
+            </li>
+          ))}
       </ul>
       <p className="rm-summary" data-testid="trim-info">
         {summary ? summary(ranges) : defaultSummary}

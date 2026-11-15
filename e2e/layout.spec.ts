@@ -31,6 +31,9 @@ const tracks = async (page: Page) =>
 
 async function addLayout(page: Page, name: string, color: string, files: string[]) {
   await openTab(page, '版型');
+  // 已經選到某個版型時，「新增版型」收合成一顆鈕，要先展開
+  const more = page.getByTestId('layout-add-more');
+  if (await more.isVisible()) await more.tap();
   await page.getByRole('button', { name: `版型 ${name}`, exact: true }).tap();
   await expect(page.getByTestId('layout-sheet')).toBeVisible();
   await page
