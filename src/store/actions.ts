@@ -76,7 +76,6 @@ import {
   cellItem,
   cellRect,
   cellTransform,
-  coverCrop,
   defOf,
   inkFor,
   MAX_CELL_VIDEOS,
@@ -431,7 +430,8 @@ export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${
     );
     return;
   }
-  const group = target.type !== 'audio' ? target.group : undefined;
+  // 選到版型外框＝整組（外框與各格）一起調；選到格子裡的某個影像＝只調它自己
+  const group = target.type !== 'audio' && isFrameItem(target) ? target.group : undefined;
   store().apply(
     (d) => {
       for (const track of d.tracks)
@@ -444,11 +444,11 @@ export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${
   );
 }
 
-/** 調色作用的物件：版型裡的任何物件＝整組（外框與各格）；其他是自己 */
+/** 調色作用的物件：版型外框＝整組（外框與各格）；格子裡的影像、文字、貼圖＝只有自己 */
 function colorTargetIds(p: Project, id: string): string[] {
   const f = findItem(p, id);
   if (!f) return [];
-  if (f.item.type !== 'audio' && f.item.group) {
+  if (f.item.type !== 'audio' && f.item.group && isFrameItem(f.item)) {
     const group = f.item.group;
     return p.tracks
       .flatMap((t) => t.items)
@@ -989,12 +989,8 @@ export function applyLayoutShape(
         if (it.type === 'text' || it.type === 'audio' || !it.cell) continue;
         const a = d.assets.find((x) => x.id === it.assetId);
         if (!a) continue;
-        // 自己裁切過（筆刷、自由形狀）的保留裁切；其他的重新裁成填滿新的格子
-        if (!it.cropEdit && !it.mask && !it.maskBitmap) {
-          const crop = coverCrop(a as Asset, win);
-          if (crop) it.crop = crop;
-          else delete it.crop;
-        }
+        // 自己裁切過（筆刷、自由形狀）的保留裁切；其他的不裁切（整張素材蓋滿新的格子、畫面被格子遮住）
+        if (!it.cropEdit && !it.mask && !it.maskBitmap) delete it.crop;
         const base = cellTransform(a as Asset, it.crop, win, W, H);
         it.transform = {
           ...composeWith(base, frameItem.transform as Transform, W, H),
@@ -1306,10 +1302,11 @@ export function cellAvailable(item: VideoItem, asset: Asset | undefined): number
   return Math.max(asset.duration - item.trimIn, 0.2);
 }
 
-export function applyCell(trackId: string, draft: CellDraft): boolean {
+export function applyCell(trackId: string, draft: CellDraft, itemId?: string): boolean {
   const p = store().project;
   const track = p?.tracks.find((t) => t.id === trackId);
-  const first = track && cellMain(track);
+  // 要換的是這一格的哪一段（沒指定＝第一段）
+  const first = track && ((itemId && cellItems(track).find((x) => x.id === itemId)) || cellMain(track));
   const frame = p && track?.group ? groupFrame(p, track.group) : null;
   if (!p || !track || !first || !frame || !first.cell) return false;
   const group = track.group!;
@@ -1966,6 +1963,12 @@ export function moveItemTo(id: string, target: DropTarget, start: number): boole
   const dstTrack = target.type === 'track' ? p.tracks.find((t) => t.id === target.trackId) : undefined;
   const isCellItem =
     !!cur && cur.type !== 'text' && cur.type !== 'audio' && !!cur.cell && !!cur.group && !isFrameItem(cur);
+  // 版型裡的文字、貼圖、音效：也只能放進同一個版型的成員軌（不能放到版型外面的軌道）
+  const isMember = !!cur && !isFrameItem(cur) && !isCellItem && !!cur.group;
+  if (isMember && (!dstTrack || dstTrack.group !== cur!.group || dstTrack.groupRole !== 'member')) {
+    toast('版型裡的素材只能移到同一個版型裡');
+    return false;
+  }
   if (isCellItem || dstTrack?.groupRole === 'cell') {
     const srcTrack = cur ? findItem(p, id)?.track : undefined;
     if (

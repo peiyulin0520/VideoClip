@@ -67,7 +67,7 @@ const asset = (w: number, h: number, kind: Asset['kind'] = 'video'): Asset => ({
   thumbs: [],
 });
 
-describe('每一格的物件：素材裁好、剛好填滿格子', () => {
+describe('每一格的物件：整張素材蓋滿格子（不預先裁切）', () => {
   const W = 1080;
   const H = 1920;
   const ctx = (a: Asset): GeoCtx => ({
@@ -89,12 +89,15 @@ describe('每一格的物件：素材裁好、剛好填滿格子', () => {
     [3840, 2160],
   ] as const)
     for (const win of wins)
-      it(`素材 ${aw}×${ah} 放進 ${Math.round(win.w)}×${Math.round(win.h)} 的格子：方框剛好等於格子`, () => {
+      it(`素材 ${aw}×${ah} 放進 ${Math.round(win.w)}×${Math.round(win.h)} 的格子：整張蓋滿格子、不裁切`, () => {
         const a = asset(aw, ah);
         const item = cellItem(a, win, W, H, 0, 3, 'g1');
         const box = itemBox(item, ctx(a))!;
-        expect(box.w).toBeCloseTo(win.w, 1);
-        expect(box.h).toBeCloseTo(win.h, 1);
+        // 不預先裁切：整張素材蓋滿格子（至少一邊剛好等於格子、另一邊超出，超出的部分由格子範圍遮住）
+        expect(box.w).toBeGreaterThanOrEqual(win.w - 0.01);
+        expect(box.h).toBeGreaterThanOrEqual(win.h - 0.01);
+        expect(Math.min(box.w - win.w, box.h - win.h)).toBeCloseTo(0, 1);
+        expect(item.crop).toBeUndefined();
         expect(box.cx).toBeCloseTo(win.x + win.w / 2, 1);
         expect(box.cy).toBeCloseTo(win.y + win.h / 2, 1);
         expect(item.type).toBe(a.kind);

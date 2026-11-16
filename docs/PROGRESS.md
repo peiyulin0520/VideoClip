@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #16（feedback-12 全部）已開、等使用者合併；使用者在 iPhone 測試後回報 feedback-13（`docs/plans/2026-11-16-feedback-13.md`，22 點已收齊並排成 Y1–Y11（含使用者補充），待切 Sonnet 從 Y1 做起）
+- **下一步**：PR #16（feedback-12 全部）已開、等使用者合併；使用者在 iPhone 測試後回報 feedback-13（`docs/plans/2026-11-16-feedback-13.md`，22 點已收齊並排成 Y1–Y11（含使用者補充）；Y1–Y6 已做完，下一個 Y7 圖層分頁）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -88,6 +88,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-16 feedback-13 Y6 格子素材（Sonnet）
+  - 做了什麼：①**找到「版型文字跑出版型」的真正原因**：`migrate.ts` 的 `repairGroups` 每次載入專案都把所有文字的 `group` 清掉（為了清舊版型模板的字），結果版型成員文字一重載就變成普通文字、不再跟著版型；改成只清「外框已不存在」或舊模板字（有 `fontCycle`）的，並新增 `engine/memberRepair.ts`（`repairMemberItems`：成員軌上的文字補回 `group`、跑到普通軌的成員搬回自己版型的成員軌），載入與每次 `apply` 都跑；`moveItemTo` 成員只能搬進同一版型的成員軌。（「這是夾心」＝使用者在文字分頁加的字不是版型成員，不跟版型走，這是設計）②**格子影像不預先裁切**：`cellItem` 不再算 `crop`，整張素材蓋滿格子（cover），畫面一律只露出自己那一格（`groupClipArea` 對格子永遠回傳範圍，`guardCell` 不變）；自己用裁切工具調過的格子照舊；預覽點選時只有點在自己那一格範圍內才算點到（`Preview.hitsAt` 多邊形判斷）；③**「這一格」視窗換素材**：選哪一段就換哪一段（標題「換第 N 段的素材」，`applyCell(trackId, draft, itemId)`），點段落會清掉未套用的草稿；④**各格各影像單獨調色**：選到版型外框＝整組一起調，選到格子裡的影像／文字／貼圖＝只調自己（`setAdjust`、`colorTargetIds` 只有外框展開整組）。
+  - 動了哪些檔：`model/migrate.ts`、`engine/{memberRepair,layouts,scene}.ts`、`store/{projectStore,actions}.ts`、`app/editor/{Preview,CellSheet}.tsx`；測試 `e2e/y6.spec.ts`（新，3 個）、改 `e2e/layout.spec.ts`（格子不預先裁切）、單元 `memberRepair.test.ts`、`migrate.test.ts`、`layouts.test.ts`、`groupClip.test.ts`
+  - 驗證：✅ 單元 1052、e2e、`npm run check`  🟡 沒在真 iPhone 驗；舊專案裡已經預先裁好的格子保留原本的裁切（不會自動還原）
+  - 踩到的坑：載入時任何「修復」都要小心別碰使用者合法的資料（`repairGroups` 把文字 `group` 清光就是例子）
+  - 下一步：Y7 圖層分頁（版型預設收合、按實際層數排序、層號、格子上下箭頭、對齊）
+
 - 2026-11-16 feedback-13 Y5 特效分頁（Sonnet）
   - 做了什麼：①**分層**：「作用在」改成分段式切換（［進場｜出場｜轉場｜整段］，字卡多一個「文字特效」），跟下面「效果」（有標題的 `.zone-soft`，裡面是分類［基本｜相機動作｜特效｜故障］和卡片）一眼看出是不同階層；②**版型用同一套**：拿掉「整個版型的動畫」那一塊；**任何素材都能在特效分頁設**——選版型外框＝整個版型，選格子素材／版型裡的文字貼圖＝各自的（以前「請到版型分頁」）；③**整段效果**（`item.motion`，所有影像、貼圖、文字、版型外框都能用）：捲動＝從畫面下面外面一路捲到上面外面（持續整個片段，依物件／版型大小算剛好進出畫面，`motionOffset(…, size)`）、滑入滑出；舊的版型 `motion` 資料原樣相容（drift 現在是整段捲過畫面，不再是 ±0.35 小幅度）；時間軸片段中間有代表字圓圈（捲／滑）；④**版型裡素材自己的進出場特效**：格子素材、版型裡的文字貼圖可以有自己的進場／出場（疊在整個版型的特效上；格子的特效以那一格的範圍為參考）；⑤**同一格前後兩段素材之間的轉場**：格子軌也有接縫圓圈、轉場時畫面只露在那一格裡（`canTransition`、`intersectClip`；轉場的顏色層在格子裡不畫）
   - 動了哪些檔：`engine/{scene,player,transitions,groupTransform}.ts`、`model/types.ts`（`motion` 移到 `ItemBase`）、`store/{actions,uiStore}.ts`（`setItemMotion` 取代 `setGroupMotion`、`fxFocus.role` 加 `whole`）、`app/editor/tabs/EffectTab.tsx`、`app/editor/Timeline.tsx`、`app/styles.css`；測試 `engine/groupTransform.test.ts`、`e2e/y5.spec.ts`（新，4 個）、改 `e2e/{g4,l0,helpers}`

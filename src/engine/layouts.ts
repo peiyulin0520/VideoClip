@@ -636,7 +636,7 @@ export function coverCrop(asset: Pick<Asset, 'width' | 'height'>, win: Rect): Cr
   return isNoCrop(crop) ? undefined : crop;
 }
 
-/** 一格的疊加物件：素材置中裁好、填滿那個洞；記下格子的位置（之後在裁切模式調整範圍時，畫面還是填滿這個洞） */
+/** 一格的疊加物件：整張素材置中、蓋滿那個洞（不裁切，畫面被格子範圍遮住）；記下格子的位置（之後在裁切模式調整範圍時，畫面還是填滿這個洞） */
 export function cellItem(
   asset: Asset,
   win: Rect,
@@ -647,10 +647,10 @@ export function cellItem(
   group: string,
 ): VideoItem {
   const item = createOverlayClip(asset, start);
-  const crop = coverCrop(asset, win);
   item.duration = Math.max(duration, 0.2);
-  if (crop) item.crop = crop;
-  item.transform = cellTransform(asset, crop, win, W, H);
+  // 不預先裁切（2026-11-16）：整張素材蓋滿這一格的大小放進去，畫面用格子範圍遮住（scene 的 groupClipFor）；
+  // 拖移、放大縮小時露出的是同一張素材在格子外的部分，不會露出底下的影像
+  item.transform = cellTransform(asset, undefined, win, W, H);
   item.cell = { x: win.x / W, y: win.y / H, w: win.w / W, h: win.h / H };
   item.group = group;
   return item;

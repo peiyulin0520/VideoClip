@@ -65,15 +65,14 @@ describe('groupClipArea：版型裡的文字／貼圖只露出外框線以內的
       2,
     );
   });
-  it('外框自己、沒動過的格子不遮；force 時格子也回傳範圍', () => {
+  it('外框自己不遮；格子裡的素材一律遮在自己那一格', () => {
     expect(groupClipArea(frame(0), frame(0), ctx, W, H, none)).toBeUndefined();
     const cell = {
       ...frame(0),
       id: 'c',
       cell: { x: 0.3, y: 0.3, w: 0.2, h: 0.2 },
     } as unknown as VideoItem;
-    expect(groupClipArea(cell, frame(0), ctx, W, H, none)).toBeUndefined();
-    const pts = groupClipArea(cell, frame(0), ctx, W, H, none, true)!;
+    const pts = groupClipArea(cell, frame(0), ctx, W, H, none)!;
     expect(Math.min(...pts.map((p) => p[0]))).toBeCloseTo(300, 3);
     expect(
       groupClipArea({ ...cell, cellEdit: true } as unknown as VideoItem, frame(0), ctx, W, H, none),

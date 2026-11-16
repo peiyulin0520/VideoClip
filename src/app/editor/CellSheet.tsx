@@ -43,7 +43,9 @@ export function CellSheet({
 }) {
   const project = useProjectStore((s) => s.project)!;
   const track = project.tracks.find((t) => t.id === trackId);
-  const item = track && cellMain(track);
+  const selectedId = useProjectStore((s) => s.selectedId);
+  // 現在選的是這一格的哪一段（沒選＝第一段）：下面「換素材」「用素材的哪一段」都是對這一段
+  const item = track && (cellItems(track).find((x) => x.id === selectedId) ?? cellMain(track));
   const frameItem = track?.group ? frameOfGroup(project.tracks, track.group)?.item : undefined;
   const textNow = project.tracks
     .flatMap((t) => t.items)
@@ -52,7 +54,6 @@ export function CellSheet({
   const [ranging, setRanging] = useState(false);
   const [adding, setAdding] = useState(false);
   const [edit, setEdit] = useState<{ id: string; color: string; text: string } | null>(null);
-  const selectedId = useProjectStore((s) => s.selectedId);
   const fileRef = useRef<HTMLInputElement>(null);
   if (!track || !frameItem) return null;
   if (!item) {
@@ -159,6 +160,7 @@ export function CellSheet({
                     className="cell-item-main"
                     aria-label={`第 ${n + 1} 段 ${itemTitle(it, a)}`}
                     onClick={() => {
+                      setDraft(null);
                       useProjectStore.getState().select(it.id);
                       useUI.getState().player?.seek(it.start + 0.02);
                       if (isColor) {
@@ -235,7 +237,14 @@ export function CellSheet({
             ＋ 加素材
           </button>
           <div className="panel-head">
-            <span>換第 1 段的素材</span>
+            <span>
+              換第{' '}
+              {Math.max(
+                all.findIndex((x) => x.id === item.id),
+                0,
+              ) + 1}{' '}
+              段的素材
+            </span>
           </div>
           <div className="cover-strip" data-testid="cell-assets">
             {choices.map((a) => (
@@ -342,7 +351,7 @@ export function CellSheet({
               className="btn primary grow"
               data-testid="cell-apply"
               onClick={() => {
-                if (applyCell(trackId, d)) {
+                if (applyCell(trackId, d, item.id)) {
                   setDraft(null);
                   useUI.getState().player?.refresh();
                   toast('已套用');

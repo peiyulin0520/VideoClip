@@ -148,17 +148,15 @@ test('版型：同時超過 5 支影片會提醒；照片裁成格子的比例',
   await expect(page.locator('.toast').filter({ hasText: '同時播放超過 5 支影片' })).toBeVisible();
 });
 
-test('版型：拍立得的方形格子——4:3 照片置中裁成正方形，方框剛好等於格子', async ({ page }) => {
+test('版型：拍立得的方形格子——4:3 照片整張蓋滿正方形格子，整張蓋滿格子、不預先裁切', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '拍立得', '白', ['photo.png']); // 400×300
   const cell = (await tracks(page)).find((t) => t.items[0]?.cell)!.items[0]!;
   const p = await dims(page);
-  expect(cell.crop!.t).toBe(0);
-  expect(cell.crop!.l).toBeCloseTo(0.125, 3); // 400×300 取中間 300×300：左右各裁 12.5%
-  expect(cell.crop!.r).toBeCloseTo(0.125, 3);
-  // 方框大小＝格子大小：照片（400×300 裁成 300×300）以「完整」顯示在畫面裡的大小 × 縮放
-  const base = Math.min(p.width / 300, p.height / 300) * 300;
-  expect(base * cell.transform.scale).toBeCloseTo(cell.cell!.w * p.width, 1);
+  expect(cell.crop).toBeUndefined(); // 不預先裁切：整張照片蓋滿正方形的格子，露出的範圍由格子遮住
+  // 照片（400×300）以「完整」顯示在畫面裡的大小 × 縮放：高度剛好＝格子高度（寬度超出的部分被格子遮住）
+  const fit = Math.min(p.width / 400, p.height / 300);
+  expect(fit * 300 * cell.transform.scale).toBeCloseTo(cell.cell!.h * p.height, 1);
   expect(cell.transform.x).toBeCloseTo(cell.cell!.x + cell.cell!.w / 2, 5);
   expect(cell.transform.y).toBeCloseTo(cell.cell!.y + cell.cell!.h / 2, 5);
   // 照片中央（白色圓）出現在格子中央
@@ -199,7 +197,7 @@ test('版型的格子可以用裁切調整露出的範圍：預設鎖定格子�
   const ch = 568 * (1 - c.t - c.b);
   const base = cw * Math.min(d.width / cw, d.height / ch);
   expect(base * after.transform.scale).toBeCloseTo(after.cell!.w * d.width, 1);
-  expect(c.t + c.b).toBeGreaterThan(it.crop!.t + it.crop!.b + 0.05); // 真的縮小了露出的範圍
+  expect(c.t + c.b).toBeGreaterThan((it.crop?.t ?? 0) + (it.crop?.b ?? 0) + 0.05); // 真的縮小了露出的範圍
   const [cx, cy] = center(after.cell!);
   await expect.poll(async () => !!(await samplePreview(page, cx, cy))).toBe(true);
 });

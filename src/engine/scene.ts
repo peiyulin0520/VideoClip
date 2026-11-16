@@ -419,7 +419,8 @@ export function groupClipArea(
       ] as const
     ).map(([dx, dy]) => [cx + dx * cos - dy * sin + off.x * W, cy + dx * sin + dy * cos + off.y * H]);
   if (item.type !== 'text' && item.cell) {
-    if (!item.cellEdit && !force) return undefined;
+    // 格子裡的素材不預先裁切，畫面一律只露出自己那一格（force 只是舊的參數：以前沒動過的格子不用遮）
+    void force;
     const r = cellRect(item.cell, W, H);
     const c = composeWith(
       { x: (r.x + r.w / 2) / W, y: (r.y + r.h / 2) / H, scale: 1, rotation: 0, opacity: 1 },

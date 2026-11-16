@@ -283,7 +283,16 @@ export function Preview({
   const hitsAt = (pt: Pt) => {
     const st = useProjectStore.getState();
     const t = useUI.getState().player?.time ?? 0;
-    return hitTestAll(visibleLayers(timeResolved(st.project!, t), t), geo, pt.x, pt.y, 40 / k);
+    const rp = timeResolved(st.project!, t);
+    const hits = hitTestAll(visibleLayers(rp, t), geo, pt.x, pt.y, 40 / k);
+    // 格子裡的影像沒有預先裁切，方框可能超出那一格：只有點在自己那一格的範圍內才算點到它
+    return hits.filter((l) => {
+      const it = l.item;
+      if (it.type === 'text' || it.type === 'audio' || !it.cell || !it.group) return true;
+      const fr = frameOfGroup(rp.tracks, it.group);
+      const poly = fr ? groupClipArea(it, fr.item, geo, width, height, { x: 0, y: 0 }) : undefined;
+      return !poly || pointInPoly(poly, pt.x, pt.y);
+    });
   };
 
   const onPointerDown = (e: RPointerEvent) => {
@@ -678,4 +687,15 @@ function cellBadges(
       });
     }
   return out;
+}
+
+/** 點是不是在多邊形裡（射線法） */
+function pointInPoly(poly: [number, number][], x: number, y: number): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]!;
+    const [xj, yj] = poly[j]!;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }
