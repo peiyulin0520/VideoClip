@@ -13,7 +13,7 @@ import { CellSheet } from './CellSheet';
 import { importFilesIntoCell } from './cellImport';
 import { CellAddSheet } from './CellAddSheet';
 import { createAudioClip, createTextItem } from '../../model/defaults';
-import { ensureUrls } from '../../engine/assetUrls';
+import { ensureUrls, isAssetMissing } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { Eye, EyeOff, Film, Lock, Music, Plus, Sparkles, Type, Volume2, VolumeX } from 'lucide-react';
 import {
@@ -1125,6 +1125,11 @@ export function Timeline({
                       ) : isVideoItem(it) ? (
                         <Tiles item={it} asset={asset} pps={pps} h={h} />
                       ) : null}
+                      {it.type !== 'text' && isAssetMissing(project.id, it.assetId) && (
+                        <span className="clip-lost" data-testid="clip-lost">
+                          素材遺失
+                        </span>
+                      )}
                       {isFrameItem(it) && (
                         <button
                           className="grp-toggle"

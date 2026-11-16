@@ -2,7 +2,7 @@ import { ChevronLeft, Pause, Play, Redo2, Share, Undo2, ZoomIn, ZoomOut } from '
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { countEditorRender } from '../../engine/debug';
-import { ensureUrls, releaseProjectUrls } from '../../engine/assetUrls';
+import { ensureUrls, findMissing, releaseProjectUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { enqueueProxies } from '../../engine/proxyQueue';
 import { addOverlayClips, importToBase } from '../../store/actions';
@@ -48,15 +48,28 @@ function EditorLoader({ projectId }: { projectId: string }) {
       const p = migrated.project;
       if (migrated.changed) await saveProject(p); // 舊格式（v1）：轉成新格式存回去，下次打開就不用再轉
       if (cancelled) return;
-      const missing = await ensureUrls(p.id, p.assets);
+      const gone = await findMissing(p.id, p.assets);
       if (cancelled) return;
+      // 找不到檔案的素材：專案裡沒有任何物件在用的，直接從素材清單拿掉、不用通知；有在用的才提醒（片段上會標「素材遺失」）
+      const used = new Set(
+        p.tracks.flatMap((t) => t.items.flatMap((it) => (it.type !== 'text' ? [it.assetId] : []))),
+      );
+      const unused = new Set(gone.filter((a) => !used.has(a.id)).map((a) => a.id));
+      if (unused.size) {
+        p.assets = p.assets.filter((a) => !unused.has(a.id));
+        await saveProject(p);
+      }
+      const missing = gone.filter((a) => used.has(a.id)).map((a) => a.name);
       useProjectStore.getState().load(p);
       autosave = startAutosave();
       enqueueProxies(p.id, p.assets); // 舊專案的大影片：背景補做預覽用輕量影片
       setStatus('ready');
       if (migrated.reordered) toast('為了讓字卡永遠在影像上面，這個專案的圖層順序已經調整過', 9000);
       if (missing.length)
-        toast(`找不到素材檔：${missing.join('、')}（可能是上次存不下、沒有留在手機裡，請重新匯入）`, 8000);
+        toast(
+          `有 ${missing.length} 個素材找不到檔案：${missing.join('、')}（用到它的片段標了「素材遺失」，請重新匯入）`,
+          8000,
+        );
     })();
     return () => {
       cancelled = true;

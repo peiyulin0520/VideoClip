@@ -25,8 +25,18 @@ export async function ensureProxyUrl(projectId: string, a: Asset): Promise<void>
   await loadProxy(projectId, a);
 }
 
+/** 找不到檔案的素材（專案 id＋素材 id）：時間軸上用到它的片段會標「素材遺失」 */
+const lost = new Set<string>();
+export const isAssetMissing = (projectId: string, assetId: string): boolean =>
+  lost.has(key(projectId, assetId));
+
+/** 檢查素材檔都在不在：回傳找不到的素材（有檔案的會順便載入網址） */
 export async function ensureUrls(projectId: string, assets: Asset[]): Promise<string[]> {
-  const missing: string[] = [];
+  return (await findMissing(projectId, assets)).map((a) => a.name);
+}
+
+export async function findMissing(projectId: string, assets: Asset[]): Promise<Asset[]> {
+  const missing: Asset[] = [];
   await Promise.all(
     assets.map(async (a) => {
       await loadProxy(projectId, a);
@@ -34,8 +44,10 @@ export async function ensureUrls(projectId: string, assets: Asset[]): Promise<st
       try {
         const f = await getMedia(projectId, a.id, a.mime);
         urls.set(key(projectId, a.id), URL.createObjectURL(f));
+        lost.delete(key(projectId, a.id));
       } catch {
-        missing.push(a.name);
+        missing.push(a);
+        lost.add(key(projectId, a.id));
       }
     }),
   );

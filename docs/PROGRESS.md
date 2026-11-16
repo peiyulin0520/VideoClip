@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #16（feedback-12 全部）已開、等使用者合併；使用者在 iPhone 測試後回報 feedback-13（`docs/plans/2026-11-16-feedback-13.md`，22 點已收齊並排成 Y1–Y11（含使用者補充）；Y1–Y9 已做完，下一個 Y10 播放效能（先量再改）；另有「文字特效加 64 式」新需求要先請 Opus 規劃，見日誌最上面）
+- **下一步**：PR #16（feedback-12 全部）已開、等使用者合併；使用者在 iPhone 測試後回報 feedback-13（`docs/plans/2026-11-16-feedback-13.md`，22 點已收齊並排成 Y1–Y11（含使用者補充）；Y1–Y9、Y11 已做完，剩 Y10 播放效能（要先在 iPhone 量數字再改）；另有「文字特效加 64 式」新需求要先請 Opus 規劃，見日誌最上面）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -88,6 +88,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-16 feedback-13 Y11 素材遺失通知（Sonnet；Y10 先跳過，要在 iPhone 量數字）
+  - 做了什麼：打開專案時找不到檔案的素材（例如清掉 Safari 網站資料）：①**沒有任何物件在用的**，安靜地從專案素材清單拿掉並存檔，不跳通知；②**有在用的**才提醒（「有 N 個素材找不到檔案：…（用到它的片段標了「素材遺失」，請重新匯入）」），時間軸上用到它的片段蓋一層紅色「素材遺失」（`engine/assetUrls.ts` 新 `findMissing`／`isAssetMissing`，`app/pages/Editor.tsx`，`Timeline.tsx` 的 `.clip-lost`）。
+  - 動了哪些檔：`engine/assetUrls.ts`、`app/pages/Editor.tsx`、`app/editor/Timeline.tsx`、`app/styles.css`；測試 `e2e/y11.spec.ts`（新，1 個：刪掉 OPFS 的素材檔再重新整理）
+  - 驗證：✅ 單元、e2e、`npm run check`  🟡 沒在真 iPhone 驗
+  - 下一步：Y10（需要你在 iPhone 跑量測面板回報數字）；文字特效 64 式請切 Opus 規劃
+
 - 2026-11-16 feedback-13 Y9 預覽拖格子大小（Sonnet）
   - 做了什麼：版型分頁〔大小與格數〕多了［拖格子大小］／［重置格子大小］。按了預覽上每一格出現虛線框（左上有格號），格子之間的線上有把手（`LayoutCellResize.tsx`）：拖一條線＝線兩邊的格子一起變（一邊變大、另一邊變小，每格最小 8%）；同一條線上的格子（例如 2×2 的中間直線）一起動；版型旋轉、縮放也算（手指移動量換算回版型自己的方向）。按「套用」才重畫外框圖、格子重新排（`frameStyle.cells` 存每格佔畫面的比例，照格號順序；`buildIn`／`paintFrame`／`renderFramePng`／`applyLayoutShape` 都吃 `cells`，外框底板不動）；✕ 放棄；改格數、版型大小、框線粗細會清掉自訂的格子範圍，改外框顏色不會。格子素材照新範圍重新蓋滿（Y6 不預先裁切）。
   - 動了哪些檔：`model/types.ts`、`engine/layouts.ts`、`store/{actions,uiStore}.ts`、`app/editor/{LayoutCellResize,Preview,LayoutDiagram,frameRestyle}`、`app/editor/tabs/LayoutTab.tsx`、`app/styles.css`；測試 `e2e/y8.spec.ts`（加 1 個）、單元 `LayoutCellResize.test.ts`、`layouts.test.ts`
