@@ -90,6 +90,7 @@
 ## 日誌（最新在最上面）
 - 2026-11-16 feedback-13 Y6 格子素材（Sonnet）
   - 做了什麼：①**找到「版型文字跑出版型」的真正原因**：`migrate.ts` 的 `repairGroups` 每次載入專案都把所有文字的 `group` 清掉（為了清舊版型模板的字），結果版型成員文字一重載就變成普通文字、不再跟著版型；改成只清「外框已不存在」或舊模板字（有 `fontCycle`）的，並新增 `engine/memberRepair.ts`（`repairMemberItems`：成員軌上的文字補回 `group`、跑到普通軌的成員搬回自己版型的成員軌），載入與每次 `apply` 都跑；`moveItemTo` 成員只能搬進同一版型的成員軌。（「這是夾心」＝使用者在文字分頁加的字不是版型成員，不跟版型走，這是設計）②**格子影像不預先裁切**：`cellItem` 不再算 `crop`，整張素材蓋滿格子（cover），畫面一律只露出自己那一格（`groupClipArea` 對格子永遠回傳範圍，`guardCell` 不變）；自己用裁切工具調過的格子照舊；預覽點選時只有點在自己那一格範圍內才算點到（`Preview.hitsAt` 多邊形判斷）；③**「這一格」視窗換素材**：選哪一段就換哪一段（標題「換第 N 段的素材」，`applyCell(trackId, draft, itemId)`），點段落會清掉未套用的草稿；④**各格各影像單獨調色**：選到版型外框＝整組一起調，選到格子裡的影像／文字／貼圖＝只調自己（`setAdjust`、`colorTargetIds` 只有外框展開整組）。
+  - 順手修（使用者從 iPhone 回報首頁）：專案卡片右上角「⋯」改成主題背景色＋邊框＋陰影（以前灰底深點看不出來）；「載入中」的字改放在中間的實心卡片（`.busy-card`），底下「還沒有專案」的說明字不會透出來疊在字上（`ui/Toasts.tsx`、`styles.css`）。
   - 動了哪些檔：`model/migrate.ts`、`engine/{memberRepair,layouts,scene}.ts`、`store/{projectStore,actions}.ts`、`app/editor/{Preview,CellSheet}.tsx`；測試 `e2e/y6.spec.ts`（新，3 個）、改 `e2e/layout.spec.ts`（格子不預先裁切）、單元 `memberRepair.test.ts`、`migrate.test.ts`、`layouts.test.ts`、`groupClip.test.ts`
   - 驗證：✅ 單元 1052、e2e、`npm run check`  🟡 沒在真 iPhone 驗；舊專案裡已經預先裁好的格子保留原本的裁切（不會自動還原）
   - 踩到的坑：載入時任何「修復」都要小心別碰使用者合法的資料（`repairGroups` 把文字 `group` 清光就是例子）

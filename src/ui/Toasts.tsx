@@ -14,8 +14,10 @@ export function Toasts() {
       </div>
       {busy && (
         <div className="busy" role="status">
-          <div className="spinner" />
-          <div>{busy}</div>
+          <div className="busy-card">
+            <div className="spinner" />
+            <div>{busy}</div>
+          </div>
         </div>
       )}
     </>

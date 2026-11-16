@@ -91,3 +91,21 @@ test('Y6 各格各影像單獨調色：選到第 2 格調成黑白，第 1 格�
   expect(isGreen(await samplePreview(page, ...mid(c2!.cell!)))).toBe(false);
   await page.screenshot({ path: `${SHOT}/y6-cell-grade-390.png` });
 });
+
+test('首頁：專案卡片右上角的「⋯」看得清楚', async ({ page }) => {
+  await createProjectWith(page, ['solid-blue.webm']);
+  await page.goto('./');
+  const menu = page.getByTestId('project-card').first().locator('.card-menu');
+  await expect(menu).toBeVisible();
+  // 「⋯」按鈕底色跟字色（主題的背景色／文字色）要有明顯差距
+  const [bg, fg] = await menu.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return [cs.backgroundColor, cs.color];
+  });
+  const lum = (c: string) => {
+    const n = (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+    return (0.2126 * n[0]! + 0.7152 * n[1]! + 0.0722 * n[2]!) / 255;
+  };
+  expect(Math.abs(lum(bg) - lum(fg))).toBeGreaterThan(0.5);
+  await page.screenshot({ path: `${SHOT}/y6-home-menu-390.png` });
+});
