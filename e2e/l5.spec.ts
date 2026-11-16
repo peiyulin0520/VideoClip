@@ -97,7 +97,7 @@ test('L5 版型層與素材層：選整個版型縮小＝格子一起縮；選�
   expect(text2.transform.scale).toBeLessThan(text1.transform.scale * 0.8);
 });
 
-test('L5 選到版型裡的素材時，預覽上有一個虛線框（格子素材標「第 N 格」）；選整個版型就沒有', async ({
+test('L5 選到版型裡的素材時，預覽上有一個虛線框（格子素材看編號、版型裡的文字貼圖標「只露出這個範圍」）；選整個版型就沒有', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -106,7 +106,8 @@ test('L5 選到版型裡的素材時，預覽上有一個虛線框（格子素�
   await page.getByRole('button', { name: '版型 上下雙格', exact: true }).tap();
   await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]); // 選到第 1 格
   await expect(page.getByTestId('clip-area')).toBeVisible();
-  await expect(page.locator('.clip-tag')).toHaveText('第 1 格');
+  await expect(page.getByTestId('preview-cell-no')).toHaveText(['1', '2']); // 格子素材：預覽上每一格有編號，不再另外標字
+  await expect(page.locator('.clip-tag')).toHaveCount(0);
   expect(await page.getByTestId('clip-area').locator('polygon').getAttribute('points')).toMatch(
     /^[\d.,\s-]+$/,
   );

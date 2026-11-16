@@ -148,7 +148,8 @@ test('X6 移至格子：剪輯分頁［移至格子］把素材搬到別格，�
   const it = c1!.items[0]!;
   await showTimeline(page);
   await page.locator(`[data-testid="clip"][data-item-id="${it.id}"]`).tap();
-  await expect(page.locator('.clip-tag')).toHaveText('第 1 格');
+  await expect(page.getByTestId('clip-area')).toBeVisible();
+  await expect(page.getByTestId('preview-cell-no')).toHaveText(['1', '2']);
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '移至格子' }).tap();
   await page.getByRole('button', { name: '移至第 2 格' }).tap();

@@ -157,7 +157,8 @@ export class Compositor {
     return this.app.canvas as HTMLCanvasElement;
   }
 
-  render(layers: SceneLayer[]): void {
+  /** 回傳：這一輪的圖層是不是全部準備好了（影片都 seek 完、圖都載好） */
+  render(layers: SceneLayer[]): boolean {
     const stage = this.world;
     const seen = new Set<string>();
     let allReady = true;
@@ -181,6 +182,7 @@ export class Compositor {
       }
     }
     this.app.renderer.render({ container: stage });
+    return allReady;
   }
 
   private ensure(layer: SceneLayer): Obj {

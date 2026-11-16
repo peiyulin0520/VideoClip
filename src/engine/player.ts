@@ -135,6 +135,11 @@ export class Player {
   get isPlaying() {
     return this.playing;
   }
+  /** 最近一次畫的畫面是不是全部準備好了（換預覽畫質重建引擎時，等它好了才拿掉暫存的舊畫面） */
+  private settledNow = false;
+  get settled() {
+    return this.settledNow;
+  }
 
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
@@ -473,6 +478,7 @@ export class Player {
     const { compositor: comp } = this;
     if (!p) {
       comp.render([]);
+      this.settledNow = true;
       return;
     }
     const used = new Set<HTMLVideoElement>();
@@ -568,7 +574,7 @@ export class Player {
     this.pool.pauseAllExcept(used);
     this.syncMusic(p, t);
     const t1 = performance.now();
-    comp.render(scene);
+    this.settledNow = comp.render(scene);
     const t2 = performance.now();
     this.seg = { build: t1 - t0, comp: t2 - t1, upload: comp.takeUploadMs() };
   }
