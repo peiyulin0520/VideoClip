@@ -90,6 +90,9 @@ export class Player {
   private trans = { frames: 0, drops: 0, hardSeeks: 0, lastAt: 0 };
   private transHeavyTold = false;
   private videoCount = 0;
+  /** 效能框用：這一格正在解碼的每支影片（解碼後的大小、用預覽檔還是原檔）、播放中每秒格數的最低值 */
+  private sources: string[] = [];
+  private fpsMin = Infinity;
   private poolFullTold = false;
   offMask: (() => void) | null = null;
   private thumbImgs = new Map<string, HTMLImageElement>();
@@ -246,6 +249,8 @@ export class Player {
     if (this.statSince === 0) this.statSince = now;
     if (now - this.statSince >= 1000) {
       this.statFps = (this.statFrames * 1000) / (now - this.statSince);
+      if (this.playing) this.fpsMin = Math.min(this.fpsMin, this.statFps);
+      else this.fpsMin = Infinity;
       // 連續 3 秒：播放中、同時 2 支以上影片、每秒不到 20 格 → 建議流暢預覽
       if (this.playing && this.videoCount >= 2 && this.statFps < 20) this.slowSecs++;
       else this.slowSecs = 0;
@@ -280,6 +285,15 @@ export class Player {
     video: string;
     /** 最近一次轉場：畫了幾格、兩格間隔超過 50ms 的次數、為了追時間硬 seek 的次數 */
     transition: { frames: number; drops: number; hardSeeks: number };
+    /** 目前每支在解碼的影片：解碼大小＋預覽檔／原檔 */
+    sources: string[];
+    /** 同時在用的影片數、影片池裡總共開著幾個解碼器 */
+    decoders: number;
+    pool: number;
+    /** 預覽合成畫布的大小 */
+    canvas: string;
+    /** 這次播放中每秒格數的最低值（0＝還沒播） */
+    fpsMin: number;
   } {
     let dropped = 0;
     for (const v of this.pool.els) {
@@ -295,6 +309,11 @@ export class Player {
       dropped,
       video: this.videoInfo,
       transition: { frames: this.trans.frames, drops: this.trans.drops, hardSeeks: this.trans.hardSeeks },
+      sources: this.sources,
+      decoders: this.videoCount,
+      pool: this.pool.els.length,
+      canvas: `${this.compositor.width}×${this.compositor.height}`,
+      fpsMin: Number.isFinite(this.fpsMin) ? this.fpsMin : 0,
     };
   }
 
@@ -482,6 +501,7 @@ export class Player {
       return;
     }
     const used = new Set<HTMLVideoElement>();
+    const srcs: string[] = [];
     this.trackTransitions(p, t);
 
     const t0 = performance.now();
@@ -521,6 +541,9 @@ export class Player {
         const el = this.pool.acquire(item.id, asset.id, url, used);
         if (!el) return this.thumbFallback(item, asset, t); // 同時疊的影片超過上限：多的先畫縮圖
         used.add(el);
+        srcs.push(
+          `${el.videoWidth}×${el.videoHeight} ${asset.proxy?.status === 'ready' ? '預覽檔' : '原檔'}`,
+        );
         this.syncVideo(el, item, asset, track, t);
         this.maybeCaptureThumb(el, asset);
         if (track.kind === 'media' && el.videoWidth)
@@ -542,6 +565,7 @@ export class Player {
     );
 
     this.videoCount = used.size;
+    this.sources = srcs;
 
     // 預載：下一個主軌片段、1 秒內要開始的疊加影片
     for (const { item, asset, track } of this.upcoming(p, t)) {
