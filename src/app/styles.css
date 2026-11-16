@@ -4211,3 +4211,39 @@ button:not(:disabled):active,
 .cell-item-edit {
   flex-basis: 100%;
 }
+
+/* Y1：版型分頁的區塊標題、大小那一列 */
+.zone-title {
+  margin-bottom: 4px;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+.size-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.size-row .btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+.size-now {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: var(--fs-note);
+  white-space: nowrap;
+}
+/* 色票在窄區塊裡（版型分頁的 zone-soft）也不要超出：每顆跟著欄寬縮小 */
+.color-row {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.color-row .swatch,
+.panel.text-panel .color-row .swatch {
+  width: 100%;
+  max-width: 40px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+}

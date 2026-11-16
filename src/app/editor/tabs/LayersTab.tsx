@@ -224,43 +224,51 @@ export function LayersTab() {
               </button>
             ))}
           </div>
-          <Slider
-            label="圓角"
-            value={Math.round((it.cornerRadius ?? 0) * 100)}
-            min={0}
-            max={50}
-            step={1}
-            format={(v) => `${v}%`}
-            onChange={(v) =>
-              editItem(it.id, (x) => void (x.cornerRadius = v / 100), { coalesce: `cr:${it.id}` })
-            }
-          />
-          <Slider
-            label="外框粗細"
-            value={it.outline?.width ?? 0}
-            min={0}
-            max={40}
-            step={1}
-            format={(v) => `${v}`}
-            onChange={(v) =>
-              editItem(it.id, (x) => void (x.outline = { color: x.outline?.color ?? '#ffffff', width: v }), {
-                coalesce: `ow:${it.id}`,
-              })
-            }
-          />
-          <div className="chips">
-            {COLORS.map((c) => (
-              <button
-                key={c}
-                className={`swatch${it.outline?.color === c ? ' active' : ''}`}
-                style={{ background: c }}
-                aria-label={`外框顏色 ${c}`}
-                onClick={() =>
-                  editItem(it.id, (x) => void (x.outline = { width: x.outline?.width || 8, color: c }))
+          {!isFrameItem(it) && (
+            <>
+              <Slider
+                label="圓角"
+                value={Math.round((it.cornerRadius ?? 0) * 100)}
+                min={0}
+                max={50}
+                step={1}
+                format={(v) => `${v}%`}
+                onChange={(v) =>
+                  editItem(it.id, (x) => void (x.cornerRadius = v / 100), { coalesce: `cr:${it.id}` })
                 }
               />
-            ))}
-          </div>
+              <Slider
+                label="外框粗細"
+                value={it.outline?.width ?? 0}
+                min={0}
+                max={40}
+                step={1}
+                format={(v) => `${v}`}
+                onChange={(v) =>
+                  editItem(
+                    it.id,
+                    (x) => void (x.outline = { color: x.outline?.color ?? '#ffffff', width: v }),
+                    {
+                      coalesce: `ow:${it.id}`,
+                    },
+                  )
+                }
+              />
+              <div className="chips">
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    className={`swatch${it.outline?.color === c ? ' active' : ''}`}
+                    style={{ background: c }}
+                    aria-label={`外框顏色 ${c}`}
+                    onClick={() =>
+                      editItem(it.id, (x) => void (x.outline = { width: x.outline?.width || 8, color: c }))
+                    }
+                  />
+                ))}
+              </div>
+            </>
+          )}
           <button className="btn" onClick={() => resetTransform(it.id)}>
             位置、大小、旋轉歸位
           </button>

@@ -11,6 +11,7 @@ import {
   coverCrop,
   defOf,
   GRID_MAX,
+  hasFrameLine,
   LINE_MAX,
   gridDef,
   LAYOUTS,
@@ -203,13 +204,21 @@ describe('格子之間的框線粗細', () => {
     expect(gapOf(applyLineScale(b0, 99))).toBeCloseTo(g * LINE_MAX, 3); // 上限 3 倍
     for (const w of applyLineScale(b0, 3).windows) expect(w.w).toBeGreaterThan(0);
   });
-  it('buildIn 帶 line；每個內建多格版型都有框線可調，拍立得（一格）沒有', () => {
-    for (const d of LAYOUTS) {
-      const gap = cellGap(d.build(1080, 1920).windows);
-      if (d.cells === 1) expect(gap).toBeUndefined();
-      else expect(gap).toBeGreaterThan(0);
-    }
-    const thick = buildIn(gridDef(1, 2), 1000, 1000, undefined, 2);
-    expect(gapOf(thick)).toBeCloseTo(gapOf(b0) * 2, 3);
+  it('applyLineScale：格子離外框邊的距離也一起變（拍立得的白邊）；每個內建版型都有框線可調', () => {
+    for (const d of LAYOUTS) expect(hasFrameLine(d.build(1080, 1920))).toBe(true);
+    // 兩格：外圍邊距也變 2 倍
+    const m0 = b0.windows[0]!.x - b0.panels[0]!.x;
+    const t2 = applyLineScale(b0, 2);
+    expect(t2.windows[0]!.x - b0.panels[0]!.x).toBeCloseTo(m0 * 2, 3);
+    expect(applyLineScale(b0, 0).windows[0]!.x).toBeCloseTo(b0.panels[0]!.x, 3);
+    // 一格（拍立得）：四邊的白邊都變
+    const pol = LAYOUTS.find((d) => d.cells === 1)!.build(1080, 1920);
+    const thick = applyLineScale(pol, 2);
+    expect(thick.windows[0]!.w).toBeLessThan(pol.windows[0]!.w);
+    // 完全沒有框線（格子貼滿、沒有外框）的版型不動
+    const flat = { windows: [{ x: 0, y: 0, w: 100, h: 100 }], panels: [], holes: [], radius: 0 };
+    expect(applyLineScale(flat, 2)).toBe(flat);
+    const thick2 = buildIn(gridDef(1, 2), 1000, 1000, undefined, 2);
+    expect(gapOf(thick2)).toBeCloseTo(gapOf(b0) * 2, 3);
   });
 });

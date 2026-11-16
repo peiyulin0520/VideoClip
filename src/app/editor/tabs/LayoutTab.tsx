@@ -1,11 +1,11 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { GRID_MAX, LINE_MAX, buildIn, cellGap, defOf } from '../../../engine/layouts';
+import { GRID_MAX, LINE_MAX, buildIn, defOf, hasFrameLine } from '../../../engine/layouts';
 import { Slider } from '../../../ui/Slider';
 import type { Project, VideoItem } from '../../../model/types';
 import { useUI } from '../../../store/uiStore';
 import { ConfirmSheet } from '../../../ui/Sheet';
-import { arrangeGroup, removeGroup, setGapMode } from '../../../store/actions';
+import { arrangeGroup, editItem, removeGroup, setGapMode } from '../../../store/actions';
 import { FrameStyleControls } from '../FrameStyleControls';
 import { reshapeLayout, restyleFrame } from '../frameRestyle';
 import { useProjectStore } from '../../../store/projectStore';
@@ -46,9 +46,7 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
       <div className="panel-head">
         <span>整個版型 · {frame.label}</span>
       </div>
-      <p className="hint">
-        在預覽上拖移、縮放整個版型（格子會一起動）。點下面示意圖的格子，可以改那一格的名稱、素材、片段、空白畫面。進場、出場、動畫、轉場到「特效」分頁；長度在播放軸拖尾端。
-      </p>
+      <p className="hint">點示意圖的格子可以改那一格。進出場、轉場在「特效」分頁；長度在播放軸。</p>
       <LayoutDiagram
         project={project}
         group={group}
@@ -62,12 +60,37 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
       <PlayControls frame={frame} />
       {cell && <CellSheet key={cell.id} trackId={cell.id} index={cell.index} onClose={() => setCell(null)} />}
       {frame.frameStyle && (
-        <FrameStyleEditor
-          key={frame.frameStyle.opacity}
-          group={group}
-          color={frame.frameStyle.color}
-          opacity={frame.frameStyle.opacity}
-        />
+        <div className="zone-soft" data-testid="layout-frame">
+          <div className="zone-title">外框</div>
+          <FrameStyleEditor
+            key={frame.frameStyle.opacity}
+            group={group}
+            color={frame.frameStyle.color}
+            opacity={frame.frameStyle.opacity}
+          />
+          {frame.outline && (
+            <button
+              className="btn"
+              data-testid="frame-outline-off"
+              onClick={() =>
+                editItem(frame.id, (x) => {
+                  delete x.outline;
+                })
+              }
+            >
+              拿掉外圍描邊
+            </button>
+          )}
+          {hasFrameLine(
+            buildIn(defOf(frame.frameStyle), project.width, project.height, frame.frameStyle.box),
+          ) && (
+            <LineSlider
+              key={`${frame.frameStyle.line ?? 1}`}
+              group={group}
+              line={frame.frameStyle.line ?? 1}
+            />
+          )}
+        </div>
       )}
       {frame.frameStyle && <ShapeControls project={project} group={group} frame={frame} />}
     </div>
@@ -81,6 +104,7 @@ function PlayControls({ frame }: { frame: VideoItem }) {
   const gap = frame.gapMode ?? 'fill';
   return (
     <div className="zone-soft" data-testid="layout-play">
+      <div className="zone-title">播放</div>
       <div className="slider-label">播放方式</div>
       <div className="chips" role="radiogroup" aria-label="播放方式">
         {(
@@ -133,7 +157,7 @@ function LineSlider({ group, line }: { group: string; line: number }) {
   useEffect(() => () => window.clearTimeout(timer.current), []);
   return (
     <Slider
-      label="格子之間的框線粗細"
+      label="格子框線粗細"
       value={v}
       min={0}
       max={LINE_MAX * 100}
@@ -162,23 +186,33 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
     else void reshapeLayout(group, { rows: r, cols: c });
   };
   const box = style.box ?? { w: 1, h: 1 };
-  // 格子之間的框線粗細：只有一格的版型（拍立得）沒有格子間框線
-  const hasGap =
-    cellGap(buildIn(defOf(style), project.width, project.height, style.box).windows) !== undefined;
+  const full = box.w >= 0.999 && box.h >= 0.999;
   return (
     <div className="zone-soft" data-testid="layout-shape">
-      <div className="slider-label">版型的大小與格數</div>
-      <button
-        className="btn"
-        data-testid="layout-resize"
-        onClick={() => {
-          player?.pause();
-          useUI.setState({ layoutEdit: { group, sx: 1, sy: 1 } });
-        }}
-      >
-        調整版型大小（在預覽上拖邊，現在 {Math.round(box.w * 100)}% × {Math.round(box.h * 100)}%）
-      </button>
-      {hasGap && <LineSlider key={`${style.line ?? 1}`} group={group} line={style.line ?? 1} />}
+      <div className="zone-title">大小與格數</div>
+      <div className="size-row">
+        <button
+          className="btn"
+          data-testid="layout-resize"
+          onClick={() => {
+            player?.pause();
+            useUI.setState({ layoutEdit: { group, sx: 1, sy: 1 } });
+          }}
+        >
+          拖邊調整大小
+        </button>
+        <span className="size-now" data-testid="layout-size-now">
+          {Math.round(box.w * 100)}% × {Math.round(box.h * 100)}%
+        </span>
+        <button
+          className="btn"
+          data-testid="layout-size-reset"
+          disabled={full}
+          onClick={() => void reshapeLayout(group, { box: { w: 1, h: 1 } })}
+        >
+          重置大小
+        </button>
+      </div>
       {style.layout === 'grid' && (
         <div className="grid-steppers" data-testid="shape-steppers">
           {(

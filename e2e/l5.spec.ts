@@ -198,9 +198,7 @@ test('L7 調整版型大小：預覽上拖右邊把手往左 → 套用 → 版�
   await expect.poll(async () => (await frameOf()).frameStyle?.box).toBeUndefined();
 });
 
-test('L7 格子之間的框線粗細：滑桿 0%＝格子貼在一起、300%＝框線變粗；拍立得（一格）沒有這個滑桿；一步復原', async ({
-  page,
-}) => {
+test('L7 格子框線粗細：滑桿 0%＝格子貼在一起、300%＝框線變粗；一步復原', async ({ page }) => {
   test.setTimeout(150_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '版型');
@@ -216,7 +214,7 @@ test('L7 格子之間的框線粗細：滑桿 0%＝格子貼在一起、300%＝�
   };
   const g1 = await gap();
   expect(g1).toBeGreaterThan(0);
-  const slider = page.getByLabel('格子之間的框線粗細');
+  const slider = page.getByLabel('格子框線粗細');
   await expect(slider).toHaveValue('100');
   await slider.fill('300');
   await expect.poll(gap, { timeout: 15_000 }).toBeGreaterThan(g1 * 2.5);
@@ -236,7 +234,7 @@ test('L7 格子之間的框線粗細：滑桿 0%＝格子貼在一起、300%＝�
   await expect.poll(gap, { timeout: 5000 }).toBeCloseTo(g1, 3);
 });
 
-test('L7 拍立得（只有一格）沒有框線粗細滑桿', async ({ page }) => {
+test('L7 拍立得（只有一格）也有框線粗細滑桿：白邊跟著變粗細', async ({ page }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '版型');
@@ -245,7 +243,12 @@ test('L7 拍立得（只有一格）沒有框線粗細滑桿', async ({ page }) 
   await selectFrame(page);
   await openTab(page, '版型');
   await expect(page.getByTestId('layout-shape')).toBeVisible();
-  await expect(page.getByLabel('格子之間的框線粗細')).toHaveCount(0);
+  const slider = page.getByLabel('格子框線粗細');
+  await expect(slider).toBeVisible();
+  const w = async () => (await tracks(page)).filter((t) => t.groupRole === 'cell')[0]!.items[0]!.cell!.w;
+  const w0 = await w();
+  await slider.fill('300');
+  await expect.poll(w, { timeout: 15_000 }).toBeLessThan(w0 * 0.97);
 });
 
 test('L8 版型裡的文字有上下圖層：兩個文字各一條成員軌，選單「往上一層」只在版型裡換；到頂有提示', async ({
