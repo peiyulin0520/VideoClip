@@ -225,3 +225,19 @@ describe('格子之間的框線粗細', () => {
     expect(gapOf(thick2)).toBeCloseTo(gapOf(b0) * 2, 3);
   });
 });
+
+describe('自訂每一格的範圍（拖格子大小）', () => {
+  it('buildIn 有 cells 且格數對＝格子照 cells（比例 × 畫面）、外框底板不動；格數不對就忽略', () => {
+    const d = gridDef(1, 2);
+    const base = buildIn(d, 1000, 2000);
+    const cells = [
+      { x: 0.1, y: 0.1, w: 0.8, h: 0.5 },
+      { x: 0.1, y: 0.65, w: 0.8, h: 0.2 },
+    ];
+    const b = buildIn(d, 1000, 2000, undefined, undefined, cells);
+    expect(b.windows[0]).toEqual({ x: 100, y: 200, w: 800, h: 1000 });
+    expect(b.windows[1]).toEqual({ x: 100, y: 1300, w: 800, h: 400 });
+    expect(b.panels).toEqual(base.panels);
+    expect(buildIn(d, 1000, 2000, undefined, undefined, [cells[0]!]).windows).toEqual(base.windows);
+  });
+});

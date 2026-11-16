@@ -522,9 +522,14 @@ export function buildIn(
   H: number,
   box?: { w: number; h: number },
   line?: number,
+  cells?: Rect[],
 ): ReturnType<LayoutDef['build']> {
   const b0 = buildBox(def, W, H, box);
-  return line === undefined ? b0 : applyLineScale(b0, line);
+  const b = line === undefined ? b0 : applyLineScale(b0, line);
+  // 使用者在預覽上拖過格子大小：格子範圍照記下來的（比例 × 畫面），外框的底板不動
+  if (cells && cells.length === b.windows.length)
+    return { ...b, windows: cells.map((c) => ({ x: c.x * W, y: c.y * H, w: c.w * W, h: c.h * H })) };
+  return b;
 }
 
 function buildBox(
@@ -566,8 +571,9 @@ export function paintFrame(
   opacity = 1,
   box?: { w: number; h: number },
   line?: number,
+  cells?: Rect[],
 ) {
-  const b = buildIn(def, W, H, box, line);
+  const b = buildIn(def, W, H, box, line, cells);
   const rr = (r: Rect, radius: number) => {
     ctx.roundRect(r.x, r.y, r.w, r.h, Math.min(radius, r.w / 2, r.h / 2));
   };
@@ -598,11 +604,12 @@ export async function renderFramePng(
   opacity = 1,
   box?: { w: number; h: number },
   line?: number,
+  cells?: Rect[],
 ): Promise<Blob> {
   const c = document.createElement('canvas');
   c.width = Math.round(W);
   c.height = Math.round(H);
-  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity, box, line);
+  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity, box, line, cells);
   return new Promise((ok, bad) =>
     c.toBlob((b) => (b ? ok(b) : bad(new Error('外框轉成圖片失敗'))), 'image/png'),
   );

@@ -3940,6 +3940,53 @@ button:not(:disabled):active,
 .lr-card {
   z-index: 10;
 }
+/* 拖格子大小：每格一個虛線框（編號在左上）、格子之間的線上有把手 */
+.lc-cell {
+  position: absolute;
+  z-index: 9;
+  pointer-events: none;
+  outline: 2px dashed var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.lc-cell i {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: var(--fs-note);
+  font-style: normal;
+  color: #fff;
+  text-shadow: 0 0 3px #000;
+}
+.lc-card {
+  top: 8px;
+  transform: translateX(-50%);
+}
+.lc-handle {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  pointer-events: auto;
+  touch-action: none;
+}
+.lc-handle i {
+  display: block;
+  background: var(--accent);
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.lc-handle.v i {
+  width: 10px;
+  height: 30px;
+}
+.lc-handle.h i {
+  width: 30px;
+  height: 10px;
+}
 
 /* ---- L6 按鈕分區：功能層級不同的按鈕用「分區＋細線」隔開 ---- */
 .btn-zone {

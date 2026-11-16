@@ -9,11 +9,19 @@ import {
   project,
   samplePreview,
   seekTo,
+  selectFrame,
   showTimeline,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-13';
-type It = { id: string; type: string; assetId?: string; start: number; duration: number };
+type It = {
+  id: string;
+  type: string;
+  assetId?: string;
+  start: number;
+  duration: number;
+  cell?: { x: number; y: number; w: number; h: number };
+};
 type Tr = {
   id: string;
   groupRole?: string;
@@ -102,4 +110,41 @@ test('Y8 改成第 N 格：這一列的素材搬到另一格（畫面照新格�
     [1, 0],
     [2, 2],
   ]);
+});
+
+test('Y9 預覽上拖格子大小：拖兩格之間的線，一格變大、另一格變小；套用後外框重畫、格子仍蓋滿；重置回原樣', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await twoCells(page);
+  await selectFrame(page);
+  await openTab(page, '版型');
+  await page.getByTestId('layout-cell-resize').scrollIntoViewIfNeeded();
+  const before = await cellTracks(page);
+  const h0 = before[0]!.cell!.h;
+  const h1 = before[1]!.cell!.h;
+  await page.getByTestId('layout-cell-resize').tap();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(page.getByTestId('lc-cell')).toHaveCount(2);
+  const hd = (await page.getByTestId('lc-handle-h').boundingBox())!;
+  const x = hd.x + hd.width / 2;
+  const y = hd.y + hd.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y + 60, { steps: 6 });
+  await page.mouse.up();
+  await page.screenshot({ path: `${SHOT}/y9-drag-390.png` });
+  await page.getByTestId('cell-resize-apply').tap();
+  await expect
+    .poll(async () => (await cellTracks(page))[0]!.cell!.h, { timeout: 20_000 })
+    .toBeGreaterThan(h0 + 0.02);
+  const after = await cellTracks(page);
+  expect(after[1]!.cell!.h).toBeLessThan(h1 - 0.02);
+  // 第 1 格的素材仍蓋滿那一格（沒有預先裁切）
+  expect(after[0]!.items[0]!.cell).toEqual(after[0]!.cell);
+  // 重置
+  await selectFrame(page);
+  await openTab(page, '版型');
+  await page.getByTestId('layout-cell-reset').tap();
+  await expect.poll(async () => (await cellTracks(page))[0]!.cell!.h, { timeout: 20_000 }).toBeCloseTo(h0, 3);
 });

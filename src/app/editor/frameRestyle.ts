@@ -25,6 +25,7 @@ export async function restyleFrame(group: string, patch: Partial<{ color: string
       style.opacity,
       style.box,
       style.line,
+      style.cells,
     );
     const file = new File([blob], `版型-${def.name}.png`, { type: 'image/png' });
     const res = await importFiles(p.id, [file]);
@@ -43,7 +44,13 @@ export async function restyleFrame(group: string, patch: Partial<{ color: string
  */
 export async function reshapeLayout(
   group: string,
-  patch: Partial<{ rows: number; cols: number; box: { w: number; h: number }; line: number }>,
+  patch: Partial<{
+    rows: number;
+    cols: number;
+    box: { w: number; h: number };
+    line: number;
+    cells: { x: number; y: number; w: number; h: number }[] | undefined;
+  }>,
 ) {
   const p = useProjectStore.getState().project;
   if (!p) return;
@@ -52,6 +59,9 @@ export async function reshapeLayout(
     .find((x) => x.type !== 'text' && x.type !== 'audio' && x.group === group && x.frameStyle);
   if (!frame || frame.type === 'text' || frame.type === 'audio' || !frame.frameStyle) return;
   const style = { ...frame.frameStyle, ...patch };
+  // 改格數、版型大小、框線粗細之後，原本拖出來的格子範圍就不適用了：清掉（這次有給 cells 的除外）
+  if (!('cells' in patch)) delete style.cells;
+  else if (!patch.cells) delete style.cells;
   const def = defOf(style);
   try {
     const blob = await renderFramePng(
@@ -62,6 +72,7 @@ export async function reshapeLayout(
       style.opacity,
       style.box,
       style.line,
+      style.cells,
     );
     const file = new File([blob], `版型-${def.name}.png`, { type: 'image/png' });
     const res = await importFiles(p.id, [file]);

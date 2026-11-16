@@ -44,6 +44,7 @@ export function LayoutDiagram({
         style.opacity,
         style.box,
         style.line,
+        style.cells,
       );
   }, [style, W, H]);
 

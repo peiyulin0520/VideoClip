@@ -28,6 +28,8 @@ type UI = {
   addToGroupOff: boolean;
   /** 調整版型大小：預覽上正在拖版型的邊（sx、sy＝相對於開始時的寬、高倍數）；沒有＝沒在調 */
   layoutEdit: { group: string; sx: number; sy: number } | null;
+  /** 預覽上拖格子大小：cells＝草稿（每格佔畫面寬、高的比例，照格號順序） */
+  cellEdit: { group: string; cells: { x: number; y: number; w: number; h: number }[] } | null;
 };
 
 export const useUI = create<UI>((set, get) => ({
@@ -49,6 +51,7 @@ export const useUI = create<UI>((set, get) => ({
   frameEdit: null,
   addToGroupOff: false,
   layoutEdit: null,
+  cellEdit: null,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

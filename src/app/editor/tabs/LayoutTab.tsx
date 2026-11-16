@@ -213,6 +213,44 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
           重置大小
         </button>
       </div>
+      <div className="size-row">
+        <button
+          className="btn"
+          data-testid="layout-cell-resize"
+          onClick={() => {
+            player?.pause();
+            const b = buildIn(
+              defOf(style),
+              project.width,
+              project.height,
+              style.box,
+              style.line,
+              style.cells,
+            );
+            useUI.setState({
+              cellEdit: {
+                group,
+                cells: b.windows.map((w) => ({
+                  x: w.x / project.width,
+                  y: w.y / project.height,
+                  w: w.w / project.width,
+                  h: w.h / project.height,
+                })),
+              },
+            });
+          }}
+        >
+          拖格子大小
+        </button>
+        <button
+          className="btn"
+          data-testid="layout-cell-reset"
+          disabled={!style.cells}
+          onClick={() => void reshapeLayout(group, { cells: undefined })}
+        >
+          重置格子大小
+        </button>
+      </div>
       {style.layout === 'grid' && (
         <div className="grid-steppers" data-testid="shape-steppers">
           {(

@@ -195,6 +195,8 @@ export type VideoItem = ItemBase & {
     cols?: number;
     /** 版型占畫面的寬、高比例（沒有＝整個畫面）；調整版型大小會改它 */
     box?: { w: number; h: number };
+    /** 自訂每一格的範圍（佔畫面寬、高的比例，照格號順序）。在預覽上拖格子大小會寫進來；改格數、版型大小、框線粗細會清掉 */
+    cells?: { x: number; y: number; w: number; h: number }[];
     /** 格子之間框線的粗細倍數（沒有＝1，原本的粗細；0＝沒有框線，最大 3） */
     line?: number;
   };
