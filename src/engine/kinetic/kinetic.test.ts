@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { clamp, E, fit, marquee, rnd, seg, splitWords, wlen, type Stage } from './core';
-import { KINETIC, kineticById } from './index';
+import { beforeAll } from 'vitest';
+import { KINETIC, kineticById, schemeOf } from './index';
+
+// jsdom 沒有真的 canvas：暫存畫布（scratch／圖案）也用假的 2D（只記呼叫）
+beforeAll(() => {
+  HTMLCanvasElement.prototype.getContext = (() => fakeCtx().ctx) as never;
+});
 
 /** 假的 canvas 2D：記下所有呼叫（名稱＋參數），不真的畫；measureText 用字數×字級估寬度 */
-function fakeCtx() {
-  const log: string[] = [];
+function fakeCtx(log: string[] = []) {
   let font = '12px x';
   const state: Record<string, unknown> = {};
   const ctx = new Proxy(state, {
@@ -12,9 +17,9 @@ function fakeCtx() {
       if (k === 'measureText')
         return (s: string) => ({ width: s.length * (parseFloat(font.split(' ')[1] ?? '12') || 12) * 0.9 });
       if (k in state) return state[k];
-      if (k === 'createLinearGradient')
+      if (k === 'createLinearGradient' || k === 'createRadialGradient')
         return (...a: unknown[]) => {
-          log.push(`createLinearGradient(${a.join(',')})`);
+          log.push(`${k}(${a.join(',')})`);
           return { addColorStop: () => {} };
         };
       return (...a: unknown[]) =>
@@ -22,6 +27,7 @@ function fakeCtx() {
     },
     set(_t, k: string, v) {
       state[k] = v;
+      log.push(`set ${k}=${typeof v === 'number' ? v.toFixed(3) : String(v)}`);
       if (k === 'font') font = String(v);
       return true;
     },
@@ -30,6 +36,8 @@ function fakeCtx() {
 }
 const stage = (words: string[], W = 540, H = 960): { s: Stage; log: string[] } => {
   const { ctx, log } = fakeCtx();
+  // 暫存畫布（scratch、圖案）的呼叫也記到同一份紀錄
+  HTMLCanvasElement.prototype.getContext = (() => fakeCtx(log).ctx) as never;
   return {
     log,
     s: {
@@ -41,6 +49,7 @@ const stage = (words: string[], W = 540, H = 960): { s: Stage; log: string[] } =
       cqh: H / 100,
       words,
       fg: '#f4f5f7',
+      paper: '#14161b',
       hi: '#ff4d2e',
       hifg: '#14161b',
       bg: null,
@@ -105,7 +114,9 @@ describe('動態字卡：每一式', () => {
         f.draw(s, t);
         return log.join('\n');
       };
-      for (const t of [0, f.poster, 1.1, 3.7, 9.2]) expect(run(t).length, `t=${t}`).toBeGreaterThan(0);
+      // 代表秒數一定畫得出東西；其他時間（例如剛開始、兩輪之間的空檔）可以是空的，但不能出錯
+      expect(run(f.poster).length, `poster=${f.poster}`).toBeGreaterThan(0);
+      for (const t of [0, 1.1, 3.7, 9.2]) expect(() => run(t), `t=${t}`).not.toThrow();
       expect(run(f.poster)).toBe(run(f.poster));
       // 真的在動：不同時間點之間至少有兩種不同的畫面
       expect(new Set([0.1, 0.25, f.poster, 1.3, 4.1].map((t) => run(t))).size).toBeGreaterThan(1);
@@ -201,5 +212,39 @@ describe('動態字卡：換行與邊緣淡出', () => {
       expect(log.filter((l) => l.startsWith('fillRect'))).toHaveLength(2);
       expect(log.filter((l) => l.startsWith('createLinearGradient'))).toHaveLength(2);
     }
+  });
+});
+
+describe('動態字卡：K4 的共用工具', () => {
+  it('withAlpha：#rgb、#rrggbb 換成 rgba；不是十六進位原樣回傳', async () => {
+    const { withAlpha } = await import('./core');
+    expect(withAlpha('#ff4d2e', 0.45)).toBe('rgba(255,77,46,0.45)');
+    expect(withAlpha('#fff', 0.13)).toBe('rgba(255,255,255,0.13)');
+    expect(withAlpha('red', 0.5)).toBe('red');
+  });
+  it('sentenceAt：每句佔各自的秒數、繞一圈回到第一句', async () => {
+    const { sentenceAt } = await import('./core');
+    expect(sentenceAt([2, 3], 0.5)).toEqual({ i: 0, tt: 0.5 });
+    expect(sentenceAt([2, 3], 2.5)).toEqual({ i: 1, tt: 0.5 });
+    expect(sentenceAt([2, 3], 5.25)).toEqual({ i: 0, tt: 0.25 });
+  });
+  it('綜藝粗外框 vt：先描邊（總寬 .16em）再填色；陰影用完會還原', async () => {
+    const { drawWord } = await import('./core');
+    const { s, log } = stage(['字']);
+    drawWord(s, '字', 100, 100, 50, { color: '#fff', vt: '#000' });
+    const i = log.findIndex((l) => l.startsWith('strokeText'));
+    const j = log.findIndex((l) => l.startsWith('fillText'));
+    expect(i).toBeGreaterThan(-1);
+    expect(j).toBeGreaterThan(i);
+    expect(log).toContain('set lineWidth=8.000');
+    const sh = stage(['字']);
+    drawWord(sh.s, '字', 100, 100, 50, { shadow: ['#fff', 12] });
+    expect(sh.log).toContain('set shadowBlur=12.000');
+    expect(sh.log.at(-1)).not.toBe('set shadowBlur=12.000');
+  });
+  it('schemeOf：有自己的預設強調色（滴血、重影的朱紅）就用它，沒有用配色原本的', () => {
+    expect(schemeOf(kineticById('drip')!).hi).toBe('#ff4d2e');
+    expect(schemeOf(kineticById('ghost')!).hi).toBe('#ff4d2e');
+    expect(schemeOf(kineticById('star')!).hi).toBe('#2340ff');
   });
 });

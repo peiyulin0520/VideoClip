@@ -1,9 +1,24 @@
 // 動態字卡（64 式）的登錄表：照原版順序。已經改寫好的才會出現在介面（KINETIC）；其餘 id 先留在型別裡。
 import type { KineticDef, KineticGroup } from './core';
+import { FX_EM } from './fx/em';
 import { FX_FLOW } from './fx/flow';
 import { FX_IN } from './fx/in';
+import { FX_HR } from './fx/hr';
+import { FX_MV } from './fx/mv';
+import { FX_SP } from './fx/sp';
+import { FX_TV } from './fx/tv';
+import { FX_SWAP } from './fx/swap';
 
-export const KINETIC: KineticDef[] = [...FX_IN, ...FX_FLOW];
+export const KINETIC: KineticDef[] = [
+  ...FX_IN,
+  ...FX_FLOW,
+  ...FX_SWAP,
+  ...FX_EM,
+  ...FX_SP,
+  ...FX_MV,
+  ...FX_TV,
+  ...FX_HR,
+];
 export const kineticById = (id: string): KineticDef | undefined => KINETIC.find((f) => f.id === id);
 export const KINETIC_GROUPS: { id: KineticGroup; name: string }[] = [
   { id: 'in', name: '登場' },
@@ -24,6 +39,12 @@ export const SCHEMES = {
   verm: { bg: '#ff4d2e', fg: '#14161b', hi: '#f4f5f7', hifg: '#14161b' },
   key: { bg: '#00b140', fg: '#ffffff', hi: '#14161b', hifg: '#ffffff' },
 } as const;
+
+/** 這一式的預設配色（原版配色，加上這一式自己改過的強調色） */
+export function schemeOf(def: KineticDef) {
+  const sch = SCHEMES[def.scheme];
+  return def.hi ? { ...sch, hi: def.hi } : sch;
+}
 
 /** 舞台底色：存的是色碼（沒有＝透明）；K0 存過原版配色名稱（'ink' 等）也認得 */
 export function resolveBg(bg: string | undefined): string | null {

@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：文字特效 64 式（`docs/plans/2026-11-16-kinetic-text.md`）K0、K0.5 已做（骨架＋爆出、巨字橫移＋顯示範圍框＋顏色自訂＋邊緣淡出＋換行工具），下一個 K1（登場＋流動其餘 14 式）；Y10 等使用者 iPhone 數字；PR #16 等使用者合併
+- **下一步**：文字特效 64 式全部做完（K0～K5）；使用者在 iPhone 上看過動態字卡的效果後，依回饋調整；新的修改還沒進 PR（PR #17 已合併）；Y10 等使用者 iPhone 數字
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,36 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-16 文字特效 K4＋K5：綜藝 8 式＋恐怖 8 式，64 式齊了（Sonnet）
+  - 做了什麼：**綜藝**（`fx/tv.ts`）：彈出字卡 vpop、斜砸下來 slam（砸到瞬間整個畫面閃字色）、集中線 lines（兩層放射線＋橢圓遮罩，預設「整個畫面」框）、問號驚嘆號 marks、字卡條 telop、關鍵字放大 emph、逐字蹦跳 bouncy、爆炸框 star；**恐怖**（`fx/hr.ts`）：燈泡將熄 flick、往下滴 drip、慢慢逼近 creep、重影抽搐 ghost、字被換掉 corrupt、鏡中倒影 mirror、手電筒 torch（預設「整個畫面」框）、融化拉長 melt。共用工具新增：`drawWord`／`drawChars` 的 `vt`（綜藝粗外框：先描 .16em 的邊再填色，半透明時整組一起淡，不讓外框從字裡透出來）、`shadow`（text-shadow）、`drawChars` 的 `spacing`（字距）、`withAlpha`、`sentenceAt`；`KineticDef.hi`＋`schemeOf(def)`＝這一式自己的預設強調色（原版把滴血、重影、集中線的 `--hi` 改成朱紅，使用者換強調色照樣有效）。
+  - 並排比對（16 式）：動作、構圖、顏色、時間都跟原版一致；原版恐怖組用襯線字，這裡一律用字卡選的字體（跟前面一樣的差異）。綜藝粗外框的接角用圓角（原版看起來是圓角）。
+  - **K5 收尾（效能）**：新增 `window.__videoclip.kineticBench`＋`e2e/kinetic-bench.spec.ts`（`KINETIC_BENCH=1` 才跑，印每一式在 1080×1920 畫一張的毫秒；Chromium 軟體繪圖、每張畫完讀回 1 個像素逼它畫完，所以只能當相對比較）。第一輪量到太慢的：柔光 soft 96 ms（每個字各一次濾鏡、每次處理整張畫布）、對焦 focus 19、手電筒 torch 33、集中線 lines 30、點陣 led 29、鏡中倒影 mirror 28。已改：①模糊濾鏡只處理字附近的範圍（soft 96→10、focus 19→5）；②torch／mirror 的暫存畫布只開「字那一條」的大小（33→6、28→6）；③lines 放射線用一半解析度畫再放大（30→16）。**還超過 8 ms 的**：led 23、lines 16、soft 10、trail 9（Chromium 軟體繪圖數字，iPhone GPU 通常比較快，要用手機上的效能框確認）。
+  - 動了哪些檔：`engine/kinetic/{core,index,render,fx/tv,fx/hr,fx/em,fx/mv}.ts`、`engine/debug.ts`、`app/editor/{KineticCards,tabs/EffectTab}.tsx`（`schemeOf`）、測試 `kinetic.test.ts`（K4 工具）、`e2e/{k0,kinetic-bench}.spec.ts`
+  - 驗證：✅ 單元（79）、`npm run check`、e2e（64 張卡都能選）；對照圖目測
+  - 下一步：使用者在 iPhone 上看動態字卡（先看「歌詞框」「顯示範圍」「顏色自訂」），回報哪幾式太慢、哪幾式想調；Y10 等 iPhone 數字
+
+- 2026-11-16 文字特效 K3：空間 8 式＋歌詞 8 式（Sonnet）
+  - 做了什麼：**空間**（`fx/sp.ts`）：立方體 cube、3D 跑馬燈 crawl3d（逐行縮放近似透視）、環繞 orbit、隧道 tunnel、散開拼起 scatter、立體厚片 extrude、百葉窗 blinds、色塊揭開 block；**歌詞**（`fx/mv.ts`）：卡拉 OK kara、跳動同步 popsync、雙行輪替 dual、節拍 beat、柔光 soft、滾動歌詞 lyrics（像 Spotify，框外淡出）、重拍殘影 trail（空心殘影）、大小混排 mix。kara／popsync／soft／lyrics 預設「歌詞框」，lyrics 預設上下邊緣淡出。
+  - 並排比對（16 式）：動作、構圖、顏色、時間都跟原版一致。小差異：crawl3d 比原版略小、角度略緩（逐行近似）；trail 的殘影描邊接角是圓的（原版是尖角）；extrude 字形較寬（沙盒備用字型）。
+  - 動了哪些檔：`engine/kinetic/{index,fx/sp,fx/mv}.ts`、`e2e/k0.spec.ts`、單元測試
+  - 驗證：✅ 單元（每一式：代表秒數畫得出東西、同 t 同結果、真的會動）、e2e（16 張卡都能選）；對照圖目測
+  - 下一步：K4（綜藝 8＋恐怖 8）＋K5 收尾
+
+- 2026-11-16 文字特效 K2：切換 8 式＋強調 8 式（Sonnet）
+  - 做了什麼：**切換**：翻牌看板 flap、翻卡 flip（繞垂直軸＋透視，用 20 條細條模擬 `drawRotY`）、打字機 type（太長自動換行、字不小於 8cqmin）、拉霸 slot、跳錶 odo（字裡有數字就用它，沒有用 36,920）、標題輪替 swapline（固定標籤「速報」）、點陣看板 led（燈點遮罩用圖案＋`destination-in`）、上下裂開 split；**強調**：訊號故障 glitch、螢光筆 marker、抖動 shake、霓虹燈管 neon（空心描邊＋雙層發光）、波浪起伏 bob、字距拉開 track、空心填滿 fill、對焦 focus（`ctx.filter` blur，舊版 Safari 沒有就用「疊 12 次、各偏一點」模擬）。共用工具新增：`drawWord` 的 `clip`（只畫字框的某段高度）／`stroke`／`glow`、`drawChars` 同樣、`scratch`（共用暫存畫布，每次先還原狀態）、`blurred`、`drawRotY`、`fitN`；`Stage.paper`＝原版的 `var(--bg)`（方牌上的字、反白帶子上的字用它，使用者換底色也不變）。
+  - 並排比對（16 式）：動作、構圖、顏色、隨機位置（同一組種子）都跟原版一致。抓到的錯：①`scratch` 用完沒還原合成方式，第二次畫就空白（led）；②發光半徑單位：CSS drop-shadow 半徑＝canvas shadowBlur（不是 2 倍）；③方牌字色要用原版的紙色而不是「對比色」。neon 的描邊比原版略粗（沙盒備用字型字形較粗），已縮細到 .028em。
+  - 與原版不同：打字機太長會換行（原版是縮小字）；不另外用明體；框外不顯示
+  - 動了哪些檔：`engine/kinetic/{core,render,index,fx/swap,fx/em,fx/in,fx/flow}.ts`、`engine/debug.ts`、`app/editor/KineticCards.tsx`、測試 `kinetic.test.ts`（假的 canvas 也接 scratch）、`e2e/k0.spec.ts`
+  - 驗證：✅ 單元（43）、e2e（32 張卡都能選）；對照圖目測
+  - 下一步：K3（空間 8＋歌詞 8）
+
+- 2026-11-16 文字特效 K1：登場剩 7 式＋流動剩 7 式，並排比對工具（Sonnet）
+  - 做了什麼：①**登場**：逐字重擊 hit、蓋章 stamp、衝向鏡頭 punch、左右疊字 stack、拉長 stretch、穿過去 through、落地回彈 squash；**流動**：直排對流 drift、重複波浪 echo、斜帶 slant、彎道 path、多層跑馬燈 ticker、遠近直書 depth、交叉封條 tape。全部照原碼的時間、緩動、數字改寫成 canvas（`fx/in.ts`、`fx/flow.ts`）；②**共用工具**（`core.ts`）：`keys`（原版關鍵格內插）、`drawChars`（每個字各自變形，基準點可設）、`band`（有底色的帶子＋跑馬燈，可旋轉）、`inkOn`（放在某色上的對比字色）、`drawWord` 加 `skew`、`originY`；`len` 改成吃詞陣列（逐字重擊的一輪看字數）；③**預設框**：流動組多數 `full`（當背景鋪滿），遠近直書 `wide`（原版要寬度）；④**並排比對工具**：`window.__videoclip.kineticPaint`＋`e2e/kinetic-compare.spec.ts`（`KINETIC_COMPARE=1` 才跑，可用 `KINETIC_IDS=burst,hit` 指定）＋`scripts/kinetic-compare.py` 拼成「上排原版、下排我們」5 個時間點的對照圖（輸出在 `.kinetic-compare/`，不進 git）。16 式對照後動作、構圖、時間、顏色都跟原版一致；字重在沙盒偏細（沙盒的備用字型沒有粗體，真機用字卡選的字體）。
+  - 與原版不同：不另外用明體（原版有些式子用 Noto Serif，這裡一律用字卡選的字體，使用者換字體就會全部跟著換）；框外不顯示
+  - 動了哪些檔：`engine/kinetic/{core,render,fx/in,fx/flow}.ts`、`engine/debug.ts`、`app/editor/tabs/EffectTab.tsx`、`e2e/{k0,kinetic-compare}.spec.ts`、`scripts/kinetic-compare.py`、`.gitignore`
+  - 驗證：✅ 單元（每一式：代表秒數畫得出東西、同 t 同結果、真的會動）、e2e（16 張卡都能選）；對照圖目測
+  - 下一步：K2（切換 8＋強調 8）
+
 - 2026-11-16 文字特效 K0.5：顯示範圍框、顏色自訂、邊緣淡出、換行工具（Sonnet）
   - 使用者回饋：顏色要能自訂；字要能設定顯示範圍（像 Spotify 歌詞框，框外看不到）；64 式可為實用調整（計畫「使用者回饋」）。
   - 做了什麼：①**顯示範圍＝框**：動態字卡畫在一張「框大小」的圖上（框外不畫＝看不到），框的中心＝字卡位置、大小＝`kinetic.size`（佔畫面寬高的比例；沒有＝那一式的預設框）；預設框 `area`：wide（畫面中間 16:9 一條，直式也跟原版比例一樣）、full（整個畫面，流動組）、lyrics（寬 84%×高 34%，中下方，歌詞組）；所有 cqmin／cqw／cqh 單位以框為準（`hit.ts` 的 `kineticFrame`／`areaSize`／`areaCenter`、`render.ts`）；②**調整範圍**：設定區［調整範圍］→ 預覽上虛線框＋四邊四角把手（拖一邊只動那一邊、對邊不動；拖框裡面＝移動；最小 10%、最大 150%；跟著字卡旋轉縮放；`KineticAreaEdit.tsx`、`dragArea` 有單元測試），按「套用」才寫回，✕ 放棄；［重置範圍］回預設框與位置；③**邊緣淡出**［無｜上下｜左右］（`fadeEdges` 用 destination-out 漸層，各 12%）；巨字橫移預設左右淡出；④**顏色都能自訂**：設定分成［顏色］［顯示範圍］［速度］三塊，顏色塊裡字色（改字卡文字段的顏色）、強調色、底色都有選色器（含自訂顏色）；底色另有［透明｜墨黑｜紙白｜鈷藍｜朱紅｜綠幕］捷徑，存色碼（K0 存過的名稱載入時換成色碼，`resolveBg`）；⑤**換行工具** `wrapLines`（中文逐字斷、英文在空白斷、超長英文字硬斷、`\n` 換行）先放進 `core.ts`，K2 以後的句子型式子（打字機、歌詞捲動…）用；⑥選另一式時，自己調過的框大小保留，沒調過的用新那一式的預設框與位置；卡片縮圖的比例跟那一式的預設框一樣。
