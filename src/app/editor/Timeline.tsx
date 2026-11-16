@@ -1185,7 +1185,7 @@ export function Timeline({
                 )}
 
                 {track.kind !== 'audio' &&
-                  !track.groupRole &&
+                  (!track.groupRole || track.groupRole === 'cell') &&
                   seamsOf(track.items).map(({ next }) => {
                     const sel = next.id === selectedId && fxFocus?.id === next.id && fxFocus.role === 'seam';
                     const tr = next.transitionIn;
@@ -1214,7 +1214,8 @@ export function Timeline({
                 {track.kind !== 'audio' &&
                   track.items.map((it) => {
                     const styleFx = it.type === 'text' ? it.textFx : undefined;
-                    if (it.type === 'audio' || (!it.inEffect && !it.outEffect && !styleFx)) return null;
+                    if (it.type === 'audio' || (!it.inEffect && !it.outEffect && !styleFx && !it.motion))
+                      return null;
                     const d = effectDurations(it);
                     const x0 = half + it.start * pps;
                     const x1 = x0 + it.duration * pps;
@@ -1268,6 +1269,24 @@ export function Timeline({
                             }}
                           >
                             {textFxCode(styleFx.kind)}
+                          </button>
+                        )}
+                        {it.motion && (
+                          <button
+                            className={`fx-circle style whole${it.id === selectedId && fxFocus?.id === it.id && fxFocus.role === 'whole' ? ' sel' : ''}`}
+                            data-testid="fx-circle-whole"
+                            data-item-id={it.id}
+                            aria-label={`整段效果 ${it.motion === 'drift' ? '捲動' : '滑入滑出'}`}
+                            style={{ left: x0 + Math.max((x1 - x0) / 2 + 14, 40) }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              useProjectStore.getState().select(it.id);
+                              useUI.setState({ requestTab: 'effect', fxFocus: { id: it.id, role: 'whole' } });
+                              player?.seek(it.start + it.duration / 2);
+                            }}
+                          >
+                            {it.motion === 'drift' ? '捲' : '滑'}
                           </button>
                         )}
                         {it.inEffect && d.in > 0.01 && mk('in', it.inEffect.kind, x0 + 13, d.in * pps)}

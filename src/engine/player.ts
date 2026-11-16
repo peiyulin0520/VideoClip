@@ -9,7 +9,7 @@ import { activeTransition, transitionAudioGain } from './transitions';
 import { showPlaceholders } from './placeholder';
 import { driftPlan, videoSyncPlan } from './videoSync';
 import { captureThumb } from './probe';
-import { buildScene } from './scene';
+import { buildScene, canTransition } from './scene';
 import { previewSizeFor } from './previewQuality';
 import { thumbOf } from './labels';
 import { onMaskReady } from './maskBitmap';
@@ -442,7 +442,7 @@ export class Player {
     const ids = new Set<string>();
     const heavy: Asset[] = [];
     for (const tr of p.tracks) {
-      if (tr.kind === 'audio' || tr.hidden || tr.groupRole) continue;
+      if (!canTransition(tr)) continue;
       const at = activeTransition(tr.items, t);
       if (!at) continue;
       for (const x of [at.a, at.b]) {

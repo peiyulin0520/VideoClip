@@ -131,6 +131,11 @@ function groupExtended(track: Track, gts: Map<string, GroupTr>, t: number): Item
   return null;
 }
 
+/** 這一條軌道能不能有轉場：一般軌道、版型的格子軌（同一格前後兩段素材之間）；版型的文字貼圖音效成員軌不行 */
+export function canTransition(track: Track): boolean {
+  return track.kind !== 'audio' && !track.hidden && (!track.groupRole || track.groupRole === 'cell');
+}
+
 /**
  * 這個時間點要畫的所有物件（含轉場期間延長／提前的虛擬物件）。匯出時要先備好這些物件的畫面，所以獨立成函式。
  */
@@ -139,8 +144,7 @@ export function sceneItems(project: Project, t: number): { item: Item; track: Tr
   const live = new Map(visibleLayers(project, t).map((l) => [l.trackIndex, l]));
   const gts = groupTransitions(project, t);
   project.tracks.forEach((track, i) => {
-    const at =
-      track.kind !== 'audio' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
+    const at = canTransition(track) ? activeTransition(track.items, t) : null;
     if (at) {
       for (const x of [at.a, at.b]) if (x) out.push({ item: x, track });
       return;
@@ -191,22 +195,38 @@ export function buildScene(
     const li = l?.item;
     const group = li && li.type !== 'audio' ? li.group : track.group;
     const frame = group ? frameOf(project, group) : null;
-    // 版型整組動畫（捲動、滑入滑出）：整組的位置一起偏移
+    // 版型整組的「整段」效果（捲動、滑入滑出）：整組的位置一起偏移（以版型看得到的範圍大小算捲多遠）
     const off = frame
-      ? motionOffset(frame.item.motion, t - frame.item.start, frame.item.duration)
+      ? motionOffset(
+          frame.item.motion,
+          t - frame.item.start,
+          frame.item.duration,
+          frameSize(frame.item, ctx, canvasW, canvasH),
+        )
       : { x: 0, y: 0 };
-    const at =
-      track.kind !== 'audio' && !track.hidden && !track.groupRole ? activeTransition(track.items, t) : null;
+    const at = canTransition(track) ? activeTransition(track.items, t) : null;
     if (at) {
       // 轉場期間：A、B 兩段同時畫（B 在上或 A 在上看轉場種類），各自套上位移、縮放、透明度、裁切、模糊
       const mk = (item: Item | null, look: (typeof at.frame)['a']): SceneLayer | null => {
         if (!item) return null;
         const layer = toLayer(item, track, project, ctx, provide, { t });
         if (!layer) return null;
+        // 版型格子裡前後兩段素材之間的轉場：跟著整組動，畫面只露出這一格
+        const inCell = track.groupRole === 'cell' && !!frame;
+        if (inCell)
+          layer.box = {
+            ...layer.box,
+            cx: layer.box.cx + off.x * canvasW,
+            cy: layer.box.cy + off.y * canvasH,
+          };
         layer.box = applyLook(layer.box, look, canvasW, canvasH);
         layer.opacity *= look.opacity;
         if (look.clip) layer.clip = clipPx(look.clip, canvasW, canvasH);
         if (look.blur) layer.blur = look.blur * Math.min(canvasW, canvasH);
+        if (inCell) {
+          const gclip = groupClipFor(item, frame!.item, ctx, canvasW, canvasH, off);
+          if (gclip) layer.clip = intersectClip(layer.clip, gclip);
+        }
         return layer;
       };
       const A = mk(at.a, at.frame.a);
@@ -229,16 +249,20 @@ export function buildScene(
         }
         out.push(x);
       }
-      at.frame.covers.forEach((c, n) => covers.push({ id: `${i}-${n}`, c }));
+      if (track.groupRole !== 'cell') at.frame.covers.forEach((c, n) => covers.push({ id: `${i}-${n}`, c }));
     } else if (l) {
       // 單一素材的進場／出場特效；版型的格子與外框看外框的特效（整組一起動）；字卡的「打字」只決定露出幾個字
       const fxItem = group ? frame?.item : l.item;
       const fx = fxItem ? itemEffectAt(fxItem, t - fxItem.start) : null;
+      // 版型裡的素材（格子、文字、貼圖）自己也可以有進出場特效，疊在整個版型的特效上
+      const isFrameSelf = !!frame && l.item.id === frame.item.id;
+      const own = group && frame && !isFrameSelf ? itemEffectAt(l.item, t - l.item.start) : null;
+      const textFx = group ? own : fx;
       const visible =
-        l.item.type === 'text' && fx?.kind === 'typewriter'
+        l.item.type === 'text' && textFx?.kind === 'typewriter'
           ? typingCount(
-              fx.role,
-              fx.p,
+              textFx.role,
+              textFx.p,
               Array.from(l.item.card.runs.map((r) => r.text).join('')).filter((c) => c.trim() !== '').length,
             )
           : undefined;
@@ -252,6 +276,14 @@ export function buildScene(
       );
       if (layer) {
         layer.box = { ...layer.box, cx: layer.box.cx + off.x * canvasW, cy: layer.box.cy + off.y * canvasH };
+        // 自己的「整段」效果（版型外框的由整組處理）：任何影像、貼圖、文字、版型裡的素材都可以
+        if (l.item.type !== 'audio' && l.item.motion && !isFrameSelf) {
+          const mo = motionOffset(l.item.motion, t - l.item.start, l.item.duration, {
+            w: layer.box.w / canvasW,
+            h: layer.box.h / canvasH,
+          });
+          layer.box = { ...layer.box, cx: layer.box.cx + mo.x * canvasW, cy: layer.box.cy + mo.y * canvasH };
+        }
         const gt = group ? gts.get(group) : undefined;
         // 版型裡的素材可以放大、移到框外，但畫面只露出版型裡面（格子：自己那一格；文字、貼圖：版型外框的範圍）
         if (frame && group && !layer.clip) {
@@ -270,6 +302,18 @@ export function buildScene(
             covers,
             covered,
             `${i}`,
+          );
+        if (own)
+          applyItemEffect(
+            layer,
+            own,
+            canvasW,
+            canvasH,
+            covers,
+            `${i}o`,
+            track.groupRole === 'cell' && frame && l.item.type !== 'text' && l.item.type !== 'audio'
+              ? cellRefBox(l.item, frame.item, canvasW, canvasH, off)
+              : undefined,
           );
         if (gt) applyGroupLook(layer, gt.look, canvasW, canvasH);
         emit(group, layer, track.groupRole === 'cell');
@@ -414,6 +458,59 @@ export function groupClipFor(
     return { rects: [[x, y, Math.max(...xs) - x, Math.max(...ys) - y]] };
   }
   return { poly: [pts] };
+}
+
+/** 版型外框看得到的範圍占畫面的寬、高比例（捲動要捲多遠用） */
+function frameSize(
+  frame: VideoItem,
+  ctx: GeoCtx,
+  W: number,
+  H: number,
+): { w: number; h: number } | undefined {
+  const fb = itemBox(frame, ctx);
+  if (!fb) return undefined;
+  const v = frame.visible ?? { x: 0, y: 0, w: 1, h: 1 };
+  return { w: (v.w * fb.w) / W, h: (v.h * fb.h) / H };
+}
+
+/** 格子在畫面上的方框（版型的移動、縮放、旋轉都算進去）：格子素材自己的進出場特效用它當參考範圍 */
+function cellRefBox(
+  item: VideoItem,
+  frame: VideoItem,
+  W: number,
+  H: number,
+  off: { x: number; y: number },
+): { cx: number; cy: number; w: number; h: number } | undefined {
+  if (!item.cell) return undefined;
+  const r = cellRect(item.cell, W, H);
+  const c = composeWith(
+    { x: (r.x + r.w / 2) / W, y: (r.y + r.h / 2) / H, scale: 1, rotation: 0, opacity: 1 },
+    frame.transform,
+    W,
+    H,
+  );
+  return {
+    cx: c.x * W + off.x * W,
+    cy: c.y * H + off.y * H,
+    w: r.w * frame.transform.scale,
+    h: r.h * frame.transform.scale,
+  };
+}
+
+/** 兩個裁切範圍取交集：都是矩形就真的取交集；其他（多邊形、圓）以版型範圍（b）為準 */
+function intersectClip(a: SceneLayer['clip'], b: SceneLayer['clip']): SceneLayer['clip'] {
+  if (!a) return b;
+  if (!b) return a;
+  if (a.rects?.length === 1 && b.rects?.length === 1 && !a.poly && !b.poly && !a.circle && !b.circle) {
+    const [ax, ay, aw, ah] = a.rects[0]!;
+    const [bx, by, bw, bh] = b.rects[0]!;
+    const x0 = Math.max(ax, bx);
+    const y0 = Math.max(ay, by);
+    const x1 = Math.min(ax + aw, bx + bw);
+    const y1 = Math.min(ay + ah, by + bh);
+    return { rects: [[x0, y0, Math.max(x1 - x0, 0), Math.max(y1 - y0, 0)]] };
+  }
+  return b;
 }
 
 /** 版型參加轉場：整組都套外框的轉場（位移、放大、透明度、裁切、模糊，跟外框完全一樣所以一起動） */

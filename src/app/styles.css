@@ -4319,3 +4319,35 @@ button:not(:disabled):active,
 .sub-head {
   right: 0; /* 標題列拉到跟播放軸一樣寬，裡面的 sticky 才有地方黏（不然只有內容那麼寬，往右捲就消失） */
 }
+
+/* Y5：特效分頁——「作用在」（分段式切換）跟「效果」（有標題的區塊）分開，一眼看出是不同階層 */
+.fx-where {
+  margin: 0 0 8px;
+}
+.seg {
+  display: flex;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-ctl);
+  overflow: hidden;
+}
+.seg-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 4px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--fs-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.seg-btn + .seg-btn {
+  border-left: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.seg-btn.on {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}

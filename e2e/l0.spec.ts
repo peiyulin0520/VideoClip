@@ -165,9 +165,10 @@ test('L2 版型分頁只挑版型：沒有特效／動畫／長度；按鈕寫�
   expect(frame.start).toBeGreaterThan(1.9);
   expect(frame.start).toBeLessThan(2.1);
   expect(frame.duration).toBe(5);
-  // 特效分頁選到整個版型：有版型動畫
+  // 特效分頁選到整個版型：跟一般素材同一套（進場、出場、轉場、整段），沒有另外的版型動畫區
   await openTab(page, '特效');
-  await expect(page.getByTestId('layout-motion')).toBeVisible();
+  await expect(page.getByTestId('fx-where')).toBeVisible();
+  await expect(page.getByTestId('layout-motion')).toHaveCount(0);
   await page.getByRole('button', { name: '復原' }).tap();
   expect((await tracks(page)).filter((t) => t.groupRole === 'cell')).toHaveLength(0);
 });

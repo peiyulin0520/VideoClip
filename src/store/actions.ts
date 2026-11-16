@@ -1266,13 +1266,10 @@ export function setTransitionAll(trackId: string, kind: TransitionKind | null, d
   return ids.length;
 }
 
-/** 版型整組動畫：不動／捲動／滑入滑出 */
-export function setGroupMotion(group: string, motion: 'drift' | 'slide' | undefined) {
-  const p = store().project;
-  const frame = p && groupFrame(p, group);
-  if (!frame) return;
-  editItem(frame.item.id, (it) => {
-    if (it.type === 'text') return;
+/** 「整段」效果（捲動、滑入滑出）：任何影像、貼圖、文字、版型外框（整組一起動）都能用。一步復原 */
+export function setItemMotion(id: string, motion: 'drift' | 'slide' | undefined) {
+  editItem(id, (it) => {
+    if (it.type === 'audio') return;
     if (motion) it.motion = motion;
     else delete it.motion;
   });

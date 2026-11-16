@@ -272,7 +272,7 @@ export const isFrameTrack = (t: { items: object[] }): boolean =>
 /**
  * 版型 v2：已經在「版型」分頁點了某個版型（可選外框顏色等）→ 按「確定」新增空版型，
  * 再依序把素材放進各格（素材比格子少就輪流重複，跟舊版一樣；files 是檔案路徑）。
- * 結束時選到第 1 格。`motion` 是版型動畫（到特效分頁設）。
+ * 結束時選到第 1 格。`motion` 是整段效果（特效分頁的「整段」：捲動、滑入滑出）。
  */
 export async function finishLayout(page: Page, files: string[], opts: { motion?: string } = {}) {
   await page.getByTestId('layout-confirm').tap();
@@ -283,7 +283,8 @@ export async function finishLayout(page: Page, files: string[], opts: { motion?:
   const n = await cells.count();
   if (opts.motion) {
     await openTab(page, '特效');
-    await page.getByRole('radio', { name: `動畫 ${opts.motion}` }).tap();
+    await page.getByTestId('fx-part-whole').tap();
+    await page.getByRole('radio', { name: `整段 ${opts.motion}` }).tap();
     await openTab(page, '版型');
   }
   for (let i = 0; i < n; i++) {

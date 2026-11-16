@@ -14,7 +14,7 @@ import {
 import type { EffectKind, Item, TextFxKind, VideoItem } from '../../../model/types';
 import {
   editItem,
-  setGroupMotion,
+  setItemMotion,
   setItemEffect,
   setTextFx,
   setTransition,
@@ -23,7 +23,6 @@ import {
 } from '../../../store/actions';
 import { TEXT_FXS, textFxName } from '../../../engine/textFx';
 import { useProjectStore } from '../../../store/projectStore';
-import { isFrameItem } from '../../../engine/layoutTracks';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
 import { EffectTimingSheet } from '../EffectTimingSheet';
@@ -31,7 +30,7 @@ import { TransitionAudioBlock } from '../TransitionAudio';
 import { TransitionCard } from '../TransitionCards';
 import type { Found } from './shared';
 
-type Part = 'in' | 'out' | 'seam' | 'style';
+type Part = 'in' | 'out' | 'seam' | 'style' | 'whole';
 type CatKey = TransitionCat | '文字';
 
 /** 特效分頁：依選到的素材類別，列出這一類能用的特效——進場、出場（只在素材自己的開頭／結尾）、跟前一段的轉場 */
@@ -39,9 +38,8 @@ export function EffectTab({ found }: { found: Found }) {
   useProjectStore((s) => s.project); // 專案變了要重畫
   const fxFocus = useUI((s) => s.fxFocus);
   const [cat, setCat] = useState<CatKey | null>(null);
-  // 版型：只有外框（整個版型）能在這裡設特效與轉場；格子、版型裡的文字各自走版型分頁
-  const item: Item | null =
-    found && (isFrameItem(found.item) || !('group' in found.item && found.item.group)) ? found.item : null;
+  // 任何素材都能在這裡設特效：版型外框＝整個版型；格子裡的素材、版型裡的文字貼圖＝各自的
+  const item: Item | null = found ? found.item : null;
   const track = item ? found!.track : null;
   const part: Part = item && fxFocus?.id === item.id ? fxFocus.role : 'in';
   const setPart = (role: Part) => item && useUI.setState({ fxFocus: { id: item.id, role } });
@@ -54,73 +52,89 @@ export function EffectTab({ found }: { found: Found }) {
       </div>
       {!item || !track ? (
         <p className="hint">
-          先在時間軸點一個素材（選進場、出場特效），或點兩個素材中間的小圓圈（選轉場），再選特效。整個版型的特效：點時間軸上的版型那一條；版型裡的格子、文字目前請到「版型」分頁改。
+          先在時間軸點一個素材（進場、出場、整段），或點兩個素材中間的小圓圈（轉場），再選特效。整個版型：點版型那一條；版型裡的素材：點那個素材。
         </p>
       ) : item.type === 'audio' ? (
         <AudioFx item={item as VideoItem} />
       ) : (
         <>
-          {isFrameItem(item) && (
-            <div className="zone-soft" data-testid="layout-motion">
-              <div className="slider-label">整個版型的動畫</div>
-              <div className="chips" role="radiogroup" aria-label="版型動畫">
-                {(
-                  [
-                    [undefined, '不動'],
-                    ['drift', '捲動'],
-                    ['slide', '滑入滑出'],
-                  ] as const
-                ).map(([id, name]) => (
-                  <button
-                    key={name}
-                    role="radio"
-                    aria-checked={item.motion === id}
-                    aria-label={`動畫 ${name}`}
-                    className={`chip${item.motion === id ? ' active' : ''}`}
-                    onClick={() => setGroupMotion(item.group!, id)}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
+          <div className="fx-where" data-testid="fx-where">
+            <div className="zone-title">作用在</div>
+            <div className="seg" role="tablist" aria-label="特效位置">
+              {(
+                [
+                  ['in', '進場'],
+                  ['out', '出場'],
+                  ['seam', '轉場'],
+                  ['whole', '整段'],
+                  ...(item.type === 'text' ? [['style', '文字特效'] as const] : []),
+                ] as (readonly [Part, string])[]
+              ).map(([k, name]) => (
+                <button
+                  key={k}
+                  role="tab"
+                  aria-selected={part === k}
+                  data-testid={`fx-part-${k}`}
+                  className={`seg-btn${part === k ? ' on' : ''}`}
+                  onClick={() => setPart(k)}
+                >
+                  {name}
+                  {k === 'in' && item.inEffect ? ` ·${transitionName(item.inEffect.kind)}` : ''}
+                  {k === 'out' && item.outEffect ? ` ·${transitionName(item.outEffect.kind)}` : ''}
+                  {k === 'seam' && item.transitionIn ? ` ·${transitionName(item.transitionIn.kind)}` : ''}
+                  {k === 'style' && item.type === 'text' && item.textFx
+                    ? ` ·${textFxName(item.textFx.kind)}`
+                    : ''}
+                  {k === 'whole' && item.motion ? ` ·${item.motion === 'drift' ? '捲動' : '滑入滑出'}` : ''}
+                </button>
+              ))}
             </div>
-          )}
-          <div className="chips cat-chips" role="tablist" aria-label="特效位置">
-            {(
-              [
-                ['in', '進場'],
-                ['out', '出場'],
-                ['seam', '轉場'],
-                ...(item.type === 'text' ? [['style', '文字特效'] as const] : []),
-              ] as (readonly [Part, string])[]
-            ).map(([k, name]) => (
-              <button
-                key={k}
-                role="tab"
-                aria-selected={part === k}
-                data-testid={`fx-part-${k}`}
-                className={`chip3${part === k ? ' on' : ''}`}
-                onClick={() => setPart(k)}
-              >
-                {name}
-                {k === 'in' && item.inEffect ? ` ·${transitionName(item.inEffect.kind)}` : ''}
-                {k === 'out' && item.outEffect ? ` ·${transitionName(item.outEffect.kind)}` : ''}
-                {k === 'seam' && item.transitionIn ? ` ·${transitionName(item.transitionIn.kind)}` : ''}
-                {k === 'style' && item.type === 'text' && item.textFx
-                  ? ` ·${textFxName(item.textFx.kind)}`
-                  : ''}
-              </button>
-            ))}
           </div>
-          {part === 'seam' ? (
-            <SeamBlock item={item} track={track} cat={cat} setCat={setCat} />
-          ) : part === 'style' && item.type === 'text' ? (
-            <StyleBlock item={item} />
-          ) : part === 'style' ? null : (
-            <SingleBlock item={item} role={part} cat={cat} setCat={setCat} />
-          )}
+          <div className="zone-soft" data-testid="fx-effects">
+            <div className="zone-title">效果</div>
+            {part === 'seam' ? (
+              <SeamBlock item={item} track={track} cat={cat} setCat={setCat} />
+            ) : part === 'whole' ? (
+              <WholeBlock item={item} />
+            ) : part === 'style' && item.type === 'text' ? (
+              <StyleBlock item={item} />
+            ) : part === 'style' ? null : (
+              <SingleBlock item={item} role={part} cat={cat} setCat={setCat} />
+            )}
+          </div>
         </>
       )}
+    </div>
+  );
+}
+
+/** 整段效果：捲動（從畫面下面外面一路捲到上面外面）、滑入滑出；版型外框＝整組一起動 */
+function WholeBlock({ item }: { item: Item }) {
+  const cur = item.type === 'audio' ? undefined : item.motion;
+  const pick = (m: 'drift' | 'slide' | undefined) => {
+    setItemMotion(item.id, m);
+    useUI.setState({ fxFocus: { id: item.id, role: 'whole' } });
+  };
+  return (
+    <div className="chips" role="radiogroup" aria-label="整段效果" data-testid="fx-whole">
+      {(
+        [
+          [undefined, '無'],
+          ['drift', '捲動'],
+          ['slide', '滑入滑出'],
+        ] as const
+      ).map(([id, name]) => (
+        <button
+          key={name}
+          role="radio"
+          aria-checked={cur === id}
+          aria-label={`整段 ${name}`}
+          className={`chip${cur === id ? ' active' : ''}`}
+          onClick={() => pick(id)}
+        >
+          {name}
+        </button>
+      ))}
     </div>
   );
 }
