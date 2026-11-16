@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #16（feedback-12 全部）已開、等使用者合併；使用者在 iPhone 測試後回報 feedback-13（`docs/plans/2026-11-16-feedback-13.md`，22 點已收齊並排成 Y1–Y11（含使用者補充）；Y1–Y9、Y11 已做完，Y10 量測面板已加、等使用者在 iPhone 回報數字再決定怎麼改；另有「文字特效加 64 式」新需求要先請 Opus 規劃，見日誌最上面）
+- **下一步**：文字特效 64 式計畫已寫好（`docs/plans/2026-11-16-kinetic-text.md`，Opus），待切 Sonnet 從 K0 做起；feedback-13 Y1–Y11 已做完（Y10 只加了量測，等使用者 iPhone 數字）；PR #16 等使用者合併
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -88,6 +88,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-16 規劃：文字特效 64 式（Opus）
+  - 做了什麼：讀原版（claude-animated-text，MIT；沙盒擋 github.io，用 raw.githubusercontent.com 讀）的結構與 64 式，寫好計畫 `docs/plans/2026-11-16-kinetic-text.md`：每式改寫成 canvas 2D 的 `draw(g, t, s)`（同一個 t 同一張圖，預覽／匯出一致），字卡新欄位 `kinetic`，放在特效分頁［文字特效］（舊 4 種當「基本」組＋8 組各 8 式），預設全畫面舞台、透明底、字卡顏色字體、可調強調色／底色／速度；步驟 K0（骨架＋burst、crawl）→ K1–K4（每次 16 式）→ K5 收尾；驗收重點是「跟原版同樣的字、同樣的秒數並排截圖比對」。
+  - 動了哪些檔：`docs/plans/2026-11-16-kinetic-text.md`（新）
+  - 下一步：切 Sonnet 做 K0
+
 - 2026-11-16 匯出加「4K」選項（Sonnet）
   - 使用者問 4K 60fps 素材：匯出原本最高長邊 1920（1080p）→ 加 4K。匯出視窗解析度多一個［4K（最清楚、最慢）］，**這支手機編得出 4K 影片才顯示**（`canEncodeSize` 用 Mediabunny `canEncodeVideo` 偵測 avc／vp9，偵測中或編不出就不顯示）；4K＝長邊 3840（專案畫面 1080×1920 → 2160×3840，專案畫面再小也畫到 4K，1080p／720p 還是不放大）；位元率照像素放大（最多 4 倍），上限 60 Mbps。匯出仍讀原檔（4K 原檔細節真的會進到輸出）。
   - 動了哪些檔：`engine/exporter.ts`（`longSide` 加 3840、`outputSize`、`videoBitrate`、`canEncodeSize`）、`app/editor/ExportSheet.tsx`；測試 `exporter.test.ts`、`e2e/export.spec.ts`（4K 選項）
