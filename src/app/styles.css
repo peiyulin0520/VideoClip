@@ -4273,3 +4273,49 @@ button:not(:disabled):active,
   height: 100%;
   pointer-events: none;
 }
+
+/* Y4：標題列的文字與按鈕往右捲也留在左邊（overflow:hidden 會讓裡面的 sticky 失效，改成 clip）；選取的片段外框明顯 */
+.cat-head,
+.group-head,
+.sub-head {
+  overflow: clip;
+}
+.clip.selected {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px #fff inset,
+    0 0 0 1px #000;
+}
+.fx-circle.head {
+  position: sticky;
+  left: 9em;
+  flex: none;
+  top: auto;
+  transform: none;
+}
+
+/* 標題列裡的鈕包成一塊一起黏在左邊（各自 sticky 會互相重疊） */
+.head-inner {
+  position: sticky;
+  left: 4px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 8px);
+}
+.head-inner > .cat-toggle,
+.head-inner > .grp-add,
+.head-inner > .cat-mixed,
+.head-inner > .fx-circle.head {
+  position: static;
+  left: auto;
+}
+.cat-head .head-inner,
+.sub-head .head-inner {
+  height: 100%;
+}
+.group-head,
+.sub-head {
+  right: 0; /* 標題列拉到跟播放軸一樣寬，裡面的 sticky 才有地方黏（不然只有內容那麼寬，往右捲就消失） */
+}

@@ -328,7 +328,16 @@ export function Timeline({
     const slots: { edge: 'top' | 'bottom'; top: number }[] = [];
     const heads: { kind: TrackKind; tracks: Track[]; top: number; open: boolean; mixed: boolean }[] = [];
     const rows: { track: Track; index: number; h: number; top: number; sub?: string }[] = [];
-    const gheads: { group: string; label: string; top: number; cells: number; empty: number }[] = [];
+    const gheads: {
+      group: string;
+      label: string;
+      top: number;
+      cells: number;
+      empty: number;
+      frameId: string;
+      inFx?: EffectKind;
+      outFx?: EffectKind;
+    }[] = [];
     const sheads: {
       group: string;
       kind: TrackKind;
@@ -378,6 +387,9 @@ export function Timeline({
             top: y,
             cells: cells.length,
             empty: cells.filter((c) => c.items.length === 0).length,
+            frameId: fr.id,
+            inFx: fr.inEffect?.kind,
+            outFx: fr.outEffect?.kind,
           });
           y += HEAD_H + ROW_GAP;
           const shut = groupClosed[g] ?? [];
@@ -765,7 +777,7 @@ export function Timeline({
 
   const menuTrack = project.tracks.find((t) => t.id === menuTrackId) ?? null;
   // 時間軸高度＝全部軌道（不在裡面上下捲；上下交給整頁捲動）
-  const viewH = Math.max(contentH, 112);
+  const viewH = contentH; // 跟著內容長高、不留白（2026-11-16 使用者：新專案播放軸下面一大塊空白）
 
   return (
     <div className="timeline" style={{ height: viewH, minHeight: viewH }}>
@@ -853,35 +865,37 @@ export function Timeline({
                           />
                         )),
                   )}
-                <button
-                  className="cat-toggle"
-                  aria-expanded={hd.open}
-                  aria-label={`${hd.open ? '收合' : '展開'}${KIND_NAME[hd.kind]}（${count} 個）`}
-                  data-testid="cat-toggle"
-                  disabled={showAll}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() =>
-                    setClosedSave(
-                      hd.open
-                        ? [...closed.filter((k) => k !== hd.kind), hd.kind]
-                        : closed.filter((k) => k !== hd.kind),
-                    )
-                  }
-                >
-                  {hd.open ? '▾' : '▸'} {KIND_NAME[hd.kind]} {hd.tracks.length}
-                  {hidden > 0 && `（${hidden} 條隱藏）`}
-                </button>
-                {hd.mixed && (
+                <div className="head-inner">
                   <button
-                    className="cat-mixed"
-                    data-testid="cat-mixed"
-                    aria-label="這一類有圖層和別類穿插，到圖層分頁看完整順序"
+                    className="cat-toggle"
+                    aria-expanded={hd.open}
+                    aria-label={`${hd.open ? '收合' : '展開'}${KIND_NAME[hd.kind]}（${count} 個）`}
+                    data-testid="cat-toggle"
+                    disabled={showAll}
                     onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => useUI.setState({ requestTab: 'layers' })}
+                    onClick={() =>
+                      setClosedSave(
+                        hd.open
+                          ? [...closed.filter((k) => k !== hd.kind), hd.kind]
+                          : closed.filter((k) => k !== hd.kind),
+                      )
+                    }
                   >
-                    已穿插
+                    {hd.open ? '▾' : '▸'} {KIND_NAME[hd.kind]} {hd.tracks.length}
+                    {hidden > 0 && `（${hidden} 條隱藏）`}
                   </button>
-                )}
+                  {hd.mixed && (
+                    <button
+                      className="cat-mixed"
+                      data-testid="cat-mixed"
+                      aria-label="這一類有圖層和別類穿插，到圖層分頁看完整順序"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => useUI.setState({ requestTab: 'layers' })}
+                    >
+                      已穿插
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -893,25 +907,46 @@ export function Timeline({
               data-bg="1"
               style={{ top: gh.top, height: HEAD_H }}
             >
-              <button
-                className="cat-toggle grp"
-                aria-expanded
-                aria-label={`收合版型 ${gh.label}`}
-                data-testid="group-toggle"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => toggleGroup(gh.group)}
-              >
-                ▾ 版型：{gh.label} · {gh.cells} 格{gh.empty > 0 ? `（${gh.empty} 格空）` : ''}
-              </button>
-              <button
-                className="grp-add"
-                aria-label={`加入到版型 ${gh.label}`}
-                data-testid="group-add"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => setAddMenuGroup(gh.group)}
-              >
-                <Plus size={14} /> 加入
-              </button>
+              <div className="head-inner">
+                <button
+                  className="cat-toggle grp"
+                  aria-expanded
+                  aria-label={`收合版型 ${gh.label}`}
+                  data-testid="group-toggle"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => toggleGroup(gh.group)}
+                >
+                  ▾ 版型：{gh.label} · {gh.cells} 格{gh.empty > 0 ? `（${gh.empty} 格空）` : ''}
+                </button>
+                <button
+                  className="grp-add"
+                  aria-label={`加入到版型 ${gh.label}`}
+                  data-testid="group-add"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => setAddMenuGroup(gh.group)}
+                >
+                  <Plus size={14} /> 加入
+                </button>
+                {(['in', 'out'] as const).map((role) => {
+                  const kind = role === 'in' ? gh.inFx : gh.outFx;
+                  if (!kind) return null;
+                  return (
+                    <button
+                      key={role}
+                      className={`fx-circle head ${role}`}
+                      data-testid={`group-fx-${role}`}
+                      aria-label={`整個版型的${role === 'in' ? '進場' : '出場'}特效 ${transitionName(kind)}`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => {
+                        useProjectStore.getState().select(gh.frameId);
+                        useUI.setState({ requestTab: 'effect', fxFocus: { id: gh.frameId, role } });
+                      }}
+                    >
+                      {transitionCode(kind)}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ))}
           {layout.sheads.map((sh) => (
@@ -923,16 +958,18 @@ export function Timeline({
               data-bg="1"
               style={{ top: sh.top, height: HEAD_H }}
             >
-              <button
-                className="cat-toggle sub"
-                aria-expanded={sh.open}
-                aria-label={`${sh.open ? '收合' : '展開'}版型的${sh.label}（${sh.count} 個）`}
-                data-testid="sub-toggle"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => toggleKind(sh.group, sh.kind)}
-              >
-                {sh.open ? '▾' : '▸'} {sh.label} {sh.count}
-              </button>
+              <div className="head-inner">
+                <button
+                  className="cat-toggle sub"
+                  aria-expanded={sh.open}
+                  aria-label={`${sh.open ? '收合' : '展開'}版型的${sh.label}（${sh.count} 個）`}
+                  data-testid="sub-toggle"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => toggleKind(sh.group, sh.kind)}
+                >
+                  {sh.open ? '▾' : '▸'} {sh.label} {sh.count}
+                </button>
+              </div>
             </div>
           ))}
           {rows.map(({ track, top, h, sub }, rowIdx) => {
@@ -1175,7 +1212,6 @@ export function Timeline({
 
                 {/* 單一素材的進場／出場特效：特效佔的那一段（淡色）＋代表字圓圈（跟接縫的轉場不同色）；版型看外框那一條 */}
                 {track.kind !== 'audio' &&
-                  track.groupRole !== 'cell' &&
                   track.items.map((it) => {
                     const styleFx = it.type === 'text' ? it.textFx : undefined;
                     if (it.type === 'audio' || (!it.inEffect && !it.outEffect && !styleFx)) return null;
