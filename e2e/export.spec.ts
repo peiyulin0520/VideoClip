@@ -206,3 +206,19 @@ test('沒有內容時匯出鈕按下去會說要先匯入；專案資料不會�
   await expect(page.getByText('還沒有內容可以匯出')).toBeVisible();
   await expect(page.getByRole('button', { name: '開始匯出' })).toBeDisabled();
 });
+
+test('匯出視窗：這個瀏覽器編得出 4K 才有「4K」選項；選了預估輸出是 2160×3840', async ({ page }) => {
+  test.setTimeout(120_000);
+  await createProjectWith(page, ['clip-a.webm']);
+  await page.getByRole('button', { name: '匯出影片' }).tap();
+  await expect(page.getByTestId('export-options')).toBeVisible();
+  const r4k = page.getByRole('radio', { name: /解析度 4K/ });
+  // 沙盒的 Chromium 不一定編得出 4K：有選項才測選了之後的預估；沒有選項代表被關掉（也是正確行為）
+  await page.waitForTimeout(1500);
+  if (await r4k.count()) {
+    await r4k.tap();
+    await expect(page.getByTestId('export-estimate')).toContainText('2160×3840');
+  } else {
+    await expect(page.getByRole('radio', { name: '解析度 1080p（較清楚）' })).toBeVisible();
+  }
+});

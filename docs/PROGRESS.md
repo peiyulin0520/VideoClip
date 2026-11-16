@@ -88,6 +88,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-16 匯出加「4K」選項（Sonnet）
+  - 使用者問 4K 60fps 素材：匯出原本最高長邊 1920（1080p）→ 加 4K。匯出視窗解析度多一個［4K（最清楚、最慢）］，**這支手機編得出 4K 影片才顯示**（`canEncodeSize` 用 Mediabunny `canEncodeVideo` 偵測 avc／vp9，偵測中或編不出就不顯示）；4K＝長邊 3840（專案畫面 1080×1920 → 2160×3840，專案畫面再小也畫到 4K，1080p／720p 還是不放大）；位元率照像素放大（最多 4 倍），上限 60 Mbps。匯出仍讀原檔（4K 原檔細節真的會進到輸出）。
+  - 動了哪些檔：`engine/exporter.ts`（`longSide` 加 3840、`outputSize`、`videoBitrate`、`canEncodeSize`）、`app/editor/ExportSheet.tsx`；測試 `exporter.test.ts`、`e2e/export.spec.ts`（4K 選項）
+  - 驗證：✅ 單元、e2e；沙盒 Chromium 實際匯出 2160×3840（VP9/WebM）成功；🟡 **iPhone 上 4K H.264／HEVC 素材的速度、記憶體、HDR 顏色沒驗**，請使用者實測
+  - 下一步：同上
+
 - 2026-11-16 匯出視窗加說明：輸出用原檔（Sonnet）
   - 做了什麼：使用者問「高清預覽輸出時會不會用原檔」→ 查程式：匯出一律讀原檔（`getMedia`），輸出尺寸由匯出視窗的解析度（長邊 1920／1280）決定，跟預覽畫質無關；匯出視窗預估大小下面加一行「輸出用原檔，不受預覽畫質影響。」（`ExportSheet.tsx`，`data-testid="export-source-note"`）。匯出已經有 30／60 fps 與畫質（標準約 8 Mbps、高約 14 Mbps）選項。
   - 驗證：✅ e2e（export）、`npm run check`

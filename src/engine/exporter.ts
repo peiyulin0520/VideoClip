@@ -36,8 +36,8 @@ export type ExportQuality = 'standard' | 'high';
 export type ExportOptions = {
   /** 只給測試用：強制輸出 WebM（VP9＋Opus）——沙盒的 Chromium 編不出 AAC，要測聲音只能走這條 */
   preferWebm?: boolean;
-  /** 長邊像素：1920（1080p）或 1280（720p） */
-  longSide: 1920 | 1280;
+  /** 長邊像素：3840（4K）、1920（1080p）或 1280（720p） */
+  longSide: 3840 | 1920 | 1280;
   fps: 30 | 60;
   quality: ExportQuality;
 };
@@ -69,12 +69,13 @@ export class ExportCancelled extends Error {
 
 // ---------- 純計算（有單元測試） ----------
 
-/** 輸出尺寸：長邊縮到 longSide（不放大），偶數 */
+/** 輸出尺寸：長邊縮到 longSide（1080p、720p 不放大；4K 是明確要的，專案畫面比較小也會放大畫到 4K），偶數 */
 export function outputSize(
   project: Pick<Project, 'width' | 'height'>,
   longSide: number,
 ): { width: number; height: number } {
-  const k = Math.min(longSide / Math.max(project.width, project.height, 1), 1);
+  const raw = longSide / Math.max(project.width, project.height, 1);
+  const k = longSide > 1920 ? raw : Math.min(raw, 1);
   const even = (n: number) => Math.max(Math.round((n * k) / 2) * 2, 2);
   return { width: even(project.width), height: even(project.height) };
 }
@@ -84,7 +85,11 @@ export function videoBitrate(width: number, height: number, fps: number, quality
   const base = quality === 'high' ? 14_000_000 : 8_000_000;
   const pixels = (width * height) / (1080 * 1920);
   const rate = fps > 30 ? 1.5 : 1;
-  return Math.max(Math.round(base * Math.min(Math.max(pixels, 0.25), 2) * rate), 1_000_000);
+  // 4K（像素是 1080×1920 的 4 倍）位元率跟著放大到 4 倍；其他大小最多 2 倍
+  return Math.min(
+    Math.max(Math.round(base * Math.min(Math.max(pixels, 0.25), 4) * rate), 1_000_000),
+    60_000_000, // 上限 60 Mbps（4K 60fps 高畫質也不會大到離譜）
+  );
 }
 export const AUDIO_BITRATE = 192_000;
 
@@ -131,6 +136,12 @@ async function detect(width: number, height: number, bitrate: number): Promise<C
     safe(canEncodeAudio('opus', { numberOfChannels: 2, sampleRate: 48000, bitrate: AUDIO_BITRATE })),
   ]);
   return { avc, vp9, aac, opus };
+}
+
+/** 這支手機編不編得出這個大小的影片（匯出視窗用來決定要不要開放 4K 選項） */
+export async function canEncodeSize(width: number, height: number, bitrate: number): Promise<boolean> {
+  const c = await detect(width, height, bitrate);
+  return c.avc || c.vp9;
 }
 
 // ---------- 影片畫面來源 ----------

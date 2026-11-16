@@ -1,11 +1,13 @@
 import { emptyCellCount, placeholderCount } from '../../engine/placeholder';
 import { Download, Share2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  canEncodeSize,
   ExportCancelled,
   estimateBytes,
   exportProject,
   outputSize,
+  videoBitrate,
   type ExportOptions,
   type ExportProgress,
   type ExportResult,
@@ -46,6 +48,19 @@ export function ExportSheet({
   const total = totalDuration(project);
   const size = outputSize(project, opts.longSide);
   const running = state.kind === 'running';
+  // 4K：這支手機編得出 4K 影片才開放這個選項（沒偵測完或編不出就不顯示）
+  const [ok4k, setOk4k] = useState(false);
+  const s4k = outputSize(project, 3840);
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    void canEncodeSize(s4k.width, s4k.height, videoBitrate(s4k.width, s4k.height, 60, 'high'))
+      .then((ok) => alive && setOk4k(ok))
+      .catch(() => alive && setOk4k(false));
+    return () => {
+      alive = false;
+    };
+  }, [open, s4k.width, s4k.height]);
 
   const finish = () => {
     if (state.kind === 'done') void state.result.dispose();
@@ -139,6 +154,14 @@ export function ExportSheet({
                 <span>解析度</span>
               </div>
               <div className="chips" role="radiogroup" aria-label="解析度">
+                {ok4k &&
+                  chip(
+                    '4K（最清楚、最慢）',
+                    3840 as const,
+                    opts.longSide,
+                    (v) => setOpts({ ...opts, longSide: v }),
+                    '解析度',
+                  )}
                 {chip(
                   '1080p（較清楚）',
                   1920 as const,
