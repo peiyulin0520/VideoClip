@@ -68,7 +68,15 @@ import {
   textsOnItem,
 } from '../engine/cellOps';
 import { cellItems } from '../engine/cellGap';
-import { cellTracksOf, frameOfGroup, isFrameItem } from '../engine/layoutTracks';
+import {
+  cellNoOf,
+  cellTracksOf,
+  cellsOf,
+  ensureCellNos,
+  frameOfGroup,
+  isFrameItem,
+  rowsOfCell,
+} from '../engine/layoutTracks';
 import { remapKeepOnStage } from '../engine/aspectRemap';
 import { geoCtx } from '../engine/scene';
 import {
@@ -761,6 +769,7 @@ export function addLayout(o: {
       const tr = createTrack('media', d.tracks as Track[]);
       tr.group = group;
       tr.groupRole = 'cell';
+      tr.cellNo = i + 1;
       tr.fill = '#000000';
       tr.cell = { x: c.win.x / W, y: c.win.y / H, w: c.win.w / W, h: c.win.h / H };
       if (c.asset) {
@@ -926,7 +935,10 @@ export function importIntoCell(trackId: string, asset: Asset): string | null {
 export function fillEmptyCells(group: string, assets: Asset[]): number {
   const p = store().project;
   if (!p) return 0;
-  const empty = p.tracks.filter((t) => t.group === group && t.groupRole === 'cell' && !cellMain(t));
+  // 整格都空的格子（一格有好幾列時用第一列）
+  const empty = cellsOf(p.tracks as Track[], group)
+    .filter((c) => c.tracks.every((t) => !cellMain(t)))
+    .map((c) => c.tracks[0]!);
   let n = 0;
   empty.forEach((t, i) => {
     const a = assets[i];
@@ -968,41 +980,45 @@ export function applyLayoutShape(
     if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
     const frameTrack = d.tracks.find((t) => t.id === fr.track.id)!;
     const frameItem = frameTrack.items.find((x) => x.id === fr.item.id) as VideoItem;
-    const cells = d.tracks.filter((t) => t.group === group && t.groupRole === 'cell');
+    d.tracks = ensureCellNos(d.tracks as Track[]) as never;
+    const rowsOf = (no: number) =>
+      (d.tracks as Track[]).filter((t) => t.group === group && t.groupRole === 'cell' && t.cellNo === no);
     b.windows.forEach((win, i) => {
-      let tr = cells[i];
-      if (!tr) {
-        tr = createTrack('media', d.tracks as Track[]);
+      let rows = rowsOf(i + 1);
+      if (rows.length === 0) {
+        const tr = createTrack('media', d.tracks as Track[]);
         tr.group = group;
         tr.groupRole = 'cell';
+        tr.cellNo = i + 1;
         tr.fill = '#000000';
         d.tracks.splice(
           d.tracks.findIndex((t) => t.id === frameTrack.id),
           0,
           tr,
         );
-        tr = d.tracks.find((t) => t.id === tr!.id)!;
-        cells.push(tr);
+        rows = [d.tracks.find((t) => t.id === tr.id) as Track];
       }
-      tr.cell = frac(win);
-      for (const it of tr.items) {
-        if (it.type === 'text' || it.type === 'audio' || !it.cell) continue;
-        const a = d.assets.find((x) => x.id === it.assetId);
-        if (!a) continue;
-        // 自己裁切過（筆刷、自由形狀）的保留裁切；其他的不裁切（整張素材蓋滿新的格子、畫面被格子遮住）
-        if (!it.cropEdit && !it.mask && !it.maskBitmap) delete it.crop;
-        const base = cellTransform(a as Asset, it.crop, win, W, H);
-        it.transform = {
-          ...composeWith(base, frameItem.transform as Transform, W, H),
-          opacity: it.transform.opacity,
-        };
-        it.cell = frac(win);
-        delete it.cellEdit;
+      for (const tr of rows) {
+        tr.cell = frac(win);
+        for (const it of tr.items) {
+          if (it.type === 'text' || it.type === 'audio' || !it.cell) continue;
+          const a = d.assets.find((x) => x.id === it.assetId);
+          if (!a) continue;
+          // 自己裁切過（筆刷、自由形狀）的保留裁切；其他的不裁切（整張素材蓋滿新的格子、畫面被格子遮住）
+          if (!it.cropEdit && !it.mask && !it.maskBitmap) delete it.crop;
+          const base = cellTransform(a as Asset, it.crop, win, W, H);
+          it.transform = {
+            ...composeWith(base, frameItem.transform as Transform, W, H),
+            opacity: it.transform.opacity,
+          };
+          it.cell = frac(win);
+          delete it.cellEdit;
+        }
       }
     });
     // 少掉的格子：拿掉（連素材）
     d.tracks = d.tracks.filter(
-      (t) => !(t.group === group && t.groupRole === 'cell' && cells.indexOf(t) >= b.windows.length),
+      (t) => !(t.group === group && t.groupRole === 'cell' && (t.cellNo ?? 0) > b.windows.length),
     ) as never;
     // 版型的大小變了：版型裡的文字、貼圖照比例換位置（版型在畫面正中央排版）
     if (Math.abs(newBox.w - oldBox.w) > 1e-6 || Math.abs(newBox.h - oldBox.h) > 1e-6) {
@@ -1474,6 +1490,98 @@ export function moveToCell(itemId: string, cellTrackId: string): boolean {
   const next = moveToCellTracks(p.tracks as Track[], p.assets, p.width, p.height, itemId, cellTrackId);
   if (!next) return false;
   store().apply((d) => void (d.tracks = next as never));
+  return true;
+}
+
+/** 這一格再加一列（同一格、同一範圍的另一條格子軌，疊在這一格最上面）。回傳新軌的 id；一步復原 */
+export function addCellRow(trackId: string): string | null {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !track || track.groupRole !== 'cell' || !track.group) return null;
+  let id: string | null = null;
+  store().apply((d) => {
+    d.tracks = ensureCellNos(d.tracks as Track[]) as never;
+    const mine = d.tracks.find((t) => t.id === trackId) as Track;
+    const rows = rowsOfCell(d.tracks as Track[], mine);
+    const last = rows[rows.length - 1]!;
+    const nt = createTrack('media', d.tracks as Track[]);
+    nt.group = mine.group;
+    nt.groupRole = 'cell';
+    nt.cellNo = mine.cellNo;
+    nt.fill = mine.fill;
+    if (mine.cell) nt.cell = { ...mine.cell };
+    d.tracks.splice(d.tracks.findIndex((t) => t.id === last.id) + 1, 0, nt);
+    id = nt.id;
+  });
+  return id;
+}
+
+/** 刪掉這一格的某一列（連裡面的素材與色塊上的文字）；這一格只剩一列時不能刪。一步復原 */
+export function removeCellRow(trackId: string): boolean {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !track || track.groupRole !== 'cell' || !track.group) return false;
+  if (rowsOfCell(p.tracks as Track[], track).length < 2) {
+    toast('這一格只有一列，不能刪');
+    return false;
+  }
+  const gone = new Set(track.items.map((x) => x.id));
+  store().apply(
+    (d) => {
+      let tracks = (d.tracks as Track[])
+        .filter((t) => t.id !== trackId)
+        .map((t) =>
+          t.items.some((x) => x.type === 'text' && x.onItem && gone.has(x.onItem))
+            ? ({
+                ...t,
+                items: t.items.filter((x) => !(x.type === 'text' && x.onItem && gone.has(x.onItem))),
+              } as Track)
+            : t,
+        );
+      tracks = fitFrameToCells(tracks, track.group!);
+      d.tracks = tracks as never;
+    },
+    { select: null },
+  );
+  return true;
+}
+
+/** 把這一列的素材全部改放到第 no 格（時間不變，畫面照那一格重新蓋滿）；這一格還有別的列就把空列刪掉。一步復原 */
+export function setCellNo(trackId: string, no: number): boolean {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !track || track.groupRole !== 'cell' || !track.group) return false;
+  const cells = cellsOf(p.tracks as Track[], track.group);
+  const target = cells.find((c) => c.no === no);
+  if (!target || cellNoOf(p.tracks as Track[], track) === no) return false;
+  const dest = target.tracks[target.tracks.length - 1]!;
+  let tracks = p.tracks as Track[];
+  for (const it of cellItems(track)) {
+    const next = moveToCellTracks(tracks, p.assets, p.width, p.height, it.id, dest.id);
+    if (next) tracks = next;
+  }
+  const sameCellRows = rowsOfCell(p.tracks as Track[], track).length;
+  if (sameCellRows > 1) tracks = tracks.filter((t) => t.id !== trackId);
+  store().apply((d) => void (d.tracks = tracks as never));
+  return true;
+}
+
+/** 這一格裡的列上下換（dir＝-1 往上＝蓋在上面）；已經在最上／最下回傳 false。一步復原 */
+export function swapCellRows(trackId: string, dir: -1 | 1): boolean {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !track || track.groupRole !== 'cell') return false;
+  const rows = rowsOfCell(p.tracks as Track[], track);
+  const i = rows.findIndex((r) => r.id === trackId);
+  const other = rows[i - dir]; // 往上＝陣列後面
+  if (!other) return false;
+  store().apply((d) => {
+    const a = d.tracks.findIndex((t) => t.id === trackId);
+    const b = d.tracks.findIndex((t) => t.id === other.id);
+    const ta = d.tracks[a]!;
+    d.tracks[a] = d.tracks[b]!;
+    d.tracks[b] = ta;
+  });
   return true;
 }
 

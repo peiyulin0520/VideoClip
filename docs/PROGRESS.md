@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #16（feedback-12 全部）已開、等使用者合併；使用者在 iPhone 測試後回報 feedback-13（`docs/plans/2026-11-16-feedback-13.md`，22 點已收齊並排成 Y1–Y11（含使用者補充）；Y1–Y7 已做完，下一個 Y8 同一格多列）
+- **下一步**：PR #16（feedback-12 全部）已開、等使用者合併；使用者在 iPhone 測試後回報 feedback-13（`docs/plans/2026-11-16-feedback-13.md`，22 點已收齊並排成 Y1–Y11（含使用者補充）；Y1–Y8 已做完，下一個 Y9 預覽拖格子大小；另有「文字特效加 64 式」新需求要先請 Opus 規劃，見日誌最上面）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -88,6 +88,14 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-16 feedback-13 Y8 同一格同一時間疊圖＋文字特效 64 式的評估（Sonnet）
+  - 做了什麼：①**格號**：格子軌新欄位 `Track.cellNo`（第幾格，1 起算）；`engine/layoutTracks.ts` 新 `cellNoOf`／`cellsOf`（一格＝幾條格子軌）／`rowsOfCell`／`ensureCellNos`（舊資料依順序補號，每次 `apply` 跑）；②**一格多列**：同一格可以有好幾條格子軌（同 `cellNo`、同範圍，陣列順序＝上下，後面蓋前面）；新動作 `addCellRow`／`removeCellRow`（最後一列不能刪）／`setCellNo`（「改成第 N 格」＝搬素材、空出的列刪掉）／`swapCellRows`（圖層分頁格子列 ▲▼ 現在真的換）；「這一格」視窗（有素材、空的都有）多了［格與列］區：第 N 格選單、加一列、刪除這列；播放軸編號、預覽格子編號、示意圖、移至格子、版型改格數／大小（`applyLayoutShape` 照 cellNo 改每一列的範圍）、`arrangeCells`／`rippleAfter` 都改用格號；③**空檔規則以整格為準**：同一格有列在播就不畫色塊、不停格；色塊只有最下面那列畫、停格只有「有素材的最上面那列」停（`cellAt`、`ownsGapFill`）。
+  - **文字特效 64 式（使用者新需求，還沒做）**：來源 <https://pound0423.github.io/claude-animated-text/>（MIT，沙盒擋 github.io，用 `raw.githubusercontent.com/pound0423/claude-animated-text/main/index.html` 讀得到，暫存在 `/tmp`，單檔 1563 行、`FX` 陣列 64 式，每式 `make(root, words)` 回傳「時間→改 DOM／CSS（cqmin 單位）」的函式，分 8 組：登場、流動、切換、強調、空間、歌詞 MV、綜藝字卡、恐怖片）。**不能照搬**：它們是改 DOM 的整個畫面動畫（多個詞、放射線、跑馬燈、底色），我們的引擎是 Pixi 圖層＋文字畫成 canvas，要改寫成「每式一個 `draw(ctx, t, words, W, H)` 畫到 canvas」；這是新的功能（動態字卡），要先請 Opus 寫計畫（`docs/plans/`）再由 Sonnet 做。
+  - 動了哪些檔：`model/types.ts`、`engine/{layoutTracks,cellGap,cellOps,placeholder,scene}.ts`、`store/{actions,projectStore}.ts`、`app/editor/{Timeline,CellSheet,LayoutDiagram,Preview}.tsx`、`app/editor/tabs/{LayersTab,LayoutTab,EditTab}.tsx`；測試 `e2e/y8.spec.ts`（新，2 個）、單元 `cellGap.test.ts`、`layoutTracks.test.ts`
+  - 驗證：✅ 單元、e2e、`npm run check`  🟡 沒在真 iPhone 驗
+  - 踩到的坑：`ensureCellNos` 要在「加一列」之前先跑，不然舊資料的第 1 軌會被排到第 2 號
+  - 下一步：Y9 預覽拖格子大小；文字特效 64 式請切 Opus 規劃
+
 - 2026-11-16 feedback-13 Y7 圖層分頁（Sonnet）
   - 做了什麼：①版型在圖層分頁**預設收合成一列**（「▸ 版型 · 名稱　第 2–4 層　共 3 層」，列尾有整塊往上／往下／更多排序），點開才列出外框、各格、版型文字，順序＝實際上下（不按種類分），層號由下往上 1、2、3…；②展開後裡面的列縮排、左邊一條線連起來；每列按鈕固定位置（格子列沒有「更多」，留空位對齊）；③**格子列也有 ▲▼**（目前每格只有一層，按了提示「這一格只有一層」；Y8 做一格多列後會真的換）。連續屬於同一版型的圖層才併成一塊（版型被別的圖層夾住就分成兩塊）。
   - 動了哪些檔：`app/editor/tabs/LayersTab.tsx`、`app/styles.css`；測試 `e2e/y7.spec.ts`（新，2 個）

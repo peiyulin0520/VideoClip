@@ -100,3 +100,38 @@ describe('cellGap：一格多個素材，空檔畫什麼', () => {
     expect(gapFillColor(c0, frame())).toBeNull();
   });
 });
+
+describe('cellGap：同一格有好幾列', () => {
+  // 同一格（cellNo 1）兩列：下面那列 0–2，上面那列 4–6
+  const mk = (gap: 'hold' | 'fill' | 'none') => {
+    const lower = trackOf('r1', [vid('a', 0, 2)], {
+      group: 'g',
+      groupRole: 'cell',
+      cellNo: 1,
+      fill: '#ff0000',
+    });
+    const upper = trackOf('r2', [vid('b', 4, 2)], { group: 'g', groupRole: 'cell', cellNo: 1 });
+    return {
+      tracks: [lower, upper, trackOf('main', [frame(gap)])],
+      assets: [],
+      width: 1080,
+      height: 1920,
+    } as unknown as Project;
+  };
+  it('停格：只有「有素材的最上面那列」停格；別列有素材在播時不停（不蓋住別列）', () => {
+    const p = mk('hold');
+    const [lower, upper] = p.tracks as [Track, Track];
+    expect(cellAt(p, upper, 3)?.id).toBe('b'); // 4 之前是空檔：停在後一段（before）
+    expect(cellAt(p, lower, 3)).toBeNull(); // 下面那列不停格
+    expect(cellAt(p, upper, 1)).toBeNull(); // 下面那列正在播（0–2）→ 上面不停格
+    expect(cellAt(p, lower, 1)?.id).toBe('a');
+  });
+  it('色塊空檔：只有最下面那列畫，而且整格沒有任何一列在播才畫', async () => {
+    const { ownsGapFill } = await import('./cellGap');
+    const p = mk('fill');
+    const [lower, upper] = p.tracks as [Track, Track];
+    expect(ownsGapFill(p.tracks, lower, 3)).toBe(true);
+    expect(ownsGapFill(p.tracks, upper, 3)).toBe(false);
+    expect(ownsGapFill(p.tracks, lower, 5)).toBe(false); // 上面那列在播（4–6）
+  });
+});

@@ -1,5 +1,5 @@
 import type { Item, Project, Track, VideoItem } from '../model/types';
-import { frameOfGroup } from './layoutTracks';
+import { frameOfGroup, rowsOfCell } from './layoutTracks';
 
 // 版型的一格可以有多個素材（影片、照片、色塊）。素材之間、頭尾的空檔畫什麼，看外框的 gapMode：
 // 停格（hold）＝停在前一段的最後一格（前面沒有就停在後一段的第一格）、色塊（fill）＝格子的 fill 色、透明（none）＝不畫。
@@ -24,6 +24,14 @@ export function cellAt(project: Pick<Project, 'tracks'>, track: Track, t: number
   const live = items.find((x) => t >= x.start && t < x.start + x.duration);
   if (live) return live;
   if (!track.group || items.length === 0) return null;
+  // 同一格有好幾列：這一格任何一列有素材在播，或自己不是「有素材的最上面那列」就不停格（不然會蓋住別列）
+  const rows = rowsOfCell(project.tracks, track);
+  if (rows.length > 1) {
+    if (rows.some((r) => r !== track && cellItems(r).some((x) => t >= x.start && t < x.start + x.duration)))
+      return null;
+    const top = rows.filter((r) => cellItems(r).length > 0).at(-1);
+    if (top !== track) return null;
+  }
   const fr = frameOfGroup(project.tracks, track.group);
   if (!fr || fr.item.gapMode !== 'hold') return null;
   if (t < fr.item.start || t >= fr.item.start + fr.item.duration) return null;
@@ -58,4 +66,15 @@ export function gapFillColor(track: Track, frame: Item | undefined): string | nu
   if (mode === 'hold') return cellItems(track).length === 0 ? (track.fill ?? null) : null;
   if (mode === 'fill') return track.fill ?? frame.frameStyle?.color ?? '#000000';
   return track.fill ?? null;
+}
+
+/**
+ * 這一列要不要畫空檔色塊：同一格有好幾列時，只有最下面那列畫、而且這一格沒有任何一列有素材在播（t 秒）。
+ * 只有一列＝照舊（由 gapFillColor 決定）。
+ */
+export function ownsGapFill(tracks: Track[], track: Track, t: number): boolean {
+  const rows = rowsOfCell(tracks, track);
+  if (rows.length <= 1) return true;
+  if (rows[0] !== track) return false;
+  return !rows.some((r) => cellItems(r).some((x) => t >= x.start && t < x.start + x.duration));
 }

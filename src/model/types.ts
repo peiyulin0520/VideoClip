@@ -434,6 +434,8 @@ export type Track = {
   group?: string;
   /** 'cell'＝版型的格子軌（貼在外框那一列下面）；'member'＝版型裡的文字／貼圖／音效軌（只在版型展開時看得到）。'frame' 是舊資料（外框自己一條軌），載入時會轉成一般影像軌 */
   groupRole?: 'frame' | 'cell' | 'member';
+  /** 格子軌是版型的第幾格（1 起算）。同一格可以有好幾條格子軌（同一個 cellNo、同一個 cell 範圍），陣列順序＝這一格裡的上下 */
+  cellNo?: number;
   /** 格子軌：這一格的位置（佔畫面寬、高的比例）。格子還沒放素材時靠它知道在哪 */
   cell?: { x: number; y: number; w: number; h: number };
   /** 格子軌道：素材放完（或這段時間沒有素材）時，格子顯示的色塊顏色 */

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { itemTitle, thumbOf } from '../../engine/labels';
-import { frameOfGroup } from '../../engine/layoutTracks';
+import { cellsOf, frameOfGroup } from '../../engine/layoutTracks';
 import { defOf, paintFrame } from '../../engine/layouts';
 import type { Project } from '../../model/types';
 import { cellMain } from '../../store/actions';
@@ -22,7 +22,7 @@ export function LayoutDiagram({
 }) {
   const frame = frameOfGroup(project.tracks, group)?.item;
   const style = frame?.frameStyle;
-  const cells = project.tracks.filter((t) => t.group === group && t.groupRole === 'cell');
+  const cells = cellsOf(project.tracks, group);
   const W = project.width;
   const H = project.height;
   const ref = useRef<HTMLCanvasElement>(null);
@@ -49,9 +49,12 @@ export function LayoutDiagram({
 
   return (
     <div className="layout-diagram" data-testid="layout-diagram" style={{ aspectRatio: `${W} / ${H}` }}>
-      {cells.map((t, i) => {
+      {cells.map((cell) => {
+        const i = cell.no - 1;
+        // 一格有好幾列時，示意圖用第一個有素材的列
+        const t = cell.tracks.find((r) => cellMain(r)) ?? cell.tracks[0]!;
         const it = cellMain(t);
-        const box = t.cell ?? it?.cell;
+        const box = cell.rect ?? it?.cell;
         if (!box) return null;
         const asset = it ? project.assets.find((a) => a.id === it.assetId) : undefined;
         const thumb = it ? thumbOf(it, asset) : undefined;

@@ -1,6 +1,6 @@
 import { createTextItem } from '../model/defaults';
 import type { Project, TextItem, Track } from '../model/types';
-import { frameOfGroup } from './layoutTracks';
+import { cellNoOf, frameOfGroup, rowsOfCell } from './layoutTracks';
 
 // 「點兩下編輯文字」提示字：新文字一開始是空的（placeholder: true），預覽上用半透明的提示字畫出來讓人看得到、點得到；
 // 一打字就拿掉旗標。匯出、單格輸出直接用專案資料（空字串，不畫），所以提示字不會出現在影片裡。
@@ -9,7 +9,12 @@ export const PLACEHOLDER_TEXT = '點兩下編輯文字';
 
 /** 版型裡還沒放素材的格子（有位置、有外框，沒有素材） */
 export function emptyCells(p: Project): Track[] {
-  return p.tracks.filter((t) => t.groupRole === 'cell' && !!t.cell && t.items.length === 0);
+  return p.tracks.filter((t) => {
+    if (t.groupRole !== 'cell' || !t.cell || t.items.length > 0) return false;
+    // 一格有好幾列：整格都空才提示，而且只在第一列提示
+    const rows = rowsOfCell(p.tracks, t);
+    return rows[0] === t && rows.every((r) => r.items.length === 0);
+  });
 }
 
 /** 預覽用：把還沒輸入的文字換成半透明提示字；空的版型格子畫上「第 N 格」。沒有任何提示就原樣回傳同一個專案 */
@@ -23,7 +28,7 @@ export function showPlaceholders(p: Project): Project {
       if (empties.includes(t)) {
         const fr = t.group ? frameOfGroup(p.tracks, t.group) : null;
         if (!fr) return t;
-        const n = p.tracks.filter((x) => x.group === t.group && x.groupRole === 'cell').indexOf(t) + 1;
+        const n = cellNoOf(p.tracks, t);
         const c = t.cell!;
         // 預覽專用的提示字（鎖住的軌道：預覽上不會被點到、也不會進匯出）
         const hint = createTextItem(fr.item.start, `第 ${n} 格`);

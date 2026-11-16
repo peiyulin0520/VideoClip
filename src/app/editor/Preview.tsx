@@ -1,6 +1,6 @@
 import { cellItems } from '../../engine/cellGap';
 import type { GeoCtx } from '../../engine/geometry';
-import { cellTracksOf, frameOfGroup, isFrameItem } from '../../engine/layoutTracks';
+import { cellsOf, frameOfGroup, isFrameItem } from '../../engine/layoutTracks';
 import type { Item, Project } from '../../model/types';
 import { groupClipArea } from '../../engine/scene';
 import { showPlaceholders } from '../../engine/placeholder';
@@ -678,13 +678,15 @@ function cellBadges(
   for (const tr of p.tracks)
     for (const it of tr.items) {
       if (!isFrameItem(it) || t < it.start || t >= it.start + it.duration) continue;
-      cellTracksOf(p.tracks, it.group!).forEach((c, i) => {
-        const box = c.cell ?? cellItems(c)[0]?.cell;
-        if (!box) return;
+      // 一格有好幾列時只標一個編號（格號 cellNo）
+      for (const cell of cellsOf(p.tracks, it.group!)) {
+        const c = cell.tracks[0]!;
+        const box = cell.rect ?? cellItems(c)[0]?.cell;
+        if (!box) continue;
         const probe = { type: 'image', group: it.group, cell: box } as unknown as Item;
         const pts = groupClipArea(probe, it, ctx, W, H, { x: 0, y: 0 }, true);
-        if (pts) out.push({ key: c.id, n: i + 1, x: pts[0]![0], y: pts[0]![1] });
-      });
+        if (pts) out.push({ key: c.id, n: cell.no, x: pts[0]![0], y: pts[0]![1] });
+      }
     }
   return out;
 }

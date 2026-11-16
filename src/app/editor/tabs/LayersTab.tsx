@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { BLEND_LABELS } from '../../../engine/geometry';
 import { timeResolved } from '../../../engine/keyframes';
-import { frameOfGroup, isFrameItem } from '../../../engine/layoutTracks';
+import { frameOfGroup, isFrameItem, rowsOfCell } from '../../../engine/layoutTracks';
 import { findItem, isVideoItem, layersAt, trackUnits } from '../../../engine/timeline';
 import type { Track, TrackKind } from '../../../model/types';
 import {
@@ -25,6 +25,7 @@ import {
   setTransform,
   moveTrackPast,
   moveTrackToEdge,
+  swapCellRows,
 } from '../../../store/actions';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
@@ -92,7 +93,13 @@ export function LayersTab() {
   };
   const move = (track: Track, idx: number, dir: -1 | 1) => {
     if (track.groupRole === 'cell') {
-      toast('這一格只有一層');
+      // 同一格裡的上下（有好幾列才換得動）
+      if (!swapCellRows(track.id, dir))
+        toast(
+          rowsOfCell(project.tracks, track).length < 2
+            ? '這一格只有一層'
+            : `已經是這一格最${dir === -1 ? '上' : '下'}面的一層`,
+        );
       return;
     }
     const o = neighbour(track, idx, dir);

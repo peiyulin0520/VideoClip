@@ -9,7 +9,7 @@ import { arrangeGroup, editItem, removeGroup, setGapMode } from '../../../store/
 import { FrameStyleControls } from '../FrameStyleControls';
 import { reshapeLayout, restyleFrame } from '../frameRestyle';
 import { useProjectStore } from '../../../store/projectStore';
-import { cellTracksOf, frameOfGroup } from '../../../engine/layoutTracks';
+import { cellsOf, frameOfGroup } from '../../../engine/layoutTracks';
 import { CellSheet } from '../CellSheet';
 import { LayoutDiagram } from '../LayoutDiagram';
 import { LayoutPicker } from '../LayoutPicker';
@@ -175,13 +175,13 @@ function LineSlider({ group, line }: { group: string; line: number }) {
 /** 版型的大小（預覽上拖邊）與自訂格數的列、欄（加減）。舊版型（沒有記錄用哪個版型）沒有 */
 function ShapeControls({ project, group, frame }: { project: Project; group: string; frame: VideoItem }) {
   const style = frame.frameStyle!;
-  const cells = cellTracksOf(project.tracks, group);
+  const cells = cellsOf(project.tracks, group);
   const [ask, setAsk] = useState<{ rows: number; cols: number; lost: number } | null>(null);
   const player = useUI((s) => s.player);
   const rows = style.rows ?? 2;
   const cols = style.cols ?? 2;
   const setGrid = (r: number, c: number) => {
-    const lost = cells.slice(r * c).filter((t) => t.items.length > 0).length;
+    const lost = cells.slice(r * c).filter((c2) => c2.tracks.some((t) => t.items.length > 0)).length;
     if (lost > 0) setAsk({ rows: r, cols: c, lost });
     else void reshapeLayout(group, { rows: r, cols: c });
   };

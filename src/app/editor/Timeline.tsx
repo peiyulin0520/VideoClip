@@ -1,4 +1,12 @@
-import { cellTracksOf, frameOfGroup, isFrameItem, memberTracksOf } from '../../engine/layoutTracks';
+import {
+  cellNoOf,
+  cellsOf,
+  cellTracksOf,
+  frameOfGroup,
+  isFrameItem,
+  memberTracksOf,
+  rowsOfCell,
+} from '../../engine/layoutTracks';
 import { useGroupOpen } from '../../store/groupOpenStore';
 import { EmptyCellSlot } from './EmptyCellSlot';
 import { CellSheet } from './CellSheet';
@@ -230,6 +238,12 @@ function MultiBar({
   );
 }
 
+/** 一格有好幾列時，軌道名稱帶「第 k 列」 */
+function rowTagOf(tracks: Track[], t: Track): string {
+  const rows = rowsOfCell(tracks, t);
+  return rows.length > 1 ? ` 第 ${rows.indexOf(t) + 1} 列` : '';
+}
+
 export function Timeline({
   pps,
   setPps,
@@ -381,12 +395,13 @@ export function Timeline({
           if (!isFrameItem(fr) || !groupOpen.includes(fr.group!)) continue;
           const g = fr.group!;
           const cells = cellTracksOf(project.tracks, g);
+          const cellList = cellsOf(project.tracks, g);
           gheads.push({
             group: g,
             label: fr.label ?? '版型',
             top: y,
-            cells: cells.length,
-            empty: cells.filter((c) => c.items.length === 0).length,
+            cells: cellList.length,
+            empty: cellList.filter((c) => c.tracks.every((r) => r.items.length === 0)).length,
             frameId: fr.id,
             inFx: fr.inEffect?.kind,
             outFx: fr.outEffect?.kind,
@@ -1003,7 +1018,7 @@ export function Timeline({
                   className={`track-chip${sub ? ' sub' : ' draggable'}${multi ? (multi.includes(track.id) ? ' multi-on' : ' multi-off') : ''}`}
                   aria-label={
                     sub && track.groupRole === 'cell'
-                      ? `第 ${cellTracksOf(project.tracks, track.group!).indexOf(track) + 1} 格 軌道`
+                      ? `第 ${cellNoOf(project.tracks, track)} 格${rowTagOf(project.tracks, track)} 軌道`
                       : `${track.name} 軌道設定`
                   }
                   data-testid="track-chip"
@@ -1011,7 +1026,7 @@ export function Timeline({
                   onClick={() => {
                     if (suppressChipClick.current) return;
                     if (sub && track.groupRole === 'cell') {
-                      const i = cellTracksOf(project.tracks, track.group!).indexOf(track);
+                      const i = cellNoOf(project.tracks, track) - 1;
                       const it = track.items[0];
                       if (it) useProjectStore.getState().select(it.id);
                       return setCellSheet({ id: track.id, index: i });
@@ -1026,7 +1041,7 @@ export function Timeline({
                 >
                   {sub && track.groupRole === 'cell' ? (
                     <span className="cell-no" data-testid="cell-no">
-                      {cellTracksOf(project.tracks, track.group!).indexOf(track) + 1}
+                      {cellNoOf(project.tracks, track)}
                     </span>
                   ) : track.kind === 'media' ? (
                     <Film size={16} />
@@ -1049,7 +1064,7 @@ export function Timeline({
                 {sub && track.groupRole === 'cell' && track.items.length === 0 && (
                   <EmptyCellSlot
                     track={track}
-                    index={cellTracksOf(project.tracks, track.group!).indexOf(track)}
+                    index={cellNoOf(project.tracks, track) - 1}
                     project={project}
                     left={half}
                     pps={pps}
@@ -1168,7 +1183,7 @@ export function Timeline({
                   <button
                     className="cell-add"
                     data-testid="cell-add"
-                    aria-label={`第 ${cellTracksOf(project.tracks, track.group!).indexOf(track) + 1} 格 加素材`}
+                    aria-label={`第 ${cellNoOf(project.tracks, track)} 格${rowTagOf(project.tracks, track)} 加素材`}
                     style={{
                       left: half + Math.max(...track.items.map((x) => x.start + x.duration)) * pps + 6,
                     }}
@@ -1176,7 +1191,7 @@ export function Timeline({
                     onClick={() =>
                       setCellAdd({
                         id: track.id,
-                        index: cellTracksOf(project.tracks, track.group!).indexOf(track),
+                        index: cellNoOf(project.tracks, track) - 1,
                       })
                     }
                   >

@@ -5,7 +5,7 @@ import { effectiveAdjust } from './grade';
 import { timeResolved } from './keyframes';
 import { renderText, measureTextItem, uiScale } from './textRender';
 import { applyTextFx, typingCount } from './textFx';
-import { gapFillColor } from './cellGap';
+import { gapFillColor, ownsGapFill } from './cellGap';
 import { visibleLayers } from './timeline';
 import { frameOfGroup, isFrameItem } from './layoutTracks';
 import { composeWith, motionOffset } from './groupTransform';
@@ -318,7 +318,13 @@ export function buildScene(
         if (gt) applyGroupLook(layer, gt.look, canvasW, canvasH);
         emit(group, layer, track.groupRole === 'cell');
       }
-    } else if (track.groupRole === 'cell' && !track.hidden && frame && gapFillColor(track, frame.item)) {
+    } else if (
+      track.groupRole === 'cell' &&
+      !track.hidden &&
+      frame &&
+      gapFillColor(track, frame.item) &&
+      ownsGapFill(project.tracks, track, t)
+    ) {
       // 這一格沒有素材可播（放完了或空位）：顯示色塊，湊滿版型的秒數
       const fr = frame.item;
       const gtf = group ? gts.get(group) : undefined;
