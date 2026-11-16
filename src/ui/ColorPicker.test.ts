@@ -57,3 +57,18 @@ describe('最近用過', () => {
     expect(JSON.parse(localStorage.getItem('vc-recent-colors')!)).toEqual(['#222222']);
   });
 });
+
+describe('最近用過的顯示', () => {
+  it('nearColor：每個通道差 ≤ 6 算幾乎一樣', async () => {
+    const m = await import('./ColorPicker');
+    expect(m.nearColor('#ffffff', '#fafafa')).toBe(true);
+    expect(m.nearColor('#ffffff', '#f0f0f0')).toBe(false);
+    expect(m.nearColor('x', '#ffffff')).toBe(false);
+  });
+  it('shownRecents：去掉幾乎一樣的重複、去掉已經在「常用」那排的顏色，順序不變', async () => {
+    const m = await import('./ColorPicker');
+    const basic = ['#ffffff', '#111111', '#ff4d8d'];
+    const out = m.shownRecents(['#4dd0ff', '#ffffff', '#4dd0fe', '#abcdef', '#ff4d8d'], basic);
+    expect(out).toEqual(['#4dd0ff', '#abcdef']);
+  });
+});
