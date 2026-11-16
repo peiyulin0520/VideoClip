@@ -1,18 +1,18 @@
-// 動態字卡：把字卡（item.kinetic）在 t 秒（字卡自己的時間）畫成一張 W×H 的舞台圖。
+// 動態字卡：把字卡（item.kinetic）在 t 秒（字卡自己的時間）畫成一張「框」大小的圖。框外面不畫（看不到）。
 import { cssFamily, requestFont } from '../../fonts/fontStore';
 import type { TextItem } from '../../model/types';
 import { canvasFamily } from '../textRender';
-import { splitWords, type KineticDef, type Stage } from './core';
-import { kineticContent } from './hit';
-import { kineticById, SCHEMES } from './index';
+import { fadeEdges, splitWords, type KineticDef, type Stage } from './core';
+import { kineticContent, kineticFrame } from './hit';
+import { kineticById, resolveBg, SCHEMES } from './index';
 
 export type KineticRender = {
   canvas: HTMLCanvasElement;
   w: number;
   h: number;
-  /** 內容有變就不一樣（compositor 用它判斷要不要重傳貼圖）；舞台圖固定在同一張畫布上重畫 */
+  /** 內容有變就不一樣（compositor 用它判斷要不要重傳貼圖）；框圖固定在同一張畫布上重畫 */
   key: string;
-  /** 點選、選取框用的範圍（舞台的像素，相對畫布左上角） */
+  /** 點選、選取框用的範圍（像素，相對畫布左上角） */
   content: { x: number; y: number; w: number; h: number };
 };
 
@@ -36,7 +36,7 @@ const luma = (hex: string) => {
   return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
 };
 
-/** t＝字卡自己的時間（開始後幾秒）。回傳 null＝這個 id 還沒改寫好（不畫） */
+/** t＝字卡自己的時間（開始後幾秒）；W、H＝合成畫布（畫面）大小。回傳 null＝這個 id 還沒改寫好（不畫） */
 export function renderKinetic(item: TextItem, t: number, W: number, H: number): KineticRender | null {
   const k = item.kinetic;
   const def = k ? kineticById(k.id) : undefined;
@@ -51,30 +51,43 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   const fg = run?.color ?? sch.fg;
   const hi = k.accent ?? sch.hi;
   const hifg = k.accent ? (luma(k.accent) > 0.55 ? '#14161b' : '#ffffff') : sch.hifg;
-  const bg = k.bg ? SCHEMES[k.bg].bg : null;
-  const key = [item.id, k.id, step, W, H, words.join('|'), fg, hi, bg ?? '', cssFamily(fontId) ? 1 : 0].join(
-    '~',
-  );
+  const bg = resolveBg(k.bg);
+  const fade = k.fade ?? def.fade ?? 'none';
+  const fr = kineticFrame(item, W, H);
+  const key = [
+    item.id,
+    k.id,
+    step,
+    fr.w,
+    fr.h,
+    words.join('|'),
+    fg,
+    hi,
+    bg ?? '',
+    fade,
+    cssFamily(fontId) ? 1 : 0,
+  ].join('~');
 
-  const ck = `${item.id}|${W}x${H}`;
+  const ck = `${item.id}|${fr.w}x${fr.h}`;
   let canvas = canvases.get(ck);
   if (!canvas) {
     canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
+    canvas.width = fr.w;
+    canvas.height = fr.h;
     canvases.set(ck, canvas);
     if (canvases.size > MAX_CANVASES) canvases.delete(canvases.keys().next().value!);
   }
-  paintKinetic(canvas, def, { words, fg, hi, hifg, bg, family: canvasFamily(fontId) }, step / STEP);
-  return { canvas, w: W, h: H, key, content: kineticContent(item, W, H) };
+  paintKinetic(canvas, def, { words, fg, hi, hifg, bg, family: canvasFamily(fontId) }, step / STEP, fade);
+  return { canvas, w: fr.w, h: fr.h, key, content: kineticContent(item, W, H) };
 }
 
-/** 把某一式在 t 秒畫到 canvas 上（整張清掉重畫）。卡片縮圖、字卡舞台共用 */
+/** 把某一式在 t 秒畫到 canvas 上（整張清掉重畫；單位＝這張畫布的大小）。卡片縮圖、字卡的框共用 */
 export function paintKinetic(
   canvas: HTMLCanvasElement,
   def: KineticDef,
   p: Pick<Stage, 'words' | 'fg' | 'hi' | 'hifg' | 'bg' | 'family'>,
   t: number,
+  fade: 'none' | 'v' | 'h' = 'none',
 ) {
   const W = canvas.width;
   const H = canvas.height;
@@ -89,4 +102,5 @@ export function paintKinetic(
   g.save();
   def.draw({ g, W, H, cqmin: Math.min(W, H) / 100, cqw: W / 100, cqh: H / 100, ...p }, t);
   g.restore();
+  fadeEdges(g, W, H, fade);
 }

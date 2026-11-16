@@ -10,6 +10,8 @@ export const FX_FLOW: KineticDef[] = [
     scheme: 'ink',
     words: ['環島公路', '一路向南'],
     poster: 1.5,
+    area: 'full',
+    fade: 'h',
     len: () => null,
     hit: [0, 0.2, 1, 0.6],
     draw(s, t) {

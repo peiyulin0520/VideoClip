@@ -412,15 +412,19 @@ export type TextItem = ItemBase & {
     id: KineticId;
     /** 強調色（放射線、色塊、底條…）；沒有＝照那一式原版的配色 */
     accent?: string;
-    /** 舞台底色；沒有＝透明 */
-    bg?: KineticBg;
+    /** 舞台底色（色碼）；沒有＝透明。（K0 存過原版配色名稱 'ink' 等，讀的時候換成色碼） */
+    bg?: string;
+    /** 顯示範圍（框）的大小，佔畫面寬、高的比例；框的中心＝字卡的位置。沒有＝那一式的預設框。框外一律看不到 */
+    size?: { w: number; h: number };
+    /** 框的邊緣淡出：none 不淡、v 上下、h 左右；沒有＝那一式的預設 */
+    fade?: KineticFade;
     /** 速度倍數（0.5、1、1.5、2）；沒有＝1 */
     speed?: number;
   };
 };
 
-/** 動態字卡舞台的底色：墨黑、紙白、鈷藍、朱紅、綠幕（色碼照原版） */
-export type KineticBg = 'ink' | 'paper' | 'cobalt' | 'verm' | 'key';
+/** 動態字卡框的邊緣淡出：不淡、上下、左右 */
+export type KineticFade = 'none' | 'v' | 'h';
 
 /** 動態字卡 64 式的 id（照原版順序：登場、流動、切換、強調、空間、歌詞、綜藝、恐怖各 8 式） */
 export type KineticId =

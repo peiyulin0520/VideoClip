@@ -4460,6 +4460,7 @@ button:not(:disabled):active,
 .tr-card .kn-thumb {
   width: 64px;
   height: 64px;
+  object-fit: contain;
   border-radius: 8px;
   background: #111;
 }
@@ -4475,4 +4476,15 @@ button:not(:disabled):active,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 動態字卡的顯示範圍：虛線框；拖框裡面＝整個框移動（框裡的 body 接手指，把手疊在上面） */
+.ka-frame .ka-body {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: move;
+}
+.ka-frame .crop-h {
+  z-index: 1;
 }

@@ -31,15 +31,18 @@ export function KineticCard({
     const c = cv.current;
     if (!c) return;
     const scale = Math.min(window.devicePixelRatio || 1, 2);
-    c.width = c.height = Math.round(SIZE * scale);
+    // 縮圖的比例跟那一式的預設框一樣（16:9 一條、整個畫面＝方形、歌詞框）
+    const area = def.area ?? 'wide';
+    c.width = Math.round(SIZE * scale);
+    c.height = Math.round(SIZE * scale * (area === 'full' ? 1 : area === 'lyrics' ? 0.4 : 9 / 16));
     const sch = SCHEMES[def.scheme];
     const p = { words, fg: sch.fg, hi: sch.hi, hifg: sch.hifg, bg: sch.bg, family: canvasFamily(fontId) };
-    paintKinetic(c, def, p, def.poster);
+    paintKinetic(c, def, p, def.poster, def.fade ?? 'none');
     if (!active || reduced()) return;
     let raf = 0;
     const t0 = performance.now();
     const loop = (now: number) => {
-      paintKinetic(c, def, p, def.poster + (now - t0) / 1000);
+      paintKinetic(c, def, p, def.poster + (now - t0) / 1000, def.fade ?? 'none');
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);

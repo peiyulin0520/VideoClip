@@ -19,7 +19,7 @@ import {
   type LookRef,
   type Item,
   type Project,
-  type KineticBg,
+  type KineticFade,
   type KineticId,
   type TextFxKind,
   type TextItem,
@@ -70,6 +70,8 @@ import {
   textsOnItem,
 } from '../engine/cellOps';
 import { cellItems } from '../engine/cellGap';
+import { kineticById } from '../engine/kinetic';
+import { areaCenter } from '../engine/kinetic/hit';
 import {
   cellNoOf,
   cellTracksOf,
@@ -1204,7 +1206,8 @@ export function setTextFx(id: string, kind: TextFxKind | null, opts?: Opts): voi
 
 /**
  * 動態字卡（64 式）：選一式；null＝取消。跟文字樣式特效二選一。
- * 舞台是整個畫面，所以位置歸中、縮放歸 1（之後可以再拖、縮放）；之前選過的底色、速度保留，強調色換成新那一式的原版配色。
+ * 框（顯示範圍）：之前自己調過大小的保留；沒有的用那一式的預設框，位置也放到預設位置（歌詞框在中下方、其他正中央），縮放、旋轉歸位。
+ * 之前選過的底色、速度保留，強調色換成新那一式的原版配色。
  */
 export function setKinetic(id: string, kid: KineticId | null, opts?: Opts): void {
   editItem(
@@ -1220,18 +1223,27 @@ export function setKinetic(id: string, kid: KineticId | null, opts?: Opts): void
         id: kid,
         ...(prev?.bg ? { bg: prev.bg } : {}),
         ...(prev?.speed ? { speed: prev.speed } : {}),
+        ...(prev?.size ? { size: prev.size } : {}),
       };
       delete it.textFx;
-      if (!prev) it.transform = { ...it.transform, x: 0.5, y: 0.5, scale: 1, rotation: 0 };
+      if (!prev?.size) {
+        const c = areaCenter(kineticById(kid)?.area ?? 'wide');
+        it.transform = { ...it.transform, x: c.x, y: c.y, scale: 1, rotation: 0 };
+      }
     },
     opts,
   );
 }
 
-/** 動態字卡的設定（強調色、底色、速度）；undefined 的欄位＝拿掉（回到預設）。連續調整合併成一步復原 */
+/** 動態字卡的設定（強調色、底色、速度、邊緣淡出）；undefined 的欄位＝拿掉（回到預設）。連續調整合併成一步復原 */
 export function patchKinetic(
   id: string,
-  patch: { accent?: string | undefined; bg?: KineticBg | undefined; speed?: number | undefined },
+  patch: {
+    accent?: string | undefined;
+    bg?: string | undefined;
+    speed?: number | undefined;
+    fade?: KineticFade | undefined;
+  },
 ): void {
   editItem(
     id,
@@ -1246,6 +1258,37 @@ export function patchKinetic(
     },
     { coalesce: `kinetic:${id}` },
   );
+}
+
+/** 動態字卡的字色：改字卡所有文字段的顏色（文字分頁看到的也一起變）。連續調整合併成一步復原 */
+export function setKineticTextColor(id: string, color: string): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type !== 'text') return;
+      for (const r of it.card.runs) r.color = color;
+    },
+    { coalesce: `kinetic-fg:${id}` },
+  );
+}
+
+/** 動態字卡的顯示範圍（框）：中心 x、y 與大小 w、h 都是佔畫面的比例。一步復原 */
+export function setKineticArea(id: string, r: { x: number; y: number; w: number; h: number }): void {
+  editItem(id, (it) => {
+    if (it.type !== 'text' || !it.kinetic) return;
+    it.kinetic.size = { w: r.w, h: r.h };
+    it.transform = { ...it.transform, x: r.x, y: r.y };
+  });
+}
+
+/** 動態字卡的顯示範圍回到那一式的預設框（大小、位置；縮放、旋轉歸位）。一步復原 */
+export function resetKineticArea(id: string): void {
+  editItem(id, (it) => {
+    if (it.type !== 'text' || !it.kinetic) return;
+    delete it.kinetic.size;
+    const c = areaCenter(kineticById(it.kinetic.id)?.area ?? 'wide');
+    it.transform = { ...it.transform, x: c.x, y: c.y, scale: 1, rotation: 0 };
+  });
 }
 
 /** 轉場分配：佔前一段結尾 before 秒、佔這一段開頭 after 秒（總長＝兩者相加） */

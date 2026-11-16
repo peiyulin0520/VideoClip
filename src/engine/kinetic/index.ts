@@ -24,3 +24,10 @@ export const SCHEMES = {
   verm: { bg: '#ff4d2e', fg: '#14161b', hi: '#f4f5f7', hifg: '#14161b' },
   key: { bg: '#00b140', fg: '#ffffff', hi: '#14161b', hifg: '#ffffff' },
 } as const;
+
+/** 舞台底色：存的是色碼（沒有＝透明）；K0 存過原版配色名稱（'ink' 等）也認得 */
+export function resolveBg(bg: string | undefined): string | null {
+  if (!bg) return null;
+  const named = (SCHEMES as Record<string, { bg: string }>)[bg];
+  return named ? named.bg : bg;
+}

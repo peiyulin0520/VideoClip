@@ -12,6 +12,11 @@ function fakeCtx() {
       if (k === 'measureText')
         return (s: string) => ({ width: s.length * (parseFloat(font.split(' ')[1] ?? '12') || 12) * 0.9 });
       if (k in state) return state[k];
+      if (k === 'createLinearGradient')
+        return (...a: unknown[]) => {
+          log.push(`createLinearGradient(${a.join(',')})`);
+          return { addColorStop: () => {} };
+        };
       return (...a: unknown[]) =>
         void log.push(`${k}(${a.map((x) => (typeof x === 'number' ? x.toFixed(2) : String(x))).join(',')})`);
     },
@@ -109,4 +114,92 @@ describe('動態字卡：每一式', () => {
       expect(run(f.poster, 500, 500).length).toBeGreaterThan(0);
     });
   }
+});
+
+describe('動態字卡：顯示範圍（框）', () => {
+  it('areaSize：wide＝16:9（直式滿寬、橫式縮到放得下）、full＝整個畫面、lyrics＝寬 84%×高 34%', async () => {
+    const { areaSize, areaCenter } = await import('./hit');
+    expect(areaSize('wide', 1080, 1920)).toEqual({ w: 1080, h: 608 });
+    expect(areaSize('wide', 1920, 1080)).toEqual({ w: 1920, h: 1080 });
+    expect(areaSize('wide', 1000, 1000)).toEqual({ w: 1000, h: 563 });
+    expect(areaSize('full', 1080, 1920)).toEqual({ w: 1080, h: 1920 });
+    expect(areaSize('lyrics', 1000, 2000)).toEqual({ w: 840, h: 680 });
+    expect(areaCenter('lyrics').y).toBeGreaterThan(0.5);
+    expect(areaCenter('wide')).toEqual({ x: 0.5, y: 0.5 });
+  });
+  it('kineticFrame：有自己的大小就用它，沒有用那一式的預設框；框是整個畫面時選取範圍只算中間一條', async () => {
+    const { kineticFrame, kineticContent } = await import('./hit');
+    const item = (kinetic: object) => ({ kinetic }) as never;
+    expect(kineticFrame(item({ id: 'burst' }), 1080, 1920)).toEqual({ w: 1080, h: 608 });
+    expect(kineticFrame(item({ id: 'crawl' }), 1080, 1920)).toEqual({ w: 1080, h: 1920 });
+    expect(kineticFrame(item({ id: 'burst', size: { w: 0.5, h: 0.25 } }), 1080, 1920)).toEqual({
+      w: 540,
+      h: 480,
+    });
+    // 小框＝整個框都能點；整個畫面的框＝中間一條
+    expect(kineticContent(item({ id: 'burst' }), 1080, 1920)).toEqual({ x: 0, y: 0, w: 1080, h: 608 });
+    const full = kineticContent(item({ id: 'crawl' }), 1080, 1920);
+    expect(full.h).toBeLessThan(1920 * 0.7);
+    expect(full.y).toBeGreaterThan(0);
+  });
+  it('resolveBg：色碼原樣、沒有＝透明、K0 的配色名稱換成色碼', async () => {
+    const { resolveBg } = await import('./index');
+    expect(resolveBg(undefined)).toBeNull();
+    expect(resolveBg('#123456')).toBe('#123456');
+    expect(resolveBg('ink')).toBe('#14161b');
+  });
+  it('dragArea：拖下邊只動下邊（對邊不動）；拖框裡面＝移動；有最小大小；旋轉過也對', async () => {
+    const { dragArea } = await import('../../app/editor/KineticAreaEdit');
+    const d = { id: 'a', x: 0.5, y: 0.5, w: 1, h: 0.4 };
+    const W = 1000;
+    const H = 2000;
+    // 下邊往下 200px：高 0.4→0.5，中心往下 100px（0.05）
+    const b = dragArea(d, 'b', 0, 200, W, H, 1, 0);
+    expect(b.h).toBeCloseTo(0.5, 5);
+    expect(b.y).toBeCloseTo(0.55, 5);
+    expect(b.w).toBe(1);
+    // 左邊往右 400px：寬 1→0.6，中心往右 200px（0.2）
+    const l = dragArea(d, 'l', 400, 0, W, H, 1, 0);
+    expect(l.w).toBeCloseTo(0.6, 5);
+    expect(l.x).toBeCloseTo(0.7, 5);
+    // 移動
+    const m = dragArea(d, 'move', 100, -200, W, H, 1, 0);
+    expect(m.x).toBeCloseTo(0.6, 5);
+    expect(m.y).toBeCloseTo(0.4, 5);
+    // 最小 10%
+    const tiny = dragArea(d, 'b', 0, -5000, W, H, 1, 0);
+    expect(tiny.h).toBeCloseTo(0.1, 5);
+    // 旋轉 90°（順時針）：框自己的「下邊」朝畫面左邊；手指往左拉 200px＝下邊往外拉 200px
+    const r = dragArea(d, 'b', -200, 0, W, H, 1, Math.PI / 2);
+    expect(r.h).toBeCloseTo(0.5, 5);
+    expect(r.x).toBeCloseTo(0.5 - 100 / W, 5);
+  });
+});
+
+describe('動態字卡：換行與邊緣淡出', () => {
+  // 假的量字：每個字 10px 寬
+  const g = { measureText: (s: string) => ({ width: s.length * 10 }) } as unknown as CanvasRenderingContext2D;
+  it('wrapLines：中文逐字斷、英文在空白斷、\\n 一律換行、超長英文字硬斷', async () => {
+    const { wrapLines } = await import('./core');
+    expect(wrapLines(g, '今晚八點首播不見不散', 50)).toEqual(['今晚八點首', '播不見不散']);
+    expect(wrapLines(g, 'hello big world', 100)).toEqual(['hello big', 'world']);
+    expect(wrapLines(g, '第一行\n第二行', 500)).toEqual(['第一行', '第二行']);
+    expect(wrapLines(g, 'abcdefghijkl', 50)).toEqual(['abcde', 'fghij', 'kl']);
+    expect(wrapLines(g, '', 50)).toEqual(['']);
+    // 每一行都不超過 maxW
+    for (const l of wrapLines(g, '中文 and english 混在一起 的長句子 should wrap nicely', 90))
+      expect(l.length * 10).toBeLessThanOrEqual(90);
+  });
+  it('fadeEdges：none 什麼都不畫；v／h 各畫兩條漸層（destination-out）', async () => {
+    const { fadeEdges } = await import('./core');
+    const none = fakeCtx();
+    fadeEdges(none.ctx, 100, 100, 'none');
+    expect(none.log).toHaveLength(0);
+    for (const f of ['v', 'h'] as const) {
+      const { ctx, log } = fakeCtx();
+      fadeEdges(ctx, 100, 200, f);
+      expect(log.filter((l) => l.startsWith('fillRect'))).toHaveLength(2);
+      expect(log.filter((l) => l.startsWith('createLinearGradient'))).toHaveLength(2);
+    }
+  });
 });

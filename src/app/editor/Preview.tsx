@@ -27,6 +27,7 @@ import { useQuality } from '../../store/qualityStore';
 import { AspectOverlay } from './AspectOverlay';
 import { LayoutResize } from './LayoutResize';
 import { LayoutCellResize } from './LayoutCellResize';
+import { KineticAreaEdit } from './KineticAreaEdit';
 import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
 import { useCrop } from '../../store/cropStore';
@@ -244,6 +245,8 @@ export function Preview({
   const selLocked = !!sel?.track.locked || !!sel?.track.hidden;
   const layoutEdit = useUI((s) => s.layoutEdit);
   const cellEdit = useUI((s) => s.cellEdit);
+  const kineticEdit = useUI((s) => s.kineticEdit);
+  const keItem = kineticEdit ? findItem(rproject, kineticEdit.id)?.item : undefined;
   const ceFrame = cellEdit ? (frameOfGroup(rproject.tracks, cellEdit.group)?.item ?? null) : null;
   const lrFrame = layoutEdit ? (frameOfGroup(rproject.tracks, layoutEdit.group)?.item ?? null) : null;
   // 選到版型裡的素材（素材層）：把「畫面只露出來的範圍」畫成虛線框（版型旋轉也跟著轉），知道超出去的部分不會出現
@@ -300,7 +303,13 @@ export function Preview({
 
   const onPointerDown = (e: RPointerEvent) => {
     if ((e.target as HTMLElement).closest('[data-handle]')) return;
-    if (useUI.getState().frameEdit || useUI.getState().layoutEdit || useUI.getState().cellEdit) return; // 正在調自訂比例／版型大小：預覽上的東西先不能動
+    if (
+      useUI.getState().frameEdit ||
+      useUI.getState().layoutEdit ||
+      useUI.getState().cellEdit ||
+      useUI.getState().kineticEdit
+    )
+      return; // 正在調自訂比例／版型大小：預覽上的東西先不能動
     baseRef.current!.setPointerCapture(e.pointerId);
     const pt = toProj(e);
     pointers.current.set(e.pointerId, pt);
@@ -570,6 +579,9 @@ export function Preview({
           )}
           {lrFrame && !playing && <LayoutResize frame={lrFrame} geo={geo} k={k} />}
           {ceFrame && !playing && <LayoutCellResize frame={ceFrame} geo={geo} k={k} W={width} H={height} />}
+          {keItem && keItem.type === 'text' && !playing && (
+            <KineticAreaEdit item={keItem} k={k} W={width} H={height} />
+          )}
           {box && sel && !cropping && !playing && (
             <div
               className={`selbox${selLocked ? ' locked' : ''}${sel.item.group && !isFrameItem(sel.item) ? ' member' : ''}`}

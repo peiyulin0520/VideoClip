@@ -1,5 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, exportFrame, openTab, project, samplePreview, seekTo } from './helpers';
+import {
+  countColor,
+  createProjectWith,
+  exportFrame,
+  openTab,
+  project,
+  samplePreview,
+  seekTo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/kinetic';
 type Kin = { id: string; accent?: string; bg?: string; speed?: number };
@@ -93,28 +101,22 @@ test('K0 動態字卡：爆出會動（字從小變大、放射線出現又消�
   await seekTo(page, 1.0); // 字已經完整出現
   await expect.poll(centerDiff).toBeGreaterThan(0);
   await page.screenshot({ path: `${SHOT}/k0-burst-390.png` });
-  // 放射線（強調色）在 0.3 秒左右出現在字的四周
+  // 放射線（強調色 #ff4d2e）在 0.3 秒左右出現在字的四周；剛開始和放完之後沒有
   await seekTo(page, 0.3);
-  // 直式畫面：第 0 條線朝正上方、第 7 條朝正下方（離中心約 0.33 倍高度）
-  let hot = 0;
-  for (const [x, y] of [
-    [0.5, 0.168],
-    [0.5, 0.832],
-    [0.5, 0.17],
-    [0.5, 0.83],
-  ] as const) {
-    const c = await samplePreview(page, x, y);
-    if (c && c[0] > 200 && c[1] > 40 && c[1] < 120 && c[2] < 90) hot++;
-  }
-  expect(hot).toBeGreaterThan(0);
+  await expect.poll(() => countColor(page, [255, 77, 46], 40, [0, 0, 1, 1])).toBeGreaterThan(0);
+  await seekTo(page, 1.0);
+  await expect.poll(() => countColor(page, [255, 77, 46], 40, [0, 0, 1, 1])).toBe(0);
 
   // 底色：墨黑 → 角落是 #14161b
   await page.getByRole('radio', { name: '底色 墨黑' }).tap();
   await seekTo(page, 1.0);
-  const corner = await samplePreview(page, 0.04, 0.04);
-  expect(corner![0]).toBeLessThan(40);
-  expect(corner![2]).toBeLessThan(45);
-  expect((await textItem(page)).kinetic?.bg).toBe('ink');
+  // 爆出的框是畫面中間一條 16:9：框裡面是墨黑、框外面還是底下的藍色影片
+  const inside = await samplePreview(page, 0.08, 0.4);
+  expect(inside![0]).toBeLessThan(40);
+  expect(inside![2]).toBeLessThan(45);
+  const outside = await samplePreview(page, 0.08, 0.15);
+  expect(outside![2]).toBeGreaterThan(200);
+  expect((await textItem(page)).kinetic?.bg).toBe('#14161b');
   await page.getByRole('radio', { name: '底色 透明' }).tap();
   expect((await textItem(page)).kinetic?.bg).toBeUndefined();
 

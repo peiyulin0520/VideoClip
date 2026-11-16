@@ -11,19 +11,22 @@ import {
   TYPEWRITER_CODE,
   type TransitionCat,
 } from '../../../engine/transitions';
-import type { EffectKind, Item, KineticBg, TextFxKind, TextItem, VideoItem } from '../../../model/types';
+import type { EffectKind, Item, KineticFade, TextFxKind, TextItem, VideoItem } from '../../../model/types';
 import {
   editItem,
   setItemMotion,
   setItemEffect,
   patchKinetic,
+  resetKineticArea,
   setKinetic,
+  setKineticTextColor,
   setTextFx,
   setTransition,
   setTransitionAll,
   setTransitionSplit,
 } from '../../../store/actions';
-import { KINETIC, KINETIC_GROUPS, SCHEMES, kineticById } from '../../../engine/kinetic';
+import { KINETIC, KINETIC_GROUPS, SCHEMES, kineticById, resolveBg } from '../../../engine/kinetic';
+import { kineticFrame } from '../../../engine/kinetic/hit';
 import type { KineticDef, KineticGroup } from '../../../engine/kinetic/core';
 import { kineticWords } from '../../../engine/kinetic/render';
 import { TEXT_FXS, textFxName } from '../../../engine/textFx';
@@ -234,62 +237,133 @@ function StyleBlock({ item }: { item: Item }) {
   );
 }
 
-const KINETIC_BGS: [KineticBg | undefined, string][] = [
+const KINETIC_BGS: [string | undefined, string][] = [
   [undefined, '透明'],
-  ['ink', '墨黑'],
-  ['paper', '紙白'],
-  ['cobalt', '鈷藍'],
-  ['verm', '朱紅'],
-  ['key', '綠幕'],
+  ['#14161b', '墨黑'],
+  ['#f4f5f7', '紙白'],
+  ['#2340ff', '鈷藍'],
+  ['#ff4d2e', '朱紅'],
+  ['#00b140', '綠幕'],
 ];
 const KINETIC_SPEEDS = [0.5, 1, 1.5, 2];
+const KINETIC_FADES: [KineticFade, string][] = [
+  ['none', '無'],
+  ['v', '上下'],
+  ['h', '左右'],
+];
 
-/** 動態字卡的設定：強調色、底色、速度；一輪幾秒 */
+/** 動態字卡的設定：顏色（字色、強調色、底色，都能自訂）、顯示範圍（調整範圍、邊緣淡出）、速度與一輪幾秒 */
 function KineticSettings({ item, def, wordCount }: { item: TextItem; def: KineticDef; wordCount: number }) {
   const k = item.kinetic!;
   const sch = SCHEMES[def.scheme];
   const len = def.len(wordCount);
   const speed = k.speed ?? 1;
+  const fade = k.fade ?? def.fade ?? 'none';
+  const bg = resolveBg(k.bg);
+  const player = useUI((s) => s.player);
   return (
-    <div className="zone-soft kn-set" data-testid="kn-settings">
-      <div className="zone-title">{def.zh}</div>
-      <div className="slider-label">強調色</div>
-      <ColorPicker
-        label="強調色"
-        value={k.accent ?? sch.hi}
-        onPick={(c) => patchKinetic(item.id, { accent: c })}
-      />
-      <div className="slider-label">底色</div>
-      <div className="chips" role="radiogroup" aria-label="動態字卡底色">
-        {KINETIC_BGS.map(([id, name]) => (
-          <button
-            key={name}
-            role="radio"
-            aria-checked={k.bg === id}
-            aria-label={`底色 ${name}`}
-            className={`chip${k.bg === id ? ' active' : ''}`}
-            onClick={() => patchKinetic(item.id, { bg: id })}
-          >
-            {name}
-          </button>
-        ))}
+    <div className="kn-set" data-testid="kn-settings">
+      <div className="zone-soft" data-testid="kn-colors">
+        <div className="zone-title">顏色</div>
+        <div className="slider-label">字色</div>
+        <ColorPicker
+          label="字色"
+          value={item.card.runs[0]?.color ?? sch.fg}
+          onPick={(c) => setKineticTextColor(item.id, c)}
+        />
+        <div className="slider-label">強調色</div>
+        <ColorPicker
+          label="強調色"
+          value={k.accent ?? sch.hi}
+          onPick={(c) => patchKinetic(item.id, { accent: c })}
+        />
+        <div className="slider-label">底色</div>
+        <div className="chips" role="radiogroup" aria-label="動態字卡底色">
+          {KINETIC_BGS.map(([id, name]) => (
+            <button
+              key={name}
+              role="radio"
+              aria-checked={bg === (id ?? null)}
+              aria-label={`底色 ${name}`}
+              className={`chip${bg === (id ?? null) ? ' active' : ''}`}
+              onClick={() => patchKinetic(item.id, { bg: id })}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <ColorPicker
+          label="自訂底色"
+          value={bg ?? '#14161b'}
+          onPick={(c) => patchKinetic(item.id, { bg: c })}
+        />
       </div>
-      <div className="slider-label">速度</div>
-      <div className="chips" role="radiogroup" aria-label="動態字卡速度">
-        {KINETIC_SPEEDS.map((v) => (
+      <div className="zone-soft" data-testid="kn-area">
+        <div className="zone-title">顯示範圍</div>
+        <div className="size-row">
           <button
-            key={v}
-            role="radio"
-            aria-checked={speed === v}
-            aria-label={`速度 ${v}×`}
-            className={`chip${speed === v ? ' active' : ''}`}
-            onClick={() => patchKinetic(item.id, { speed: v === 1 ? undefined : v })}
+            className="btn"
+            data-testid="kn-area-edit"
+            onClick={() => {
+              player?.pause();
+              const p = useProjectStore.getState().project!;
+              const f = kineticFrame(item, p.width, p.height);
+              useUI.setState({
+                kineticEdit: {
+                  id: item.id,
+                  x: item.transform.x,
+                  y: item.transform.y,
+                  w: f.w / p.width,
+                  h: f.h / p.height,
+                },
+              });
+            }}
           >
-            {v}×
+            調整範圍
           </button>
-        ))}
+          <button
+            className="btn"
+            data-testid="kn-area-reset"
+            disabled={!k.size}
+            onClick={() => resetKineticArea(item.id)}
+          >
+            重置範圍
+          </button>
+        </div>
+        <div className="slider-label">邊緣淡出</div>
+        <div className="chips" role="radiogroup" aria-label="邊緣淡出">
+          {KINETIC_FADES.map(([id, name]) => (
+            <button
+              key={id}
+              role="radio"
+              aria-checked={fade === id}
+              aria-label={`邊緣淡出 ${name}`}
+              className={`chip${fade === id ? ' active' : ''}`}
+              onClick={() => patchKinetic(item.id, { fade: id })}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
       </div>
-      {len !== null && <div className="slider-label">一輪 {(len / speed).toFixed(1)} 秒</div>}
+      <div className="zone-soft" data-testid="kn-speed">
+        <div className="zone-title">速度</div>
+        <div className="chips" role="radiogroup" aria-label="動態字卡速度">
+          {KINETIC_SPEEDS.map((v) => (
+            <button
+              key={v}
+              role="radio"
+              aria-checked={speed === v}
+              aria-label={`速度 ${v}×`}
+              className={`chip${speed === v ? ' active' : ''}`}
+              onClick={() => patchKinetic(item.id, { speed: v === 1 ? undefined : v })}
+            >
+              {v}×
+            </button>
+          ))}
+        </div>
+        {len !== null && <div className="slider-label">一輪 {(len / speed).toFixed(1)} 秒</div>}
+      </div>
     </div>
   );
 }
