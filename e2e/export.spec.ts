@@ -143,6 +143,7 @@ test('匯出面板：選項、預估大小、進度、完成後可以下載；�
   await expect(page.getByTestId('export-options')).toBeVisible();
   const est = page.getByTestId('export-estimate');
   await expect(est).toContainText('1080×1920');
+  await expect(page.getByTestId('export-source-note')).toHaveText('輸出用原檔，不受預覽畫質影響。');
   await page.getByRole('radio', { name: '解析度 720p（檔案較小）' }).tap();
   await expect(est).toContainText('720×1280');
   await page.getByRole('radio', { name: '更新率 60 fps（較順、較慢）' }).tap();

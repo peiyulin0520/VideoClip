@@ -184,6 +184,9 @@ export function ExportSheet({
                 輸出 {size.width}×{size.height}，長度 {formatTime(total)}，預估檔案約{' '}
                 {mb(estimateBytes(project, opts))}。匯出需要一點時間，過程中請不要切到別的 App 或關螢幕。
               </p>
+              <p className="hint" data-testid="export-source-note">
+                輸出用原檔，不受預覽畫質影響。
+              </p>
             </>
           )}
           <div className="sheet-row">
