@@ -4056,8 +4056,25 @@ button:not(:disabled):active,
 .layer-row {
   flex-wrap: wrap;
 }
-.layer-row.sub {
-  margin-left: 1em;
+/* 版型展開後：裡面的圖層縮排、左邊一條線把同一組連起來；每列的按鈕固定寬度，上下對齊 */
+.layer-group > .layer-children {
+  padding: 0 0 0 0.9em;
+  margin: 0 0 4px 0.7em;
+  list-style: none;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.layer-group-head {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.layer-spacer {
+  width: 88px;
+  height: 44px;
+  visibility: hidden;
+}
+.layer-spacer-btn {
+  display: inline-block;
+  width: 44px;
+  height: 44px;
 }
 .layer-main {
   display: flex;
