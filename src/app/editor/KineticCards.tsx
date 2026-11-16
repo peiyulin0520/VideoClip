@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { KineticDef } from '../../engine/kinetic/core';
 import { paintKinetic } from '../../engine/kinetic/render';
-import { SCHEMES } from '../../engine/kinetic';
+import { schemeOf } from '../../engine/kinetic';
 import { canvasFamily } from '../../engine/textRender';
 
 const SIZE = 64;
@@ -35,7 +35,7 @@ export function KineticCard({
     const area = def.area ?? 'wide';
     c.width = Math.round(SIZE * scale);
     c.height = Math.round(SIZE * scale * (area === 'full' ? 1 : area === 'lyrics' ? 0.4 : 9 / 16));
-    const sch = SCHEMES[def.scheme];
+    const sch = schemeOf(def);
     const p = {
       words,
       fg: sch.fg,

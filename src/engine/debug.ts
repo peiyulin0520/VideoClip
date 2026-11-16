@@ -8,7 +8,7 @@ import { exportProject, type ExportOptions } from './exporter';
 import { renderFrame } from './exportFrame';
 import { lastImportErrors } from './importMedia';
 import { renderText, canvasFamily } from './textRender';
-import { kineticById, KINETIC, SCHEMES } from './kinetic';
+import { kineticById, KINETIC, schemeOf } from './kinetic';
 import { paintKinetic } from './kinetic/render';
 import type { Player } from './player';
 
@@ -36,7 +36,7 @@ export function installDebugHook(player: Player) {
       const c = document.createElement('canvas');
       c.width = W;
       c.height = H;
-      const sch = SCHEMES[def.scheme];
+      const sch = schemeOf(def);
       paintKinetic(
         c,
         def,
@@ -52,6 +52,33 @@ export function installDebugHook(player: Player) {
         t,
       );
       return c.toDataURL('image/png');
+    },
+    /** 測試用：每一式在 W×H 畫一張要多久（ms，取 24 張的平均；Chromium 軟體繪圖，只能當相對比較） */
+    kineticBench: (W: number, H: number) => {
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      return KINETIC.map((def) => {
+        const sch = schemeOf(def);
+        const p = {
+          words: def.words,
+          fg: sch.fg,
+          paper: sch.bg,
+          hi: sch.hi,
+          hifg: sch.hifg,
+          bg: sch.bg,
+          family: canvasFamily(''),
+        };
+        paintKinetic(c, def, p, def.poster);
+        const flush = () => c.getContext('2d')!.getImageData(0, 0, 1, 1); // 逼畫布真的畫完（不然只量到記錄指令的時間）
+        flush();
+        const t0 = performance.now();
+        for (let i = 0; i < 24; i++) {
+          paintKinetic(c, def, p, def.poster + i * 0.11);
+          flush();
+        }
+        return { id: def.id, ms: (performance.now() - t0) / 24 };
+      });
     },
     kineticList: () => KINETIC.map((f) => ({ id: f.id, zh: f.zh, group: f.group, poster: f.poster })),
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),

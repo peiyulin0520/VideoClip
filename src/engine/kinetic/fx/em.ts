@@ -260,8 +260,12 @@ export const FX_EM: KineticDef[] = [
       const o = E.in(seg(tt, 2.4, 2.9));
       const b = (1 - p) * 5 + o * 4;
       const sc = lerp(1.15, 1, p) + o * 0.06;
-      blurred(g, clamp(b, 0, 99) * cqmin, () =>
-        drawWord(s, word, W / 2, H / 2, px, { sx: sc, sy: sc, alpha: seg(tt, 0, 0.5) * (1 - o) }),
+      const bl = clamp(b, 0, 99) * cqmin;
+      blurred(
+        g,
+        bl,
+        () => drawWord(s, word, W / 2, H / 2, px, { sx: sc, sy: sc, alpha: seg(tt, 0, 0.5) * (1 - o) }),
+        [W / 2, H / 2, (wlen(word) * 0.62 * px + 0.9 * px) * sc + bl * 3, px * 0.9 * sc + bl * 3],
       );
     },
   },

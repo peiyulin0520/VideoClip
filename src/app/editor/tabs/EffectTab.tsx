@@ -25,7 +25,7 @@ import {
   setTransitionAll,
   setTransitionSplit,
 } from '../../../store/actions';
-import { KINETIC, KINETIC_GROUPS, SCHEMES, kineticById, resolveBg } from '../../../engine/kinetic';
+import { KINETIC, KINETIC_GROUPS, kineticById, resolveBg, schemeOf } from '../../../engine/kinetic';
 import { kineticFrame } from '../../../engine/kinetic/hit';
 import type { KineticDef, KineticGroup } from '../../../engine/kinetic/core';
 import { kineticWords } from '../../../engine/kinetic/render';
@@ -253,7 +253,7 @@ const KINETIC_FADES: [KineticFade, string][] = [
 /** 動態字卡的設定：顏色（字色、強調色、底色，都能自訂）、顯示範圍（調整範圍、邊緣淡出）、速度與一輪幾秒 */
 function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef; words: string[] }) {
   const k = item.kinetic!;
-  const sch = SCHEMES[def.scheme];
+  const sch = schemeOf(def);
   const len = def.len(words);
   const speed = k.speed ?? 1;
   const fade = k.fade ?? def.fade ?? 'none';

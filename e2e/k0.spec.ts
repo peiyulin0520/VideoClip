@@ -46,6 +46,10 @@ test('K0 動態字卡：特效分頁分組（基本／登場／流動）、選�
     '流動',
     '切換',
     '強調',
+    '空間',
+    '歌詞',
+    '綜藝',
+    '恐怖',
   ]);
   await page.getByTestId('kn-group-in').tap();
   await expect(page.getByTestId('kn-card')).toHaveCount(8);
@@ -208,6 +212,48 @@ test('K2 切換與強調各 8 式：每張卡片都能選、寫進字卡', async
   for (const [group, ids] of [
     ['swap', ['flap', 'flip', 'type', 'slot', 'odo', 'swapline', 'led', 'split']],
     ['em', ['glitch', 'marker', 'shake', 'neon', 'bob', 'track', 'fill', 'focus']],
+  ] as const) {
+    await page.getByTestId(`kn-group-${group}`).tap();
+    expect(
+      await page.getByTestId('kn-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-kn-id'))),
+    ).toEqual(ids);
+    for (const id of ids) {
+      await page.locator(`[data-testid="kn-card"][data-kn-id="${id}"]`).tap();
+      expect((await textItem(page)).kinetic?.id).toBe(id);
+    }
+  }
+});
+
+test('K3 空間與歌詞各 8 式：每張卡片都能選、寫進字卡', async ({ page }) => {
+  test.setTimeout(240_000);
+  await addText(page, '開場 登場');
+  for (const [group, ids] of [
+    ['sp', ['cube', 'crawl3d', 'orbit', 'tunnel', 'scatter', 'extrude', 'blinds', 'block']],
+    ['mv', ['kara', 'popsync', 'dual', 'beat', 'soft', 'lyrics', 'trail', 'mix']],
+  ] as const) {
+    await page.getByTestId(`kn-group-${group}`).tap();
+    expect(
+      await page.getByTestId('kn-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-kn-id'))),
+    ).toEqual(ids);
+    for (const id of ids) {
+      await page.locator(`[data-testid="kn-card"][data-kn-id="${id}"]`).tap();
+      expect((await textItem(page)).kinetic?.id).toBe(id);
+    }
+  }
+});
+
+test('K4 綜藝與恐怖各 8 式：每張卡片都能選、寫進字卡（64 式齊了）', async ({ page }) => {
+  test.setTimeout(240_000);
+  await addText(page, '開場 登場');
+  let total = 0;
+  for (const g of ['in', 'flow', 'swap', 'em', 'sp', 'mv', 'tv', 'hr']) {
+    await page.getByTestId(`kn-group-${g}`).tap();
+    total += await page.getByTestId('kn-card').count();
+  }
+  expect(total).toBe(64);
+  for (const [group, ids] of [
+    ['tv', ['vpop', 'slam', 'lines', 'marks', 'telop', 'emph', 'bouncy', 'star']],
+    ['hr', ['flick', 'drip', 'creep', 'ghost', 'corrupt', 'mirror', 'torch', 'melt']],
   ] as const) {
     await page.getByTestId(`kn-group-${group}`).tap();
     expect(

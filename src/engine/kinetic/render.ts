@@ -4,7 +4,7 @@ import type { TextItem } from '../../model/types';
 import { canvasFamily } from '../textRender';
 import { fadeEdges, inkOn, splitWords, type KineticDef, type Stage } from './core';
 import { kineticContent, kineticFrame } from './hit';
-import { kineticById, resolveBg, SCHEMES } from './index';
+import { kineticById, resolveBg, schemeOf } from './index';
 
 export type KineticRender = {
   canvas: HTMLCanvasElement;
@@ -39,7 +39,7 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   requestFont(fontId);
   const tt = Math.max(t, 0) * (k.speed ?? 1);
   const step = Math.floor(tt * STEP + 1e-6);
-  const sch = SCHEMES[def.scheme];
+  const sch = schemeOf(def);
   const words = kineticWords(item, def.words);
   const fg = run?.color ?? sch.fg;
   const hi = k.accent ?? sch.hi;

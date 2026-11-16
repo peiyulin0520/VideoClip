@@ -35,6 +35,8 @@ export type KineticDef = {
   en: string;
   /** 原版預設底色（這一式搭配的配色）：fg／hi／hifg／bg 的預設值 */
   scheme: KineticScheme;
+  /** 這一式的預設強調色（原版有些式子把 --hi 改成朱紅）；沒給＝用配色的強調色 */
+  hi?: string;
   /** 範例字（字卡還沒輸入時用） */
   words: string[];
   /** 代表畫面的秒數（卡片縮圖用） */
@@ -121,10 +123,16 @@ export function drawWord(
     originY?: number;
     /** 只畫字框的這一段高度（上緣往下的百分比，例 [0, 50]＝上半；原版 clip-path inset，在變形之前裁） */
     clip?: [number, number];
+    /** 只畫字的某一段寬度（從字的左緣往右的百分比，可為負；例 [-2, 40]＝左邊 40%；跟唱填色用），也在變形之前裁 */
+    clipX?: [number, number];
     /** 空心字：描邊寬度（px），不填色（原版 -webkit-text-stroke） */
     stroke?: number;
     /** 發光：一串模糊半徑（px，原版 drop-shadow 的半徑），每個半徑疊一層同色的光暈 */
     glow?: number[];
+    /** 綜藝字的粗外框色（原版 .vt：字填 color，外面一圈 .16em 的粗框） */
+    vt?: string;
+    /** 字的陰影［顏色，模糊半徑 px］（原版 text-shadow 0 0 r） */
+    shadow?: [string, number];
   } = {},
 ) {
   const { g } = s;
@@ -142,7 +150,14 @@ export function drawWord(
     g.rect(-s.W * 3, top + (o.clip[0] / 100) * bh, s.W * 6, ((o.clip[1] - o.clip[0]) / 100) * bh);
     g.clip();
   }
-  paintText(s, word, -oy, px, o.color ?? s.fg, o.weight, o.stroke, o.glow);
+  if (o.clipX) {
+    g.font = fontOf(s, px, o.weight);
+    const tw = g.measureText(word).width;
+    g.beginPath();
+    g.rect(-tw / 2 + (o.clipX[0] / 100) * tw, -s.H * 3, ((o.clipX[1] - o.clipX[0]) / 100) * tw, s.H * 6);
+    g.clip();
+  }
+  paintText(s, word, -oy, px, o.color ?? s.fg, o.weight, o.stroke, o.glow, { vt: o.vt, shadow: o.shadow });
   g.restore();
 }
 
@@ -156,6 +171,7 @@ function paintText(
   weight?: number,
   stroke?: number,
   glow?: number[],
+  fx?: { vt?: string; shadow?: [string, number] },
 ) {
   const { g } = s;
   g.font = fontOf(s, px, weight);
@@ -174,8 +190,44 @@ function paintText(
     g.shadowBlur = 0;
     return;
   }
+  if (fx?.vt) {
+    // 粗外框畫在字的後面（paint-order: stroke fill）：總寬 .16em，露出來的是外側 .08em
+    const outline = (c: CanvasRenderingContext2D) => {
+      c.font = fontOf(s, px, weight);
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.strokeStyle = fx.vt!;
+      c.lineWidth = 0.16 * px;
+      c.lineJoin = 'round';
+      c.strokeText(str, 0, y);
+      c.fillStyle = color;
+      c.fillText(str, 0, y);
+    };
+    // 半透明時整組（外框＋字）一起淡（CSS opacity 是整個元素），不然外框會從字裡透出來
+    if (g.globalAlpha < 0.999 && g.getTransform) {
+      const cv = scratch(s.W, s.H);
+      const c = cv.getContext('2d')!;
+      c.setTransform(g.getTransform());
+      outline(c);
+      g.save();
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.drawImage(cv, 0, 0);
+      g.restore();
+      return;
+    }
+    outline(g);
+    return;
+  }
+  if (fx?.shadow) {
+    g.shadowColor = fx.shadow[0];
+    g.shadowBlur = fx.shadow[1];
+  }
   g.fillStyle = color;
   g.fillText(str, 0, y);
+  if (fx?.shadow) {
+    g.shadowColor = 'transparent';
+    g.shadowBlur = 0;
+  }
 }
 
 /**
@@ -319,6 +371,10 @@ export type CharFx = {
   /** 空心字描邊寬度（px）／發光半徑（px，可多層），同 drawWord */
   stroke?: number;
   glow?: number[];
+  /** 模糊（px，原版 filter: blur） */
+  blur?: number;
+  /** 綜藝字的粗外框色，同 drawWord */
+  vt?: string;
 };
 export function drawChars(
   s: Stage,
@@ -327,14 +383,15 @@ export function drawChars(
   cy: number,
   px: number,
   f: (i: number, ch: string, n: number) => CharFx,
-  o: { originY?: number; weight?: number } = {},
+  o: { originY?: number; weight?: number; spacing?: number } = {},
 ) {
   const { g } = s;
   const chars = cs(str);
   g.save();
   g.font = fontOf(s, px, o.weight);
   const ws = chars.map((c) => g.measureText(c).width);
-  const total = ws.reduce((a, b) => a + b, 0);
+  const sp = o.spacing ?? 0; // 字距（px）：每個字後面多空這麼多（CSS letter-spacing）
+  const total = ws.reduce((a, b) => a + b, 0) + sp * chars.length;
   // 字框高＝行高 1.1；原點在字框上緣往下 originY（0～1）處，換算成離字框中心的距離
   const oy = ((o.originY ?? 0.88) - 0.5) * px * 1.1;
   let x = cx - total / 2;
@@ -344,13 +401,32 @@ export function drawChars(
     const my = cy + (c.dy ?? 0);
     g.save();
     g.globalAlpha *= c.alpha ?? 1;
+    // 有模糊的字：濾鏡只處理這個字附近（先在變形之前量好範圍，再套變形）
+    const box: [number, number, number, number] | undefined =
+      c.blur && c.blur > 0.3
+        ? [
+            mx,
+            my,
+            px * (0.9 * Math.max(c.sx ?? 1, c.sy ?? 1)) + Math.abs(oy) + c.blur * 3,
+            px * (0.9 * Math.max(c.sx ?? 1, c.sy ?? 1)) + Math.abs(oy) + c.blur * 3,
+          ]
+        : undefined;
+    if (box) {
+      g.beginPath();
+      g.rect(box[0] - box[2], box[1] - box[3], box[2] * 2, box[3] * 2);
+      g.clip();
+    }
     g.translate(mx, my + oy);
     if (c.rot) g.rotate((c.rot * Math.PI) / 180);
     if (c.skew) g.transform(1, 0, Math.tan((c.skew * Math.PI) / 180), 1, 0, 0);
     g.scale(c.sx ?? 1, c.sy ?? 1);
-    paintText(s, ch, -oy, px, c.color ?? s.fg, o.weight, c.stroke, c.glow);
+    if (box)
+      blurred(g, c.blur!, () =>
+        paintText(s, ch, -oy, px, c.color ?? s.fg, o.weight, c.stroke, c.glow, { vt: c.vt }),
+      );
+    else paintText(s, ch, -oy, px, c.color ?? s.fg, o.weight, c.stroke, c.glow, { vt: c.vt });
     g.restore();
-    x += ws[i]!;
+    x += ws[i]! + sp;
   });
   g.restore();
 }
@@ -420,10 +496,21 @@ const canFilter = () =>
   typeof CanvasRenderingContext2D !== 'undefined' && 'filter' in CanvasRenderingContext2D.prototype;
 
 /** 模糊（原版 filter: blur）：支援 ctx.filter 就直接用；不支援（舊版 Safari）就把同一張圖疊好幾次、各偏一點、降低透明度，看起來也是糊的 */
-export function blurred(g: CanvasRenderingContext2D, blur: number, draw: () => void) {
+export function blurred(
+  g: CanvasRenderingContext2D,
+  blur: number,
+  draw: () => void,
+  /** 模糊會碰到的範圍（中心 x、y 與半寬、半高，目前座標）：把濾鏡限制在這裡面，不然每次都要處理整張畫布 */
+  box?: [number, number, number, number],
+) {
   if (blur < 0.3) return draw();
   if (canFilter()) {
     g.save();
+    if (box) {
+      g.beginPath();
+      g.rect(box[0] - box[2], box[1] - box[3], box[2] * 2, box[3] * 2);
+      g.clip();
+    }
     g.filter = `blur(${blur.toFixed(2)}px)`;
     draw();
     g.restore();
@@ -486,4 +573,74 @@ export function drawRotY(
       h * kk,
     );
   }
+}
+
+/**
+ * 把一張圖（正面朝鏡頭、中心在 (cx, cy)、大小 w×h）繞水平軸轉 deg 度，先沿鏡頭方向前移 tz、整體再後移 zOff，最後做透視（原版
+ * `rotateX(deg) translateZ(tz)` 外面再包 `translateZ(zOff)`）。切成橫條，每條照自己的深度放大縮小。看不到正面（背面朝鏡頭）就不畫。
+ */
+export function drawRotX(
+  g: CanvasRenderingContext2D,
+  src: HTMLCanvasElement,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  deg: number,
+  tz: number,
+  zOff: number,
+  persp: number,
+) {
+  const a = (deg * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  if (cos <= 0.01) return;
+  const N = 28;
+  const proj = (y: number) => {
+    const y2 = y * cos - tz * sin; // 轉過去之後的高度
+    const z2 = y * sin + tz * cos + zOff; // 轉過去之後離鏡頭的距離
+    const k = persp / (persp - z2);
+    return { y: y2 * k, k };
+  };
+  for (let i = 0; i < N; i++) {
+    const y0 = -h / 2 + (h * i) / N;
+    const y1 = -h / 2 + (h * (i + 1)) / N;
+    const p0 = proj(y0);
+    const p1 = proj(y1);
+    const kk = (p0.k + p1.k) / 2;
+    const top = Math.min(p0.y, p1.y);
+    g.drawImage(
+      src,
+      0,
+      (src.height * i) / N,
+      src.width,
+      src.height / N,
+      cx - (w * kk) / 2,
+      cy + top,
+      w * kk,
+      Math.abs(p1.y - p0.y) + 0.6,
+    );
+  }
+}
+
+/** 十六進位色碼加上透明度（#rgb、#rrggbb）；不是十六進位的就原樣回傳 */
+export function withAlpha(color: string, a: number): string {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
+  if (!m) return color;
+  let h = m[1]!;
+  if (h.length === 3) h = h.replace(/./g, (c) => c + c);
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/** 一句一句輪流（每句佔 T[i] 秒）：回傳目前是第幾句、這一句的第幾秒 */
+export function sentenceAt(T: number[], t: number) {
+  const total = T.reduce((a, b) => a + b, 0);
+  let tt = t % total;
+  let i = 0;
+  while (i < T.length - 1 && tt >= T[i]!) {
+    tt -= T[i]!;
+    i++;
+  }
+  return { i, tt };
 }
