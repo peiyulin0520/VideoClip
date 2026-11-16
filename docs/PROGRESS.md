@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：文字特效 64 式計畫已寫好（`docs/plans/2026-11-16-kinetic-text.md`，Opus），待切 Sonnet 從 K0 做起；feedback-13 Y1–Y11 已做完（Y10 只加了量測，等使用者 iPhone 數字）；PR #16 等使用者合併
+- **下一步**：文字特效 64 式（`docs/plans/2026-11-16-kinetic-text.md`）K0 已做（骨架＋爆出、巨字橫移），下一個 K1（登場＋流動其餘 14 式）；Y10 等使用者 iPhone 數字；PR #16 等使用者合併
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -88,6 +88,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-16 文字特效 64 式 K0：骨架＋爆出、巨字橫移（Sonnet）
+  - 做了什麼：①**資料**：`TextItem.kinetic`（`id`、`accent`、`bg`、`speed`；`KineticId` 64 個 id 都先放進型別）；跟舊的 `textFx` 二選一（`setTextFx`／`setKinetic` 互相拿掉對方）；②**引擎**（新 `engine/kinetic/`）：`core.ts`（原版數學工具照抄：緩動、`seg`、`rnd`、`fit`、`splitWords`；`drawWord`、`marquee`＝原版 `mq` 的 canvas 版）、`fx/in.ts`（爆出）、`fx/flow.ts`（巨字橫移）、`index.ts`（登錄表、5 種原版配色 `SCHEMES`）、`render.ts`（`renderKinetic`＋`paintKinetic`：每個字卡一張固定畫布、每格重畫；t 量化成 1/60 秒；key 變了才通知）、`hit.ts`（選取範圍）；`textRender.measureTextItem`：動態字卡的大小＝整個畫面、選取範圍＝中間一條；`scene.toLayer`：有 `kinetic` 就畫舞台；`compositor`：`dynamic` 文字圖層同一張畫布每格重畫只重新上傳、不重建貼圖；③**介面**：特效分頁［文字特效］上方一排分組切換［基本｜登場｜流動］（只列有做好的組；基本＝舊 4 種），卡片是那一式的代表畫面（選中的會動，其他靜止），選了之後出現設定：強調色、底色（透明／墨黑／紙白／鈷藍／朱紅／綠幕）、速度（0.5～2×）、一輪幾秒；「作用在」分段按鈕名稱太長用刪節號；④**時間軸標記（使用者要求）**：字卡片段上有圓圈（代表字＝那一式名稱第一個字，例：爆、巨）＋頂端整條色帶（`.fx-span.style`），舊的 4 種文字特效也一樣；點圓圈跳到特效分頁。字詞：字卡文字用空白、逗號、頓號、換行拆成詞（最多 8 個、每個最多 14 字），還沒輸入用範例字。
+  - 動了哪些檔：`model/types.ts`、`engine/kinetic/*`（新）、`engine/{textRender,scene,compositor}.ts`、`store/actions.ts`、`app/editor/{KineticCards,Timeline}.tsx`、`app/editor/tabs/EffectTab.tsx`、`app/styles.css`；`docs/reference/claude-animated-text/`（原版 index.html、LICENSE、README）；測試 `engine/kinetic/kinetic.test.ts`（工具＋每一式在不同時間／舞台大小都畫得出來、同 t 同結果、真的會動）、`e2e/k0.spec.ts`（2 個）
+  - 驗證：✅ 單元、e2e、`npm run check`；截圖 `docs/screenshots/kinetic/k0-*.png`  🟡 沒在真 iPhone 驗；**還沒做「跟原版並排截圖比對」**（計畫的驗收項，K1 開始做：需要一個比對腳本，K0 兩式先用目測＋數字驗證）
+  - 已知：原版舞台是 16:9，直式畫面（9:16）時 cqmin 單位＝寬度的 1%，所以字大小、放射線半徑相對於高度比原版小（超出畫面左右的部分會被裁掉）；這是照原碼單位換算的結果，不是 bug，要不要為直式調整等使用者看過再說
+  - 下一步：K1（登場 7 式＋流動 7 式）
+
 - 2026-11-16 規劃：文字特效 64 式（Opus）
   - 做了什麼：讀原版（claude-animated-text，MIT；沙盒擋 github.io，用 raw.githubusercontent.com 讀）的結構與 64 式，寫好計畫 `docs/plans/2026-11-16-kinetic-text.md`：每式改寫成 canvas 2D 的 `draw(g, t, s)`（同一個 t 同一張圖，預覽／匯出一致），字卡新欄位 `kinetic`，放在特效分頁［文字特效］（舊 4 種當「基本」組＋8 組各 8 式），預設全畫面舞台、透明底、字卡顏色字體、可調強調色／底色／速度；步驟 K0（骨架＋burst、crawl）→ K1–K4（每次 16 式）→ K5 收尾；驗收重點是「跟原版同樣的字、同樣的秒數並排截圖比對」。
   - 動了哪些檔：`docs/plans/2026-11-16-kinetic-text.md`（新）

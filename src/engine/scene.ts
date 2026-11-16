@@ -5,6 +5,8 @@ import { effectiveAdjust } from './grade';
 import { timeResolved } from './keyframes';
 import { renderText, measureTextItem, uiScale } from './textRender';
 import { applyTextFx, typingCount } from './textFx';
+import { kineticById } from './kinetic';
+import { renderKinetic } from './kinetic/render';
 import { gapFillColor, ownsGapFill } from './cellGap';
 import { visibleLayers } from './timeline';
 import { frameOfGroup, isFrameItem } from './layoutTracks';
@@ -670,6 +672,26 @@ function toLayer(
     adjust: effectiveAdjust(item, item.adjust),
   };
   if (item.type === 'text') {
+    if (item.kinetic) {
+      // 動態字卡：整個畫面大小的舞台，每一格重畫在同一張畫布上（compositor 用 dynamic 更新貼圖）
+      const kr = renderKinetic(
+        item,
+        extra.t !== undefined ? extra.t - item.start : (kineticById(item.kinetic.id)?.poster ?? 0),
+        ctx.canvasW,
+        ctx.canvasH,
+      );
+      if (kr)
+        return {
+          ...common,
+          kind: 'text',
+          source: kr.canvas,
+          ready: true,
+          srcW: kr.w,
+          srcH: kr.h,
+          textKey: kr.key,
+          dynamic: true,
+        };
+    }
     const sc = uiScale(ctx.canvasW, ctx.canvasH);
     let r = renderText(item.card, sc, extra.visible);
     if (item.textFx && extra.t !== undefined) {

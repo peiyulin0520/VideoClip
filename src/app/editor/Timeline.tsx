@@ -1,3 +1,4 @@
+import { kineticById } from '../../engine/kinetic';
 import {
   cellNoOf,
   cellsOf,
@@ -1233,7 +1234,16 @@ export function Timeline({
                 {/* 單一素材的進場／出場特效：特效佔的那一段（淡色）＋代表字圓圈（跟接縫的轉場不同色）；版型看外框那一條 */}
                 {track.kind !== 'audio' &&
                   track.items.map((it) => {
-                    const styleFx = it.type === 'text' ? it.textFx : undefined;
+                    // 字卡的文字特效（舊的 4 種或動態字卡 64 式）：整段一直動，標在字卡片段上
+                    const kdef = it.type === 'text' && it.kinetic ? kineticById(it.kinetic.id) : undefined;
+                    const styleFx =
+                      it.type !== 'text'
+                        ? undefined
+                        : kdef
+                          ? { name: kdef.zh, code: kdef.zh.slice(0, 1) }
+                          : it.textFx
+                            ? { name: textFxName(it.textFx.kind), code: textFxCode(it.textFx.kind) }
+                            : undefined;
                     if (it.type === 'audio' || (!it.inEffect && !it.outEffect && !styleFx && !it.motion))
                       return null;
                     const d = effectDurations(it);
@@ -1274,11 +1284,18 @@ export function Timeline({
                     return (
                       <span key={`fx-${it.id}`}>
                         {styleFx && (
+                          <span
+                            className={`fx-span style${styleSel ? ' sel' : ''}`}
+                            style={{ left: x0, width: Math.max(x1 - x0, 4) }}
+                          />
+                        )}
+                        {styleFx && (
                           <button
                             className={`fx-circle style${styleSel ? ' sel' : ''}`}
                             data-testid="fx-circle-style"
                             data-item-id={it.id}
-                            aria-label={`文字特效 ${textFxName(styleFx.kind)}`}
+                            aria-label={`文字特效 ${styleFx.name}`}
+                            title={styleFx.name}
                             style={{ left: x0 + Math.max((x1 - x0) / 2 - 11, 13) }}
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
@@ -1288,7 +1305,7 @@ export function Timeline({
                               player?.seek(it.start + 0.3);
                             }}
                           >
-                            {textFxCode(styleFx.kind)}
+                            {styleFx.code}
                           </button>
                         )}
                         {it.motion && (

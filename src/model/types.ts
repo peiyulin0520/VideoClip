@@ -407,7 +407,87 @@ export type TextItem = ItemBase & {
   placeholder?: boolean;
   /** 文字樣式特效（IG 那種，整段一直動）；沒有＝無 */
   textFx?: { kind: TextFxKind };
+  /** 動態字卡（64 式，docs/plans/2026-11-16-kinetic-text.md）：整個畫面大小的舞台，字卡的文字拆成詞照那一式動；跟 textFx 二選一 */
+  kinetic?: {
+    id: KineticId;
+    /** 強調色（放射線、色塊、底條…）；沒有＝照那一式原版的配色 */
+    accent?: string;
+    /** 舞台底色；沒有＝透明 */
+    bg?: KineticBg;
+    /** 速度倍數（0.5、1、1.5、2）；沒有＝1 */
+    speed?: number;
+  };
 };
+
+/** 動態字卡舞台的底色：墨黑、紙白、鈷藍、朱紅、綠幕（色碼照原版） */
+export type KineticBg = 'ink' | 'paper' | 'cobalt' | 'verm' | 'key';
+
+/** 動態字卡 64 式的 id（照原版順序：登場、流動、切換、強調、空間、歌詞、綜藝、恐怖各 8 式） */
+export type KineticId =
+  | 'burst'
+  | 'hit'
+  | 'stamp'
+  | 'punch'
+  | 'stack'
+  | 'stretch'
+  | 'through'
+  | 'squash'
+  | 'crawl'
+  | 'drift'
+  | 'echo'
+  | 'slant'
+  | 'path'
+  | 'ticker'
+  | 'depth'
+  | 'tape'
+  | 'flap'
+  | 'flip'
+  | 'type'
+  | 'slot'
+  | 'odo'
+  | 'swapline'
+  | 'led'
+  | 'split'
+  | 'glitch'
+  | 'marker'
+  | 'shake'
+  | 'neon'
+  | 'bob'
+  | 'track'
+  | 'fill'
+  | 'focus'
+  | 'cube'
+  | 'crawl3d'
+  | 'orbit'
+  | 'tunnel'
+  | 'scatter'
+  | 'extrude'
+  | 'blinds'
+  | 'block'
+  | 'kara'
+  | 'popsync'
+  | 'dual'
+  | 'beat'
+  | 'soft'
+  | 'lyrics'
+  | 'trail'
+  | 'mix'
+  | 'vpop'
+  | 'slam'
+  | 'lines'
+  | 'marks'
+  | 'telop'
+  | 'emph'
+  | 'bouncy'
+  | 'star'
+  | 'flick'
+  | 'drip'
+  | 'creep'
+  | 'ghost'
+  | 'corrupt'
+  | 'mirror'
+  | 'torch'
+  | 'melt';
 
 /** 文字樣式特效（整段字卡一直在動）：閃爍（亮光掃過）、發光閃亮、方格字、震動 */
 export type TextFxKind = 'shimmer' | 'sparkle' | 'pixel' | 'shake';

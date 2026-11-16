@@ -46,6 +46,8 @@ export type SceneLayer = {
   box: Box;
   /** 文字：內容改變時才重新上傳貼圖 */
   textKey?: string;
+  /** 文字圖層的畫布每格都會重畫（動態字卡）：貼圖不重建，只重新上傳 */
+  dynamic?: boolean;
   /** 影片/照片：暫存畫面的解析度（固定，免得縮放手勢時一直重建貼圖） */
   frameW?: number;
   frameH?: number;
@@ -292,7 +294,10 @@ export class Compositor {
     // ---- 內容 ----
     if (layer.kind === 'text') {
       if (o.textKey !== layer.textKey || !o.texture) {
-        this.setSource(o, layer.source as HTMLCanvasElement);
+        // 動態字卡：同一張畫布每格重畫，貼圖不用重建，通知它重新上傳就好
+        if (layer.dynamic && o.texture && o.textureSource && o.textureSource.resource === layer.source)
+          o.textureSource.update();
+        else this.setSource(o, layer.source as HTMLCanvasElement);
         o.textKey = layer.textKey;
         o.hasFrame = true;
       }

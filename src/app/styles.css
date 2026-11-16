@@ -4448,3 +4448,31 @@ button:not(:disabled):active,
   background: rgba(176, 42, 42, 0.78);
   pointer-events: none;
 }
+
+/* 字卡的文字特效（整段一直動）：片段頂端的整條色帶 */
+.fx-span.style {
+  background: repeating-linear-gradient(135deg, #a8688a 0 4px, rgba(236, 206, 222, 0.9) 4px 8px);
+}
+.fx-span.style.sel {
+  background: repeating-linear-gradient(135deg, #5d2a47 0 4px, rgba(168, 104, 138, 0.9) 4px 8px);
+}
+/* 動態字卡的卡片：縮圖是那一式的代表畫面（選中的會動） */
+.tr-card .kn-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: #111;
+}
+.kn-set {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+/* 特效分頁「作用在」：名稱太長（例：文字特效 ·巨字橫移）就用刪節號，不把後面的按鈕擠出去 */
+.fx-where .seg-btn {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

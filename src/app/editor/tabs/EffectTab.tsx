@@ -11,17 +11,24 @@ import {
   TYPEWRITER_CODE,
   type TransitionCat,
 } from '../../../engine/transitions';
-import type { EffectKind, Item, TextFxKind, VideoItem } from '../../../model/types';
+import type { EffectKind, Item, KineticBg, TextFxKind, TextItem, VideoItem } from '../../../model/types';
 import {
   editItem,
   setItemMotion,
   setItemEffect,
+  patchKinetic,
+  setKinetic,
   setTextFx,
   setTransition,
   setTransitionAll,
   setTransitionSplit,
 } from '../../../store/actions';
+import { KINETIC, KINETIC_GROUPS, SCHEMES, kineticById } from '../../../engine/kinetic';
+import type { KineticDef, KineticGroup } from '../../../engine/kinetic/core';
+import { kineticWords } from '../../../engine/kinetic/render';
 import { TEXT_FXS, textFxName } from '../../../engine/textFx';
+import { ColorPicker } from '../../../ui/ColorPicker';
+import { KineticCard } from '../KineticCards';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
@@ -82,8 +89,8 @@ export function EffectTab({ found }: { found: Found }) {
                   {k === 'in' && item.inEffect ? ` ·${transitionName(item.inEffect.kind)}` : ''}
                   {k === 'out' && item.outEffect ? ` ·${transitionName(item.outEffect.kind)}` : ''}
                   {k === 'seam' && item.transitionIn ? ` ·${transitionName(item.transitionIn.kind)}` : ''}
-                  {k === 'style' && item.type === 'text' && item.textFx
-                    ? ` ·${textFxName(item.textFx.kind)}`
+                  {k === 'style' && item.type === 'text' && (item.kinetic || item.textFx)
+                    ? ` ·${item.kinetic ? (kineticById(item.kinetic.id)?.zh ?? '') : textFxName(item.textFx!.kind)}`
                     : ''}
                   {k === 'whole' && item.motion ? ` ·${item.motion === 'drift' ? '捲動' : '滑入滑出'}` : ''}
                 </button>
@@ -139,48 +146,151 @@ function WholeBlock({ item }: { item: Item }) {
   );
 }
 
-/** 字卡的文字樣式特效：整段字一直在動（IG 那種），選一種或「無」 */
+/** 字卡的文字特效：整段字一直在動。［基本］是舊的 4 種；其他組是動態字卡 64 式（照原版分組），選一種或「無」 */
 function StyleBlock({ item }: { item: Item }) {
-  const cur = item.type === 'text' ? item.textFx?.kind : undefined;
-  const pick = (k: TextFxKind | null) => {
+  const textFx = item.type === 'text' ? item.textFx?.kind : undefined;
+  const kin = item.type === 'text' ? item.kinetic : undefined;
+  const kdef = kin ? kineticById(kin.id) : undefined;
+  const groups = KINETIC_GROUPS.filter((g) => KINETIC.some((f) => f.group === g.id));
+  const [pickedGroup, setGroup] = useState<KineticGroup | 'basic' | null>(null);
+  const grp: KineticGroup | 'basic' = pickedGroup ?? kdef?.group ?? 'basic';
+  const focus = () => useUI.setState({ fxFocus: { id: item.id, role: 'style' } });
+  const pickBasic = (k: TextFxKind | null) => {
     setTextFx(item.id, k);
-    useUI.setState({ fxFocus: { id: item.id, role: 'style' } });
+    focus();
   };
+  const pickKinetic = (id: KineticDef['id'] | null) => {
+    setKinetic(item.id, id);
+    focus();
+  };
+  const run = item.type === 'text' ? item.card.runs[0] : undefined;
+  const words = item.type === 'text' && kdef ? kineticWords(item, kdef.words) : [];
+  const cardWords = (def: KineticDef) => (item.type === 'text' ? kineticWords(item, def.words) : def.words);
+  const none = !textFx && !kin;
   return (
     <>
+      <div className="seg" role="tablist" aria-label="文字特效分組" data-testid="kn-groups">
+        {([['basic', '基本'], ...groups.map((g) => [g.id, g.name] as const)] as const).map(([id, name]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={grp === id}
+            data-testid={`kn-group-${id}`}
+            className={`seg-btn${grp === id ? ' on' : ''}`}
+            onClick={() => setGroup(id)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
       <div className="tr-grid" role="radiogroup" aria-label="文字特效" data-testid="tr-grid">
         <button
           role="radio"
-          aria-checked={!cur}
+          aria-checked={none}
           aria-label="文字特效 無"
-          className={`tr-card${cur ? '' : ' on'}`}
-          onClick={() => pick(null)}
+          className={`tr-card${none ? ' on' : ''}`}
+          onClick={() => {
+            setTextFx(item.id, null);
+            setKinetic(item.id, null);
+            focus();
+          }}
         >
           <span className="tr-none" aria-hidden="true">
             ⊘
           </span>
           <span className="tr-name">無</span>
         </button>
-        {TEXT_FXS.map((f) => (
+        {grp === 'basic'
+          ? TEXT_FXS.map((f) => (
+              <button
+                key={f.id}
+                role="radio"
+                aria-checked={textFx === f.id}
+                aria-label={`文字特效 ${f.name}`}
+                className={`tr-card${textFx === f.id ? ' on' : ''}`}
+                onClick={() => pickBasic(f.id)}
+              >
+                <span className="tr-none" aria-hidden="true">
+                  {f.code}
+                </span>
+                <span className="tr-name">{f.name}</span>
+              </button>
+            ))
+          : KINETIC.filter((f) => f.group === grp).map((f) => (
+              <KineticCard
+                key={f.id}
+                def={f}
+                words={cardWords(f)}
+                fontId={run?.fontId ?? ''}
+                active={kin?.id === f.id}
+                onPick={() => pickKinetic(f.id)}
+              />
+            ))}
+      </div>
+      {kin && kdef && item.type === 'text' && (
+        <KineticSettings item={item} def={kdef} wordCount={words.length} />
+      )}
+    </>
+  );
+}
+
+const KINETIC_BGS: [KineticBg | undefined, string][] = [
+  [undefined, '透明'],
+  ['ink', '墨黑'],
+  ['paper', '紙白'],
+  ['cobalt', '鈷藍'],
+  ['verm', '朱紅'],
+  ['key', '綠幕'],
+];
+const KINETIC_SPEEDS = [0.5, 1, 1.5, 2];
+
+/** 動態字卡的設定：強調色、底色、速度；一輪幾秒 */
+function KineticSettings({ item, def, wordCount }: { item: TextItem; def: KineticDef; wordCount: number }) {
+  const k = item.kinetic!;
+  const sch = SCHEMES[def.scheme];
+  const len = def.len(wordCount);
+  const speed = k.speed ?? 1;
+  return (
+    <div className="zone-soft kn-set" data-testid="kn-settings">
+      <div className="zone-title">{def.zh}</div>
+      <div className="slider-label">強調色</div>
+      <ColorPicker
+        label="強調色"
+        value={k.accent ?? sch.hi}
+        onPick={(c) => patchKinetic(item.id, { accent: c })}
+      />
+      <div className="slider-label">底色</div>
+      <div className="chips" role="radiogroup" aria-label="動態字卡底色">
+        {KINETIC_BGS.map(([id, name]) => (
           <button
-            key={f.id}
+            key={name}
             role="radio"
-            aria-checked={cur === f.id}
-            aria-label={`文字特效 ${f.name}`}
-            className={`tr-card${cur === f.id ? ' on' : ''}`}
-            onClick={() => pick(f.id)}
+            aria-checked={k.bg === id}
+            aria-label={`底色 ${name}`}
+            className={`chip${k.bg === id ? ' active' : ''}`}
+            onClick={() => patchKinetic(item.id, { bg: id })}
           >
-            <span className="tr-none" aria-hidden="true">
-              {f.code}
-            </span>
-            <span className="tr-name">{f.name}</span>
+            {name}
           </button>
         ))}
       </div>
-      <p className="hint">
-        整段字一直在動：閃爍＝亮光從左掃到右；發光閃亮＝字邊發光＋小星星；方格字＝粗方格一直動；震動＝左右抖動。進場、出場可以同時再加別的特效。
-      </p>
-    </>
+      <div className="slider-label">速度</div>
+      <div className="chips" role="radiogroup" aria-label="動態字卡速度">
+        {KINETIC_SPEEDS.map((v) => (
+          <button
+            key={v}
+            role="radio"
+            aria-checked={speed === v}
+            aria-label={`速度 ${v}×`}
+            className={`chip${speed === v ? ' active' : ''}`}
+            onClick={() => patchKinetic(item.id, { speed: v === 1 ? undefined : v })}
+          >
+            {v}×
+          </button>
+        ))}
+      </div>
+      {len !== null && <div className="slider-label">一輪 {(len / speed).toFixed(1)} 秒</div>}
+    </div>
   );
 }
 

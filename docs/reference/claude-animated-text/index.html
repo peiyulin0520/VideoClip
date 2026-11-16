@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>字會動 64 式</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: left-aligned masthead and one sticky input bar, then three bands of 16:9 print blocks in a dense grid.
+     Palette: two-ink riso print (cobalt + vermilion) on cool grey stock. Stage inks stay fixed in both themes. */
+  --paper:#eceef2;
+  --panel:#f8f9fb;
+  --ink:#14161b;
+  --muted:#5d6472;
+  --rule:#c8ccd6;
+  --accent:#2340ff;
+  --accent-2:#ff4d2e;
+  --on-accent:#ffffff;
+
+  --s-ink:#14161b;
+  --s-paper:#f4f5f7;
+  --s-cobalt:#2340ff;
+  --s-verm:#ff4d2e;
+  --s-key:#00b140;
+
+  --display:"Noto Sans TC","PingFang TC","Microsoft JhengHei","Noto Sans CJK TC",sans-serif;
+  --serif:"Noto Serif TC","Songti TC","PMingLiU","Noto Serif CJK TC",serif;
+  --latin:"Archivo","Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0f1116; --panel:#181b22; --ink:#eceef2; --muted:#9aa1b0; --rule:#2c313c;
+    --accent:#8696ff; --accent-2:#ff6a4f; --on-accent:#0f1116;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0f1116; --panel:#181b22; --ink:#eceef2; --muted:#9aa1b0; --rule:#2c313c;
+  --accent:#8696ff; --accent-2:#ff6a4f; --on-accent:#0f1116;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--latin),var(--display); font-size:15px; line-height:1.6;
+}
+.wrap{max-width:1240px; margin:0 auto; padding:0 clamp(16px,3.5vw,40px)}
+button{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+
+/* masthead */
+.mast{padding:clamp(28px,5vw,56px) 0 18px; display:grid; gap:10px}
+.mast .kicker{margin:0; font-family:var(--latin); font-stretch:115%; font-weight:700; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+.mast h1{
+  margin:0; font-family:var(--display); font-weight:900; line-height:1;
+  font-size:clamp(44px,8.4vw,104px); letter-spacing:-.01em; text-wrap:balance;
+}
+.mast h1 .n{
+  font-family:var(--latin); font-stretch:68%; font-weight:900; font-size:1.22em; letter-spacing:-.02em;
+  color:var(--accent); text-shadow:.045em .045em 0 var(--accent-2); padding:0 .06em;
+}
+.mast .lede{margin:6px 0 0; max-width:38em; font-family:var(--display); font-size:16px; color:var(--muted)}
+
+/* input bar */
+.bar{
+  position:sticky; top:0; z-index:5; background:var(--paper);
+  border-top:2px solid var(--ink); border-bottom:1px solid var(--rule);
+}
+.bar-in{display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; padding-top:10px; padding-bottom:10px}
+.field{display:flex; align-items:center; gap:10px; flex:1 1 320px; min-width:0}
+.field label{font-family:var(--display); font-weight:900; font-size:14px; white-space:nowrap}
+.field input{
+  flex:1; min-width:0; font:inherit; font-family:var(--display); font-weight:700; font-size:16px;
+  color:var(--ink); background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:9px 12px;
+}
+.field input::placeholder{color:var(--muted); font-weight:400}
+.field input:focus-visible{outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent)}
+.btn{
+  font-family:var(--display); font-weight:700; font-size:13px; cursor:pointer; white-space:nowrap;
+  background:transparent; border:1px solid var(--ink); border-radius:3px; padding:8px 12px;
+}
+.btn:hover{background:var(--ink); color:var(--paper)}
+.btn[disabled]{opacity:.35; cursor:default; pointer-events:none}
+.chips{display:flex; gap:0; border:1px solid var(--ink); border-radius:3px; overflow:hidden}
+.chips button{
+  font-family:var(--display); font-weight:700; font-size:13px; cursor:pointer;
+  background:transparent; border:0; border-left:1px solid var(--ink); padding:8px 12px;
+}
+.chips button:first-child{border-left:0}
+.chips button[aria-pressed="true"]{background:var(--ink); color:var(--paper)}
+.chips button:focus-visible{outline-offset:-3px}
+
+/* bands */
+.band-sec{padding:34px 0 6px}
+.band-sec[hidden]{display:none}
+.band-h{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 16px; margin-bottom:16px}
+.band-h h2{margin:0; font-family:var(--display); font-weight:900; font-size:28px; line-height:1.1}
+.band-h .rng{font-family:var(--latin); font-stretch:115%; font-weight:700; font-size:12px; letter-spacing:.1em; color:var(--accent); font-variant-numeric:tabular-nums}
+.band-h p{margin:0; font-family:var(--display); color:var(--muted); font-size:14px}
+.grid{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:26px 18px}
+.card{display:grid; gap:9px; align-content:start; min-width:0}
+.stage-btn{display:block; width:100%; padding:0; border:0; background:none; cursor:zoom-in; border-radius:3px}
+.meta{display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:1px; align-items:baseline}
+.meta .no{font-family:var(--latin); font-stretch:70%; font-weight:900; font-size:22px; line-height:1; color:var(--accent); font-variant-numeric:tabular-nums; grid-row:span 2; align-self:start; padding-top:2px}
+.meta h3{margin:0; font-family:var(--display); font-weight:900; font-size:16px; line-height:1.3; display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px}
+.meta h3 .en{font-family:var(--latin); font-stretch:112%; font-weight:600; font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
+.meta p{margin:0; font-family:var(--display); font-size:13px; line-height:1.5; color:var(--muted)}
+.meta .use{color:var(--ink); font-weight:700; white-space:nowrap}
+.foot{padding:40px 0 48px; font-family:var(--display); font-size:13px; color:var(--muted); max-width:44em}
+
+/* stage */
+.stage{
+  container-type:size; position:relative; overflow:hidden; aspect-ratio:16/9; width:100%;
+  background:var(--bg); color:var(--fg); border-radius:3px;
+  font-family:var(--display); font-weight:900; line-height:1.1; text-align:center;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 14%,transparent);
+  user-select:none; -webkit-user-select:none;
+}
+.stage[data-scheme="ink"]{--bg:var(--s-ink);--fg:var(--s-paper);--hi:var(--s-verm);--hifg:var(--s-ink)}
+.stage[data-scheme="paper"]{--bg:var(--s-paper);--fg:var(--s-ink);--hi:var(--s-cobalt);--hifg:#fff}
+.stage[data-scheme="cobalt"]{--bg:var(--s-cobalt);--fg:#fff;--hi:var(--s-ink);--hifg:#fff}
+.stage[data-scheme="verm"]{--bg:var(--s-verm);--fg:var(--s-ink);--hi:var(--s-paper);--hifg:var(--s-ink)}
+.stage[data-scheme="key"]{--bg:var(--s-key);--fg:#fff;--hi:var(--s-ink);--hifg:#fff}
+.stage:fullscreen{aspect-ratio:auto; width:100vw; height:100vh; border-radius:0; box-shadow:none}
+
+.fx{position:absolute; inset:0; display:grid; place-items:center; overflow:hidden}
+.w900{font-weight:900; white-space:nowrap; line-height:1.1; will-change:transform}
+.pile{display:grid; place-items:center; width:100%; height:100%}
+.pile>*{grid-area:1/1}
+.col{display:flex; flex-direction:column; align-items:center; gap:.6cqmin}
+.chars span{display:inline-block; transform-origin:50% 88%; will-change:transform}
+
+.mq{display:flex; overflow:hidden; white-space:nowrap; width:100%}
+.mq-t{display:flex; flex:none; will-change:transform}
+.mq-t>span{flex:none}
+.mq.v{flex-direction:column; width:auto; height:100%}
+.mq.v .mq-t{flex-direction:column}
+.mq.v .mq-t>span{writing-mode:vertical-rl}
+
+.rays{position:absolute; inset:0}
+.rays i{position:absolute; left:50%; top:50%; width:1.1cqmin; height:13cqmin; margin:-6.5cqmin 0 0 -.55cqmin; background:var(--hi); opacity:0}
+.stamps{display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:3cqmin 4.5cqw; padding:0 4cqw}
+.stamp{display:block; border:.13em solid currentColor; border-radius:.16em; padding:.1em .3em; color:var(--hi); line-height:1.15; white-space:nowrap; opacity:0}
+.stamp:nth-child(2){color:var(--fg)}
+.ghost{color:var(--hi)}
+
+.huge{position:absolute; inset:0 0 10cqmin 0; width:auto; align-items:center; font-size:58cqmin; line-height:1}
+.strip{position:absolute; left:0; right:0; bottom:0; width:auto; background:var(--hi); color:var(--hifg); font-size:5.6cqmin; font-weight:700; padding:1.6cqmin 0; line-height:1.2}
+.vcols{position:absolute; inset:0; display:flex; justify-content:space-evenly; font-family:var(--serif); font-size:15cqmin; line-height:1}
+.vcols .alt{color:var(--hi)}
+.wave{display:grid; justify-items:center; gap:1.4cqmin 0; width:100%; padding:0 3cqw; font-weight:700; line-height:1.15}
+.wave span{white-space:nowrap}
+.diag{position:absolute; inset:-30%; display:flex; flex-direction:column; justify-content:center; gap:3.4cqmin; transform:rotate(-9deg)}
+.sband{font-size:13cqmin; padding:1.7cqmin 0; line-height:1.1}
+.sb1{background:var(--hi); color:var(--hifg)}
+.sb2{background:var(--fg); color:var(--bg); font-family:var(--serif)}
+.rib{position:absolute; inset:0; width:100%; height:100%}
+.rib-b{fill:none; stroke:var(--hi); stroke-width:26}
+.rib-t,.rib-m{font-family:var(--display); font-size:15px; font-weight:900; fill:var(--hifg)}
+.rib-m{visibility:hidden}
+.rows{position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; gap:1.6cqmin}
+.r-s{font-size:6.2cqmin; font-weight:500; line-height:1.15}
+.r-b{font-size:27cqmin; color:var(--hi); line-height:1.05}
+.r-s2{font-size:6.2cqmin; font-weight:700; background:var(--fg); color:var(--bg); padding:1cqmin 0; line-height:1.15}
+.r-m{font-size:13cqmin; font-family:var(--serif); line-height:1.1}
+.v3{position:absolute; inset:0; display:flex; justify-content:center; gap:5cqmin; font-family:var(--serif); line-height:1}
+.v3 .far{font-size:7cqmin; opacity:.28}
+.v3 .side{font-size:13cqmin; opacity:.55}
+.v3 .mid{font-size:30cqmin; color:var(--hi)}
+.tape{position:absolute; left:-25%; width:150%; top:50%; font-size:11cqmin; padding:1.5cqmin 0; line-height:1.1}
+.tp1{transform:translateY(-50%) rotate(12deg); background:var(--hi); color:var(--hifg)}
+.tp2{transform:translateY(-50%) rotate(-10deg); background:var(--fg); color:var(--bg)}
+
+.tiles{display:flex; gap:.12em}
+.tile{position:relative; display:grid; place-items:center; width:1.22em; height:1.42em; background:var(--fg); color:var(--bg); border-radius:.08em; overflow:hidden; will-change:transform}
+.tile b{display:block; font-size:.84em; line-height:1; font-weight:900}
+.tile.flap::after{content:""; position:absolute; left:0; right:0; top:50%; height:.02em; background:var(--bg); opacity:.32}
+.reel b{position:absolute; inset:0; display:grid; place-items:center}
+.type{font-family:var(--serif); font-weight:700; text-align:left; white-space:nowrap; line-height:1.3}
+.caret{display:inline-block; width:.09em; height:1em; background:var(--hi); vertical-align:-.13em; margin-left:.08em}
+.odo{display:flex; align-items:center; gap:.3em; white-space:nowrap}
+.odo small{font-size:.34em; font-weight:700}
+.odo-n{display:flex; align-items:flex-end; gap:.06em}
+.dg{display:block; width:.8em; height:1.25em; background:var(--fg); color:var(--bg); border-radius:.08em; overflow:hidden; font-family:var(--latin); font-stretch:80%; font-variant-numeric:tabular-nums}
+.dg b{display:block; line-height:1.25em; font-weight:900; will-change:transform}
+.comma{font-style:normal; font-family:var(--latin); line-height:1}
+.head{display:flex; align-items:stretch; gap:.28em; line-height:1.5; white-space:nowrap}
+.lab{display:grid; place-items:center; padding:0 .32em; border:.08em solid currentColor; font-weight:900}
+.win{position:relative; overflow:hidden; height:1.66em; background:var(--hi); color:var(--hifg)}
+.win span{position:absolute; inset:0; display:grid; place-items:center; will-change:transform}
+.fx-led{--d:2.7cqmin}
+.led-bg{position:absolute; inset:0; background:radial-gradient(circle,color-mix(in srgb,var(--hi) 16%,transparent) 0 44%,transparent 50%) 0 0/var(--d) var(--d)}
+.led{
+  position:absolute; inset:0; display:flex; align-items:center; font-size:46cqmin; line-height:1; color:var(--hi);
+  -webkit-mask:radial-gradient(circle,#000 0 44%,transparent 50%) 0 0/var(--d) var(--d);
+  mask:radial-gradient(circle,#000 0 44%,transparent 50%) 0 0/var(--d) var(--d);
+}
+
+.btn.sm{font-size:12px; padding:4px 9px}
+.meta .no{grid-row:span 3}
+.meta .cp{grid-column:2; justify-self:start; margin-top:6px}
+.all{padding-top:44px; scroll-margin-top:72px}
+.all .band-h .btn{margin-left:auto}
+.plist{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,430px),1fr)); gap:18px}
+.plist li{display:grid; gap:8px; align-content:start; min-width:0}
+.p-h{display:flex; align-items:baseline; gap:10px}
+.p-h .no{font-family:var(--latin); font-stretch:70%; font-weight:900; font-size:20px; line-height:1; color:var(--accent); font-variant-numeric:tabular-nums}
+.p-h b{font-family:var(--display); font-weight:900; font-size:15px}
+.p-h .btn{margin-left:auto; align-self:center}
+pre.pr{margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--display); font-size:13px; line-height:1.7; color:var(--ink); background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:12px 14px}
+.dlg-p{display:grid; gap:8px}
+.dlg-p pre.pr{background:var(--paper); max-height:190px; overflow:auto}
+
+.hl{position:relative; display:inline-block; padding:0 .2em; white-space:nowrap; font-weight:900; line-height:1.15}
+.hl-bar{position:absolute; left:0; right:0; top:42%; bottom:2%; background:var(--hi); will-change:transform}
+.hl span{position:relative}
+.neon{filter:drop-shadow(0 0 .09em var(--hi)) drop-shadow(0 0 .32em var(--hi))}
+.neon span{color:transparent; -webkit-text-stroke:.035em var(--hi)}
+.outl{color:transparent; -webkit-text-stroke:.03em var(--fg)}
+.tun.o{color:transparent; -webkit-text-stroke:.025em var(--fg)}
+.fx-cube{perspective:95cqmin}
+.cube{display:grid; place-items:center; transform-style:preserve-3d; transform:translateZ(-.66em); white-space:nowrap; font-weight:900; line-height:1.32}
+.face{grid-area:1/1; padding:0 .36em; background:var(--hi); color:var(--hifg); backface-visibility:hidden; will-change:transform}
+.fx-crawl3d{perspective:70cqmin; perspective-origin:50% 25%}
+.crawl{position:absolute; left:-15%; right:-15%; bottom:-6%; height:190%; transform:rotateX(56deg); transform-origin:50% 100%; overflow:hidden; line-height:21.75cqmin; color:var(--hi); font-weight:900; white-space:nowrap}
+.crawl-t{will-change:transform}
+.crawl-fade{position:absolute; left:0; right:0; top:0; height:52%; background:linear-gradient(var(--bg) 25%,transparent); pointer-events:none}
+.orb{position:absolute; inset:0; width:100%; height:100%}
+.orb-t{font-family:var(--display); font-weight:900; fill:var(--fg)}
+.orb-c{font-family:var(--display); font-weight:900; fill:var(--hi); text-anchor:middle; dominant-baseline:central}
+.blk{position:relative; display:inline-block; padding:0 .22em; white-space:nowrap; font-weight:900; line-height:1.25}
+.blk i{position:absolute; inset:0; background:var(--hi); will-change:transform}
+
+.stage[data-scheme="ink"]{--vf:var(--s-verm);--vs:var(--s-paper)}
+.stage[data-scheme="paper"]{--vf:var(--s-verm);--vs:var(--s-ink)}
+.stage[data-scheme="cobalt"],.stage[data-scheme="verm"],.stage[data-scheme="key"]{--vf:#fff;--vs:var(--s-ink)}
+.vt{color:var(--vf); -webkit-text-stroke:.16em var(--vs); paint-order:stroke fill; font-weight:900}
+.vt span{color:var(--vf)}
+.hser{font-family:var(--serif)}
+.dl{position:absolute; white-space:nowrap}
+.dl-a{left:8cqw; top:20cqh}
+.dl-b{right:8cqw; bottom:20cqh}
+.dl i{position:absolute; left:0; right:0; bottom:-.16em; height:.1em; background:var(--hi); transform-origin:0 50%}
+.lyr{position:absolute; inset:0}
+.lyr div{position:absolute; left:0; right:0; top:50%; margin-top:-.55em; line-height:1.1; white-space:nowrap; font-weight:900; will-change:transform}
+.mixb{position:relative; width:100em; height:56em; font-size:min(.9cqw,1.5cqh)}
+.mixb div{position:absolute; display:grid; place-items:center; will-change:transform}
+.mixb span{display:block; white-space:nowrap; line-height:1; font-weight:900}
+.mixb .vr{writing-mode:vertical-rl}
+.flines{position:absolute; inset:-25%; background:repeating-conic-gradient(from var(--a,0deg),var(--fg) 0 .9deg,transparent .9deg 7deg),repeating-conic-gradient(from calc(var(--a,0deg) * 1.7),var(--fg) 0 1.5deg,transparent 1.5deg 11deg); -webkit-mask:radial-gradient(ellipse at center,transparent 30%,#000 66%); mask:radial-gradient(ellipse at center,transparent 30%,#000 66%)}
+.mk{position:absolute; left:50%; top:50%; font-size:24cqmin; line-height:1; white-space:nowrap}
+.tel{position:relative; display:inline-block; padding:.14em .5em; font-weight:900; line-height:1.2; white-space:nowrap}
+.tel-bg{position:absolute; inset:0; background:var(--hi); transform-origin:0 50%}
+.tel .chars{position:relative; color:var(--hifg)}
+.emph{display:flex; align-items:baseline; gap:.2em; white-space:nowrap; font-weight:900; line-height:1.2}
+.emph .sm{font-size:.5em}
+.emph .vt{display:inline-block; transform-origin:30% 80%}
+.star{position:absolute; left:50%; top:50%; width:92cqmin; height:92cqmin; margin:-46cqmin 0 0 -46cqmin; background:var(--hi)}
+.dripw{position:relative; display:inline-block; white-space:nowrap; font-weight:900; line-height:1.1; color:var(--hi)}
+.dripw i{position:absolute; top:80%; height:0; background:var(--hi); border-radius:0 0 1em 1em}
+.refl{-webkit-mask:linear-gradient(transparent 25%,#000 95%); mask:linear-gradient(transparent 25%,#000 95%)}
+.torch{position:absolute; inset:0; display:grid; place-items:center}
+
+/* enlarged view */
+dialog{
+  border:0; padding:0; background:var(--panel); color:var(--ink); border-radius:4px;
+  width:min(980px,calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto;
+}
+dialog::backdrop{background:rgba(8,10,14,.72)}
+.dlg-in{display:grid; gap:14px; padding:16px clamp(14px,2.4vw,22px) 18px}
+.dlg-h{display:flex; align-items:baseline; gap:10px}
+.dlg-h .no{font-family:var(--latin); font-stretch:70%; font-weight:900; font-size:26px; line-height:1; color:var(--accent)}
+.dlg-h h2{margin:0; font-family:var(--display); font-weight:900; font-size:20px}
+.dlg-h .en{font-family:var(--latin); font-stretch:112%; font-weight:600; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
+.dlg-h .x{margin-left:auto; align-self:center}
+.dlg-stage{display:grid; place-items:center; background:var(--paper); border-radius:3px; padding:12px; min-height:200px}
+.stage.big{aspect-ratio:var(--r,16/9); width:min(100%,calc(58vh * var(--rn,1.7778)))}
+.dlg-c{display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px}
+.grp{display:flex; align-items:center; gap:8px}
+.grp>span{font-family:var(--display); font-weight:700; font-size:12px; color:var(--muted)}
+.sw{display:flex; gap:6px}
+.sw button{width:28px; height:28px; border-radius:50%; border:1px solid var(--rule); cursor:pointer; padding:0}
+.sw button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.nav{margin-left:auto; display:flex; gap:8px}
+.hint{margin:0; font-family:var(--display); font-size:13px; color:var(--muted); max-width:46em}
+
+@media (max-width:520px){
+  .grid{grid-template-columns:1fr}
+  .nav{margin-left:0}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="mast">
+    <p class="kicker">Kinetic type specimen</p>
+    <h1>字會動<span class="n">64</span>式</h1>
+    <p class="lede">每一格都是即時運算的動畫，每一式都附一則可以直接貼給 AI 的指令。輸入你的字，64 種動態和指令一起換；點任一格放大，換比例、換底色，切綠幕後錄螢幕就能去背。</p>
+  </header>
+</div>
+
+<div class="bar">
+  <div class="wrap bar-in">
+    <div class="field">
+      <label for="words">你的字</label>
+      <input id="words" type="text" autocomplete="off" maxlength="80" placeholder="例：今晚八點 首播 不見不散（用空格分開多個詞）">
+    </div>
+    <button class="btn" id="reset" type="button" disabled>還原範例字</button>
+    <button class="btn" id="play" type="button" aria-pressed="true">暫停全部</button>
+    <button class="btn" id="to-prompts" type="button">看全部指令</button>
+    <div class="chips" role="group" aria-label="只看某一組">
+      <button type="button" data-g="all" aria-pressed="true">全部</button>
+      <button type="button" data-g="in" aria-pressed="false">登場</button>
+      <button type="button" data-g="flow" aria-pressed="false">流動</button>
+      <button type="button" data-g="swap" aria-pressed="false">切換</button>
+      <button type="button" data-g="em" aria-pressed="false">強調</button>
+      <button type="button" data-g="sp" aria-pressed="false">空間</button>
+      <button type="button" data-g="mv" aria-pressed="false">歌詞</button>
+      <button type="button" data-g="tv" aria-pressed="false">綜藝</button>
+      <button type="button" data-g="hr" aria-pressed="false">恐怖</button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap" id="main"></main>
+
+<section class="wrap all" id="all-prompts" aria-labelledby="all-h">
+  <div class="band-h">
+    <h2 id="all-h">全部指令</h2>
+    <span class="rng">01 – 64</span>
+    <p>每一則都能直接貼給 Claude 或其他會寫程式的 AI，請它做出同一種動態。上方輸入的字會自動帶進指令。</p>
+    <button class="btn" id="copy-all" type="button">複製全部 64 則</button>
+  </div>
+  <ol class="plist" id="plist"></ol>
+</section>
+
+<div class="wrap">
+  <p class="foot">指令裡的秒數、角度、比例都取自這一頁實際在跑的動畫，貼出去後想快一點、慢一點，直接改數字就行。</p>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlg-t">
+  <div class="dlg-in">
+    <div class="dlg-h">
+      <span class="no" id="dlg-no"></span>
+      <h2 id="dlg-t"></h2>
+      <span class="en" id="dlg-en"></span>
+      <button class="btn x" id="dlg-x" type="button">關閉</button>
+    </div>
+    <div class="dlg-stage"><div class="stage big" id="big" data-scheme="ink"></div></div>
+    <div class="dlg-c">
+      <div class="grp"><span>比例</span>
+        <div class="chips" id="ratio" role="group" aria-label="畫面比例">
+          <button type="button" data-r="16/9" data-rn="1.7778" aria-pressed="true">16:9</button>
+          <button type="button" data-r="9/16" data-rn="0.5625" aria-pressed="false">9:16</button>
+          <button type="button" data-r="1/1" data-rn="1" aria-pressed="false">1:1</button>
+        </div>
+      </div>
+      <div class="grp"><span>底色</span>
+        <div class="sw" id="sw" role="group" aria-label="底色">
+          <button type="button" data-s="ink" style="background:#14161b" aria-label="墨黑" aria-pressed="false"></button>
+          <button type="button" data-s="paper" style="background:#f4f5f7" aria-label="紙白" aria-pressed="false"></button>
+          <button type="button" data-s="cobalt" style="background:#2340ff" aria-label="鈷藍" aria-pressed="false"></button>
+          <button type="button" data-s="verm" style="background:#ff4d2e" aria-label="朱紅" aria-pressed="false"></button>
+          <button type="button" data-s="key" style="background:#00b140" aria-label="綠幕" aria-pressed="false"></button>
+        </div>
+      </div>
+      <button class="btn" id="fs" type="button">全螢幕播放</button>
+      <div class="nav">
+        <button class="btn" id="prev" type="button">上一式</button>
+        <button class="btn" id="next" type="button">下一式</button>
+      </div>
+    </div>
+    <div class="dlg-p">
+      <div class="p-h"><b>這一式的指令</b><button class="btn sm" id="dlg-copy" type="button">複製指令</button></div>
+      <pre class="pr" id="dlg-pr"></pre>
+    </div>
+    <p class="hint">用系統的螢幕錄影錄下這一格。選綠幕底，匯入剪輯軟體後做色度去背，就能疊在影片上。換比例或底色，指令也會跟著改。鍵盤左右鍵可換上一式、下一式。</p>
+  </div>
+</dialog>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- helpers ---------- */
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,p)=>a+(b-a)*p;
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const E={
+  out:p=>1-Math.pow(1-p,3),
+  in:p=>p*p*p,
+  io:p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2,
+  back:p=>{const c=2.2;return 1+(c+1)*Math.pow(p-1,3)+c*Math.pow(p-1,2);},
+  expo:p=>p>=1?1:1-Math.pow(2,-10*p),
+  el:p=>p<=0?0:p>=1?1:Math.pow(2,-10*p)*Math.sin((p*10-.75)*(2*Math.PI/3))+1
+};
+const h=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;};
+const cs=s=>Array.from(s);
+const wlen=s=>cs(s).reduce((n,c)=>n+(c.codePointAt(0)<0x2e80?.58:1),0);
+const rnd=(a,b,c)=>{const x=Math.sin(a*127.1+b*311.7+c*74.7)*43758.5453;return x-Math.floor(x);};
+const pick=(W,i)=>W[((i%W.length)+W.length)%W.length];
+const fit=(s,max,w)=>`min(${max}cqmin, ${(w/Math.max(wlen(s),1)).toFixed(2)}cqw)`;
+const fitN=(n,max,w)=>`min(${max}cqmin, ${(w/Math.max(n,1)).toFixed(2)}cqw)`;
+function keys(t,pts){
+  if(t<=pts[0][0])return pts[0][1];
+  for(let i=1;i<pts.length;i++){
+    if(t<=pts[i][0]){const a=pts[i-1],b=pts[i];const p=(t-a[0])/(b[0]-a[0]);return lerp(a[1],b[1],b[2]?b[2](p):p);}
+  }
+  return pts[pts.length-1][1];
+}
+function mq(parent,unit,opt){
+  opt=opt||{};
+  const wrap=h('div','mq '+(opt.v?'v ':'')+(opt.cls||''));
+  const track=h('div','mq-t');
+  let s=unit;while(wlen(s)<(opt.min||12))s+=unit;
+  track.append(h('span',null,s),h('span',null,s));
+  wrap.append(track);parent.append(wrap);
+  const n=wlen(s);
+  return {set(dist){
+    const f=((dist/n)%1+1)%1;
+    track.style.transform=opt.v?`translate3d(0,${-f*50}%,0)`:`translate3d(${-f*50}%,0,0)`;
+  }};
+}
+function setText(e,s){if(e._s!==s){e._s=s;e.textContent=s;}}
+let uid=0;
+function setChars(row,s){row.textContent='';return cs(s).map(ch=>{const e=h('span',null,ch===' '?'\u00a0':ch);row.append(e);return e;});}
+
+/* ---------- the 64 motions ---------- */
+const FX=[
+/* 登場 */
+{id:'burst',g:'in',zh:'爆出',en:'Burst',desc:'字從中心彈出來，四周炸開放射線。',use:'片頭、標題',scheme:'ink',words:['開場','登場','來了'],poster:.6,
+ make(r,W){
+  const rays=h('div','rays'),w=h('div','w900'),R=[];
+  for(let i=0;i<14;i++){const e=h('i');rays.append(e);R.push(e);}
+  r.append(rays,w);let k=-1;const D=2.2;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);w.textContent=s;w.style.fontSize=fit(s,46,78);}
+    const p=E.back(seg(tt,0,.42)),out=seg(tt,1.85,2.15);
+    w.style.transform=`scale(${p*(1-out*.25)})`;w.style.opacity=1-out;
+    const q=seg(tt,.02,.55);
+    R.forEach((e,j)=>{
+      const d=lerp(18,64,E.out(q));
+      e.style.transform=`rotate(${j*360/14+k*17}deg) translateY(${-d}cqmin) scaleY(${(1-q)*(j%2?1:.55)})`;
+      e.style.opacity=q>0&&q<1?1:0;
+    });
+  };
+ }},
+{id:'hit',g:'in',zh:'逐字重擊',en:'Hit by hit',desc:'一次一個大字，砸在畫面正中央。',use:'口號、倒數',scheme:'verm',words:['一刀未剪'],poster:.3,
+ make(r,W){
+  const c=h('div','w900');c.style.fontSize='62cqmin';r.append(c);
+  const S=cs(W.join('')).filter(x=>x.trim()).slice(0,14);const D=.42,total=S.length*D+.5;
+  return t=>{
+    const tt=t%total,i=tt<S.length*D?Math.floor(tt/D):-1;
+    if(i<0){c.style.opacity=0;return;}
+    setText(c,S[i]);
+    const p=E.out(seg(tt-i*D,0,.13));
+    c.style.opacity=1;
+    c.style.transform=`scale(${lerp(2.4,1,p)}) rotate(${(i%2?1:-1)*lerp(7,0,p)}deg)`;
+  };
+ }},
+{id:'stamp',g:'in',zh:'蓋章',en:'Stamp',desc:'歪歪的印章，一顆一顆蓋上去。',use:'公告、認證',scheme:'paper',words:['通過','已讀','限定'],poster:2.4,
+ make(r,W){
+  const row=h('div','stamps'),rot=[-9,5,-4],dy=[-7,9,-3];
+  const S=[0,1,2].map(i=>{const s=pick(W,i),e=h('b','stamp',s);e.style.fontSize=fit(s,17,23);row.append(e);return e;});
+  r.append(row);const D=3.6;
+  return t=>{
+    const tt=t%D,out=seg(tt,3.2,3.5);
+    S.forEach((e,i)=>{
+      const p=seg(tt,.25+i*.6,.39+i*.6);
+      e.style.opacity=(p>0?1:0)*(1-out);
+      e.style.transform=`translateY(${dy[i]}cqh) rotate(${rot[i]}deg) scale(${lerp(2.6,1,E.in(p))})`;
+    });
+  };
+ }},
+{id:'punch',g:'in',zh:'衝向鏡頭',en:'Punch in',desc:'從遠處衝到面前，後面拖著殘影。',use:'重點強調',scheme:'ink',words:['重磅','注意','震撼'],poster:.22,
+ make(r,W){
+  const box=h('div','pile');
+  const G=[3,2,1,0].map(j=>{const e=h('div','w900'+(j?' ghost':''));box.append(e);return {e,j};});
+  r.append(box);let k=-1;const D=2.1;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);G.forEach(g=>{g.e.textContent=s;g.e.style.fontSize=fit(s,48,80);});}
+    const out=seg(tt,1.7,2.0);
+    G.forEach(({e,j})=>{
+      const raw=seg(tt-j*.07,0,.55),p=E.expo(raw);
+      e.style.transform=`scale(${lerp(.06,1,p)*(1+E.in(out)*(.35+j*.22))})`;
+      const trail=j?Math.max(.34*(1-seg(tt,.42+j*.07,.75+j*.07)),out>0?.3*(1-out):0):1-out;
+      e.style.opacity=raw>0?trail:0;
+    });
+  };
+ }},
+{id:'stack',g:'in',zh:'左右疊字',en:'Side stack',desc:'一行從左、一行從右，往下疊起來。',use:'歌詞、預告',scheme:'cobalt',words:['不是夢','是預告','今晚見'],poster:2.2,
+ make(r,W){
+  const col=h('div','col');
+  const L=[0,1,2].map(i=>{const s=pick(W,i),e=h('div','w900',s);e.style.fontSize=fit(s,25,74);if(i===1)e.style.color='var(--hi)';col.append(e);return e;});
+  r.append(col);const D=3.4;
+  return t=>{
+    const tt=t%D,out=seg(tt,3.0,3.3);
+    L.forEach((e,i)=>{
+      const st=.2+i*.55,raw=seg(tt,st,st+.32),p=E.out(raw),dir=i%2?1:-1;
+      const dim=i<2?lerp(1,.45,seg(tt,st+.55,st+.75)):1;
+      e.style.transform=`translateX(${dir*lerp(110,0,p)}cqw) skewX(${dir*lerp(-18,0,p)}deg)`;
+      e.style.opacity=(raw>0?1:0)*dim*(1-out);
+    });
+  };
+ }},
+{id:'stretch',g:'in',zh:'拉長',en:'Stretch',desc:'每個字輪流被往上拉長，再彈回來。',use:'搞笑、驚訝',scheme:'verm',words:['長高了'],poster:.5,
+ make(r,W){
+  const row=h('div','w900 chars');row.style.transform='translateY(9cqh)';r.append(row);
+  let C=[],k=-1;const D=4.2;
+  return t=>{
+    const i=Math.floor(t/D);
+    if(i!==k){k=i;const s=pick(W,i);row.textContent='';row.style.fontSize=fit(s,38,74);C=cs(s).map(ch=>{const e=h('span',null,ch);row.append(e);return e;});}
+    C.forEach((e,j)=>{
+      const v=Math.pow(Math.max(0,Math.sin(t*3.6-j*.75)),2.2);
+      e.style.transform=`scale(${1-.22*v},${1+v})`;
+    });
+  };
+ }},
+{id:'through',g:'in',zh:'穿過去',en:'Fly through',desc:'字放大到穿過鏡頭，直接接下一個詞。',use:'轉場',scheme:'paper',words:['入口','深處','出口'],poster:1.55,
+ make(r,W){
+  const box=h('div','pile'),a=h('div','w900'),b=h('div','w900');box.append(b,a);r.append(box);
+  let k=-1;const D=1.9,H=1.25;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s1=pick(W,i),s2=pick(W,i+1);a.textContent=s1;b.textContent=s2;a.style.fontSize=fit(s1,44,76);b.style.fontSize=fit(s2,44,76);}
+    const q=seg(tt,H,D);
+    a.style.transform=`scale(${1+E.in(q)*16})`;a.style.opacity=1-seg(q,.75,1);
+    b.style.transform=`scale(${lerp(.35,1,E.out(q))})`;b.style.opacity=seg(q,.15,.6);
+  };
+ }},
+{id:'squash',g:'in',zh:'落地回彈',en:'Drop and squash',desc:'掉下來壓扁、彈起來、再站穩。',use:'可愛、活潑',scheme:'ink',words:['落地','回彈','站穩'],poster:1.2,
+ make(r,W){
+  const e=h('div','w900');e.style.transformOrigin='50% 92%';e.style.color='var(--hi)';r.append(e);
+  let k=-1;const D=2.2;
+  const Y=[[0,-85],[.28,0,E.in],[.36,0],[.56,-20,E.out],[.74,0,E.in],[1.82,0],[2.1,-95,E.in]];
+  const S=[[0,1.25],[.28,1.25],[.36,.5],[.56,1.12],[.74,1.05],[.8,.78],[.96,1,E.out],[1.72,1],[1.82,.62],[2.0,1.3]];
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,44,76);}
+    const sy=keys(tt,S);
+    e.style.transform=`translateY(${keys(tt,Y)}cqh) scale(${1+(1-sy)*.6},${sy})`;
+  };
+ }},
+
+/* 流動 */
+{id:'crawl',g:'flow',zh:'巨字橫移',en:'Giant crawl',desc:'超大的字慢慢橫越，底下一條小字反向跑。',use:'背景、片頭',scheme:'ink',words:['環島公路','一路向南'],
+ make(r,W){
+  const unit=W.join('・')+'・';
+  const big=mq(r,unit,{cls:'huge',min:8}),strip=mq(r,unit,{cls:'strip',min:44});
+  return t=>{big.set(t*.55);strip.set(-t*2.4);};
+ }},
+{id:'drift',g:'flow',zh:'直排對流',en:'Column drift',desc:'直排的字，一欄往上、一欄往下。',use:'東方氛圍',scheme:'cobalt',words:['潮起','潮落','無聲'],
+ make(r,W){
+  const row=h('div','vcols');
+  const M=[0,1,2,3,4].map(i=>mq(row,pick(W,i)+'・',{v:1,min:9,cls:i%2?'alt':''}));
+  r.append(row);
+  return t=>M.forEach((m,i)=>m.set((i%2?-1:1)*t*(.8+(i%3)*.25)));
+ }},
+{id:'echo',g:'flow',zh:'重複波浪',en:'Echo wave',desc:'同一個詞鋪滿畫面，亮度像波浪掃過。',use:'背景、節奏',scheme:'paper',words:['呼吸'],
+ make(r,W){
+  const s=pick(W,0),n=wlen(s),cols=clamp(Math.round(13/n),2,8),rows=6;
+  const g=h('div','wave');g.style.gridTemplateColumns=`repeat(${cols},1fr)`;g.style.fontSize=`min(11cqmin, ${(84/cols/n).toFixed(2)}cqw)`;
+  const C=[];
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){const e=h('span',null,s);g.append(e);C.push({e,x,y});}
+  r.append(g);const sx=.55*6/cols*1.2;
+  return t=>C.forEach(({e,x,y})=>{
+    const a=Math.pow(Math.max(0,Math.sin(t*3.2-(x*sx+y*.7))),2);
+    e.style.opacity=.1+.9*a;e.style.color=a>.72?'var(--hi)':'';
+  });
+ }},
+{id:'slant',g:'flow',zh:'斜帶',en:'Slant bands',desc:'兩條斜放的帶子，文字反向跑。',use:'預告、促銷',scheme:'ink',words:['週五晚上','不見不散'],
+ make(r,W){
+  const box=h('div','diag');
+  const a=mq(box,pick(W,0)+'・',{cls:'sband sb1',min:34}),b=mq(box,pick(W,1)+'・',{cls:'sband sb2',min:34});
+  r.append(box);
+  return t=>{a.set(t*1.5);b.set(-t*1.1);};
+ }},
+{id:'path',g:'flow',zh:'彎道',en:'Path ribbon',desc:'字沿著一條彎曲的帶子流過去。',use:'歌詞、過場',scheme:'verm',words:['順著河走','就會到海'],
+ make(r,W){
+  const unit=W.join('・')+'・',id='rp'+(uid++);
+  r.insertAdjacentHTML('beforeend',`<svg class="rib" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path id="${id}" class="rib-b" d="M-60 128 C 30 20, 110 30, 165 92 S 300 170, 390 50"/><text class="rib-t" dy="5.4"><textPath href="#${id}"></textPath></text><text class="rib-m" x="0" y="-60"></text></svg>`);
+  const tp=r.querySelector('textPath'),m=r.querySelector('.rib-m');
+  m.textContent=unit;let s='';const reps=Math.ceil(64/wlen(unit))+2;for(let i=0;i<reps;i++)s+=unit;tp.textContent=s;
+  let len=0,fc=0;
+  return t=>{
+    if(!len||fc++%90===0){try{len=m.getComputedTextLength()||len;}catch(e){}}
+    if(len)tp.setAttribute('startOffset',(-((t*24)%len)).toFixed(2));
+  };
+ }},
+{id:'ticker',g:'flow',zh:'多層跑馬燈',en:'Ticker stack',desc:'大小不同的幾排字，各跑各的速度。',use:'資訊、促銷',scheme:'cobalt',words:['全新一季','本週上線','敬請期待','搶先看'],
+ make(r,W){
+  const box=h('div','rows');
+  const cfg=[['r-s',2.0],['r-b',-.9],['r-s2',2.6],['r-m',-1.4]];
+  const M=cfg.map((c,i)=>({m:mq(box,pick(W,i)+'・',{cls:c[0],min:46}),sp:c[1]}));
+  r.append(box);
+  return t=>M.forEach(x=>x.m.set(x.sp*t));
+ }},
+{id:'depth',g:'flow',zh:'遠近直書',en:'Depth columns',desc:'中間大字跑得快，兩側小字慢，有景深。',use:'文藝、片尾',scheme:'paper',words:['山城','起霧','慢車'],
+ make(r,W){
+  const row=h('div','v3');
+  const cfg=[['far',.5,1,2],['far',.7,-1,1],['side',.6,1,2],['mid',.7,-1,0],['side',.75,1,1],['far',.6,-1,0],['far',.45,1,2]];
+  const M=cfg.map(c=>({m:mq(row,pick(W,c[3])+'　',{v:1,min:c[0]==='mid'?6:16,cls:c[0]}),sp:c[1]*c[2]}));
+  r.append(row);
+  return t=>M.forEach(x=>x.m.set(x.sp*t));
+ }},
+{id:'tape',g:'flow',zh:'交叉封條',en:'Crossed tape',desc:'兩條封條交叉貼著，各自反向跑。',use:'警示、限定',scheme:'ink',words:['施工中','請繞道'],
+ make(r,W){
+  const a=h('div','tape tp1'),b=h('div','tape tp2');
+  const ma=mq(a,pick(W,0)+'・',{min:44}),mb=mq(b,pick(W,1)+'・',{min:44});
+  r.append(b,a);
+  return t=>{ma.set(t*1.7);mb.set(-t*1.3);};
+ }},
+
+/* 切換 */
+{id:'flap',g:'swap',zh:'翻牌看板',en:'Split flap',desc:'像車站時刻表，一格一格翻到定位。',use:'時間、地點',scheme:'ink',words:['即將抵達','開往花蓮','請勿奔跑'],poster:2.6,
+ make(r,W){
+  const n=clamp(Math.max(...W.map(w=>cs(w).length)),1,7),pool=cs(W.join('')).filter(x=>x.trim());
+  const row=h('div','tiles');row.style.fontSize=fitN(n*1.34,30,80);
+  const T=[];for(let i=0;i<n;i++){const tl=h('span','tile flap'),g=h('b');tl.append(g);row.append(tl);T.push(g);}
+  r.append(row);const D=3.2,rate=11;
+  return t=>{
+    const k=Math.floor(t/D),tt=t%D,target=cs(pick(W,k));
+    T.forEach((g,i)=>{
+      const dur=.35+i*.28;let ch,sy=1;
+      if(tt<dur){const st=tt*rate,si=Math.floor(st);ch=pool[Math.floor(rnd(k,i,si)*pool.length)];sy=.12+.88*Math.abs(Math.sin((st-si)*Math.PI));}
+      else{ch=target[i]||'　';const lt=tt-dur;sy=lt<.09?.12+.88*Math.sin(lt/.09*Math.PI/2):1;}
+      setText(g,ch);g.style.transform=`scaleY(${sy})`;
+    });
+  };
+ }},
+{id:'flip',g:'swap',zh:'翻卡',en:'Card flip',desc:'每張字卡依序翻面，換成下一個詞。',use:'分段標題',scheme:'cobalt',words:['春日限定','夏夜特映','秋季新番','冬眠計畫'],poster:1,
+ make(r,W){
+  const n=clamp(Math.max(...W.map(w=>cs(w).length)),1,7);
+  const row=h('div','tiles');row.style.fontSize=fitN(n*1.34,30,80);
+  const T=[];for(let i=0;i<n;i++){const tl=h('span','tile'),g=h('b');tl.append(g);row.append(tl);T.push({tl,g});}
+  r.append(row);const H=1.5,D=H+.5+(n-1)*.1+.1;
+  return t=>{
+    const k=Math.floor(t/D),tt=t%D,A=cs(pick(W,k)),B=cs(pick(W,k+1));
+    T.forEach(({tl,g},i)=>{
+      const a=180*E.io(seg(tt,H+i*.1,H+i*.1+.5));
+      setText(g,(a<90?A[i]:B[i])||'　');
+      tl.style.transform=`perspective(420px) rotateY(${a<90?a:a-180}deg)`;
+    });
+  };
+ }},
+{id:'type',g:'swap',zh:'打字機',en:'Typewriter',desc:'一字一字打出來，刪掉，再打下一句。',use:'旁白、字幕',scheme:'paper',words:['凌晨三點，還醒著','再寫一行就睡'],poster:1.6,
+ make(r,W){
+  const box=h('div','type'),tx=h('span'),car=h('i','caret');box.append(tx,car);r.append(box);
+  const P=W.map(cs),maxw=Math.max(...W.map(wlen));
+  box.style.fontSize=fitN(Math.max(maxw,3)+.6,24,84);box.style.width=(maxw+.4).toFixed(2)+'em';
+  const T=P.map(p=>p.length/7+1.1+p.length/18+.35),total=T.reduce((a,b)=>a+b,0);
+  return t=>{
+    let tt=t%total,k=0;while(k<T.length-1&&tt>=T[k]){tt-=T[k];k++;}
+    const p=P[k],n=p.length,tin=n/7;let c;
+    if(tt<tin)c=Math.floor(tt*7)+1;else if(tt<tin+1.1)c=n;else c=Math.max(0,n-Math.floor((tt-tin-1.1)*18));
+    setText(tx,p.slice(0,Math.min(n,c)).join(''));
+    car.style.opacity=(tt>tin&&tt<tin+1.1)?(Math.floor(t*2.5)%2?0:1):1;
+  };
+ }},
+{id:'slot',g:'swap',zh:'拉霸',en:'Slot reel',desc:'滾輪一格接一格停下來，最後亮一下。',use:'抽獎、揭曉',scheme:'verm',words:['好運到','大滿貫','再一次'],poster:3,
+ make(r,W){
+  const n=clamp(Math.max(...W.map(w=>cs(w).length)),1,6),pool=cs(W.join('')).filter(x=>x.trim());
+  const row=h('div','tiles');row.style.fontSize=fitN(n*1.34,34,76);
+  const R=[];for(let i=0;i<n;i++){const tl=h('span','tile reel'),a=h('b'),b=h('b');tl.append(a,b);row.append(tl);R.push({tl,a,b});}
+  r.append(row);const last=1.0+(n-1)*.5,D=last+1.3;
+  return t=>{
+    const k=Math.floor(t/D),tt=t%D,target=cs(pick(W,k));
+    const flash=tt>last&&tt<last+.6&&Math.floor((tt-last)*7)%2===0;
+    R.forEach((o,i)=>{
+      const N=10+i*5,pos=N*(1-E.out(seg(tt,0,1.0+i*.5))),ri=Math.floor(pos),f=pos-ri;
+      setText(o.a,ri===0?(target[i]||'　'):pool[Math.floor(rnd(k,i,ri)*pool.length)]);
+      setText(o.b,pool[Math.floor(rnd(k,i,ri+1)*pool.length)]);
+      o.a.style.transform=`translateY(${-f*100}%)`;o.b.style.transform=`translateY(${(1-f)*100}%)`;
+      o.tl.style.color=flash?'var(--hi)':'';
+    });
+  };
+ }},
+{id:'odo',g:'swap',zh:'跳錶',en:'Odometer',desc:'數字一位一位滾到最後的數值。輸入的字裡有數字就會用它。',use:'數據、成績',scheme:'paper',words:['累積觀看','次'],num:'36920',poster:3,
+ make(r,W,fx,custom){
+  const found=W.join(' ').match(/\d[\d,]*/);
+  const num=(found?found[0].replace(/,/g,''):fx.num).slice(0,8).replace(/^0+(?=\d)/,'');
+  const fmt=Number(num).toLocaleString('en-US');
+  const labels=W.map(w=>w.replace(/\d[\d,]*/g,'').trim()).filter(Boolean);
+  const pre=labels[0]||'',post=custom?(labels[1]||''):(labels[1]||'');
+  const box=h('div','odo'),row=h('span','odo-n'),cols=[];
+  if(pre)box.append(h('small',null,pre));
+  cs(fmt).forEach(ch=>{
+    if(ch===','){row.append(h('i','comma',','));return;}
+    const c=h('span','dg'),strip=h('b');strip.innerHTML='0<br>1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>0';
+    c.append(strip);row.append(c);cols.push({strip,d:+ch});
+  });
+  box.append(row);if(post)box.append(h('small',null,post));r.append(box);
+  const em=cols.length*.86+(fmt.length-cols.length)*.3+(wlen(pre)+wlen(post))*.34+1.2;
+  box.style.fontSize=fitN(em,26,86);
+  const D=3.8;
+  return t=>{
+    const tt=t%D;
+    cols.forEach((c,i)=>{
+      const v=(c.d+10*(2+i))*E.out(seg(tt,.1,1.5+i*.18));
+      c.strip.style.transform=`translateY(${-(v%10)*100/11}%)`;
+    });
+  };
+ }},
+{id:'swapline',g:'swap',zh:'標題輪替',en:'Headline swap',desc:'前面的標籤不動，後面的詞往上換。',use:'快訊、清單',scheme:'ink',words:['颱風轉向','明日放晴','票已售完'],label:'速報',poster:.8,
+ make(r,W,fx){
+  const box=h('div','head'),lab=h('b','lab',fx.label),win=h('span','win'),a=h('span'),b=h('span');
+  win.append(a,b);box.append(lab,win);r.append(box);
+  const maxw=Math.max(...W.map(wlen));
+  box.style.fontSize=fitN(maxw+wlen(fx.label)+2.2,21,84);win.style.width=(maxw+.9).toFixed(2)+'em';
+  let k=-1;const D=1.8,H=1.3;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;a.textContent=pick(W,i);b.textContent=pick(W,i+1);}
+    const q=E.io(seg(tt,H,D));
+    a.style.transform=`translateY(${-q*100}%)`;b.style.transform=`translateY(${(1-q)*100}%)`;
+  };
+ }},
+{id:'led',g:'swap',zh:'點陣看板',en:'Dot matrix',desc:'一顆一顆燈點組成的字，橫向跑過去。',use:'復古、車站',scheme:'ink',words:['下一站','台南','請準備下車'],
+ make(r,W){
+  r.append(h('div','led-bg'));
+  const wrap=h('div','led'),m=mq(wrap,W.join('　')+'　　',{min:12});r.append(wrap);
+  const step=2.7/46;
+  return t=>m.set(Math.round(t*1.25/step)*step);
+ }},
+{id:'split',g:'swap',zh:'上下裂開',en:'Split reveal',desc:'字從中間裂成兩半，露出下一個詞。',use:'轉場、反轉',scheme:'cobalt',words:['結束','開始'],poster:1.9,
+ make(r,W){
+  const box=h('div','pile'),nx=h('div','w900'),top=h('div','w900'),bot=h('div','w900');
+  top.style.clipPath='inset(-30% -60% 50% -60%)';bot.style.clipPath='inset(50% -60% -30% -60%)';
+  box.append(nx,top,bot);r.append(box);let k=-1;const D=2.2,H=1.45;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){
+      k=i;const s=pick(W,i),s2=pick(W,i+1),c1=i%2?'var(--hi)':'var(--fg)',c2=i%2?'var(--fg)':'var(--hi)';
+      top.textContent=bot.textContent=s;nx.textContent=s2;
+      [top,bot].forEach(e=>{e.style.fontSize=fit(s,46,78);e.style.color=c1;});
+      nx.style.fontSize=fit(s2,46,78);nx.style.color=c2;
+    }
+    const q=E.io(seg(tt,H,D-.1));
+    top.style.transform=`translate(${-q*12}cqw,${-q*62}cqh)`;
+    bot.style.transform=`translate(${q*12}cqw,${q*62}cqh)`;
+    nx.style.transform=`scale(${lerp(.7,1,q)})`;nx.style.opacity=seg(q,.1,.7);
+  };
+
+ }},
+
+/* 強調 */
+{id:'glitch',g:'em',zh:'訊號故障',en:'Glitch',desc:'字被橫切錯位、閃出重影，像訊號不良。',use:'科技、懸疑',scheme:'ink',words:['訊號不良','請稍候'],poster:1.3,
+ make(r,W){
+  const box=h('div','pile'),gh=h('div','w900 ghost'),top=h('div','w900'),mid=h('div','w900'),bot=h('div','w900');
+  box.append(gh,top,mid,bot);r.append(box);const all=[gh,top,mid,bot];let k=-1;const D=2.6;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);all.forEach(e=>{e.textContent=s;e.style.fontSize=fit(s,42,76);});}
+    const g=(tt<.3||(tt>1.15&&tt<1.45)||tt>2.3)?1:0,st=Math.floor(t*20);
+    const y1=g?rnd(st,1,1)*70:0,y2=y1+(g?12+rnd(st,2,1)*22:0);
+    top.style.clipPath=`inset(-20% -60% ${100-y1}% -60%)`;
+    mid.style.clipPath=`inset(${y1}% -60% ${100-y2}% -60%)`;
+    bot.style.clipPath=`inset(${y2}% -60% -20% -60%)`;
+    top.style.transform=bot.style.transform=`translateX(${g*(rnd(st,3,1)-.5)*3}cqmin)`;
+    mid.style.transform=`translateX(${g*(rnd(st,4,1)-.5)*26}cqmin)`;
+    gh.style.opacity=g;gh.style.transform=`translate(${(rnd(st,5,1)-.5)*9}cqmin,${(rnd(st,6,1)-.5)*3}cqmin)`;
+  };
+ }},
+{id:'marker',g:'em',zh:'螢光筆',en:'Highlighter',desc:'一條色塊從左刷過字的下半部，像畫重點。',use:'重點、教學',scheme:'verm',words:['重點在這','先看這句','記下來'],poster:1.2,
+ make(r,W){
+  const box=h('div','hl'),bar=h('i','hl-bar'),tx=h('span');box.append(bar,tx);r.append(box);let k=-1;const D=2.6;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);tx.textContent=s;box.style.fontSize=fitN(wlen(s)+.4,36,78);}
+    const a=E.out(seg(tt,.25,.7)),o=E.in(seg(tt,2.1,2.45));
+    bar.style.transformOrigin=o>0?'100% 50%':'0 50%';
+    bar.style.transform=`skewX(-8deg) scaleX(${o>0?1-o:a})`;
+    tx.style.opacity=seg(tt,0,.18)*(1-seg(tt,2.35,2.55));
+  };
+ }},
+{id:'shake',g:'em',zh:'抖動',en:'Shake',desc:'每個字各自亂抖，再慢慢穩下來。',use:'憤怒、驚嚇',scheme:'paper',words:['不可能','怎麼會','太誇張'],poster:.6,
+ make(r,W){
+  const row=h('div','w900 chars');row.style.color='var(--hi)';r.append(row);let C=[],k=-1;const D=2.4;
+  const A=[[0,0],[.12,1],[1.5,1],[1.9,.12],[2.4,.12]];
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);row.style.fontSize=fit(s,40,72);C=setChars(row,s);}
+    const amp=keys(tt,A),st=Math.floor(t*24);
+    C.forEach((e,j)=>{e.style.transform=`translate(${(rnd(st,j,1)-.5)*amp*7}cqmin,${(rnd(st,j,2)-.5)*amp*7}cqmin) rotate(${(rnd(st,j,3)-.5)*amp*14}deg)`;});
+  };
+ }},
+{id:'neon',g:'em',zh:'霓虹燈管',en:'Neon flicker',desc:'空心發光的字一個一個閃著亮起來。',use:'夜晚、招牌',scheme:'ink',words:['深夜營業','宵夜時間'],poster:2,
+ make(r,W){
+  const row=h('div','w900 neon');r.append(row);let C=[],k=-1,n=0;const D=4;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);row.style.fontSize=fit(s,40,74);C=setChars(row,s);n=C.length;}
+    const lucky=Math.floor(rnd(k,7,7)*n);
+    C.forEach((e,j)=>{
+      const tj=.2+rnd(k,j,0)*.9;let on;
+      if(tt<tj)on=0;else if(tt<tj+.35)on=Math.floor((tt-tj)*28)%3?1:0;
+      else if(tt>3.6)on=tt<3.6+j*.05?1:0;
+      else on=(j===lucky&&tt>2.4&&tt<2.62&&Math.floor(tt*30)%2)?0:1;
+      e.style.opacity=on?1:.14;
+    });
+  };
+ }},
+{id:'bob',g:'em',zh:'波浪起伏',en:'Wave bob',desc:'每個字上下浮動，連成一道波浪。',use:'輕鬆、音樂',scheme:'cobalt',words:['搖啊搖','慢慢晃'],
+ make(r,W){
+  const row=h('div','w900 chars');r.append(row);let C=[],k=-1;const D=4.4;
+  return t=>{
+    const i=Math.floor(t/D);
+    if(i!==k){k=i;const s=pick(W,i);row.style.fontSize=fit(s,38,74);C=setChars(row,s);}
+    C.forEach((e,j)=>{const ph=t*4-j*.6;e.style.transform=`translateY(${Math.sin(ph)*8}cqmin) rotate(${Math.cos(ph)*6}deg)`;});
+  };
+ }},
+{id:'track',g:'em',zh:'字距拉開',en:'Tracking out',desc:'字距慢慢拉開，像電影片名。',use:'片名、章節',scheme:'paper',words:['序章','很久以後'],poster:1.8,
+ make(r,W){
+  const row=h('div','w900 chars');row.style.fontFamily='var(--serif)';r.append(row);let C=[],k=-1,n=0;const D=3.6;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);n=cs(s).length;row.style.fontSize=fitN(wlen(s)+(n-1)*.72,30,84);C=setChars(row,s);}
+    const sp=lerp(0,.7,tt/D);
+    C.forEach((e,j)=>{e.style.transform=`translateX(${((j-(n-1)/2)*sp).toFixed(3)}em)`;});
+    row.style.opacity=seg(tt,0,.6)*(1-seg(tt,3.1,3.55));
+  };
+ }},
+{id:'fill',g:'em',zh:'空心填滿',en:'Outline fill',desc:'空心字從底部往上被顏色灌滿。',use:'進度、蓄力',scheme:'verm',words:['充電中','滿格'],poster:1.3,
+ make(r,W){
+  const box=h('div','pile'),f=h('div','w900'),o=h('div','w900 outl');f.style.color='var(--hi)';box.append(f,o);r.append(box);
+  let k=-1;const D=3,L=[[0,0],[.2,0],[1.8,1,E.io],[2.5,1],[3,0,E.in]];
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);[f,o].forEach(e=>{e.textContent=s;e.style.fontSize=fit(s,44,76);});}
+    f.style.clipPath=`inset(${((1-keys(tt,L))*100).toFixed(2)}% -10% -6% -10%)`;
+  };
+ }},
+{id:'focus',g:'em',zh:'對焦',en:'Focus pull',desc:'從一團模糊慢慢對焦到清楚。',use:'回憶、揭曉',scheme:'ink',words:['想起來了','原來是你'],poster:1.6,
+ make(r,W){
+  const e=h('div','w900');r.append(e);let k=-1;const D=3;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,42,76);}
+    const p=E.out(seg(tt,0,1.1)),o=E.in(seg(tt,2.4,2.9)),b=(1-p)*5+o*4;
+    e.style.filter=b>.02?`blur(${b.toFixed(2)}cqmin)`:'none';
+    e.style.transform=`scale(${lerp(1.15,1,p)+o*.06})`;
+    e.style.opacity=seg(tt,0,.5)*(1-o);
+  };
+ }},
+
+/* 空間 */
+{id:'cube',g:'sp',zh:'四角柱翻面',en:'Prism roll',desc:'字貼在一根柱子上，往上滾一面換一個詞。',use:'輪播、清單',scheme:'cobalt',words:['第一幕','第二幕','第三幕'],poster:.5,
+ make(r,W){
+  const box=h('div','cube'),a=h('div','face'),b=h('div','face');box.append(a,b);r.append(box);
+  const maxw=Math.max(...W.map(wlen));box.style.fontSize=fitN(maxw+.9,36,80);let k=-1;const D=2.0,H=1.3;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;a.textContent=pick(W,i);b.textContent=pick(W,i+1);}
+    const q=E.io(seg(tt,H,D));
+    a.style.transform=`rotateX(${q*90}deg) translateZ(.66em)`;
+    b.style.transform=`rotateX(${q*90-90}deg) translateZ(.66em)`;
+    b.style.opacity=q>0?1:0;
+  };
+ }},
+{id:'crawl3d',g:'sp',zh:'透視字幕',en:'Perspective crawl',desc:'整片字躺在斜面上，往遠方滾走。',use:'開場旁白',scheme:'ink',words:['很久以前','在一座島上','有人按下錄影','故事開始了'],
+ make(r,W){
+  const pl=h('div','crawl'),tr=h('div','crawl-t'),lines=[];
+  do{W.forEach(w=>lines.push(w));}while(lines.length<16);
+  const mk=()=>{const b=h('div');lines.forEach(w=>b.append(h('div',null,w)));return b;};
+  tr.append(mk(),mk());pl.append(tr);r.append(pl,h('div','crawl-fade'));
+  pl.style.fontSize=fitN(Math.max(...W.map(wlen)),15,78);
+  const n=lines.length;
+  return t=>{tr.style.transform=`translate3d(0,${-((t*.75/n)%1)*50}%,0)`;};
+ }},
+{id:'orbit',g:'sp',zh:'環繞',en:'Orbit ring',desc:'一圈字繞著中央的詞轉。第一個詞放中央，其餘繞圈。',use:'標誌、循環',scheme:'paper',words:['循環','日復一日','周而復始'],
+ make(r,W){
+  const center=W[0],unit=(W.length>1?W.slice(1):W).join('・')+'・',id='op'+(uid++);
+  let s=unit;while(wlen(s+unit)<=27)s+=unit;
+  const n=cs(s).length,fs=Math.min(14,392/wlen(s));
+  r.insertAdjacentHTML('beforeend',`<svg class="orb" viewBox="0 0 320 180" aria-hidden="true"><defs><path id="${id}" d="M96,90 a64,64 0 1,1 128,0 a64,64 0 1,1 -128,0"/></defs><g><text class="orb-t" font-size="${fs.toFixed(2)}"><textPath href="#${id}"></textPath></text></g><text class="orb-c" x="160" y="91"></text></svg>`);
+  const tx=r.querySelector('.orb-t'),g=r.querySelector('g'),c=r.querySelector('.orb-c');
+  r.querySelector('textPath').textContent=s;c.textContent=center;c.setAttribute('font-size',Math.min(40,98/wlen(center)).toFixed(2));
+  let ls=0,fc=0;
+  return t=>{
+    if(fc++%90===0){try{const L=tx.getComputedTextLength();if(L){ls=Math.max(0,(401-(L-ls*n))/n);tx.style.letterSpacing=ls.toFixed(3)+'px';}}catch(e){}}
+    g.setAttribute('transform',`rotate(${((t*30)%360).toFixed(2)} 160 90)`);
+  };
+ }},
+{id:'tunnel',g:'sp',zh:'隧道',en:'Tunnel',desc:'同一個詞一層一層朝鏡頭飛過來。',use:'穿越、加速',scheme:'verm',words:['前進','更深'],
+ make(r,W){
+  const box=h('div','pile'),N=7,L=[];
+  for(let i=0;i<N;i++){const e=h('div','w900 tun'+(i%2?' o':''));box.append(e);L.push(e);}
+  r.append(box);let k=-1;const D=4.2;
+  return t=>{
+    const i=Math.floor(t/D);
+    if(i!==k){k=i;const s=pick(W,i);L.forEach(e=>{e.textContent=s;e.style.fontSize=fit(s,30,56);});}
+    L.forEach((e,j)=>{
+      const z=((j+t*.9)%N)/N;
+      e.style.transform=`scale(${(.08*Math.pow(60,z)).toFixed(4)})`;
+      e.style.opacity=Math.min(1,z*5)*(1-seg(z,.72,1));
+      e.style.zIndex=Math.round(z*100);
+    });
+  };
+ }},
+{id:'scatter',g:'sp',zh:'散開聚合',en:'Scatter assemble',desc:'散落各處的字飛回來拼成詞，再炸開。',use:'解謎、片名',scheme:'ink',words:['拼起來','找到了'],poster:1.6,
+ make(r,W){
+  const row=h('div','w900 chars');r.append(row);let C=[],k=-1;const D=3.2;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);row.style.fontSize=fit(s,40,74);C=setChars(row,s);}
+    C.forEach((e,j)=>{
+      const raw=seg(tt,.1+j*.06,.75+j*.06),p=E.out(raw),q=E.in(seg(tt,2.5+j*.04,3.1+j*.04));
+      const sd=q>0?5:0,m=q>0?q:1-p;
+      e.style.transform=`translate(${((rnd(k,j,1+sd)-.5)*m*95).toFixed(2)}cqw,${((rnd(k,j,2+sd)-.5)*m*95).toFixed(2)}cqh) rotate(${((rnd(k,j,3+sd)-.5)*m*300).toFixed(1)}deg) scale(${1+m*.8})`;
+      e.style.opacity=clamp(raw*3)*(1-q);
+    });
+  };
+ }},
+{id:'extrude',g:'sp',zh:'厚度陰影',en:'Extrude',desc:'字長出一塊立體厚度，陰影方向慢慢擺動。',use:'標題、海報感',scheme:'cobalt',words:['厚片','加料'],poster:1.2,
+ make(r,W){
+  const e=h('div','w900');r.append(e);let k=-1;const D=3,N=12,K=[[0,0],[.5,1,E.back],[2.5,1],[2.9,0,E.in]];
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,42,72);}
+    const dep=Math.max(0,keys(tt,K))*.2,ang=.78+Math.sin(t*1.2)*.9,cx=Math.cos(ang),sy=Math.sin(ang),sh=[];
+    for(let j=1;j<=N;j++){const d=dep*j/N;sh.push(`${(cx*d).toFixed(3)}em ${(sy*d).toFixed(3)}em 0 var(--hi)`);}
+    e.style.textShadow=sh.join(',');
+    e.style.transform=`translate(${(-cx*dep/2).toFixed(3)}em,${(-sy*dep/2).toFixed(3)}em)`;
+    e.style.opacity=seg(tt,0,.15)*(1-seg(tt,2.8,2.95));
+  };
+ }},
+{id:'blinds',g:'sp',zh:'橫條拼字',en:'Slice in',desc:'字被切成幾條橫條，左右交錯滑進來拼好。',use:'轉場、頻道感',scheme:'paper',words:['切換頻道','下一台'],poster:1.2,
+ make(r,W){
+  const box=h('div','pile'),N=6,S=[];
+  for(let i=0;i<N;i++){const e=h('div','w900');e.style.clipPath=`inset(${(i*100/N-.4).toFixed(2)}% -80% ${(100-(i+1)*100/N-.4).toFixed(2)}% -80%)`;box.append(e);S.push(e);}
+  r.append(box);let k=-1;const D=2.6;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);S.forEach(e=>{e.textContent=s;e.style.fontSize=fit(s,44,76);});}
+    S.forEach((e,j)=>{
+      const p=E.out(seg(tt,j*.06,.4+j*.06)),q=E.in(seg(tt,1.9+j*.05,2.3+j*.05)),dir=j%2?1:-1;
+      e.style.transform=`translateX(${(dir*lerp(115,0,p)-dir*q*115).toFixed(2)}cqw)`;
+    });
+  };
+ }},
+{id:'block',g:'sp',zh:'色塊揭開',en:'Block reveal',desc:'一塊色塊掃過去，字就出現；再掃一次帶走。',use:'人名條、標題',scheme:'ink',words:['導演版','未公開','獨家'],poster:1.4,
+ make(r,W){
+  const box=h('div','blk'),tx=h('span'),cv=h('i');box.append(tx,cv);r.append(box);let k=-1;const D=2.8;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);tx.textContent=s;box.style.fontSize=fitN(wlen(s)+.44,42,78);}
+    const ph=tt<.76?tt:(tt>=2.0?tt-2.0:-1);let sx=0,org='0 50%';
+    if(ph>=0&&ph<.38){sx=E.io(ph/.38);}else if(ph>=.38&&ph<.76){sx=1-E.io((ph-.38)/.38);org='100% 50%';}
+    cv.style.transformOrigin=org;cv.style.transform=`scaleX(${sx.toFixed(4)})`;
+    tx.style.opacity=(tt>=.38&&tt<2.38)?1:0;
+  };
+
+ }},
+
+/* 歌詞 MV */
+{id:'kara',g:'mv',zh:'跟唱填色',en:'Karaoke fill',desc:'顏色從左到右一個字一個字填過去，跟著唱。',use:'歌詞、跟唱',scheme:'ink',words:['把燈關掉以後','城市才開始說話'],poster:1.2,
+ make(r,W){
+  const box=h('div','pile'),a=h('div','w900'),b=h('div','w900');b.style.color='var(--hi)';box.append(a,b);r.append(box);
+  const T=W.map(w=>cs(w).length*.26+1.1),total=T.reduce((x,y)=>x+y,0);let k=-1;
+  return t=>{
+    let tt=t%total,i=0;while(i<T.length-1&&tt>=T[i]){tt-=T[i];i++;}
+    if(i!==k){k=i;[a,b].forEach(e=>{e.textContent=W[i];e.style.fontSize=fit(W[i],30,86);});}
+    const p=clamp((tt-.3)/(cs(W[i]).length*.26)),o=seg(tt,0,.2)*(1-seg(tt,T[i]-.22,T[i]));
+    b.style.clipPath=`inset(-10% ${(100-p*100).toFixed(2)}% -10% -2%)`;
+    a.style.opacity=o;b.style.opacity=o;
+  };
+ }},
+{id:'popsync',g:'mv',zh:'逐字踩拍',en:'Beat by beat',desc:'每一拍蹦出一個字，剛出來的那個字會變色。',use:'副歌、口號',scheme:'cobalt',words:['聽見了嗎','心跳的聲音'],poster:1.3,
+ make(r,W){
+  const row=h('div','w900 chars');r.append(row);const T=W.map(w=>cs(w).length*.3+1.2),total=T.reduce((x,y)=>x+y,0);let C=[],k=-1;
+  return t=>{
+    let tt=t%total,i=0;while(i<T.length-1&&tt>=T[i]){tt-=T[i];i++;}
+    if(i!==k){k=i;row.style.fontSize=fit(W[i],38,80);C=setChars(row,W[i]);}
+    const out=seg(tt,T[i]-.25,T[i]);
+    C.forEach((e,j)=>{
+      const lt=tt-.15-j*.3;
+      e.style.transform=`scale(${(lt>0?E.back(seg(lt,0,.22)):0).toFixed(4)})`;
+      e.style.color=(lt>0&&lt<.3)?'var(--hi)':'';e.style.opacity=1-out;
+    });
+  };
+ }},
+{id:'dual',g:'mv',zh:'上下兩行',en:'Two-line karaoke',desc:'左上一行、右下一行，輪流亮起來唱。',use:'KTV、對唱',scheme:'paper',words:['風從海上來','吹過你的窗','我還站在這','等一首歌唱完'],poster:1,
+ make(r,W){
+  const mk=c=>{const e=h('div','w900 dl '+c),tx=h('span'),bar=h('i');e.append(tx,bar);r.append(e);return {e,tx,bar};};
+  const A=mk('dl-a'),B=mk('dl-b');A.e.style.fontSize=B.e.style.fontSize=fitN(Math.max(...W.map(wlen)),19,72);const D=2.2;
+  return t=>{
+    const s=Math.floor(t/D),tt=t%D,actA=s%2===0,fin=seg(tt,0,.3),p=seg(tt,.15,D-.25);
+    setText(A.tx,pick(W,2*Math.floor((s+1)/2)));setText(B.tx,pick(W,2*Math.floor(s/2)+1));
+    [[A,actA],[B,!actA]].forEach(([o,act])=>{o.e.style.opacity=act?1:.3*fin;o.bar.style.transform=`scaleX(${act?p:0})`;});
+  };
+ }},
+{id:'beat',g:'mv',zh:'重拍反白',en:'Beat flash',desc:'每一拍換一個字，畫面跟著反白、字跟著震。',use:'快歌、前奏',scheme:'verm',words:['一','二','三','跳'],poster:.3,
+ make(r,W){
+  const e=h('div','w900');r.append(e);const B=.5;
+  return t=>{
+    const b=Math.floor(t/B),bt=t%B,s=pick(W,b),inv=b%2===1;
+    if(e._s!==s){e._s=s;e.textContent=s;e.style.fontSize=fit(s,58,80);}
+    r.style.background=inv?'var(--fg)':'';e.style.color=inv?'var(--bg)':'';
+    e.style.transform=`scale(${(1+(b%4===3?.6:.3)*(1-E.out(seg(bt,0,.24)))).toFixed(4)})`;
+  };
+ }},
+{id:'soft',g:'mv',zh:'柔焦浮現',en:'Soft rise',desc:'每個字從模糊裡慢慢浮上來，再一起散掉。',use:'抒情、獨白',scheme:'verm',words:['想念是一種天氣','今天有雨'],poster:1.8,
+ make(r,W){
+  const row=h('div','w900 chars hser');r.append(row);const T=W.map(w=>cs(w).length*.09+3.0),total=T.reduce((x,y)=>x+y,0);let C=[],k=-1;
+  return t=>{
+    let tt=t%total,i=0;while(i<T.length-1&&tt>=T[i]){tt-=T[i];i++;}
+    if(i!==k){k=i;row.style.fontSize=fit(W[i],28,84);C=setChars(row,W[i]);}
+    const q=seg(tt,T[i]-.7,T[i]);
+    C.forEach((e,j)=>{
+      const p=E.out(seg(tt,.1+j*.09,.9+j*.09)),b=(1-p)*1.4+q*1.6;
+      e.style.transform=`translateY(${((1-p)*6-q*3).toFixed(2)}cqmin)`;e.style.opacity=p*(1-q);
+      e.style.filter=b>.02?`blur(${b.toFixed(2)}cqmin)`:'none';
+    });
+  };
+ }},
+{id:'lyrics',g:'mv',zh:'歌詞捲動',en:'Lyric scroll',desc:'唱到的那一行在中間放大變色，其他行縮小變淡。',use:'整首歌詞',scheme:'ink',words:['天還沒亮','路燈先睡了','我騎過整座橋','風替我唱','到你家樓下','才發現忘了詞'],
+ make(r,W){
+  const col=h('div','lyr'),lines=[];do{W.forEach(w=>lines.push(w));}while(lines.length<6);
+  const n=lines.length;col.style.fontSize=fitN(Math.max(...W.map(wlen)),17,82);
+  const L=lines.map(w=>{const e=h('div',null,w);col.append(e);return e;});r.append(col);const D=1.5;
+  return t=>{
+    const s=t/D,cur=Math.floor(s),pos=(cur+E.io(seg(s-cur,.72,1)))%n;
+    L.forEach((e,j)=>{
+      let d=j-pos;if(d>n/2)d-=n;if(d<-n/2)d+=n;const a=Math.abs(d);
+      e.style.transform=`translateY(${(d*19).toFixed(2)}cqmin) scale(${lerp(1,.6,clamp(a)).toFixed(3)})`;
+      e.style.opacity=a>2.4?0:lerp(1,.3,clamp(a));e.style.color=a<.5?'var(--hi)':'';
+    });
+  };
+ }},
+{id:'trail',g:'mv',zh:'重拍殘影',en:'Echo trail',desc:'每一拍字就甩出一串空心殘影，再收回來。',use:'電音、舞曲',scheme:'cobalt',words:['回聲','還在'],poster:.14,
+ make(r,W){
+  const box=h('div','pile'),N=6,G=[];for(let j=N;j>=1;j--){const e=h('div','w900 outl');box.append(e);G.push({e,j});}
+  const m=h('div','w900');box.append(m);r.append(box);let k=-1;const B=.6;
+  return t=>{
+    const b=Math.floor(t/B),bt=t%B,i=Math.floor(b/4);
+    if(i!==k){k=i;const s=pick(W,i);[m].concat(G.map(g=>g.e)).forEach(e=>{e.textContent=s;e.style.fontSize=fit(s,40,70);});}
+    const d=E.out(seg(bt,0,.16))*(1-E.io(seg(bt,.16,.58))),dir=b%2?1:-1;
+    G.forEach(({e,j})=>{e.style.transform=`translateY(${(dir*j*d*7.5).toFixed(2)}cqmin)`;e.style.opacity=(1-j/(N+1))*Math.min(1,d*4);});
+    m.style.transform=`scale(${(1+.08*(1-seg(bt,0,.2))).toFixed(4)})`;
+  };
+ }},
+{id:'mix',g:'mv',zh:'大小混排',en:'Type block',desc:'幾個詞大小、方向都不同，一拍一個拼成一整塊。',use:'歌詞重點、片頭',scheme:'paper',words:['今晚','不回家','一直','唱'],poster:2.6,
+ make(r,W){
+  const blk=h('div','mixb');
+  const SL=[{x:2,y:1,w:66,h:31,fx:-1,fy:0},{x:71,y:1,w:27,h:54,fx:0,fy:-1,v:1,hi:1},{x:2,y:34,w:41,h:21,fx:0,fy:1,hi:1},{x:45,y:34,w:23,h:21,fx:1,fy:0}];
+  const S=SL.map((o,i)=>{
+    const s=pick(W,i),e=h('div'),sp=h('span',o.v?'vr':null,s),n=Math.max(wlen(s),1);
+    e.style.cssText=`left:${o.x}em;top:${o.y}em;width:${o.w}em;height:${o.h}em`;
+    sp.style.fontSize=(o.v?Math.min(o.w*.96,o.h/n):Math.min(o.h*.96,o.w/n)).toFixed(2)+'em';if(o.hi)sp.style.color='var(--hi)';
+    e.append(sp);blk.append(e);return {e,o};
+  });
+  r.append(blk);const D=3.8;
+  return t=>{
+    const tt=t%D,out=E.in(seg(tt,3.4,3.7));
+    S.forEach(({e,o},i)=>{
+      const raw=seg(tt,.2+i*.45,.44+i*.45),p=E.out(raw);
+      e.style.transform=`translate(${(o.fx*(1-p)*70).toFixed(2)}cqw,${(o.fy*(1-p)*70).toFixed(2)}cqh) scale(${(1-out).toFixed(3)})`;e.style.opacity=raw>0?1:0;
+    });
+  };
+ }},
+
+/* 綜藝字卡 */
+{id:'vpop',g:'tv',zh:'彈出字卡',en:'Pop caption',desc:'粗框大字彈出來，還會晃兩下。',use:'反應、吐槽',scheme:'verm',words:['太扯了','真的假的','笑死'],poster:1,
+ make(r,W){
+  const e=h('div','w900 vt');r.append(e);let k=-1;const D=2.2;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,40,70);}
+    const out=E.in(seg(tt,1.85,2.1));
+    e.style.transform=`scale(${(E.el(seg(tt,0,.7))*(1-out)).toFixed(4)}) rotate(${(Math.sin(tt*10)*5*(1-seg(tt,.2,1.1))+(i%2?3:-3)).toFixed(2)}deg)`;
+  };
+ }},
+{id:'slam',g:'tv',zh:'斜砸下來',en:'Diagonal slam',desc:'從右上角砸到中間，畫面閃一下、震一下。',use:'否定、打臉',scheme:'ink',words:['才怪','並沒有','想太多'],poster:1,
+ make(r,W){
+  const e=h('div','w900 vt');r.append(e);let k=-1;const D=2.2;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D,st=Math.floor(t*30);
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,40,68);}
+    const p=E.in(seg(tt,0,.16)),sh=tt>.16?1-seg(tt,.16,.55):0,q=E.in(seg(tt,1.8,2.1));
+    r.style.transform=`translate(${((rnd(st,1,3)-.5)*sh*5).toFixed(2)}cqmin,${((rnd(st,2,3)-.5)*sh*5).toFixed(2)}cqmin)`;
+    r.style.background=(tt>.16&&tt<.23)?'var(--fg)':'';
+    e.style.transform=`translate(${lerp(70,0,p).toFixed(2)}cqw,${(lerp(-80,0,p)+q*130).toFixed(2)}cqh) rotate(${(-7+q*25).toFixed(2)}deg) scale(${lerp(2.4,1,p).toFixed(3)})`;
+  };
+ }},
+{id:'lines',g:'tv',zh:'集中線',en:'Speed lines',desc:'四周的放射線不停閃動，把視線逼向中間的字。',use:'震驚、重點',scheme:'paper',words:['震驚','什麼'],poster:1,
+ make(r,W){
+  const bg=h('div','flines'),e=h('div','w900 vt');r.append(bg,e);let k=-1;const D=2.4;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D,st=Math.floor(t*12);
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,38,56);}
+    bg.style.setProperty('--a',(rnd(st,1,2)*360).toFixed(1)+'deg');bg.style.transform=`scale(${(1+.06*rnd(st,2,2)).toFixed(3)})`;
+    e.style.transform=`scale(${(E.back(seg(tt,0,.3))*(1+.05*Math.sin(t*16))).toFixed(4)})`;
+  };
+ }},
+{id:'marks',g:'tv',zh:'問號驚嘆號',en:'Reaction marks',desc:'字旁邊一個一個冒出問號、驚嘆號。',use:'疑惑、傻眼',scheme:'cobalt',words:['蛤','是喔','等一下'],poster:1.7,
+ make(r,W){
+  const e=h('div','w900 vt'),P=[['？',33,-19,14],['！',-34,-17,-16],['？！',40,14,8]];
+  const M=P.map(p=>{const m=h('b','mk vt',p[0]);r.append(m);return m;});r.append(e);let k=-1;const D=2.6;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,36,42);}
+    const out=seg(tt,2.35,2.55);
+    e.style.transform=`scale(${(E.back(seg(tt,0,.3))*(1-out)).toFixed(4)})`;
+    M.forEach((m,j)=>{
+      const raw=seg(tt,.55+j*.32,.8+j*.32);
+      m.style.transform=`translate(calc(-50% + ${P[j][1]}cqmin),calc(-50% + ${P[j][2]}cqmin)) rotate(${(P[j][3]+Math.sin(t*7+j)*6).toFixed(2)}deg) scale(${(E.back(raw)*(1-out)).toFixed(4)})`;
+    });
+  };
+ }},
+{id:'telop',g:'tv',zh:'字卡條',en:'Telop bar',desc:'一條色帶先刷出來，字再一個個跳上去。',use:'單元名稱、說明',scheme:'ink',words:['今日挑戰','限時三分鐘','失敗要受罰'],poster:1.2,
+ make(r,W){
+  const box=h('div','tel'),bg=h('i','tel-bg'),row=h('span','chars');box.append(bg,row);r.append(box);let C=[],k=-1;const D=2.6;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);box.style.fontSize=fitN(wlen(s)+1.2,30,84);C=setChars(row,s);}
+    box.style.transform=`translateX(${(E.in(seg(tt,2.2,2.55))*130).toFixed(2)}cqw) rotate(-3deg)`;
+    bg.style.transform=`skewX(-10deg) scaleX(${E.out(seg(tt,0,.3)).toFixed(4)})`;
+    C.forEach((e,j)=>{const p=E.back(seg(tt,.2+j*.06,.44+j*.06));e.style.transform=`translateY(${((1-p)*45).toFixed(1)}%) scale(${Math.max(0,p).toFixed(4)})`;});
+  };
+ }},
+{id:'emph',g:'tv',zh:'關鍵字放大',en:'Keyword zoom',desc:'前半句小小的，關鍵字突然放大變色還會抖。兩個詞一組。',use:'笑點、轉折',scheme:'verm',words:['其實','超好吃','結果','全吃光'],poster:1.5,
+ make(r,W){
+  const box=h('div','emph'),a=h('span','sm'),b=h('span','vt');box.append(a,b);r.append(box);let k=-1;const D=2.8,S=[[.5,0],[.72,1.35,E.out],[.9,1.15]];
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s1=pick(W,2*i),s2=pick(W,2*i+1);a.textContent=s1;b.textContent=s2;box.style.fontSize=fitN(wlen(s1)*.5+wlen(s2)*1.35+.6,40,82);}
+    const out=seg(tt,2.5,2.75);
+    a.style.opacity=seg(tt,0,.15)*(1-out);b.style.opacity=tt>.5?1-out:0;
+    b.style.transform=`scale(${keys(tt,S).toFixed(4)}) rotate(${(Math.sin(tt*22)*4*(1-seg(tt,.7,1.5))).toFixed(2)}deg)`;
+  };
+ }},
+{id:'bouncy',g:'tv',zh:'逐字蹦跳',en:'Bouncy letters',desc:'字一個一個掉下來彈一下，最後全部一起跳。',use:'歡樂、慶祝',scheme:'cobalt',words:['開心到飛起來','大成功'],poster:1.5,
+ make(r,W){
+  const row=h('div','w900 chars vt');row.style.letterSpacing='.08em';r.append(row);
+  const T=W.map(w=>cs(w).length*.1+2.4),total=T.reduce((x,y)=>x+y,0);let C=[],k=-1;
+  const Y=[[0,-95],[.22,0,E.in],[.34,-13,E.out],[.46,0,E.in]];
+  return t=>{
+    let tt=t%total,i=0;while(i<T.length-1&&tt>=T[i]){tt-=T[i];i++;}
+    if(i!==k){k=i;row.style.fontSize=fitN(wlen(W[i])*1.12,34,80);C=setChars(row,W[i]);C.forEach((e,j)=>{if(j%2)e.style.setProperty('--vf','var(--s-verm)');});}
+    const tj=C.length*.1+.9,jump=Math.sin(Math.PI*seg(tt,tj,tj+.36))*15,out=E.in(seg(tt,T[i]-.28,T[i]));
+    C.forEach((e,j)=>{
+      const lt=tt-j*.1;
+      e.style.transform=`translateY(${(keys(lt,Y)-jump).toFixed(2)}cqh) rotate(${j%2?6:-6}deg) scale(${(1-out).toFixed(3)})`;e.style.opacity=lt>0?1:0;
+    });
+  };
+ }},
+{id:'star',g:'tv',zh:'爆炸框',en:'Starburst',desc:'尖刺爆炸框彈出來慢慢轉，字在中間蹦出來。',use:'獨家、特價',scheme:'paper',words:['獨家','必看','大驚'],poster:1,
+ make(r,W){
+  const st=h('i','star'),e=h('div','w900');e.style.color='var(--hifg)';const pts=[];
+  for(let j=0;j<32;j++){const a=j/32*Math.PI*2,rr=j%2?37:50;pts.push((50+Math.cos(a)*rr).toFixed(2)+'% '+(50+Math.sin(a)*rr).toFixed(2)+'%');}
+  st.style.clipPath='polygon('+pts.join(',')+')';r.append(st,e);let k=-1;const D=2.4;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,29,36);}
+    const out=E.in(seg(tt,2.1,2.35));
+    st.style.transform=`rotate(${(t*22).toFixed(2)}deg) scale(${(E.back(seg(tt,0,.35))*(1+.05*Math.sin(t*11))*(1-out)).toFixed(4)})`;
+    e.style.transform=`scale(${(E.back(seg(tt,.12,.45))*(1-out)).toFixed(4)}) rotate(-5deg)`;
+  };
+ }},
+
+/* 恐怖片 */
+{id:'flick',g:'hr',zh:'燈泡將熄',en:'Dying bulb',desc:'字像快壞掉的燈，忽明忽暗，最後整個黑掉。',use:'懸疑開場',scheme:'ink',words:['有人在嗎','別回頭'],poster:1,
+ make(r,W){
+  const e=h('div','w900 hser');e.style.textShadow='0 0 .25em color-mix(in srgb,var(--fg) 45%,transparent)';r.append(e);let k=-1;const D=3.6;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D,st=Math.floor(t*30);
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,40,76);}
+    let o=1;
+    if(tt<.2||tt>3.3)o=.02;else if(tt>2.9)o=rnd(st,1,5)<.55?.08:1;else if(tt>1.5&&tt<1.62)o=.03;else if(rnd(st,2,5)<.1)o=.1;
+    e.style.opacity=o;
+  };
+ }},
+{id:'drip',g:'hr',zh:'往下滴',en:'Drip',desc:'字的底部慢慢滴下幾條長短不一的痕跡。',use:'片名、警告',scheme:'paper',words:['午夜','禁入'],poster:3.2,
+ make(r,W){
+  r.style.setProperty('--hi','var(--s-verm)');
+  const box=h('div','dripw'),tx=h('span');box.append(tx);box.style.transform='translateY(-12cqh)';r.append(box);let DR=[],k=-1;const D=4.4;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){
+      k=i;const s=pick(W,i),n=cs(s).length;tx.textContent=s;box.style.fontSize=fit(s,40,66);
+      DR.forEach(d=>d.e.remove());DR=[];
+      for(let j=0;j<n*2;j++){
+        const e=h('i');e.style.left=((Math.floor(j/2)+.18+rnd(i,j,1)*.6)/n*100).toFixed(2)+'%';e.style.width=(.05+rnd(i,j,2)*.06).toFixed(3)+'em';
+        box.append(e);DR.push({e,d:.3+rnd(i,j,3)*1.2,len:.35+rnd(i,j,4)*1.1});
+      }
+    }
+    box.style.opacity=seg(tt,0,.3)*(1-seg(tt,4.0,4.35));
+    DR.forEach(d=>{d.e.style.height=(d.len*E.io(seg(tt,d.d,d.d+2.4))).toFixed(3)+'em';});
+  };
+ }},
+{id:'creep',g:'hr',zh:'慢慢逼近',en:'Slow creep',desc:'字很慢很慢地變大、微微發抖，最後突然衝到臉上。',use:'驚嚇、倒數',scheme:'ink',words:['它靠近了'],poster:3.4,
+ make(r,W){
+  const e=h('div','w900 hser');r.append(e);let k=-1;const D=5.2;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D,st=Math.floor(t*20);
+    if(i!==k){k=i;const s=pick(W,i);e.textContent=s;e.style.fontSize=fit(s,34,60);}
+    if(tt<4.5){
+      const p=tt/4.5;e.style.color='';e.style.opacity=lerp(.15,1,p);
+      e.style.transform=`translate(${((rnd(st,1,7)-.5)*(.3+p)).toFixed(2)}cqmin,${((rnd(st,2,7)-.5)*(.3+p)).toFixed(2)}cqmin) scale(${lerp(.5,1.1,p*p).toFixed(4)})`;
+    }else if(tt<4.7){e.style.color='var(--hi)';e.style.opacity=1;e.style.transform=`scale(${(3.4+(tt-4.5)*4).toFixed(3)})`;}
+    else e.style.opacity=0;
+  };
+ }},
+{id:'ghost',g:'hr',zh:'重影抽搐',en:'Double vision',desc:'字後面有兩層重影，不定時突然抽動一下。',use:'不安、幻覺',scheme:'paper',words:['你不是一個人','看後面'],poster:1,
+ make(r,W){
+  r.style.setProperty('--hi','var(--s-verm)');
+  const box=h('div','pile'),g1=h('div','w900 hser'),g2=h('div','w900 hser'),m=h('div','w900 hser');g1.style.color='var(--hi)';box.append(g1,g2,m);r.append(box);let k=-1;const D=3.4;
+  const tr=(a,b)=>`translate(${a.toFixed(2)}cqmin,${b.toFixed(2)}cqmin)`;
+  return t=>{
+    const i=Math.floor(t/D),st=Math.floor(t*24),tw=rnd(Math.floor(t*3),1,9)<.32;
+    if(i!==k){k=i;const s=pick(W,i);[g1,g2,m].forEach(e=>{e.textContent=s;e.style.fontSize=fit(s,36,78);});}
+    if(tw){
+      g1.style.transform=tr((rnd(st,1,8)-.5)*12,(rnd(st,2,8)-.5)*4);g2.style.transform=tr((rnd(st,3,8)-.5)*12,(rnd(st,4,8)-.5)*4);
+      m.style.transform=tr((rnd(st,5,8)-.5)*2,0);g1.style.opacity=.7;g2.style.opacity=.4;
+    }else{
+      g1.style.transform=tr(Math.sin(t*1.3)*1.4,Math.cos(t*1.1)*.9);g2.style.transform=tr(-Math.sin(t*1.1)*1.6,Math.cos(t*1.5)*.7);
+      m.style.transform='none';g1.style.opacity=.45;g2.style.opacity=.22;
+    }
+  };
+ }},
+{id:'corrupt',g:'hr',zh:'字被換掉',en:'Corrupt',desc:'一句話裡的字一個個閃爍，被換成另一句。',use:'反轉、附身',scheme:'ink',words:['你在看我','我在看你'],poster:2.4,
+ make(r,W){
+  const n=clamp(Math.max(...W.map(w=>cs(w).length)),1,10),pool=cs(W.join('')).filter(x=>x.trim());
+  const row=h('div','w900 chars hser');row.style.fontSize=fitN(n,40,80);const C=[];
+  for(let j=0;j<n;j++){const e=h('span');row.append(e);C.push(e);}r.append(row);const D=4.4;
+  return t=>{
+    const k=Math.floor(t/D),tt=t%D,A=cs(pick(W,k)),B=cs(pick(W,k+1)),st=Math.floor(t*14);
+    C.forEach((e,j)=>{
+      const sj=1.2+rnd(k,j,1)*2;let ch,hot=false;
+      if(tt<sj-.55)ch=A[j];
+      else if(tt<sj){hot=true;const v=rnd(st,j,2);ch=v<.4?A[j]:v<.75?B[j]:pool[Math.floor(rnd(st,j,3)*pool.length)];}
+      else ch=B[j];
+      setText(e,ch||'　');e.style.color=hot?'var(--hi)':'';
+    });
+  };
+ }},
+{id:'mirror',g:'hr',zh:'鏡中倒影',en:'Mirror',desc:'字下面有倒影；主字偶爾瞬間左右反過來，倒影慢半拍才跟上。',use:'雙重人格、鏡子',scheme:'paper',words:['鏡子裡','不是你'],poster:1,
+ make(r,W){
+  const col=h('div','col'),m=h('div','w900 hser'),rf=h('div','w900 hser refl');col.style.gap='0';col.append(m,rf);r.append(col);let k=-1;const D=3.2;
+  const fl=x=>(x>1.4&&x<1.52)||(x>2.2&&x<2.27);
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);[m,rf].forEach(e=>{e.textContent=s;e.style.fontSize=fit(s,30,74);});}
+    m.style.transform=`scaleX(${fl(tt)?-1:1})`;
+    rf.style.transform=`scale(${fl(tt-.3)?-1:1},-1) skewX(${(Math.sin(t*2)*5).toFixed(2)}deg)`;rf.style.opacity=.3;
+  };
+ }},
+{id:'torch',g:'hr',zh:'手電筒',en:'Flashlight',desc:'畫面全黑，只有一圈光掃過的地方看得到字。',use:'探索、密室',scheme:'ink',words:['不要開燈','牆上有字'],poster:1.3,
+ make(r,W){
+  const beam=h('div','torch'),dim=h('div','torch'),lit=h('div','torch'),d=h('div','w900 hser'),l=h('div','w900 hser');
+  dim.append(d);lit.append(l);dim.style.opacity=.05;r.append(beam,dim,lit);let k=-1;const D=5;
+  return t=>{
+    const i=Math.floor(t/D);
+    if(i!==k){k=i;const s=pick(W,i);[d,l].forEach(e=>{e.textContent=s;e.style.fontSize=fit(s,36,78);});}
+    const x=(50+36*Math.sin(t*1.1)+5*Math.sin(t*3.7)).toFixed(2),y=(50+20*Math.sin(t*1.7+1)).toFixed(2);
+    const g=`radial-gradient(circle at ${x}% ${y}%,#000 0,#000 15cqmin,transparent 30cqmin)`;
+    lit.style.webkitMaskImage=g;lit.style.maskImage=g;
+    beam.style.background=`radial-gradient(circle at ${x}% ${y}%,color-mix(in srgb,var(--fg) 13%,transparent) 0,transparent 30cqmin)`;
+  };
+ }},
+{id:'melt',g:'hr',zh:'融化拉長',en:'Melt',desc:'字慢慢往下被拉長、歪掉，像在融化。',use:'崩壞、夢境',scheme:'verm',words:['快逃','來不及了'],poster:2.8,
+ make(r,W){
+  const row=h('div','w900 chars');row.style.transform='translateY(-14cqh)';r.append(row);let C=[],k=-1;const D=4.2;
+  return t=>{
+    const i=Math.floor(t/D),tt=t%D;
+    if(i!==k){k=i;const s=pick(W,i);row.style.fontSize=fit(s,34,74);C=setChars(row,s);C.forEach(e=>{e.style.transformOrigin='50% 10%';});}
+    const p=E.in(seg(tt,.5,3.6));row.style.opacity=seg(tt,0,.25)*(1-seg(tt,3.7,4.15));
+    C.forEach((e,j)=>{e.style.transform=`skewX(${(Math.sin(t*2+j)*p*6).toFixed(2)}deg) scale(${(1-p*.12).toFixed(3)},${(1+p*(.8+rnd(k,j,1)*1.6)).toFixed(3)})`;});
+  };
+ }}
+];
+const LEN={burst:6.6,hit:6.54,stamp:7.2,punch:6.3,stack:6.8,stretch:6.98,through:5.7,squash:6.6,crawl:8,drift:8,echo:5.89,slant:8,path:8,ticker:8,depth:8,tape:8,flap:9.6,flip:9.6,type:5.68,slot:9.9,odo:7.6,swapline:5.4,led:8,split:8.8,glitch:5.2,marker:7.8,shake:7.2,neon:8,bob:8.8,track:7.2,fill:6,focus:6,cube:6,crawl3d:8,orbit:12,tunnel:8.4,scatter:6.4,extrude:6,blinds:5.2,block:8.4,kara:5.58,popsync:5.1,dual:8.8,beat:4,soft:6.99,lyrics:9,trail:4.8,mix:7.6,vpop:6.6,slam:6.6,lines:4.8,marks:7.8,telop:7.8,emph:5.6,bouncy:5.7,star:7.2,flick:7.2,drip:8.8,creep:5.2,ghost:6.8,corrupt:8.8,mirror:6.4,torch:10,melt:8.4};
+FX.forEach((f,i)=>{f.no=String(i+1).padStart(2,'0');});
+
+const GROUPS=[
+  {g:'in',zh:'登場',note:'字一出現就要被看見。片頭、重點、口號用這組。'},
+  {g:'flow',zh:'流動',note:'字一直在跑，可以鋪滿整個畫面當背景。'},
+  {g:'swap',zh:'切換',note:'把一個詞換成另一個詞，轉場和資訊更新用這組。'},
+  {g:'em',zh:'強調',note:'字已經在畫面上，用質感和抖動讓它更有情緒。'},
+  {g:'sp',zh:'空間',note:'用透視、深度和遮罩，讓字有前後、有厚度。'},
+  {g:'mv',zh:'歌詞 MV',note:'跟著節拍和句子走。範例歌詞是為這一頁另外寫的，換成你的詞就能用。'},
+  {g:'tv',zh:'綜藝字卡',note:'粗外框、亮色、彈來彈去，吐槽和反應用這組。'},
+  {g:'hr',zh:'恐怖片',note:'忽明忽暗、抖動、緩慢逼近，氣氛比速度重要。'}
+];
+
+
+/* ---------- prompts ---------- */
+const SCH={ink:['#14161b','#f4f5f7','#ff4d2e'],paper:['#f4f5f7','#14161b','#2340ff'],cobalt:['#2340ff','#ffffff','#14161b'],verm:['#ff4d2e','#14161b','#f4f5f7'],key:['#00b140（綠幕，方便去背）','#ffffff','#14161b']};
+const qw=W=>W.map(w=>'「'+w+'」').join('');
+const PROMPT={
+burst:{m:'一次顯示一個詞，置中。每個詞用 0.4 秒從 0 放大到 100%，帶過衝回彈（先衝到約 115% 再回到 100%）。同時有 14 條強調色短線從文字中心向四周射出，0.5 秒內飛遠、縮短、消失。停留約 1.4 秒後，用 0.3 秒縮小淡出，換下一個詞。每個詞 2.2 秒。'},
+hit:{wl:W=>'文字：「'+W.join('')+'」（拆成單字，逐字顯示）',m:'一次只顯示一個字，字高約畫面高度的六成，置中。每個字停 0.42 秒；出現時用 0.13 秒從 240% 縮到 100%，同時從傾斜 7 度轉正（左右輪流），像重重砸下來。全部的字跑完後空白 0.5 秒，再從頭開始。'},
+stamp:{m:'三個詞各做成一顆印章：粗外框、小圓角，左右兩顆用強調色、中間那顆用主文字色。三顆橫排，分別歪斜 -9°、5°、-4°，上下略微錯開。每隔 0.6 秒蓋下一顆：0.14 秒內從 260% 加速縮到 100% 後定住不動。三顆都蓋完後停約 1.5 秒，一起淡出再重來。每輪 3.6 秒。'},
+punch:{m:'一次一個詞，置中。用 0.55 秒從 6% 極速放大到 100%，指數緩出（前面很快、最後變慢）。後面跟著三層強調色的半透明殘影，各晚 0.07 秒做同樣的放大，追上本體後淡掉。停到 1.7 秒，再用 0.3 秒放大衝出畫面並淡出，換下一個詞。每個詞 2.1 秒。'},
+stack:{m:'三個詞分成三行，直向排列、置中。第一行從畫面左外側滑入，第二行從右外側，第三行再從左；每行間隔 0.55 秒，滑入 0.32 秒、緩出，進場時帶 18° 斜切再拉正。新的一行進來時，前面的行降到 45% 透明度。第二行用強調色。三行到齊後停 1 秒，一起淡出再重來。每輪 3.4 秒。'},
+stretch:{wl:W=>'文字：'+qw(W)+(W.length>1?'（每 4.2 秒換下一個詞）':''),m:'文字排成一行、置中。每個字以自己的底部為基準，輪流被垂直拉長到 200%、同時橫向縮到 78%，再彈回原狀。拉伸從第一個字依序傳到最後一個字，像一道波浪持續不停，一道波約 1.7 秒。'},
+through:{m:'一次一個詞，置中，停 1.25 秒。接著用 0.65 秒加速放大到 17 倍，像直接穿過鏡頭，最後四分之一的時間淡掉；同時下一個詞在後方從 35% 放大到 100% 並淡入，成為新的主角。每個詞 1.9 秒，一個接一個不中斷。'},
+squash:{m:'一次一個詞，用強調色，以文字底部為變形基準。0.28 秒從畫面上方加速掉到中央，落地瞬間壓扁到 50% 高度、橫向變寬；接著彈起約畫面高度的 20% 並稍微拉長，再落下、輕微壓扁一次後站穩。停約 1 秒，先下蹲再向上彈出畫面，換下一個詞。每個詞 2.2 秒。'},
+crawl:{m:'把所有詞用「・」接成一長串並重複。主畫面是超大的字，字高約畫面高度的 58%，由右往左緩慢等速橫移。畫面底部有一條強調色窄帶，裡面是同一串字的小字，由左往右較快地跑。兩者都無縫循環。'},
+drift:{serif:1,m:'五欄直排文字（由上往下書寫），等距排滿畫面寬度，字高約畫面高度的 15%。每欄放一個詞，用「・」重複接續，詞依序輪流分配到各欄。第 1、3、5 欄等速往上跑，第 2、4 欄往下跑並改用強調色，各欄速度略有不同。無縫循環。'},
+echo:{wl:W=>'文字：「'+W[0]+'」',m:'同一個詞重複排成 6 列多欄的網格，鋪滿畫面，平常只有 10% 透明度。一道斜向的亮度波從左上往右下不斷掃過：波峰經過的詞變成 100% 不透明，最亮的那幾個改用強調色，之後平滑地暗回去。一道波約 2 秒，持續不停。'},
+slant:{m:'兩條橫跨畫面的色帶上下相鄰，整組逆時針傾斜 9°，兩端超出畫面。上面一條是強調色底、粗黑體，文字由右往左跑；下面一條是主文字色底、字用背景色、粗明體，由左往右跑。兩條各放一個詞，用「・」重複接續，無縫循環。'},
+path:{m:'一條寬的強調色帶子，沿著 S 形曲線從畫面左下彎到右上，兩端超出畫面。把所有詞用「・」接成一串並重複，沿著曲線排列，順著曲線等速流動；每個字要跟著曲線的方向轉。無縫循環。'},
+ticker:{m:'四排橫向跑馬燈直向堆疊、置中，每排放一個詞並用「・」重複。由上到下：第一排小字往左跑；第二排超大粗字、強調色、往右慢慢跑；第三排是反白窄條裡的小字，往左跑、速度最快；第四排中等大小的粗明體字往右跑。四排速度都不同，無縫循環。'},
+depth:{serif:1,m:'七欄直排文字置中並排，做出景深。正中間一欄最大（字高約畫面高度的 30%）、用強調色；兩旁各一欄中等大小、55% 透明度；最外側各兩欄小字、28% 透明度。相鄰的欄一上一下反向移動，各欄速度不同。每欄放一個詞並重複接續，無縫循環。'},
+tape:{m:'兩條橫跨畫面的封條在中央交叉成 X，兩端超出畫面。一條順時針傾斜 12°，強調色底；另一條逆時針傾斜 10°，主文字色底、字用背景色。兩條各放一個詞，用「・」重複接續，文字各自反向等速跑。無縫循環。'},
+flap:{m:'每個字放在一塊淺色方牌上，橫排置中，牌面中間有一條細橫縫，像車站的翻牌看板。換詞時每塊牌以每秒 11 次的速度快速翻過隨機的字（每翻一次，字上下壓扁再展開），由左到右依序停在正確的字上，每塊比前一塊晚 0.28 秒停。停留後換下一個詞。每個詞 3.2 秒。'},
+flip:{m:'每個字一張淺色卡片，橫排置中。停 1.5 秒後，卡片由左到右依序繞垂直軸翻轉 180°，每張間隔 0.1 秒、翻轉 0.5 秒、緩入緩出，要有透視感；翻到側面的瞬間換成下一個詞對應的字。翻完後繼續停留，依序輪替所有的詞。'},
+type:{serif:1,wl:W=>'句子：'+qw(W),m:'文字靠左對齊，整塊放在畫面中央。每秒打出 7 個字，一字一字出現，句尾跟著一條強調色的直線游標。打完後游標閃爍 1.1 秒，再以每秒 18 個字的速度由後往前刪掉，接著打下一句。所有句子輪流循環。'},
+slot:{m:'每個字一格深色滾輪，橫排置中，像拉霸機。所有滾輪同時開始由上往下快速滾動隨機的字，並逐漸減速；第一格在第 1 秒停，之後每格晚 0.5 秒停，依序停在正確的字上。全部停下後文字用強調色閃爍 0.6 秒，停留一下，再換下一個詞重來。'},
+odo:{wl:(W,fx)=>{const f=W.join(' ').match(/\d[\d,]*/);const n=Number((f?f[0].replace(/,/g,''):fx.num).slice(0,8)).toLocaleString('en-US');const L=W.map(w=>w.replace(/\d[\d,]*/g,'').trim()).filter(Boolean);return '數字：'+n+(L[0]?'，前面的小字標籤「'+L[0]+'」':'')+(L[1]?'，後面的小字「'+L[1]+'」':'');},m:'數字的每一位各放在一格深色方塊裡，千分位加逗號，橫排置中。每一位都是一條 0 到 9 的直向數字帶，從 0 開始向上滾動，轉好幾圈後緩出，停在目標數字；越右邊的位數轉越多圈、越晚停。約 2.5 秒全部停好，停留後歸零重來。每輪 3.8 秒。'},
+swapline:{wl:(W,fx)=>'固定標籤：「'+fx.label+'」；輪替的詞：'+qw(W),m:'左邊是固定不動的外框標籤，右邊是一塊強調色的底，裡面顯示一個詞，整組置中。每 1.8 秒換一次：目前的詞向上滑出，下一個詞從下方滑入，0.5 秒、緩入緩出。底塊像窗口一樣裁切文字，超出的部分看不到。'},
+led:{wl:W=>'文字：「'+W.join('　')+'」',m:'整個畫面是一片規則排列的小圓點，像點陣燈板；沒亮的點是很暗的強調色。文字只由亮起的強調色圓點組成，字高約畫面高度的 46%，由右往左跑。每次移動剛好一顆點的距離，一格一格跳動，不要平滑移動。無縫循環。'},
+split:{m:'一次一個詞，置中，停 1.45 秒。接著文字從水平中線裂成上下兩半：上半往左上飛出、下半往右下飛出，0.65 秒、緩入緩出；同時下一個詞在後方從 70% 放大到 100% 並淡入。文字顏色在主文字色與強調色之間輪替。每個詞 2.2 秒。'},
+glitch:{m:'一次一個詞，置中，平常靜止。每隔約 1 秒出現一次 0.3 秒的訊號故障：文字被橫向切出一條帶狀區塊並左右大幅錯位，後面閃出一層強調色的重影，整體也輕微左右抖動；故障期間每 0.05 秒換一次隨機的錯位位置，不要平滑過渡。換詞剛好發生在故障的瞬間。每個詞 2.6 秒。'},
+marker:{m:'一次一個詞，置中，文字先淡入。接著一條強調色色塊從左到右刷過文字的下半部，像螢光筆畫重點，0.45 秒、緩出，色塊帶 8° 斜切。停留約 1.4 秒後，色塊往右收掉、文字淡出，換下一個詞。每個詞 2.6 秒。'},
+shake:{m:'一次一個詞，用強調色，置中。每個字各自獨立地劇烈抖動：每秒 24 次隨機跳到新的位置，並帶隨機的小角度旋轉，不要平滑過渡。抖 1.5 秒後，在 0.4 秒內減弱成輕微顫動，接著換下一個詞再猛烈抖起來。每個詞 2.4 秒。'},
+neon:{m:'文字做成霓虹燈管：只有強調色描邊、沒有填色，外面一圈強調色柔光。開始時全部熄滅（只剩很暗的輪廓），每個字在不同的時間點亮起，亮起前快速閃爍幾下；全部亮起後穩定發光，中途隨機有一個字短暫閃一下；最後由左到右依序熄滅，換下一個詞。每個詞 4 秒。'},
+bob:{wl:W=>'文字：'+qw(W)+(W.length>1?'（每 4.4 秒換下一個詞）':''),m:'文字排成一行、置中。每個字上下浮動，位移是一條正弦波，從第一個字依序傳到最後一個字；每個字同時隨波浪左右微微傾斜 6°。持續不停，一個週期約 1.6 秒。'},
+track:{serif:1,m:'一次一個詞，置中。文字淡入後，字距從緊貼開始緩慢等速拉開，拉到每個字之間約 0.7 個字寬，全程 3.6 秒，像電影片名；最後 0.5 秒淡出，換下一個詞。'},
+fill:{m:'一次一個詞，置中。先只顯示描邊的空心字，接著強調色從字的底部往上填滿，像液體注入，1.6 秒、緩入緩出。填滿後停 0.7 秒，再用 0.5 秒由上往下退掉，換下一個詞。每個詞 3 秒。'},
+focus:{m:'一次一個詞，置中。開始時文字嚴重失焦模糊、略為放大（115%）而且透明，用 1.1 秒對焦成清晰銳利並回到 100%。清楚地停留約 1.3 秒，再用 0.5 秒模糊淡出，換下一個詞。每個詞 3 秒。'},
+cube:{m:'文字放在一條強調色的長方塊上，像一根橫放的四角柱，置中，要有透視。停 1.3 秒後，柱子向上滾 90°，0.7 秒、緩入緩出：目前這一面翻到上方消失，下一個詞從底面轉到正面。依序輪替所有的詞。'},
+crawl3d:{wl:W=>'文字（每個詞一行）：'+qw(W),m:'所有行置中對齊，接成一長串並重複。整片文字躺在一個向後傾斜約 56° 的平面上，要有透視：從畫面下方往遠處等速滾動，越遠越小，並在畫面上半部漸漸隱入背景色。文字用強調色，無縫循環。'},
+orbit:{wl:W=>'中央的詞：「'+W[0]+'」；環繞的字：「'+(W.length>1?W.slice(1):W).join('・')+'・」',m:'畫面中央放一個大的詞，用強調色。環繞的字重複接成完整的一圈，沿著圓形路徑繞著中央的詞排列，字的底部朝向圓心。整圈順時針等速旋轉，12 秒轉一圈，中央的詞不動。'},
+tunnel:{wl:W=>'文字：'+qw(W)+(W.length>1?'（每 4.2 秒換下一個詞）':''),m:'同一個詞複製成 7 層，全部置中重疊，實心字與空心描邊字交錯。每一層持續由很小（8%）放大到很大（約 5 倍），放大速度越來越快，像穿越隧道朝鏡頭飛來；剛出現時淡入，快貼到鏡頭時淡出，近的一層蓋在遠的上面。各層等間隔出發，無縫循環。'},
+scatter:{m:'一次一個詞，置中。一開始每個字散落在畫面各處，位置、旋轉角度都是隨機的，並放大到 180%；接著由第一個字起依序飛回正確位置、轉正、縮回原大小，每個字 0.65 秒、緩出、間隔 0.06 秒，拼成完整的詞。停約 1.5 秒後，所有字向四周加速飛散並淡出，換下一個詞。每個詞 3.2 秒。'},
+extrude:{m:'一次一個詞，置中。文字後面有 12 層緊密相疊的強調色硬邊陰影（不模糊），連成一塊有厚度的立體側面。出現時厚度用 0.5 秒從 0 長出來，帶一點過衝回彈，厚度約 0.2 個字高；停留期間陰影的方向在右下方來回緩慢擺動，像光源在移動。最後厚度縮回 0，換下一個詞。每個詞 3 秒。'},
+blinds:{m:'一次一個詞，置中。文字被水平切成 6 條等高的橫條：第 1、3、5 條從畫面左外側滑入，第 2、4、6 條從右外側滑入，由上到下每條間隔 0.06 秒，0.4 秒、緩出，拼成完整的字。停約 1.5 秒後，各條朝進場的反方向加速滑出，換下一個詞。每個詞 2.6 秒。'},
+block:{m:'一次一個詞，置中。一塊強調色色塊從文字的左緣長到右緣，把文字的位置蓋滿（0.38 秒）；接著色塊從左邊收向右邊，露出底下的文字（0.38 秒）。文字停留約 1.2 秒後，色塊再用同樣的方式蓋過去並把文字帶走，換下一個詞。每個詞 2.8 秒。'},
+kara:{wl:W=>'句子：'+qw(W),m:'一次顯示一句，置中，文字是主文字色。接著強調色從左到右一個字一個字填過去（同一行字的強調色版本由左往右揭開），每個字 0.26 秒、等速。整句填完後停約 0.5 秒，淡出換下一句。'},
+popsync:{wl:W=>'句子：'+qw(W),m:'一次一句，置中。字一個一個出現，每 0.3 秒一個，像踩在節拍上：每個字用 0.22 秒從 0 彈到 100%，帶過衝回彈；剛出現的字先是強調色，下一個字出現時變回主文字色。整句到齊後停約 1 秒，淡出換下一句。'},
+dual:{wl:W=>'句子（依序）：'+qw(W),m:'KTV 式的兩行字幕：一行靠左上、一行靠右下。正在唱的那一行 100% 不透明，下方有一條強調色底線在 2 秒內從左畫到右；另一行是下一句的預告，30% 透明度。每 2.2 秒輪到另一行變成正在唱，唱完的那行換成再下一句並淡入。依序輪替所有句子。'},
+beat:{m:'每 0.5 秒一拍，每拍換一個詞，置中、佔畫面高度約六成。每一拍畫面顏色反白一次（背景色與文字色互換）；文字在拍點瞬間放大到 130%，再用 0.24 秒縮回 100%；每四拍的最後一拍放大到 160%。'},
+soft:{serif:1,wl:W=>'句子：'+qw(W),m:'一次一句，置中。每個字從下方、模糊而且透明的狀態慢慢浮上來變清楚，每個字 0.8 秒、緩出，字與字間隔 0.09 秒。整句清楚後停約 1.5 秒，再一起往上飄、變模糊、淡出，換下一句。'},
+lyrics:{wl:W=>'歌詞（每個詞一行）：'+qw(W),m:'像音樂 App 的歌詞畫面：所有句子直向排成一列、置中。正在唱的那一句在畫面正中央，100% 大小、強調色；上下相鄰的句子縮到 60%、30% 透明度，更遠的看不見。每 1.5 秒整列往上滾一行（最後 0.4 秒完成滾動、緩入緩出），下一句移到中央。唱完最後一句接回第一句，無縫循環。'},
+trail:{m:'文字置中。每 0.6 秒一拍：拍點瞬間，文字後面甩出 6 層空心描邊的殘影，等距向上排開（下一拍改成向下），越遠越淡，0.16 秒甩到最遠，再用 0.4 秒收回並消失；本體在拍點放大到 108% 再回來。每四拍換下一個詞。'},
+mix:{m:'四個詞拼成一個緊密的長方形區塊，置中：第一個詞最大，橫排在左上；第二個詞直排在右側、貫穿整個高度、用強調色；第三個詞中等大小在左下、用強調色；第四個詞小字在下方中間。每個詞都撐滿自己的格子。四個詞每隔 0.45 秒依序從左、上、下、右飛入就位（0.24 秒、緩出）。全部到齊後停約 1.5 秒，一起縮小消失再重來。每輪 3.8 秒。'},
+vpop:{m:'綜藝節目字卡風格：文字是亮色填色加很粗的深色外框。一次一個詞，置中，用 0.7 秒從 0 彈出到 100%，帶明顯的彈簧回彈，同時左右搖晃幾下後停住，整體微微歪 3°（每個詞輪流往左、往右歪）。停約 1 秒後快速縮小消失，換下一個詞。每個詞 2.2 秒。'},
+slam:{m:'綜藝字卡風格（亮色填色、很粗的外框）。一次一個詞：從畫面右上角外面以 240% 的大小加速砸到畫面中央，0.16 秒，落定時逆時針歪 7°。砸中的瞬間整個畫面閃白一下並劇烈震動，震動在 0.4 秒內平息。停約 1.3 秒後，字往下掉出畫面並旋轉，換下一個詞。每個詞 2.2 秒。'},
+lines:{m:'漫畫式集中線：畫面四周佈滿從中心向外的細放射線，粗細和間距不規則，中央留一塊橢圓形空白。放射線每秒換 12 次隨機角度，看起來不停閃動。中央是綜藝字卡風格的詞（亮色填色、粗外框），彈出後持續微微脈動。每 2.4 秒換下一個詞。'},
+marks:{m:'綜藝字卡風格（亮色填色、粗外框）。詞在中央彈出後，旁邊依序冒出三個符號：右上「？」、左上「！」、右邊「？！」，每個間隔 0.32 秒彈出、帶過衝回彈，各自歪斜並持續小幅搖晃。停留後全部一起縮小消失，換下一個詞。每個詞 2.6 秒。'},
+telop:{m:'一條強調色的斜切色帶從左往右刷出來（0.3 秒、緩出），整條微微逆時針傾斜 3°，置中。接著字一個一個從下方彈上色帶，每個字間隔 0.06 秒、帶過衝回彈。停約 1.3 秒後整條往右加速滑出畫面，換下一個詞。每個詞 2.6 秒。'},
+emph:{wl:W=>{const o=[];for(let i=0;i<W.length;i+=2)o.push('「'+W[i]+'」＋關鍵字「'+(W[i+1]||W[0])+'」');return '文字（兩個詞一組）：'+o.join('、');},m:'每一組排在同一行、置中：前半段是小字（一半大小），先出現；0.5 秒後，關鍵字用綜藝字卡風格（亮色填色、粗外框）從 0 猛然放大到 135% 再回到 115%，同時左右快速抖動約 0.8 秒後停住。停留後一起淡出，換下一組。每組 2.8 秒。'},
+bouncy:{m:'綜藝字卡風格（粗外框），奇數字與偶數字用兩種不同的亮色，並輪流往左、往右歪 6°。字一個一個從畫面上方掉下來，每個間隔 0.1 秒，落地後小彈一下再站穩。全部到齊後大家一起往上跳一下。停留後一起縮小消失，換下一個詞。'},
+star:{m:'一個 16 角的尖刺爆炸框（強調色）在畫面中央彈出，帶過衝回彈，之後持續慢慢旋轉並小幅脈動。詞在爆炸框中央稍晚一點彈出，逆時針歪 5°，顏色要和爆炸框形成強烈對比。停約 1.6 秒後一起縮小消失，換下一個詞。每個詞 2.4 秒。'},
+flick:{serif:1,m:'文字置中，帶一點柔光。文字像快壞掉的燈泡：大部分時間亮著，但每秒 30 格裡隨機有幾格突然變得很暗；中途有一次短暫全黑；快結束時閃爍越來越頻繁，最後整個熄滅。熄滅時換下一個詞再亮起來。每個詞 3.6 秒。'},
+drip:{m:'文字用紅色，置中偏上，先淡入。接著從每個字的底部往下流出兩條細長的痕跡：寬度、長度、開始時間都不一樣，末端是圓的，各用約 2.4 秒緩慢伸長到 0.4 至 1.4 個字高。停留一下後整體淡出，換下一個詞。每個詞 4.4 秒。'},
+creep:{serif:1,m:'文字置中。從 50% 大小、幾乎看不見開始，用 4.5 秒極慢地變大、變亮（越後面越快），同時持續微微發抖，而且越抖越明顯。第 4.5 秒突然換成強調色並瞬間放大到 3.5 倍、衝出畫面，只維持 0.2 秒，接著全黑 0.5 秒再重來。'},
+ghost:{serif:1,m:'文字置中。本體後面有兩層半透明重影（一層紅色、一層主文字色），平常朝不同方向緩慢漂移。不定時（平均每秒一次、每次約 0.3 秒）重影突然大幅左右抽動並變得更明顯，每秒 24 次隨機換位置，本體也跟著輕微抖動，然後恢復平靜。每 3.4 秒換下一個詞。'},
+corrupt:{serif:1,wl:W=>'句子（依序互換）：'+qw(W),m:'文字置中，先顯示第一句。接著每個字在不同的時間點開始閃爍 0.55 秒：閃爍時變成強調色，並在原字、目標字和隨機的字之間快速跳動（每秒 14 次），最後定格成下一句對應的字。所有字在約 3 秒內陸續換完，停留後再用同樣的方式換成再下一句。每輪 4.4 秒。'},
+mirror:{serif:1,m:'主文字在上，正下方是它上下顛倒的倒影：30% 透明度、越遠越淡，並緩慢左右傾斜搖晃。主文字偶爾瞬間左右鏡像翻轉 0.1 秒再翻回來（每輪兩次），倒影慢 0.3 秒才做同樣的翻轉。每 3.2 秒換下一個詞。'},
+torch:{serif:1,m:'畫面全黑，文字置中但幾乎看不見（只有 5% 的亮度）。一圈柔邊的圓形光像手電筒一樣在畫面上不規則地左右、上下游移，只有被光照到的地方文字才清楚顯示，光圈範圍內的背景也微微變亮。每 5 秒換下一個詞。'},
+melt:{m:'文字置中偏上。每個字以頂端為基準，被緩慢地往下拉長，越後面越快，各字拉長的程度不同（1.8 到 3.4 倍），同時左右歪斜搖晃、略微變窄，像在融化。約 3.6 秒後淡出，換下一個詞恢復原狀再重來。每個詞 4.2 秒。'}
+};
+function promptFor(fx,o){
+  o=o||{};const P=PROMPT[fx.id],W=wordsFor(fx),c=SCH[o.scheme||fx.scheme];
+  return ['【'+fx.no+' '+fx.zh+'】',
+    '用單一 HTML 檔（純 CSS + JavaScript，不用外部套件）做一個可以無縫循環播放的文字動畫。',
+    '畫面：比例 '+(o.ratio||'16:9')+'，背景 '+c[0]+'，主文字 '+c[1]+'，強調色 '+c[2]+'。',
+    '字體：'+(P.serif?'粗明體（Noto Serif TC 900）':'最粗的黑體（Noto Sans TC 900）')+'。',
+    P.wl?P.wl(W,fx):'文字：'+qw(W),
+    '動態：'+P.m,
+    '其他：文字大小跟著畫面縮放，不要超出畫面；只要這一個動畫，不要其他介面或說明文字。'
+  ].join('\n');
+}
+function copy(text,btn,node){
+  const done=ok=>{const o=btn.dataset.l||(btn.dataset.l=btn.textContent);btn.textContent=ok?'已複製':'已選取，請按 Ctrl+C';clearTimeout(btn._t);btn._t=setTimeout(()=>{btn.textContent=o;},1800);};
+  const sel=()=>{try{if(node){const r=document.createRange();r.selectNodeContents(node);const s=getSelection();s.removeAllRanges();s.addRange(r);}}catch(e){}done(false);};
+  try{navigator.clipboard.writeText(text).then(()=>done(true),sel);}catch(e){sel();}
+}
+function renderPrompts(){
+  const pl=$('plist');pl.textContent='';
+  FX.forEach(fx=>{
+    const li=h('li'),hd=h('div','p-h'),pre=h('pre','pr',promptFor(fx)),b=h('button','btn sm','複製');
+    b.type='button';b.setAttribute('aria-label','複製 '+fx.no+' '+fx.zh+' 的指令');pre.id='pr-'+fx.id;
+    b.addEventListener('click',()=>copy(pre.textContent,b,pre));
+    hd.append(h('span','no',fx.no),h('b',null,fx.zh),b);li.append(hd,pre);pl.append(li);
+  });
+}
+function bigPrompt(){if(openIdx>=0)$('dlg-pr').textContent=promptFor(FX[openIdx],{ratio:bigRatio,scheme:big.dataset.scheme});}
+
+/* ---------- state ---------- */
+const $=id=>document.getElementById(id);
+const input=$('words'),resetBtn=$('reset'),playBtn=$('play'),main=$('main'),dlg=$('dlg'),big=$('big');
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing=!reduce,clock=0,mclock=0,last=performance.now();
+let custom=[],group='all',openIdx=-1,bigInst=null,bigScheme=null,bigRatio='16:9';
+const live=new Set(),byStage=new Map(),cards=[];
+
+function parse(s){return s.split(/[\s,，、;；|\/]+/).map(x=>cs(x).slice(0,14).join('')).filter(Boolean).slice(0,8);}
+function wordsFor(fx){return custom.length?custom:fx.words;}
+
+function mount(stage,fx,opts){
+  stage.textContent='';
+  const root=h('div','fx fx-'+fx.id);stage.append(root);
+  let frame;
+  try{frame=fx.make(root,wordsFor(fx),fx,custom.length>0);}catch(e){frame=()=>{};}
+  const inst={stage,fx,off:opts.off||0,always:!!opts.always,vis:true,c0:opts.always?mclock:clock,dead:false};
+  inst.frame=t=>{if(inst.dead)return;try{frame(Math.max(0,t));}catch(e){inst.dead=true;}};
+  inst.frame(opts.always||playing?inst.off:(fx.poster!=null?fx.poster:1));
+  return inst;
+}
+
+const io=('IntersectionObserver' in window)?new IntersectionObserver(es=>es.forEach(e=>{const i=byStage.get(e.target);if(i)i.vis=e.isIntersecting;}),{rootMargin:'120px'}):null;
+
+function build(){
+  GROUPS.forEach(G=>{
+    const list=FX.filter(f=>f.g===G.g);
+    const sec=h('section','band-sec');sec.dataset.g=G.g;
+    const hd=h('div','band-h');
+    hd.append(h('h2',null,G.zh),h('span','rng',list[0].no+' – '+list[list.length-1].no),h('p',null,G.note));
+    const ul=h('ul','grid');
+    list.forEach(fx=>{
+      const li=h('li','card'),btn=h('button','stage-btn');btn.type='button';
+      btn.setAttribute('aria-label','放大看 '+fx.no+' '+fx.zh);
+      const stage=h('div','stage');stage.dataset.scheme=fx.scheme;stage.setAttribute('aria-hidden','true');
+      btn.append(stage);
+      const meta=h('div','meta'),h3=h('h3');
+      h3.append(document.createTextNode(fx.zh),h('span','en',fx.en));
+      const p=h('p');p.append(document.createTextNode(fx.desc+' '),h('span','use',fx.use));
+      const cp=h('button','btn sm cp','複製指令');cp.type='button';cp.setAttribute('aria-label','複製 '+fx.no+' '+fx.zh+' 的指令');
+      cp.addEventListener('click',()=>copy(promptFor(fx),cp,document.getElementById('pr-'+fx.id)));
+      meta.append(h('span','no',fx.no),h3,p,cp);
+      li.append(btn,meta);ul.append(li);
+      const idx=FX.indexOf(fx);
+      btn.addEventListener('click',()=>openBig(idx));
+      cards.push({fx,stage,idx});
+      if(io)io.observe(stage);
+    });
+    sec.append(hd,ul);main.append(sec);
+  });
+}
+
+function renderAll(){
+  cards.forEach(c=>{
+    const old=byStage.get(c.stage);if(old)live.delete(old);
+    const inst=mount(c.stage,c.fx,{off:c.idx*.37});
+    byStage.set(c.stage,inst);live.add(inst);
+  });
+  renderPrompts();
+  if(openIdx>=0)mountBig();
+}
+
+function mountBig(){
+  if(bigInst)live.delete(bigInst);
+  const fx=FX[openIdx];
+  big.dataset.scheme=bigScheme||fx.scheme;
+  bigInst=mount(big,fx,{always:true});live.add(bigInst);
+  $('dlg-no').textContent=fx.no;$('dlg-t').textContent=fx.zh;$('dlg-en').textContent=fx.en;
+  $('sw').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.s===big.dataset.scheme)));
+  bigPrompt();
+}
+function openBig(i){
+  openIdx=i;bigScheme=null;mountBig();
+  if(!dlg.open){try{dlg.showModal();}catch(e){dlg.setAttribute('open','');}}
+}
+function step(d){if(openIdx<0)return;openIdx=(openIdx+d+FX.length)%FX.length;bigScheme=bigScheme==='key'?'key':null;mountBig();}
+function closeBig(){if(dlg.open)dlg.close();}
+
+dlg.addEventListener('close',()=>{if(bigInst){live.delete(bigInst);bigInst=null;}big.textContent='';openIdx=-1;});
+dlg.addEventListener('click',e=>{if(e.target===dlg)closeBig();});
+dlg.addEventListener('keydown',e=>{
+  if(e.target&&e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){e.preventDefault();step(1);}
+  if(e.key==='ArrowLeft'){e.preventDefault();step(-1);}
+});
+$('dlg-x').addEventListener('click',closeBig);
+$('prev').addEventListener('click',()=>step(-1));
+$('next').addEventListener('click',()=>step(1));
+$('ratio').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  big.style.setProperty('--r',b.dataset.r);big.style.setProperty('--rn',b.dataset.rn);
+  $('ratio').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  bigRatio=b.textContent.trim();bigPrompt();
+});
+$('sw').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  bigScheme=b.dataset.s;big.dataset.scheme=bigScheme;
+  $('sw').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  bigPrompt();
+});
+$('dlg-copy').addEventListener('click',()=>copy($('dlg-pr').textContent,$('dlg-copy'),$('dlg-pr')));
+$('copy-all').addEventListener('click',()=>copy(FX.map(f=>promptFor(f)).join('\n\n'),$('copy-all'),$('plist')));
+$('to-prompts').addEventListener('click',()=>{$('all-prompts').scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});});
+$('fs').addEventListener('click',()=>{
+  try{const p=big.requestFullscreen&&big.requestFullscreen();if(p&&p.catch)p.catch(()=>{$('fs').disabled=true;$('fs').textContent='這裡無法全螢幕';});else if(!big.requestFullscreen){$('fs').disabled=true;$('fs').textContent='這裡無法全螢幕';}}
+  catch(e){$('fs').disabled=true;$('fs').textContent='這裡無法全螢幕';}
+});
+
+/* ---------- controls ---------- */
+let deb=0;
+function applyInput(){
+  custom=parse(input.value);
+  resetBtn.disabled=!input.value;
+  try{localStorage.setItem('tm24-words',input.value);}catch(e){}
+  renderAll();
+}
+input.addEventListener('input',()=>{clearTimeout(deb);deb=setTimeout(applyInput,220);});
+resetBtn.addEventListener('click',()=>{input.value='';applyInput();input.focus();});
+function setPlay(v){
+  playing=v;playBtn.textContent=v?'暫停全部':'播放全部';playBtn.setAttribute('aria-pressed',String(v));
+}
+playBtn.addEventListener('click',()=>setPlay(!playing));
+document.querySelector('.bar .chips').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;setGroup(b.dataset.g);
+});
+function setGroup(g){
+  group=g;
+  document.querySelectorAll('.bar .chips button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.g===g)));
+  main.querySelectorAll('.band-sec').forEach(s=>{s.hidden=!(g==='all'||s.dataset.g===g);});
+}
+
+/* ---------- loop ---------- */
+function tick(now){
+  const dt=Math.min(.1,Math.max(0,(now-last)/1000));last=now;
+  mclock+=dt;if(playing)clock+=dt;
+  live.forEach(i=>{
+    if(i.always)i.frame(mclock-i.c0);
+    else if(playing&&i.vis)i.frame(clock-i.c0+i.off);
+  });
+  requestAnimationFrame(tick);
+}
+
+/* ---------- boot ---------- */
+function start(d){
+  let text='';
+  try{text=localStorage.getItem('tm24-words')||'';}catch(e){}
+  if(d&&typeof d.text==='string')text=d.text;
+  input.value=text;custom=parse(text);resetBtn.disabled=!text;
+  build();
+  if(d&&d.group)setGroup(d.group);
+  setPlay(playing);
+  renderAll();
+  requestAnimationFrame(tick);
+}
+window.__tm={
+  list:()=>FX.map(f=>({id:f.id,no:f.no,zh:f.zh,en:f.en,g:f.g,len:LEN[f.id]||6})),
+  open(id,scheme,words){
+    live.clear();const fx=FX.find(f=>f.id===id);document.body.textContent='';
+    const W=(words&&words.length)?words:fx.words;
+    const st=h('div','stage');st.style.cssText='position:fixed;inset:0;width:100vw;height:100vh;aspect-ratio:auto;border-radius:0;box-shadow:none';
+    st.dataset.scheme=scheme||fx.scheme;document.body.append(st);
+    const root=h('div','fx fx-'+id);st.append(root);this.f=fx.make(root,W,fx,W!==fx.words);this.f(0);
+  },
+  at(t){this.f(t);}
+};
+const hot=window.claude&&window.claude.hot;
+if(hot&&hot.snapshot)hot.snapshot(()=>({text:input.value,group}));
+if(hot&&hot.ready)hot.ready(start);else start((hot&&hot.data)||{});
+})();
+</script>
+</body>
+</html>

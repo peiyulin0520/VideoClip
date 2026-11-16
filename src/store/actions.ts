@@ -19,6 +19,8 @@ import {
   type LookRef,
   type Item,
   type Project,
+  type KineticBg,
+  type KineticId,
   type TextFxKind,
   type TextItem,
   type TextRun,
@@ -1184,16 +1186,65 @@ export function setTransition(id: string, kind: TransitionKind | null, duration?
   );
 }
 
-/** 字卡的文字樣式特效（閃爍、發光閃亮、方格字、震動）；null＝取消 */
+/** 字卡的文字樣式特效（閃爍、發光閃亮、方格字、震動）；null＝取消。跟動態字卡二選一（選了這個會拿掉動態字卡） */
 export function setTextFx(id: string, kind: TextFxKind | null, opts?: Opts): void {
   editItem(
     id,
     (it) => {
       if (it.type !== 'text') return;
       if (!kind) delete it.textFx;
-      else it.textFx = { kind };
+      else {
+        it.textFx = { kind };
+        delete it.kinetic;
+      }
     },
     opts,
+  );
+}
+
+/**
+ * 動態字卡（64 式）：選一式；null＝取消。跟文字樣式特效二選一。
+ * 舞台是整個畫面，所以位置歸中、縮放歸 1（之後可以再拖、縮放）；之前選過的底色、速度保留，強調色換成新那一式的原版配色。
+ */
+export function setKinetic(id: string, kid: KineticId | null, opts?: Opts): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type !== 'text') return;
+      if (!kid) {
+        delete it.kinetic;
+        return;
+      }
+      const prev = it.kinetic;
+      it.kinetic = {
+        id: kid,
+        ...(prev?.bg ? { bg: prev.bg } : {}),
+        ...(prev?.speed ? { speed: prev.speed } : {}),
+      };
+      delete it.textFx;
+      if (!prev) it.transform = { ...it.transform, x: 0.5, y: 0.5, scale: 1, rotation: 0 };
+    },
+    opts,
+  );
+}
+
+/** 動態字卡的設定（強調色、底色、速度）；undefined 的欄位＝拿掉（回到預設）。連續調整合併成一步復原 */
+export function patchKinetic(
+  id: string,
+  patch: { accent?: string | undefined; bg?: KineticBg | undefined; speed?: number | undefined },
+): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type !== 'text' || !it.kinetic) return;
+      const k = it.kinetic;
+      for (const key of Object.keys(patch) as (keyof typeof patch)[]) {
+        const v = patch[key];
+        if (v === undefined) delete k[key];
+        else (k as Record<string, unknown>)[key] = v;
+      }
+    },
+    { coalesce: `kinetic:${id}` },
   );
 }
 

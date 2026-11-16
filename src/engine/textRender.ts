@@ -3,6 +3,7 @@ import type { TextCard, TextItem, TextRun } from '../model/types';
 import type { Op } from './decorations';
 import { shapePath } from './shapes';
 import { decorationOps, drawOps, opsExtent } from './decorations';
+import { kineticContent } from './kinetic/hit';
 import { layoutCard, type GlyphBox, type GlyphMetric, type Measurer } from './cardLayout';
 
 // 字卡繪製：排版交給 cardLayout（逐字、墨跡邊界），這裡負責畫字塊、描邊、陰影、文字。見 docs/TEXT_CARDS.md。
@@ -22,6 +23,12 @@ const MAX_CACHE = 60;
 function fontOf(weight: string, px: number, fontId: string) {
   const fam = cssFamily(fontId);
   return `${weight === 'bold' ? '700' : '400'} ${px}px ${fam ? `"${fam}", ` : ''}${FALLBACK_STACK}`;
+}
+
+/** canvas font 的 family 部分：這個字體（已載入才有）＋備用字體。動態字卡畫字用 */
+export function canvasFamily(fontId: string): string {
+  const fam = cssFamily(fontId);
+  return `${fam ? `"${fam}", ` : ''}${FALLBACK_STACK}`;
 }
 
 const measureCache = new Map<string, GlyphMetric>();
@@ -252,6 +259,8 @@ export function measureTextItem(
   canvasW: number,
   canvasH: number,
 ): { w: number; h: number; content: TextRender['content'] } {
+  // 動態字卡：整個畫面大小的舞台，選取範圍只算中間有字的地方
+  if (item.kinetic) return { w: canvasW, h: canvasH, content: kineticContent(item, canvasW, canvasH) };
   const r = renderText(item.card, uiScale(canvasW, canvasH));
   return { w: r.w, h: r.h, content: r.content };
 }
