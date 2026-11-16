@@ -13,7 +13,7 @@ import {
   Trash2,
   Volume2,
 } from 'lucide-react';
-import { cellTracksOf } from '../../../engine/layoutTracks';
+import { cellsOf } from '../../../engine/layoutTracks';
 import { isVideoItem, visibleLayers } from '../../../engine/timeline';
 import type { Item } from '../../../model/types';
 import {
@@ -56,7 +56,7 @@ export function EditTab({
     selected && selected.type !== 'text' && selected.type !== 'audio' && selected.cell && selected.group
       ? selected
       : undefined;
-  const cellTracks = cellSel ? cellTracksOf(project.tracks, cellSel.group!) : [];
+  const cellList = cellSel ? cellsOf(project.tracks, cellSel.group!) : [];
 
   const need = (): Item | undefined => {
     if (!selected) toast('請先點選一個片段');
@@ -145,20 +145,23 @@ export function EditTab({
           <span className="zone-sep tool-sep" aria-hidden="true" />
           <ToolButton icon={LayoutGrid} label="移至格子" onClick={() => setMoveOpen(true)} />
           <Sheet open={moveOpen} title="移至格子" onClose={() => setMoveOpen(false)}>
-            {cellTracks.map((t, i) => (
-              <button
-                key={t.id}
-                className={`menu-item${t.id === found?.track.id ? ' active' : ''}`}
-                aria-label={`移至第 ${i + 1} 格`}
-                disabled={t.id === found?.track.id}
-                onClick={() => {
-                  setMoveOpen(false);
-                  if (!moveToCell(cellSel.id, t.id)) toast('搬不過去');
-                }}
-              >
-                第 {i + 1} 格{t.id === found?.track.id ? '（目前）' : ''}
-              </button>
-            ))}
+            {cellList.map((c) => {
+              const here = c.tracks.some((t) => t.id === found?.track.id);
+              return (
+                <button
+                  key={c.no}
+                  className={`menu-item${here ? ' active' : ''}`}
+                  aria-label={`移至第 ${c.no} 格`}
+                  disabled={here}
+                  onClick={() => {
+                    setMoveOpen(false);
+                    if (!moveToCell(cellSel.id, c.tracks[c.tracks.length - 1]!.id)) toast('搬不過去');
+                  }}
+                >
+                  第 {c.no} 格{here ? '（目前）' : ''}
+                </button>
+              );
+            })}
           </Sheet>
         </>
       )}

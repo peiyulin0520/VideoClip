@@ -76,6 +76,11 @@ export type ItemBase = {
     /** custom：後一段的聲音從哪裡開始（沒寫＝接縫，0；可以等轉場結束之後） */
     audioInB?: number;
   };
+  /**
+   * 整段效果（特效分頁的「整段」）：捲動＝從畫面下面外面捲進來、一路往上捲到出去（持續整個片段）；
+   * 滑入滑出＝開頭從右邊滑進來、結尾往左滑出去。任何影像、貼圖、文字、版型都能用；版型外框的整組一起動
+   */
+  motion?: 'drift' | 'slide';
   /** 單一素材的進場特效（這個素材當 B，一定從開頭開始）與出場特效（這個素材當 A，一定在結尾結束）；duration＝特效幾秒 */
   inEffect?: { kind: EffectKind; duration: number };
   outEffect?: { kind: EffectKind; duration: number };
@@ -190,11 +195,11 @@ export type VideoItem = ItemBase & {
     cols?: number;
     /** 版型占畫面的寬、高比例（沒有＝整個畫面）；調整版型大小會改它 */
     box?: { w: number; h: number };
+    /** 自訂每一格的範圍（佔畫面寬、高的比例，照格號順序）。在預覽上拖格子大小會寫進來；改格數、版型大小、框線粗細會清掉 */
+    cells?: { x: number; y: number; w: number; h: number }[];
     /** 格子之間框線的粗細倍數（沒有＝1，原本的粗細；0＝沒有框線，最大 3） */
     line?: number;
   };
-  /** 版型外框專用：整個版型的動畫（捲動＝由下往上捲過畫面；滑入滑出＝開頭從右邊滑進來、結尾往左滑出去） */
-  motion?: 'drift' | 'slide';
   /** 版型外框專用：最後選的排法（同步＝各格都從版型開頭；依序＝一格接一格，之後加素材／改長度會把後面的格子往後推）。沒有＝同步 */
   layoutPlay?: 'sync' | 'seq';
   /** 版型外框專用：格子沒素材可播的空檔——停格＝停在前一段最後一格、色塊＝格子的 fill 色、透明＝不畫。沒有＝舊版型的行為（有 fill 才畫色塊） */
@@ -402,7 +407,91 @@ export type TextItem = ItemBase & {
   placeholder?: boolean;
   /** 文字樣式特效（IG 那種，整段一直動）；沒有＝無 */
   textFx?: { kind: TextFxKind };
+  /** 動態字卡（64 式，docs/plans/2026-11-16-kinetic-text.md）：整個畫面大小的舞台，字卡的文字拆成詞照那一式動；跟 textFx 二選一 */
+  kinetic?: {
+    id: KineticId;
+    /** 強調色（放射線、色塊、底條…）；沒有＝照那一式原版的配色 */
+    accent?: string;
+    /** 舞台底色（色碼）；沒有＝透明。（K0 存過原版配色名稱 'ink' 等，讀的時候換成色碼） */
+    bg?: string;
+    /** 顯示範圍（框）的大小，佔畫面寬、高的比例；框的中心＝字卡的位置。沒有＝那一式的預設框。框外一律看不到 */
+    size?: { w: number; h: number };
+    /** 框的邊緣淡出：none 不淡、v 上下、h 左右；沒有＝那一式的預設 */
+    fade?: KineticFade;
+    /** 速度倍數（0.5、1、1.5、2）；沒有＝1 */
+    speed?: number;
+  };
 };
+
+/** 動態字卡框的邊緣淡出：不淡、上下、左右 */
+export type KineticFade = 'none' | 'v' | 'h';
+
+/** 動態字卡 64 式的 id（照原版順序：登場、流動、切換、強調、空間、歌詞、綜藝、恐怖各 8 式） */
+export type KineticId =
+  | 'burst'
+  | 'hit'
+  | 'stamp'
+  | 'punch'
+  | 'stack'
+  | 'stretch'
+  | 'through'
+  | 'squash'
+  | 'crawl'
+  | 'drift'
+  | 'echo'
+  | 'slant'
+  | 'path'
+  | 'ticker'
+  | 'depth'
+  | 'tape'
+  | 'flap'
+  | 'flip'
+  | 'type'
+  | 'slot'
+  | 'odo'
+  | 'swapline'
+  | 'led'
+  | 'split'
+  | 'glitch'
+  | 'marker'
+  | 'shake'
+  | 'neon'
+  | 'bob'
+  | 'track'
+  | 'fill'
+  | 'focus'
+  | 'cube'
+  | 'crawl3d'
+  | 'orbit'
+  | 'tunnel'
+  | 'scatter'
+  | 'extrude'
+  | 'blinds'
+  | 'block'
+  | 'kara'
+  | 'popsync'
+  | 'dual'
+  | 'beat'
+  | 'soft'
+  | 'lyrics'
+  | 'trail'
+  | 'mix'
+  | 'vpop'
+  | 'slam'
+  | 'lines'
+  | 'marks'
+  | 'telop'
+  | 'emph'
+  | 'bouncy'
+  | 'star'
+  | 'flick'
+  | 'drip'
+  | 'creep'
+  | 'ghost'
+  | 'corrupt'
+  | 'mirror'
+  | 'torch'
+  | 'melt';
 
 /** 文字樣式特效（整段字卡一直在動）：閃爍（亮光掃過）、發光閃亮、方格字、震動 */
 export type TextFxKind = 'shimmer' | 'sparkle' | 'pixel' | 'shake';
@@ -431,6 +520,8 @@ export type Track = {
   group?: string;
   /** 'cell'＝版型的格子軌（貼在外框那一列下面）；'member'＝版型裡的文字／貼圖／音效軌（只在版型展開時看得到）。'frame' 是舊資料（外框自己一條軌），載入時會轉成一般影像軌 */
   groupRole?: 'frame' | 'cell' | 'member';
+  /** 格子軌是版型的第幾格（1 起算）。同一格可以有好幾條格子軌（同一個 cellNo、同一個 cell 範圍），陣列順序＝這一格裡的上下 */
+  cellNo?: number;
   /** 格子軌：這一格的位置（佔畫面寬、高的比例）。格子還沒放素材時靠它知道在哪 */
   cell?: { x: number; y: number; w: number; h: number };
   /** 格子軌道：素材放完（或這段時間沒有素材）時，格子顯示的色塊顏色 */

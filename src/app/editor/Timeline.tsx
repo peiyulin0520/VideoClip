@@ -1,11 +1,20 @@
-import { cellTracksOf, frameOfGroup, isFrameItem, memberTracksOf } from '../../engine/layoutTracks';
+import { kineticById } from '../../engine/kinetic';
+import {
+  cellNoOf,
+  cellsOf,
+  cellTracksOf,
+  frameOfGroup,
+  isFrameItem,
+  memberTracksOf,
+  rowsOfCell,
+} from '../../engine/layoutTracks';
 import { useGroupOpen } from '../../store/groupOpenStore';
 import { EmptyCellSlot } from './EmptyCellSlot';
 import { CellSheet } from './CellSheet';
 import { importFilesIntoCell } from './cellImport';
 import { CellAddSheet } from './CellAddSheet';
 import { createAudioClip, createTextItem } from '../../model/defaults';
-import { ensureUrls } from '../../engine/assetUrls';
+import { ensureUrls, isAssetMissing } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { Eye, EyeOff, Film, Lock, Music, Plus, Sparkles, Type, Volume2, VolumeX } from 'lucide-react';
 import {
@@ -230,6 +239,12 @@ function MultiBar({
   );
 }
 
+/** 一格有好幾列時，軌道名稱帶「第 k 列」 */
+function rowTagOf(tracks: Track[], t: Track): string {
+  const rows = rowsOfCell(tracks, t);
+  return rows.length > 1 ? ` 第 ${rows.indexOf(t) + 1} 列` : '';
+}
+
 export function Timeline({
   pps,
   setPps,
@@ -328,7 +343,16 @@ export function Timeline({
     const slots: { edge: 'top' | 'bottom'; top: number }[] = [];
     const heads: { kind: TrackKind; tracks: Track[]; top: number; open: boolean; mixed: boolean }[] = [];
     const rows: { track: Track; index: number; h: number; top: number; sub?: string }[] = [];
-    const gheads: { group: string; label: string; top: number; cells: number; empty: number }[] = [];
+    const gheads: {
+      group: string;
+      label: string;
+      top: number;
+      cells: number;
+      empty: number;
+      frameId: string;
+      inFx?: EffectKind;
+      outFx?: EffectKind;
+    }[] = [];
     const sheads: {
       group: string;
       kind: TrackKind;
@@ -372,12 +396,16 @@ export function Timeline({
           if (!isFrameItem(fr) || !groupOpen.includes(fr.group!)) continue;
           const g = fr.group!;
           const cells = cellTracksOf(project.tracks, g);
+          const cellList = cellsOf(project.tracks, g);
           gheads.push({
             group: g,
             label: fr.label ?? '版型',
             top: y,
-            cells: cells.length,
-            empty: cells.filter((c) => c.items.length === 0).length,
+            cells: cellList.length,
+            empty: cellList.filter((c) => c.tracks.every((r) => r.items.length === 0)).length,
+            frameId: fr.id,
+            inFx: fr.inEffect?.kind,
+            outFx: fr.outEffect?.kind,
           });
           y += HEAD_H + ROW_GAP;
           const shut = groupClosed[g] ?? [];
@@ -765,7 +793,7 @@ export function Timeline({
 
   const menuTrack = project.tracks.find((t) => t.id === menuTrackId) ?? null;
   // 時間軸高度＝全部軌道（不在裡面上下捲；上下交給整頁捲動）
-  const viewH = Math.max(contentH, 112);
+  const viewH = contentH; // 跟著內容長高、不留白（2026-11-16 使用者：新專案播放軸下面一大塊空白）
 
   return (
     <div className="timeline" style={{ height: viewH, minHeight: viewH }}>
@@ -853,35 +881,37 @@ export function Timeline({
                           />
                         )),
                   )}
-                <button
-                  className="cat-toggle"
-                  aria-expanded={hd.open}
-                  aria-label={`${hd.open ? '收合' : '展開'}${KIND_NAME[hd.kind]}（${count} 個）`}
-                  data-testid="cat-toggle"
-                  disabled={showAll}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() =>
-                    setClosedSave(
-                      hd.open
-                        ? [...closed.filter((k) => k !== hd.kind), hd.kind]
-                        : closed.filter((k) => k !== hd.kind),
-                    )
-                  }
-                >
-                  {hd.open ? '▾' : '▸'} {KIND_NAME[hd.kind]} {hd.tracks.length}
-                  {hidden > 0 && `（${hidden} 條隱藏）`}
-                </button>
-                {hd.mixed && (
+                <div className="head-inner">
                   <button
-                    className="cat-mixed"
-                    data-testid="cat-mixed"
-                    aria-label="這一類有圖層和別類穿插，到圖層分頁看完整順序"
+                    className="cat-toggle"
+                    aria-expanded={hd.open}
+                    aria-label={`${hd.open ? '收合' : '展開'}${KIND_NAME[hd.kind]}（${count} 個）`}
+                    data-testid="cat-toggle"
+                    disabled={showAll}
                     onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => useUI.setState({ requestTab: 'layers' })}
+                    onClick={() =>
+                      setClosedSave(
+                        hd.open
+                          ? [...closed.filter((k) => k !== hd.kind), hd.kind]
+                          : closed.filter((k) => k !== hd.kind),
+                      )
+                    }
                   >
-                    已穿插
+                    {hd.open ? '▾' : '▸'} {KIND_NAME[hd.kind]} {hd.tracks.length}
+                    {hidden > 0 && `（${hidden} 條隱藏）`}
                   </button>
-                )}
+                  {hd.mixed && (
+                    <button
+                      className="cat-mixed"
+                      data-testid="cat-mixed"
+                      aria-label="這一類有圖層和別類穿插，到圖層分頁看完整順序"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => useUI.setState({ requestTab: 'layers' })}
+                    >
+                      已穿插
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -893,25 +923,46 @@ export function Timeline({
               data-bg="1"
               style={{ top: gh.top, height: HEAD_H }}
             >
-              <button
-                className="cat-toggle grp"
-                aria-expanded
-                aria-label={`收合版型 ${gh.label}`}
-                data-testid="group-toggle"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => toggleGroup(gh.group)}
-              >
-                ▾ 版型：{gh.label} · {gh.cells} 格{gh.empty > 0 ? `（${gh.empty} 格空）` : ''}
-              </button>
-              <button
-                className="grp-add"
-                aria-label={`加入到版型 ${gh.label}`}
-                data-testid="group-add"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => setAddMenuGroup(gh.group)}
-              >
-                <Plus size={14} /> 加入
-              </button>
+              <div className="head-inner">
+                <button
+                  className="cat-toggle grp"
+                  aria-expanded
+                  aria-label={`收合版型 ${gh.label}`}
+                  data-testid="group-toggle"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => toggleGroup(gh.group)}
+                >
+                  ▾ 版型：{gh.label} · {gh.cells} 格{gh.empty > 0 ? `（${gh.empty} 格空）` : ''}
+                </button>
+                <button
+                  className="grp-add"
+                  aria-label={`加入到版型 ${gh.label}`}
+                  data-testid="group-add"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => setAddMenuGroup(gh.group)}
+                >
+                  <Plus size={14} /> 加入
+                </button>
+                {(['in', 'out'] as const).map((role) => {
+                  const kind = role === 'in' ? gh.inFx : gh.outFx;
+                  if (!kind) return null;
+                  return (
+                    <button
+                      key={role}
+                      className={`fx-circle head ${role}`}
+                      data-testid={`group-fx-${role}`}
+                      aria-label={`整個版型的${role === 'in' ? '進場' : '出場'}特效 ${transitionName(kind)}`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => {
+                        useProjectStore.getState().select(gh.frameId);
+                        useUI.setState({ requestTab: 'effect', fxFocus: { id: gh.frameId, role } });
+                      }}
+                    >
+                      {transitionCode(kind)}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ))}
           {layout.sheads.map((sh) => (
@@ -923,16 +974,18 @@ export function Timeline({
               data-bg="1"
               style={{ top: sh.top, height: HEAD_H }}
             >
-              <button
-                className="cat-toggle sub"
-                aria-expanded={sh.open}
-                aria-label={`${sh.open ? '收合' : '展開'}版型的${sh.label}（${sh.count} 個）`}
-                data-testid="sub-toggle"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => toggleKind(sh.group, sh.kind)}
-              >
-                {sh.open ? '▾' : '▸'} {sh.label} {sh.count}
-              </button>
+              <div className="head-inner">
+                <button
+                  className="cat-toggle sub"
+                  aria-expanded={sh.open}
+                  aria-label={`${sh.open ? '收合' : '展開'}版型的${sh.label}（${sh.count} 個）`}
+                  data-testid="sub-toggle"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => toggleKind(sh.group, sh.kind)}
+                >
+                  {sh.open ? '▾' : '▸'} {sh.label} {sh.count}
+                </button>
+              </div>
             </div>
           ))}
           {rows.map(({ track, top, h, sub }, rowIdx) => {
@@ -966,7 +1019,7 @@ export function Timeline({
                   className={`track-chip${sub ? ' sub' : ' draggable'}${multi ? (multi.includes(track.id) ? ' multi-on' : ' multi-off') : ''}`}
                   aria-label={
                     sub && track.groupRole === 'cell'
-                      ? `第 ${cellTracksOf(project.tracks, track.group!).indexOf(track) + 1} 格 軌道`
+                      ? `第 ${cellNoOf(project.tracks, track)} 格${rowTagOf(project.tracks, track)} 軌道`
                       : `${track.name} 軌道設定`
                   }
                   data-testid="track-chip"
@@ -974,7 +1027,7 @@ export function Timeline({
                   onClick={() => {
                     if (suppressChipClick.current) return;
                     if (sub && track.groupRole === 'cell') {
-                      const i = cellTracksOf(project.tracks, track.group!).indexOf(track);
+                      const i = cellNoOf(project.tracks, track) - 1;
                       const it = track.items[0];
                       if (it) useProjectStore.getState().select(it.id);
                       return setCellSheet({ id: track.id, index: i });
@@ -989,7 +1042,7 @@ export function Timeline({
                 >
                   {sub && track.groupRole === 'cell' ? (
                     <span className="cell-no" data-testid="cell-no">
-                      {cellTracksOf(project.tracks, track.group!).indexOf(track) + 1}
+                      {cellNoOf(project.tracks, track)}
                     </span>
                   ) : track.kind === 'media' ? (
                     <Film size={16} />
@@ -1012,7 +1065,7 @@ export function Timeline({
                 {sub && track.groupRole === 'cell' && track.items.length === 0 && (
                   <EmptyCellSlot
                     track={track}
-                    index={cellTracksOf(project.tracks, track.group!).indexOf(track)}
+                    index={cellNoOf(project.tracks, track) - 1}
                     project={project}
                     left={half}
                     pps={pps}
@@ -1073,6 +1126,11 @@ export function Timeline({
                       ) : isVideoItem(it) ? (
                         <Tiles item={it} asset={asset} pps={pps} h={h} />
                       ) : null}
+                      {it.type !== 'text' && isAssetMissing(project.id, it.assetId) && (
+                        <span className="clip-lost" data-testid="clip-lost">
+                          素材遺失
+                        </span>
+                      )}
                       {isFrameItem(it) && (
                         <button
                           className="grp-toggle"
@@ -1131,7 +1189,7 @@ export function Timeline({
                   <button
                     className="cell-add"
                     data-testid="cell-add"
-                    aria-label={`第 ${cellTracksOf(project.tracks, track.group!).indexOf(track) + 1} 格 加素材`}
+                    aria-label={`第 ${cellNoOf(project.tracks, track)} 格${rowTagOf(project.tracks, track)} 加素材`}
                     style={{
                       left: half + Math.max(...track.items.map((x) => x.start + x.duration)) * pps + 6,
                     }}
@@ -1139,7 +1197,7 @@ export function Timeline({
                     onClick={() =>
                       setCellAdd({
                         id: track.id,
-                        index: cellTracksOf(project.tracks, track.group!).indexOf(track),
+                        index: cellNoOf(project.tracks, track) - 1,
                       })
                     }
                   >
@@ -1148,7 +1206,7 @@ export function Timeline({
                 )}
 
                 {track.kind !== 'audio' &&
-                  !track.groupRole &&
+                  (!track.groupRole || track.groupRole === 'cell') &&
                   seamsOf(track.items).map(({ next }) => {
                     const sel = next.id === selectedId && fxFocus?.id === next.id && fxFocus.role === 'seam';
                     const tr = next.transitionIn;
@@ -1175,10 +1233,19 @@ export function Timeline({
 
                 {/* 單一素材的進場／出場特效：特效佔的那一段（淡色）＋代表字圓圈（跟接縫的轉場不同色）；版型看外框那一條 */}
                 {track.kind !== 'audio' &&
-                  track.groupRole !== 'cell' &&
                   track.items.map((it) => {
-                    const styleFx = it.type === 'text' ? it.textFx : undefined;
-                    if (it.type === 'audio' || (!it.inEffect && !it.outEffect && !styleFx)) return null;
+                    // 字卡的文字特效（舊的 4 種或動態字卡 64 式）：整段一直動，標在字卡片段上
+                    const kdef = it.type === 'text' && it.kinetic ? kineticById(it.kinetic.id) : undefined;
+                    const styleFx =
+                      it.type !== 'text'
+                        ? undefined
+                        : kdef
+                          ? { name: kdef.zh, code: kdef.zh.slice(0, 1) }
+                          : it.textFx
+                            ? { name: textFxName(it.textFx.kind), code: textFxCode(it.textFx.kind) }
+                            : undefined;
+                    if (it.type === 'audio' || (!it.inEffect && !it.outEffect && !styleFx && !it.motion))
+                      return null;
                     const d = effectDurations(it);
                     const x0 = half + it.start * pps;
                     const x1 = x0 + it.duration * pps;
@@ -1217,11 +1284,18 @@ export function Timeline({
                     return (
                       <span key={`fx-${it.id}`}>
                         {styleFx && (
+                          <span
+                            className={`fx-span style${styleSel ? ' sel' : ''}`}
+                            style={{ left: x0, width: Math.max(x1 - x0, 4) }}
+                          />
+                        )}
+                        {styleFx && (
                           <button
                             className={`fx-circle style${styleSel ? ' sel' : ''}`}
                             data-testid="fx-circle-style"
                             data-item-id={it.id}
-                            aria-label={`文字特效 ${textFxName(styleFx.kind)}`}
+                            aria-label={`文字特效 ${styleFx.name}`}
+                            title={styleFx.name}
                             style={{ left: x0 + Math.max((x1 - x0) / 2 - 11, 13) }}
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
@@ -1231,7 +1305,25 @@ export function Timeline({
                               player?.seek(it.start + 0.3);
                             }}
                           >
-                            {textFxCode(styleFx.kind)}
+                            {styleFx.code}
+                          </button>
+                        )}
+                        {it.motion && (
+                          <button
+                            className={`fx-circle style whole${it.id === selectedId && fxFocus?.id === it.id && fxFocus.role === 'whole' ? ' sel' : ''}`}
+                            data-testid="fx-circle-whole"
+                            data-item-id={it.id}
+                            aria-label={`整段效果 ${it.motion === 'drift' ? '捲動' : '滑入滑出'}`}
+                            style={{ left: x0 + Math.max((x1 - x0) / 2 + 14, 40) }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              useProjectStore.getState().select(it.id);
+                              useUI.setState({ requestTab: 'effect', fxFocus: { id: it.id, role: 'whole' } });
+                              player?.seek(it.start + it.duration / 2);
+                            }}
+                          >
+                            {it.motion === 'drift' ? '捲' : '滑'}
                           </button>
                         )}
                         {it.inEffect && d.in > 0.01 && mk('in', it.inEffect.kind, x0 + 13, d.in * pps)}

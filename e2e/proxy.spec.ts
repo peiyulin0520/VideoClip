@@ -62,6 +62,11 @@ test('播放效能框：設定頁打開才有；播放時顯示每秒幾格與�
   await expect(box).toContainText('fps');
   await expect(box).toContainText('影片上傳');
   await expect(box).toContainText('320×568');
+  // Y10：畫質與畫布大小、解碼器數量、每支影片用預覽檔還是原檔、播放中每秒格數的最低值
+  await expect(box).toContainText('畫質');
+  await expect(box).toContainText('解碼器');
+  await expect(box).toContainText('最低');
+  await expect(box).toContainText('影片1 320×568');
   await page.screenshot({ path: 'docs/screenshots/feedback-5/perf-overlay.png' });
 });
 

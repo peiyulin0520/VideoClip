@@ -3,12 +3,12 @@
 規則：每完成一個有意義的步驟，就在同一個 commit 裡 **覆寫「交接快照」** 並 **在「日誌」最上面新增一筆**（規則全文見 `AGENTS.md`「紀錄規則」，背景與架構見 `docs/HANDOFF.md`）。
 
 ## 交接快照（最新狀態，每次覆寫）
-- **日期**：2026-11-15
+- **日期**：2026-11-16
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-12：X1、X2（含 X2b/X2c）、X3、X4、X5、X7、版型 v2 L0～L8（含 L6）、**X9 圖層跨類別排序（X9-1～X9-4，版型裡子標題仍分類，見日誌）** 都做完（待使用者在 iPhone 驗收、開 PR）；**X6 版型一格多素材＋同步／依序（`docs/plans/2026-11-15-x6-sequence.md`）已做完**；接著 → X8 畫畫
+- **下一步**：文字特效 64 式（`docs/plans/2026-11-16-kinetic-text.md`）K0、K0.5 已做（骨架＋爆出、巨字橫移＋顯示範圍框＋顏色自訂＋邊緣淡出＋換行工具），下一個 K1（登場＋流動其餘 14 式）；Y10 等使用者 iPhone 數字；PR #16 等使用者合併
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -27,6 +27,11 @@
 ```
 
 ## 使用者已確認的偏好
+- **捲動是「整段」效果**（從畫面外捲進、一路捲到出去，持續整個片段），任何影像（含版型）都能用；不要再有獨立的「版型動畫」區（2026-11-16）
+- **格子框線粗細**＝每一格四周的框（格子之間的距離），不是版型最外圈另一條線（2026-11-16）
+- 圖層分頁：版型預設收合；排序照實際上下，不按種類分（2026-11-16）
+- **動態字卡要能設定顯示範圍**（框外看不到、像 Spotify 歌詞框、句子超過框寬就換行）；**設定裡的顏色都要能自訂**（2026-11-16）
+- **播放時預覽上不要有任何編輯用的框線**（2026-11-16）
 - **介面用詞要像網頁、簡潔**，不要口語、不要加說明小字（2026-11-15）：版型播放方式［同步］［依序］、空檔［停格］［色塊］［透明］、［移至格子］
 - **圖層順序（2026-11-15）**：播放軸一律照分類（影像／貼圖／文字／音訊），類別裡照圖層順序；要跨類夾心（文字夾在兩個影像中間）到「圖層」分頁調；**主軌不特別**（可上下移、別的圖層可排到它下面）→ `docs/plans/2026-11-15-x9-layer-order.md`
 - **別的頁籤做得到的事，交給那個專業頁籤**；各功能頁籤（例：版型）只放自己才有的設定（2026-11-15：版型的進出場、動畫、轉場都到特效頁籤設）
@@ -84,6 +89,137 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-16 文字特效 K0.5：顯示範圍框、顏色自訂、邊緣淡出、換行工具（Sonnet）
+  - 使用者回饋：顏色要能自訂；字要能設定顯示範圍（像 Spotify 歌詞框，框外看不到）；64 式可為實用調整（計畫「使用者回饋」）。
+  - 做了什麼：①**顯示範圍＝框**：動態字卡畫在一張「框大小」的圖上（框外不畫＝看不到），框的中心＝字卡位置、大小＝`kinetic.size`（佔畫面寬高的比例；沒有＝那一式的預設框）；預設框 `area`：wide（畫面中間 16:9 一條，直式也跟原版比例一樣）、full（整個畫面，流動組）、lyrics（寬 84%×高 34%，中下方，歌詞組）；所有 cqmin／cqw／cqh 單位以框為準（`hit.ts` 的 `kineticFrame`／`areaSize`／`areaCenter`、`render.ts`）；②**調整範圍**：設定區［調整範圍］→ 預覽上虛線框＋四邊四角把手（拖一邊只動那一邊、對邊不動；拖框裡面＝移動；最小 10%、最大 150%；跟著字卡旋轉縮放；`KineticAreaEdit.tsx`、`dragArea` 有單元測試），按「套用」才寫回，✕ 放棄；［重置範圍］回預設框與位置；③**邊緣淡出**［無｜上下｜左右］（`fadeEdges` 用 destination-out 漸層，各 12%）；巨字橫移預設左右淡出；④**顏色都能自訂**：設定分成［顏色］［顯示範圍］［速度］三塊，顏色塊裡字色（改字卡文字段的顏色）、強調色、底色都有選色器（含自訂顏色）；底色另有［透明｜墨黑｜紙白｜鈷藍｜朱紅｜綠幕］捷徑，存色碼（K0 存過的名稱載入時換成色碼，`resolveBg`）；⑤**換行工具** `wrapLines`（中文逐字斷、英文在空白斷、超長英文字硬斷、`\n` 換行）先放進 `core.ts`，K2 以後的句子型式子（打字機、歌詞捲動…）用；⑥選另一式時，自己調過的框大小保留，沒調過的用新那一式的預設框與位置；卡片縮圖的比例跟那一式的預設框一樣。
+  - 動了哪些檔：`model/types.ts`（`size`、`fade`、`bg` 改色碼）、`engine/kinetic/{core,hit,render,index,fx/flow}.ts`、`engine/textRender.ts`、`store/{actions,uiStore}.ts`、`app/editor/{KineticAreaEdit,KineticCards,Preview}.tsx`、`app/editor/tabs/EffectTab.tsx`、`app/styles.css`；測試 `kinetic.test.ts`（框、`dragArea`、`wrapLines`、`fadeEdges`）、`e2e/k05.spec.ts`（新 2 個）、改 `e2e/k0.spec.ts`
+  - 驗證：✅ 單元、e2e、`npm run check`；截圖 `docs/screenshots/kinetic/k05-*.png`  🟡 沒在真 iPhone 驗；拖把手的手感要在 iPhone 看
+  - 與原版不同：框外不顯示（原版整個舞台＝容器）；預設框對直式改成 16:9 一條（wide）；其餘 K0 兩式動作照原碼
+  - 下一步：K1
+
+- 2026-11-16 規劃：文字特效回饋 → 顯示範圍框、顏色自訂、可調整原版（Opus）
+  - 使用者原話：①選了之後的設定，顏色也要可以自己客製化，要能點選自訂顏色；②會動的字可以在畫面設定移動範圍，不超出畫面；有些特效超過範圍就換行、不顯示過了的字，像 Spotify 歌曲字幕只出現在某個範圍內（附影片：Spotify 歌詞框上下淡出）；③64 式可以參考代碼自行調整到實際可用
+  - 決定（寫進計畫「使用者回饋」）：舞台改成可調大小的框（`kinetic.size`，框外看不到，單位以框為準）；每式預設框 wide（16:9 一條，直式也跟原版比例一樣）／full（流動組）／lyrics（中下方歌詞框）；［調整範圍］在預覽上拖框；邊緣淡出（無／上下／左右）；句子型自動換行；字色、強調色、底色都用選色器（含自訂），底色可透明；允許為實用調整各式（註解＋PROGRESS 記錄差異）。新增 K0.5 步驟在 K1 之前。
+  - 動了哪些檔：`docs/plans/2026-11-16-kinetic-text.md`
+  - 下一步：切 Sonnet 做 K0.5
+
+- 2026-11-16 文字特效 64 式 K0：骨架＋爆出、巨字橫移（Sonnet）
+  - 做了什麼：①**資料**：`TextItem.kinetic`（`id`、`accent`、`bg`、`speed`；`KineticId` 64 個 id 都先放進型別）；跟舊的 `textFx` 二選一（`setTextFx`／`setKinetic` 互相拿掉對方）；②**引擎**（新 `engine/kinetic/`）：`core.ts`（原版數學工具照抄：緩動、`seg`、`rnd`、`fit`、`splitWords`；`drawWord`、`marquee`＝原版 `mq` 的 canvas 版）、`fx/in.ts`（爆出）、`fx/flow.ts`（巨字橫移）、`index.ts`（登錄表、5 種原版配色 `SCHEMES`）、`render.ts`（`renderKinetic`＋`paintKinetic`：每個字卡一張固定畫布、每格重畫；t 量化成 1/60 秒；key 變了才通知）、`hit.ts`（選取範圍）；`textRender.measureTextItem`：動態字卡的大小＝整個畫面、選取範圍＝中間一條；`scene.toLayer`：有 `kinetic` 就畫舞台；`compositor`：`dynamic` 文字圖層同一張畫布每格重畫只重新上傳、不重建貼圖；③**介面**：特效分頁［文字特效］上方一排分組切換［基本｜登場｜流動］（只列有做好的組；基本＝舊 4 種），卡片是那一式的代表畫面（選中的會動，其他靜止），選了之後出現設定：強調色、底色（透明／墨黑／紙白／鈷藍／朱紅／綠幕）、速度（0.5～2×）、一輪幾秒；「作用在」分段按鈕名稱太長用刪節號；④**時間軸標記（使用者要求）**：字卡片段上有圓圈（代表字＝那一式名稱第一個字，例：爆、巨）＋頂端整條色帶（`.fx-span.style`），舊的 4 種文字特效也一樣；點圓圈跳到特效分頁。字詞：字卡文字用空白、逗號、頓號、換行拆成詞（最多 8 個、每個最多 14 字），還沒輸入用範例字。
+  - 動了哪些檔：`model/types.ts`、`engine/kinetic/*`（新）、`engine/{textRender,scene,compositor}.ts`、`store/actions.ts`、`app/editor/{KineticCards,Timeline}.tsx`、`app/editor/tabs/EffectTab.tsx`、`app/styles.css`；`docs/reference/claude-animated-text/`（原版 index.html、LICENSE、README）；測試 `engine/kinetic/kinetic.test.ts`（工具＋每一式在不同時間／舞台大小都畫得出來、同 t 同結果、真的會動）、`e2e/k0.spec.ts`（2 個）
+  - 驗證：✅ 單元、e2e、`npm run check`；截圖 `docs/screenshots/kinetic/k0-*.png`  🟡 沒在真 iPhone 驗；**還沒做「跟原版並排截圖比對」**（計畫的驗收項，K1 開始做：需要一個比對腳本，K0 兩式先用目測＋數字驗證）
+  - 已知：原版舞台是 16:9，直式畫面（9:16）時 cqmin 單位＝寬度的 1%，所以字大小、放射線半徑相對於高度比原版小（超出畫面左右的部分會被裁掉）；這是照原碼單位換算的結果，不是 bug，要不要為直式調整等使用者看過再說
+  - 下一步：K1（登場 7 式＋流動 7 式）
+
+- 2026-11-16 規劃：文字特效 64 式（Opus）
+  - 做了什麼：讀原版（claude-animated-text，MIT；沙盒擋 github.io，用 raw.githubusercontent.com 讀）的結構與 64 式，寫好計畫 `docs/plans/2026-11-16-kinetic-text.md`：每式改寫成 canvas 2D 的 `draw(g, t, s)`（同一個 t 同一張圖，預覽／匯出一致），字卡新欄位 `kinetic`，放在特效分頁［文字特效］（舊 4 種當「基本」組＋8 組各 8 式），預設全畫面舞台、透明底、字卡顏色字體、可調強調色／底色／速度；步驟 K0（骨架＋burst、crawl）→ K1–K4（每次 16 式）→ K5 收尾；驗收重點是「跟原版同樣的字、同樣的秒數並排截圖比對」。
+  - 動了哪些檔：`docs/plans/2026-11-16-kinetic-text.md`（新）
+  - 下一步：切 Sonnet 做 K0
+
+- 2026-11-16 匯出加「4K」選項（Sonnet）
+  - 使用者問 4K 60fps 素材：匯出原本最高長邊 1920（1080p）→ 加 4K。匯出視窗解析度多一個［4K（最清楚、最慢）］，**這支手機編得出 4K 影片才顯示**（`canEncodeSize` 用 Mediabunny `canEncodeVideo` 偵測 avc／vp9，偵測中或編不出就不顯示）；4K＝長邊 3840（專案畫面 1080×1920 → 2160×3840，專案畫面再小也畫到 4K，1080p／720p 還是不放大）；位元率照像素放大（最多 4 倍），上限 60 Mbps。匯出仍讀原檔（4K 原檔細節真的會進到輸出）。
+  - 動了哪些檔：`engine/exporter.ts`（`longSide` 加 3840、`outputSize`、`videoBitrate`、`canEncodeSize`）、`app/editor/ExportSheet.tsx`；測試 `exporter.test.ts`、`e2e/export.spec.ts`（4K 選項）
+  - 驗證：✅ 單元、e2e；沙盒 Chromium 實際匯出 2160×3840（VP9/WebM）成功；🟡 **iPhone 上 4K H.264／HEVC 素材的速度、記憶體、HDR 顏色沒驗**，請使用者實測
+  - 下一步：同上
+
+- 2026-11-16 匯出視窗加說明：輸出用原檔（Sonnet）
+  - 做了什麼：使用者問「高清預覽輸出時會不會用原檔」→ 查程式：匯出一律讀原檔（`getMedia`），輸出尺寸由匯出視窗的解析度（長邊 1920／1280）決定，跟預覽畫質無關；匯出視窗預估大小下面加一行「輸出用原檔，不受預覽畫質影響。」（`ExportSheet.tsx`，`data-testid="export-source-note"`）。匯出已經有 30／60 fps 與畫質（標準約 8 Mbps、高約 14 Mbps）選項。
+  - 驗證：✅ e2e（export）、`npm run check`
+  - 下一步：同上（Y10 等數字、文字特效 64 式請 Opus 規劃）
+
+- 2026-11-16 feedback-13 Y10 播放效能：先加量測（Sonnet；還沒改效能，等數字）
+  - 做了什麼：設定頁「顯示播放效能」打開後，預覽左上角的小黑框多了：①播放中每秒格數的**最低值**（這次播放）；②**畫質（自動／清楚／流暢）與預覽畫布大小**；③**解碼器 同時在用／影片池總數**；④**每支正在播的影片：解碼後大小＋用「預覽檔」還是「原檔」**（`Player.stats()` 的 `sources`／`decoders`／`pool`／`canvas`／`fpsMin`）。
+  - 動了哪些檔：`engine/player.ts`、`app/editor/PerfOverlay.tsx`；測試 `e2e/proxy.spec.ts`（效能框那個測試加了新欄位）
+  - 驗證：✅ e2e（proxy、t-smooth）、`npm run check`  🟡 數字要在真 iPhone 量
+  - **請使用者做**：設定頁打開「顯示播放效能」→ 用同一個專案分別切「清楚」「流暢」各播 10 秒 → 各截一張效能框的圖（含 fps、最低、解碼器、影片 1/2…）。**拿到數字之前不猜著改**；可能方向（量到再定）：流暢強制用預覽檔、60fps 素材的預覽檔轉 30fps、停格中的影片釋放解碼器、流暢畫布降到 0.75。
+  - 下一步：等數字；文字特效 64 式請切 Opus 規劃
+
+- 2026-11-16 feedback-13 Y11 素材遺失通知（Sonnet；Y10 先跳過，要在 iPhone 量數字）
+  - 做了什麼：打開專案時找不到檔案的素材（例如清掉 Safari 網站資料）：①**沒有任何物件在用的**，安靜地從專案素材清單拿掉並存檔，不跳通知；②**有在用的**才提醒（「有 N 個素材找不到檔案：…（用到它的片段標了「素材遺失」，請重新匯入）」），時間軸上用到它的片段蓋一層紅色「素材遺失」（`engine/assetUrls.ts` 新 `findMissing`／`isAssetMissing`，`app/pages/Editor.tsx`，`Timeline.tsx` 的 `.clip-lost`）。
+  - 動了哪些檔：`engine/assetUrls.ts`、`app/pages/Editor.tsx`、`app/editor/Timeline.tsx`、`app/styles.css`；測試 `e2e/y11.spec.ts`（新，1 個：刪掉 OPFS 的素材檔再重新整理）
+  - 驗證：✅ 單元、e2e、`npm run check`  🟡 沒在真 iPhone 驗
+  - 下一步：Y10（需要你在 iPhone 跑量測面板回報數字）；文字特效 64 式請切 Opus 規劃
+
+- 2026-11-16 feedback-13 Y9 預覽拖格子大小（Sonnet）
+  - 做了什麼：版型分頁〔大小與格數〕多了［拖格子大小］／［重置格子大小］。按了預覽上每一格出現虛線框（左上有格號），格子之間的線上有把手（`LayoutCellResize.tsx`）：拖一條線＝線兩邊的格子一起變（一邊變大、另一邊變小，每格最小 8%）；同一條線上的格子（例如 2×2 的中間直線）一起動；版型旋轉、縮放也算（手指移動量換算回版型自己的方向）。按「套用」才重畫外框圖、格子重新排（`frameStyle.cells` 存每格佔畫面的比例，照格號順序；`buildIn`／`paintFrame`／`renderFramePng`／`applyLayoutShape` 都吃 `cells`，外框底板不動）；✕ 放棄；改格數、版型大小、框線粗細會清掉自訂的格子範圍，改外框顏色不會。格子素材照新範圍重新蓋滿（Y6 不預先裁切）。
+  - 動了哪些檔：`model/types.ts`、`engine/layouts.ts`、`store/{actions,uiStore}.ts`、`app/editor/{LayoutCellResize,Preview,LayoutDiagram,frameRestyle}`、`app/editor/tabs/LayoutTab.tsx`、`app/styles.css`；測試 `e2e/y8.spec.ts`（加 1 個）、單元 `LayoutCellResize.test.ts`、`layouts.test.ts`
+  - 驗證：✅ 單元、e2e、`npm run check`；截圖 `docs/screenshots/feedback-13/y9-drag-390.png`  🟡 沒在真 iPhone 驗（手指拖的手感要在 iPhone 看）
+  - 踩到的坑：預覽上疊的操作元件外層是 `pointer-events: none`，把手要自己設 `pointer-events: auto`；操作卡片放在畫面中間會蓋住把手，改放上方
+  - 下一步：Y10 播放效能（先量再改）
+
+- 2026-11-16 feedback-13 Y8 同一格同一時間疊圖＋文字特效 64 式的評估（Sonnet）
+  - 做了什麼：①**格號**：格子軌新欄位 `Track.cellNo`（第幾格，1 起算）；`engine/layoutTracks.ts` 新 `cellNoOf`／`cellsOf`（一格＝幾條格子軌）／`rowsOfCell`／`ensureCellNos`（舊資料依順序補號，每次 `apply` 跑）；②**一格多列**：同一格可以有好幾條格子軌（同 `cellNo`、同範圍，陣列順序＝上下，後面蓋前面）；新動作 `addCellRow`／`removeCellRow`（最後一列不能刪）／`setCellNo`（「改成第 N 格」＝搬素材、空出的列刪掉）／`swapCellRows`（圖層分頁格子列 ▲▼ 現在真的換）；「這一格」視窗（有素材、空的都有）多了［格與列］區：第 N 格選單、加一列、刪除這列；播放軸編號、預覽格子編號、示意圖、移至格子、版型改格數／大小（`applyLayoutShape` 照 cellNo 改每一列的範圍）、`arrangeCells`／`rippleAfter` 都改用格號；③**空檔規則以整格為準**：同一格有列在播就不畫色塊、不停格；色塊只有最下面那列畫、停格只有「有素材的最上面那列」停（`cellAt`、`ownsGapFill`）。
+  - **文字特效 64 式（使用者新需求，還沒做）**：來源 <https://pound0423.github.io/claude-animated-text/>（MIT，沙盒擋 github.io，用 `raw.githubusercontent.com/pound0423/claude-animated-text/main/index.html` 讀得到，暫存在 `/tmp`，單檔 1563 行、`FX` 陣列 64 式，每式 `make(root, words)` 回傳「時間→改 DOM／CSS（cqmin 單位）」的函式，分 8 組：登場、流動、切換、強調、空間、歌詞 MV、綜藝字卡、恐怖片）。**不能照搬**：它們是改 DOM 的整個畫面動畫（多個詞、放射線、跑馬燈、底色），我們的引擎是 Pixi 圖層＋文字畫成 canvas，要改寫成「每式一個 `draw(ctx, t, words, W, H)` 畫到 canvas」；這是新的功能（動態字卡），要先請 Opus 寫計畫（`docs/plans/`）再由 Sonnet 做。
+  - 動了哪些檔：`model/types.ts`、`engine/{layoutTracks,cellGap,cellOps,placeholder,scene}.ts`、`store/{actions,projectStore}.ts`、`app/editor/{Timeline,CellSheet,LayoutDiagram,Preview}.tsx`、`app/editor/tabs/{LayersTab,LayoutTab,EditTab}.tsx`；測試 `e2e/y8.spec.ts`（新，2 個）、單元 `cellGap.test.ts`、`layoutTracks.test.ts`
+  - 驗證：✅ 單元、e2e、`npm run check`  🟡 沒在真 iPhone 驗
+  - 踩到的坑：`ensureCellNos` 要在「加一列」之前先跑，不然舊資料的第 1 軌會被排到第 2 號
+  - 下一步：Y9 預覽拖格子大小；文字特效 64 式請切 Opus 規劃
+
+- 2026-11-16 feedback-13 Y7 圖層分頁（Sonnet）
+  - 做了什麼：①版型在圖層分頁**預設收合成一列**（「▸ 版型 · 名稱　第 2–4 層　共 3 層」，列尾有整塊往上／往下／更多排序），點開才列出外框、各格、版型文字，順序＝實際上下（不按種類分），層號由下往上 1、2、3…；②展開後裡面的列縮排、左邊一條線連起來；每列按鈕固定位置（格子列沒有「更多」，留空位對齊）；③**格子列也有 ▲▼**（目前每格只有一層，按了提示「這一格只有一層」；Y8 做一格多列後會真的換）。連續屬於同一版型的圖層才併成一塊（版型被別的圖層夾住就分成兩塊）。
+  - 動了哪些檔：`app/editor/tabs/LayersTab.tsx`、`app/styles.css`；測試 `e2e/y7.spec.ts`（新，2 個）
+  - 驗證：✅ 單元 1052、e2e、`npm run check`；截圖 `docs/screenshots/feedback-13/y7-*.png`  🟡 沒在真 iPhone 驗
+  - 踩到的坑：外框那一列的 `track.group` 是空的，要看 `item.group`
+  - 下一步：Y8 同一格同一時間可以疊圖（一格多列、可改格號）
+
+- 2026-11-16 feedback-13 Y6 格子素材（Sonnet）
+  - 做了什麼：①**找到「版型文字跑出版型」的真正原因**：`migrate.ts` 的 `repairGroups` 每次載入專案都把所有文字的 `group` 清掉（為了清舊版型模板的字），結果版型成員文字一重載就變成普通文字、不再跟著版型；改成只清「外框已不存在」或舊模板字（有 `fontCycle`）的，並新增 `engine/memberRepair.ts`（`repairMemberItems`：成員軌上的文字補回 `group`、跑到普通軌的成員搬回自己版型的成員軌），載入與每次 `apply` 都跑；`moveItemTo` 成員只能搬進同一版型的成員軌。（「這是夾心」＝使用者在文字分頁加的字不是版型成員，不跟版型走，這是設計）②**格子影像不預先裁切**：`cellItem` 不再算 `crop`，整張素材蓋滿格子（cover），畫面一律只露出自己那一格（`groupClipArea` 對格子永遠回傳範圍，`guardCell` 不變）；自己用裁切工具調過的格子照舊；預覽點選時只有點在自己那一格範圍內才算點到（`Preview.hitsAt` 多邊形判斷）；③**「這一格」視窗換素材**：選哪一段就換哪一段（標題「換第 N 段的素材」，`applyCell(trackId, draft, itemId)`），點段落會清掉未套用的草稿；④**各格各影像單獨調色**：選到版型外框＝整組一起調，選到格子裡的影像／文字／貼圖＝只調自己（`setAdjust`、`colorTargetIds` 只有外框展開整組）。
+  - 順手修（使用者從 iPhone 回報首頁）：專案卡片右上角「⋯」改成主題背景色＋邊框＋陰影（以前灰底深點看不出來）；「載入中」的字改放在中間的實心卡片（`.busy-card`），底下「還沒有專案」的說明字不會透出來疊在字上（`ui/Toasts.tsx`、`styles.css`）。
+  - 動了哪些檔：`model/migrate.ts`、`engine/{memberRepair,layouts,scene}.ts`、`store/{projectStore,actions}.ts`、`app/editor/{Preview,CellSheet}.tsx`；測試 `e2e/y6.spec.ts`（新，3 個）、改 `e2e/layout.spec.ts`（格子不預先裁切）、單元 `memberRepair.test.ts`、`migrate.test.ts`、`layouts.test.ts`、`groupClip.test.ts`
+  - 驗證：✅ 單元 1052、e2e、`npm run check`  🟡 沒在真 iPhone 驗；舊專案裡已經預先裁好的格子保留原本的裁切（不會自動還原）
+  - 踩到的坑：載入時任何「修復」都要小心別碰使用者合法的資料（`repairGroups` 把文字 `group` 清光就是例子）
+  - 下一步：Y7 圖層分頁（版型預設收合、按實際層數排序、層號、格子上下箭頭、對齊）
+
+- 2026-11-16 feedback-13 Y5 特效分頁（Sonnet）
+  - 做了什麼：①**分層**：「作用在」改成分段式切換（［進場｜出場｜轉場｜整段］，字卡多一個「文字特效」），跟下面「效果」（有標題的 `.zone-soft`，裡面是分類［基本｜相機動作｜特效｜故障］和卡片）一眼看出是不同階層；②**版型用同一套**：拿掉「整個版型的動畫」那一塊；**任何素材都能在特效分頁設**——選版型外框＝整個版型，選格子素材／版型裡的文字貼圖＝各自的（以前「請到版型分頁」）；③**整段效果**（`item.motion`，所有影像、貼圖、文字、版型外框都能用）：捲動＝從畫面下面外面一路捲到上面外面（持續整個片段，依物件／版型大小算剛好進出畫面，`motionOffset(…, size)`）、滑入滑出；舊的版型 `motion` 資料原樣相容（drift 現在是整段捲過畫面，不再是 ±0.35 小幅度）；時間軸片段中間有代表字圓圈（捲／滑）；④**版型裡素材自己的進出場特效**：格子素材、版型裡的文字貼圖可以有自己的進場／出場（疊在整個版型的特效上；格子的特效以那一格的範圍為參考）；⑤**同一格前後兩段素材之間的轉場**：格子軌也有接縫圓圈、轉場時畫面只露在那一格裡（`canTransition`、`intersectClip`；轉場的顏色層在格子裡不畫）
+  - 動了哪些檔：`engine/{scene,player,transitions,groupTransform}.ts`、`model/types.ts`（`motion` 移到 `ItemBase`）、`store/{actions,uiStore}.ts`（`setItemMotion` 取代 `setGroupMotion`、`fxFocus.role` 加 `whole`）、`app/editor/tabs/EffectTab.tsx`、`app/editor/Timeline.tsx`、`app/styles.css`；測試 `engine/groupTransform.test.ts`、`e2e/y5.spec.ts`（新，4 個）、改 `e2e/{g4,l0,helpers}`
+  - 驗證：✅ 單元 1048、e2e 309、`npm run check`  🟡 沒在真 iPhone 驗
+  - 已知限制：格子裡的轉場不畫「閃黑／閃白／暖光」這類全畫面顏色層（格子裡沒有意義）；版型外框的轉場（跟前後影片）照舊；素材自己的「整段」效果不跟選取框移動（選取框還是在原位）
+  - 下一步：Y6 格子素材（不預先裁切、換任一段、單獨調色、版型文字跟著）
+
+- 2026-11-16 feedback-13 Y4 播放軸（Sonnet）
+  - 做了什麼：①**不留白**：播放軸高度＝內容高度（拿掉最小 112px；新專案、收合分類後都剛好）；②**標題往右捲留在左邊**：分類標題、版型標題（▾ 版型：… ＋加入）、版型裡的分類標題，裡面的鈕包成一塊 `.head-inner` 一起黏左邊（`overflow:hidden` 會讓 sticky 失效，改 `overflow:clip`；版型／子分類標題拉到跟播放軸一樣寬）；③**選取的片段外框明顯**：主題色外框＋白色內框＋黑色細外線（深色片段、淺色背景都看得到）；④**版型標題旁的進出場代表字圓圈**（整個版型的進場／出場特效，點了到特效分頁）；格子軌也顯示格子素材自己的進出場圓圈（之前被擋掉）
+  - **還沒做（併進 Y5，因為是同一塊引擎）**：格子裡素材各自的進出場特效、同一格前後兩段之間的轉場（現在引擎對版型裡的素材一律看外框的特效；`activeTransition` 也跳過格子軌）
+  - 動了哪些檔：`app/editor/Timeline.tsx`、`app/styles.css`；測試 `e2e/y4.spec.ts`（新，3 個）
+  - 驗證：✅ 單元 1047、e2e 305、`npm run check`  🟡 沒在真 iPhone 驗
+  - 下一步：Y5 特效分頁（含格子素材自己的特效與轉場）
+
+- 2026-11-16 feedback-13 Y3 預覽（Sonnet）
+  - 做了什麼：①**播放時收起所有編輯用的框**：選取框、格子虛線範圍（`.clip-area`）、版型大小框、參考線、格子編號（`player.subscribe` 的 `playing`）；暫停後回來；②**每一格編號**：預覽上每個版型的每一格左上角畫圓形編號（`.cell-badge`，跟播放軸、示意圖同樣式；版型旋轉縮放跟著；空格也有；DOM 覆蓋，匯出不會有）；選到格子素材時不再另外標「第 N 格」字（編號已經有了）；③**斜線蓋滿**：預覽區裡所有不輸出的地方都蓋斜線——底裡面版面外面、**底左右兩側的黑邊**（原本只蓋底裡面）；一個 `.out-hatch` 蓋整個預覽區、用 evenodd 在版面位置挖洞；④**換畫質（高清／順暢）不跳格**：換之前先把現在這一格存成圖頂著（`frame-hold`），新的預覽引擎畫好（`Player.settled`：全部圖層準備好）才拿掉（最多 2 秒）；`Compositor.render` 現在回傳「這一輪全部準備好沒」
+  - 動了哪些檔：`app/editor/Preview.tsx`、`engine/{compositor,player}.ts`、`app/styles.css`；測試 `e2e/y3.spec.ts`（新，3 個）、改 `e2e/{x4,l5,x6-cells}.spec.ts`（9:16 時預覽區比底寬也有斜線；格子素材改看編號）
+  - 驗證：✅ 單元 1047、e2e 302（h3 修剪拖曳在重載時偶爾慢一點會失敗，單獨跑過）、`npm run check`  🟡 沒在真 iPhone 驗（換畫質的舊畫面頂著要在 iPhone 看）
+  - 下一步：Y4 播放軸
+
+- 2026-11-16 feedback-13 Y2 選色器與加素材視窗（Sonnet）
+  - 做了什麼：①選色器（`ui/ColorPicker.tsx`）：「最近用過」去掉幾乎一樣的重複（`nearColor`，每個通道差 ≤ 6）、去掉已經在「常用」那排的顏色（`shownRecents`），所以每個顏色只出現一次、整個選色器只有一個選取記號；第二排加標籤「常用」（以前只有第一排有標籤，看起來像同一組雙排）；點的顏色一樣移到最近用過第一格；②「加到第 N 格」視窗：〔影片／照片〕［從相簿選］和〔色塊〕（顏色＋［加入色塊］）各自一個有標題的區塊，中間 `zone-line`
+  - 動了哪些檔：`ui/ColorPicker.tsx`、`app/editor/CellAddSheet.tsx`；測試 `ui/ColorPicker.test.ts`、`e2e/y2.spec.ts`（新，2 個）
+  - 驗證：✅ 單元、相關 e2e（fix-colors、x6-cells、y2）  🟡 沒在真 iPhone 驗
+  - 下一步：Y3 預覽
+
+- 2026-11-16 feedback-13 Y1 版型分頁（Sonnet）
+  - 做了什麼：①**框線粗細重做**：`applyLineScale` 改成每一格四周的框線都按倍數變（格子之間的空隙＋格子離外框邊的距離，拍立得的白邊也是；`edgeLine`、`hasFrameLine`），以前只有「格子之間」那一點點空隙（約畫面 0.7%）在變，調到 210% 幾乎看不出來；滑桿改名「格子框線粗細」，每個內建版型（含拍立得）都有；②版型分頁每組設定都在有標題（`.zone-title`）的 `.zone-soft` 區塊：〔播放〕〔外框：顏色、最近用過、透明度、格子框線粗細〕〔大小與格數〕；③大小那一列：［拖邊調整大小］＋現在大小「100% × 100%」＋［重置大小］，三個都不超出區塊（320 寬也是）；④圖層分頁選到版型外框時不再顯示「圓角／外框粗細／外框顏色」（那是物件描邊 `outline`，會在版型外圍多一層框線，使用者以為是版型外框色）；已經有描邊的版型，版型分頁「外框」區塊有［拿掉外圍描邊］；⑤色票格在窄區塊裡跟著縮小（不超出）
+  - 查不到的：使用者說「自訂顏色沒作用、只有白黑粉奶茶有效」——Chromium 重現不出（任何顏色都會換，e2e 驗過）；最可能是圖層分頁的「外框顏色」（物件描邊）造成的粉色外圍，已隱藏。若還是有問題請再給我步驟
+  - 動了哪些檔：`engine/layouts.ts`、`app/editor/tabs/{LayoutTab,LayersTab}.tsx`、`app/styles.css`；測試 `engine/layouts.test.ts`、`e2e/y1.spec.ts`（新，4 個）、改 `e2e/l5.spec.ts`
+  - 驗證：✅ 單元 1045、e2e 297、`npm run check`  🟡 沒在真 iPhone 驗
+  - 下一步：Y2 選色器與加素材視窗
+
+- 2026-11-16 feedback-13 補充（Opus 改計畫）
+  - 使用者補充：Y1 外框＝各格子的框線粗細；Y4 版型整體與格子裡各素材都要顯示自己的進出場代表字，格子裡前後素材也能轉場；Y7 版型預設收合、照實際上下排序；#6「這是夾心」原本在版型裡卻跑出去＝bug；捲動要整段時間一直捲；順暢／高清看不出差別（錄影）；清 Safari 資料後跳素材遺失通知
+  - 做了什麼：`docs/plans/2026-11-16-feedback-13.md` 加「使用者補充」一節（以它為準），Y5 改成「整段」效果（`motion` 推廣到所有影像）、Y6 加版型成員跑出版型的修正與限制、新增 Y11（沒在用的遺失素材不提示）
+  - 驗證：🔴 只有規劃
+  - 下一步：切 Sonnet 從 Y1 開始
+
+- 2026-11-16 feedback-13 規劃（Opus）
+  - 使用者確認 22 點寫完；版型動畫選 A：「因為捲動也可以作為任一影像進出場的特效」
+  - 做了什麼：在 `docs/plans/2026-11-16-feedback-13.md` 排成 Y1–Y10：Y1 版型分頁（外框顏色／粗細／大小按鈕／分區）、Y2 選色器與加素材視窗、Y3 預覽（播放時藏框、格子編號、斜線、換畫質不跳）、Y4 播放軸（不留白、標題黏左、選取明顯、版型轉場＋與特效圓圈）、Y5 特效分頁（分層、版型用同一套、捲動／滑入滑出變一般特效＋舊 motion 轉換）、Y6 格子素材（不預先裁切、換任一段、單獨調色、版型文字跟著）、Y7 圖層分頁、Y8 一格多列疊圖、Y9 預覽拖格子大小、Y10 播放效能（先量再改）
+  - 驗證：🔴 只有規劃
+  - 下一步：切 Sonnet 從 Y1 開始
+
+- 2026-11-16 feedback-13 收集中（Opus 記錄）
+  - 使用者在 iPhone 測 PR #16 後回報 11 點（特效分頁層級、版型用一般進出場／轉場、新專案播放軸留白、調整版型大小按鈕、格子間框線無效、格子照片被預先裁掉、版型文字沒跟著動、圖層分頁格子沒箭頭與跑版、外框顏色自訂無效與多一層框線、版型分頁分區、播放時虛線框沒收、預覽格子序號），並說「還有其他修改要點，請等我寫完後再一併調整」
+  - 做了什麼：寫 `docs/plans/2026-11-16-feedback-13.md`（原話摘要＋理解）。截圖有真人照片、repo 公開，所以沒放進 repo。第二批 11 點（12–22：標題列黏左、換任一段素材、同一格疊圖、選色器重複、換畫質跳格、加素材視窗分區、預覽拖格子大小、播放卡、選取對比、格子單獨調色、3:4 左右斜線）也記進去了
+  - 驗證：🔴 只有記錄
+  - 下一步：等使用者寫完其他要點 → Opus 排步驟 → Sonnet 實作
+
 - 2026-11-15 色塊上的字跟著色塊（Sonnet）
   - 使用者回饋（iPhone 截圖：色塊的「色塊上的文字」欄）：「如果字是在色塊的字框中設定，則需要跟著色塊移動、刪除等；如果在色塊的秒數、文字設在文字圖層，則不需要跟著色塊移動」
   - 做了什麼：新增不變式 `engine/cellOps.syncCaptions`，`projectStore.apply` 每次都跑：有 `onItem` 的文字（色塊欄位設的字）開始時間、長度永遠＝那一段色塊；那一段不在了（任何路徑刪掉）文字一起拿掉。在「文字」分頁自己加的字沒有 `onItem`，完全不受影響。所以單獨拖色塊本體、拖頭尾改長度、依序漣漪、移至格子、刪除都會讓字跟著

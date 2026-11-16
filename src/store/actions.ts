@@ -19,6 +19,8 @@ import {
   type LookRef,
   type Item,
   type Project,
+  type KineticFade,
+  type KineticId,
   type TextFxKind,
   type TextItem,
   type TextRun,
@@ -68,7 +70,17 @@ import {
   textsOnItem,
 } from '../engine/cellOps';
 import { cellItems } from '../engine/cellGap';
-import { cellTracksOf, frameOfGroup, isFrameItem } from '../engine/layoutTracks';
+import { kineticById } from '../engine/kinetic';
+import { areaCenter } from '../engine/kinetic/hit';
+import {
+  cellNoOf,
+  cellTracksOf,
+  cellsOf,
+  ensureCellNos,
+  frameOfGroup,
+  isFrameItem,
+  rowsOfCell,
+} from '../engine/layoutTracks';
 import { remapKeepOnStage } from '../engine/aspectRemap';
 import { geoCtx } from '../engine/scene';
 import {
@@ -76,7 +88,6 @@ import {
   cellItem,
   cellRect,
   cellTransform,
-  coverCrop,
   defOf,
   inkFor,
   MAX_CELL_VIDEOS,
@@ -431,7 +442,8 @@ export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${
     );
     return;
   }
-  const group = target.type !== 'audio' ? target.group : undefined;
+  // 選到版型外框＝整組（外框與各格）一起調；選到格子裡的某個影像＝只調它自己
+  const group = target.type !== 'audio' && isFrameItem(target) ? target.group : undefined;
   store().apply(
     (d) => {
       for (const track of d.tracks)
@@ -444,11 +456,11 @@ export function setAdjust(id: string, patch: Partial<Adjust>, coalesce = `adj:${
   );
 }
 
-/** 調色作用的物件：版型裡的任何物件＝整組（外框與各格）；其他是自己 */
+/** 調色作用的物件：版型外框＝整組（外框與各格）；格子裡的影像、文字、貼圖＝只有自己 */
 function colorTargetIds(p: Project, id: string): string[] {
   const f = findItem(p, id);
   if (!f) return [];
-  if (f.item.type !== 'audio' && f.item.group) {
+  if (f.item.type !== 'audio' && f.item.group && isFrameItem(f.item)) {
     const group = f.item.group;
     return p.tracks
       .flatMap((t) => t.items)
@@ -761,6 +773,7 @@ export function addLayout(o: {
       const tr = createTrack('media', d.tracks as Track[]);
       tr.group = group;
       tr.groupRole = 'cell';
+      tr.cellNo = i + 1;
       tr.fill = '#000000';
       tr.cell = { x: c.win.x / W, y: c.win.y / H, w: c.win.w / W, h: c.win.h / H };
       if (c.asset) {
@@ -926,7 +939,10 @@ export function importIntoCell(trackId: string, asset: Asset): string | null {
 export function fillEmptyCells(group: string, assets: Asset[]): number {
   const p = store().project;
   if (!p) return 0;
-  const empty = p.tracks.filter((t) => t.group === group && t.groupRole === 'cell' && !cellMain(t));
+  // 整格都空的格子（一格有好幾列時用第一列）
+  const empty = cellsOf(p.tracks as Track[], group)
+    .filter((c) => c.tracks.every((t) => !cellMain(t)))
+    .map((c) => c.tracks[0]!);
   let n = 0;
   empty.forEach((t, i) => {
     const a = assets[i];
@@ -953,7 +969,7 @@ export function applyLayoutShape(
   const H = p.height;
   const oldBox = fr.item.frameStyle?.box ?? { w: 1, h: 1 };
   const newBox = style.box ?? { w: 1, h: 1 };
-  const b = buildIn(defOf(style), W, H, style.box, style.line);
+  const b = buildIn(defOf(style), W, H, style.box, style.line, style.cells);
   const rs = b.panels.length ? b.panels : b.windows;
   const l = Math.min(...rs.map((r) => r.x));
   const tp = Math.min(...rs.map((r) => r.y));
@@ -968,45 +984,45 @@ export function applyLayoutShape(
     if (!d.assets.some((a) => a.id === asset.id)) d.assets.push(asset);
     const frameTrack = d.tracks.find((t) => t.id === fr.track.id)!;
     const frameItem = frameTrack.items.find((x) => x.id === fr.item.id) as VideoItem;
-    const cells = d.tracks.filter((t) => t.group === group && t.groupRole === 'cell');
+    d.tracks = ensureCellNos(d.tracks as Track[]) as never;
+    const rowsOf = (no: number) =>
+      (d.tracks as Track[]).filter((t) => t.group === group && t.groupRole === 'cell' && t.cellNo === no);
     b.windows.forEach((win, i) => {
-      let tr = cells[i];
-      if (!tr) {
-        tr = createTrack('media', d.tracks as Track[]);
+      let rows = rowsOf(i + 1);
+      if (rows.length === 0) {
+        const tr = createTrack('media', d.tracks as Track[]);
         tr.group = group;
         tr.groupRole = 'cell';
+        tr.cellNo = i + 1;
         tr.fill = '#000000';
         d.tracks.splice(
           d.tracks.findIndex((t) => t.id === frameTrack.id),
           0,
           tr,
         );
-        tr = d.tracks.find((t) => t.id === tr!.id)!;
-        cells.push(tr);
+        rows = [d.tracks.find((t) => t.id === tr.id) as Track];
       }
-      tr.cell = frac(win);
-      for (const it of tr.items) {
-        if (it.type === 'text' || it.type === 'audio' || !it.cell) continue;
-        const a = d.assets.find((x) => x.id === it.assetId);
-        if (!a) continue;
-        // 自己裁切過（筆刷、自由形狀）的保留裁切；其他的重新裁成填滿新的格子
-        if (!it.cropEdit && !it.mask && !it.maskBitmap) {
-          const crop = coverCrop(a as Asset, win);
-          if (crop) it.crop = crop;
-          else delete it.crop;
+      for (const tr of rows) {
+        tr.cell = frac(win);
+        for (const it of tr.items) {
+          if (it.type === 'text' || it.type === 'audio' || !it.cell) continue;
+          const a = d.assets.find((x) => x.id === it.assetId);
+          if (!a) continue;
+          // 自己裁切過（筆刷、自由形狀）的保留裁切；其他的不裁切（整張素材蓋滿新的格子、畫面被格子遮住）
+          if (!it.cropEdit && !it.mask && !it.maskBitmap) delete it.crop;
+          const base = cellTransform(a as Asset, it.crop, win, W, H);
+          it.transform = {
+            ...composeWith(base, frameItem.transform as Transform, W, H),
+            opacity: it.transform.opacity,
+          };
+          it.cell = frac(win);
+          delete it.cellEdit;
         }
-        const base = cellTransform(a as Asset, it.crop, win, W, H);
-        it.transform = {
-          ...composeWith(base, frameItem.transform as Transform, W, H),
-          opacity: it.transform.opacity,
-        };
-        it.cell = frac(win);
-        delete it.cellEdit;
       }
     });
     // 少掉的格子：拿掉（連素材）
     d.tracks = d.tracks.filter(
-      (t) => !(t.group === group && t.groupRole === 'cell' && cells.indexOf(t) >= b.windows.length),
+      (t) => !(t.group === group && t.groupRole === 'cell' && (t.cellNo ?? 0) > b.windows.length),
     ) as never;
     // 版型的大小變了：版型裡的文字、貼圖照比例換位置（版型在畫面正中央排版）
     if (Math.abs(newBox.w - oldBox.w) > 1e-6 || Math.abs(newBox.h - oldBox.h) > 1e-6) {
@@ -1172,17 +1188,107 @@ export function setTransition(id: string, kind: TransitionKind | null, duration?
   );
 }
 
-/** 字卡的文字樣式特效（閃爍、發光閃亮、方格字、震動）；null＝取消 */
+/** 字卡的文字樣式特效（閃爍、發光閃亮、方格字、震動）；null＝取消。跟動態字卡二選一（選了這個會拿掉動態字卡） */
 export function setTextFx(id: string, kind: TextFxKind | null, opts?: Opts): void {
   editItem(
     id,
     (it) => {
       if (it.type !== 'text') return;
       if (!kind) delete it.textFx;
-      else it.textFx = { kind };
+      else {
+        it.textFx = { kind };
+        delete it.kinetic;
+      }
     },
     opts,
   );
+}
+
+/**
+ * 動態字卡（64 式）：選一式；null＝取消。跟文字樣式特效二選一。
+ * 框（顯示範圍）：之前自己調過大小的保留；沒有的用那一式的預設框，位置也放到預設位置（歌詞框在中下方、其他正中央），縮放、旋轉歸位。
+ * 之前選過的底色、速度保留，強調色換成新那一式的原版配色。
+ */
+export function setKinetic(id: string, kid: KineticId | null, opts?: Opts): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type !== 'text') return;
+      if (!kid) {
+        delete it.kinetic;
+        return;
+      }
+      const prev = it.kinetic;
+      it.kinetic = {
+        id: kid,
+        ...(prev?.bg ? { bg: prev.bg } : {}),
+        ...(prev?.speed ? { speed: prev.speed } : {}),
+        ...(prev?.size ? { size: prev.size } : {}),
+      };
+      delete it.textFx;
+      if (!prev?.size) {
+        const c = areaCenter(kineticById(kid)?.area ?? 'wide');
+        it.transform = { ...it.transform, x: c.x, y: c.y, scale: 1, rotation: 0 };
+      }
+    },
+    opts,
+  );
+}
+
+/** 動態字卡的設定（強調色、底色、速度、邊緣淡出）；undefined 的欄位＝拿掉（回到預設）。連續調整合併成一步復原 */
+export function patchKinetic(
+  id: string,
+  patch: {
+    accent?: string | undefined;
+    bg?: string | undefined;
+    speed?: number | undefined;
+    fade?: KineticFade | undefined;
+  },
+): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type !== 'text' || !it.kinetic) return;
+      const k = it.kinetic;
+      for (const key of Object.keys(patch) as (keyof typeof patch)[]) {
+        const v = patch[key];
+        if (v === undefined) delete k[key];
+        else (k as Record<string, unknown>)[key] = v;
+      }
+    },
+    { coalesce: `kinetic:${id}` },
+  );
+}
+
+/** 動態字卡的字色：改字卡所有文字段的顏色（文字分頁看到的也一起變）。連續調整合併成一步復原 */
+export function setKineticTextColor(id: string, color: string): void {
+  editItem(
+    id,
+    (it) => {
+      if (it.type !== 'text') return;
+      for (const r of it.card.runs) r.color = color;
+    },
+    { coalesce: `kinetic-fg:${id}` },
+  );
+}
+
+/** 動態字卡的顯示範圍（框）：中心 x、y 與大小 w、h 都是佔畫面的比例。一步復原 */
+export function setKineticArea(id: string, r: { x: number; y: number; w: number; h: number }): void {
+  editItem(id, (it) => {
+    if (it.type !== 'text' || !it.kinetic) return;
+    it.kinetic.size = { w: r.w, h: r.h };
+    it.transform = { ...it.transform, x: r.x, y: r.y };
+  });
+}
+
+/** 動態字卡的顯示範圍回到那一式的預設框（大小、位置；縮放、旋轉歸位）。一步復原 */
+export function resetKineticArea(id: string): void {
+  editItem(id, (it) => {
+    if (it.type !== 'text' || !it.kinetic) return;
+    delete it.kinetic.size;
+    const c = areaCenter(kineticById(it.kinetic.id)?.area ?? 'wide');
+    it.transform = { ...it.transform, x: c.x, y: c.y, scale: 1, rotation: 0 };
+  });
 }
 
 /** 轉場分配：佔前一段結尾 before 秒、佔這一段開頭 after 秒（總長＝兩者相加） */
@@ -1266,13 +1372,10 @@ export function setTransitionAll(trackId: string, kind: TransitionKind | null, d
   return ids.length;
 }
 
-/** 版型整組動畫：不動／捲動／滑入滑出 */
-export function setGroupMotion(group: string, motion: 'drift' | 'slide' | undefined) {
-  const p = store().project;
-  const frame = p && groupFrame(p, group);
-  if (!frame) return;
-  editItem(frame.item.id, (it) => {
-    if (it.type === 'text') return;
+/** 「整段」效果（捲動、滑入滑出）：任何影像、貼圖、文字、版型外框（整組一起動）都能用。一步復原 */
+export function setItemMotion(id: string, motion: 'drift' | 'slide' | undefined) {
+  editItem(id, (it) => {
+    if (it.type === 'audio') return;
     if (motion) it.motion = motion;
     else delete it.motion;
   });
@@ -1309,10 +1412,11 @@ export function cellAvailable(item: VideoItem, asset: Asset | undefined): number
   return Math.max(asset.duration - item.trimIn, 0.2);
 }
 
-export function applyCell(trackId: string, draft: CellDraft): boolean {
+export function applyCell(trackId: string, draft: CellDraft, itemId?: string): boolean {
   const p = store().project;
   const track = p?.tracks.find((t) => t.id === trackId);
-  const first = track && cellMain(track);
+  // 要換的是這一格的哪一段（沒指定＝第一段）
+  const first = track && ((itemId && cellItems(track).find((x) => x.id === itemId)) || cellMain(track));
   const frame = p && track?.group ? groupFrame(p, track.group) : null;
   if (!p || !track || !first || !frame || !first.cell) return false;
   const group = track.group!;
@@ -1480,6 +1584,98 @@ export function moveToCell(itemId: string, cellTrackId: string): boolean {
   const next = moveToCellTracks(p.tracks as Track[], p.assets, p.width, p.height, itemId, cellTrackId);
   if (!next) return false;
   store().apply((d) => void (d.tracks = next as never));
+  return true;
+}
+
+/** 這一格再加一列（同一格、同一範圍的另一條格子軌，疊在這一格最上面）。回傳新軌的 id；一步復原 */
+export function addCellRow(trackId: string): string | null {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !track || track.groupRole !== 'cell' || !track.group) return null;
+  let id: string | null = null;
+  store().apply((d) => {
+    d.tracks = ensureCellNos(d.tracks as Track[]) as never;
+    const mine = d.tracks.find((t) => t.id === trackId) as Track;
+    const rows = rowsOfCell(d.tracks as Track[], mine);
+    const last = rows[rows.length - 1]!;
+    const nt = createTrack('media', d.tracks as Track[]);
+    nt.group = mine.group;
+    nt.groupRole = 'cell';
+    nt.cellNo = mine.cellNo;
+    nt.fill = mine.fill;
+    if (mine.cell) nt.cell = { ...mine.cell };
+    d.tracks.splice(d.tracks.findIndex((t) => t.id === last.id) + 1, 0, nt);
+    id = nt.id;
+  });
+  return id;
+}
+
+/** 刪掉這一格的某一列（連裡面的素材與色塊上的文字）；這一格只剩一列時不能刪。一步復原 */
+export function removeCellRow(trackId: string): boolean {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !track || track.groupRole !== 'cell' || !track.group) return false;
+  if (rowsOfCell(p.tracks as Track[], track).length < 2) {
+    toast('這一格只有一列，不能刪');
+    return false;
+  }
+  const gone = new Set(track.items.map((x) => x.id));
+  store().apply(
+    (d) => {
+      let tracks = (d.tracks as Track[])
+        .filter((t) => t.id !== trackId)
+        .map((t) =>
+          t.items.some((x) => x.type === 'text' && x.onItem && gone.has(x.onItem))
+            ? ({
+                ...t,
+                items: t.items.filter((x) => !(x.type === 'text' && x.onItem && gone.has(x.onItem))),
+              } as Track)
+            : t,
+        );
+      tracks = fitFrameToCells(tracks, track.group!);
+      d.tracks = tracks as never;
+    },
+    { select: null },
+  );
+  return true;
+}
+
+/** 把這一列的素材全部改放到第 no 格（時間不變，畫面照那一格重新蓋滿）；這一格還有別的列就把空列刪掉。一步復原 */
+export function setCellNo(trackId: string, no: number): boolean {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !track || track.groupRole !== 'cell' || !track.group) return false;
+  const cells = cellsOf(p.tracks as Track[], track.group);
+  const target = cells.find((c) => c.no === no);
+  if (!target || cellNoOf(p.tracks as Track[], track) === no) return false;
+  const dest = target.tracks[target.tracks.length - 1]!;
+  let tracks = p.tracks as Track[];
+  for (const it of cellItems(track)) {
+    const next = moveToCellTracks(tracks, p.assets, p.width, p.height, it.id, dest.id);
+    if (next) tracks = next;
+  }
+  const sameCellRows = rowsOfCell(p.tracks as Track[], track).length;
+  if (sameCellRows > 1) tracks = tracks.filter((t) => t.id !== trackId);
+  store().apply((d) => void (d.tracks = tracks as never));
+  return true;
+}
+
+/** 這一格裡的列上下換（dir＝-1 往上＝蓋在上面）；已經在最上／最下回傳 false。一步復原 */
+export function swapCellRows(trackId: string, dir: -1 | 1): boolean {
+  const p = store().project;
+  const track = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !track || track.groupRole !== 'cell') return false;
+  const rows = rowsOfCell(p.tracks as Track[], track);
+  const i = rows.findIndex((r) => r.id === trackId);
+  const other = rows[i - dir]; // 往上＝陣列後面
+  if (!other) return false;
+  store().apply((d) => {
+    const a = d.tracks.findIndex((t) => t.id === trackId);
+    const b = d.tracks.findIndex((t) => t.id === other.id);
+    const ta = d.tracks[a]!;
+    d.tracks[a] = d.tracks[b]!;
+    d.tracks[b] = ta;
+  });
   return true;
 }
 
@@ -1969,6 +2165,12 @@ export function moveItemTo(id: string, target: DropTarget, start: number): boole
   const dstTrack = target.type === 'track' ? p.tracks.find((t) => t.id === target.trackId) : undefined;
   const isCellItem =
     !!cur && cur.type !== 'text' && cur.type !== 'audio' && !!cur.cell && !!cur.group && !isFrameItem(cur);
+  // 版型裡的文字、貼圖、音效：也只能放進同一個版型的成員軌（不能放到版型外面的軌道）
+  const isMember = !!cur && !isFrameItem(cur) && !isCellItem && !!cur.group;
+  if (isMember && (!dstTrack || dstTrack.group !== cur!.group || dstTrack.groupRole !== 'member')) {
+    toast('版型裡的素材只能移到同一個版型裡');
+    return false;
+  }
   if (isCellItem || dstTrack?.groupRole === 'cell') {
     const srcTrack = cur ? findItem(p, id)?.track : undefined;
     if (

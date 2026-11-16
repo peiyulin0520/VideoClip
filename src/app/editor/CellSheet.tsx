@@ -6,14 +6,17 @@ import { itemTitle, thumbOf } from '../../engine/labels';
 import { textsOnItem } from '../../engine/cellOps';
 import { urlFor } from '../../engine/assetUrls';
 import { importFilesIntoCell } from './cellImport';
-import { frameOfGroup } from '../../engine/layoutTracks';
+import { cellNoOf, cellsOf, frameOfGroup, rowsOfCell } from '../../engine/layoutTracks';
 import {
+  addCellRow,
   applyCell,
   cellAvailable,
   cellMain,
   importIntoCell,
   removeAnyItem,
+  removeCellRow,
   setCellCaption,
+  setCellNo,
   setCellTrim,
   setColorItem,
   type CellDraft,
@@ -43,7 +46,9 @@ export function CellSheet({
 }) {
   const project = useProjectStore((s) => s.project)!;
   const track = project.tracks.find((t) => t.id === trackId);
-  const item = track && cellMain(track);
+  const selectedId = useProjectStore((s) => s.selectedId);
+  // 現在選的是這一格的哪一段（沒選＝第一段）：下面「換素材」「用素材的哪一段」都是對這一段
+  const item = track && (cellItems(track).find((x) => x.id === selectedId) ?? cellMain(track));
   const frameItem = track?.group ? frameOfGroup(project.tracks, track.group)?.item : undefined;
   const textNow = project.tracks
     .flatMap((t) => t.items)
@@ -52,9 +57,61 @@ export function CellSheet({
   const [ranging, setRanging] = useState(false);
   const [adding, setAdding] = useState(false);
   const [edit, setEdit] = useState<{ id: string; color: string; text: string } | null>(null);
-  const selectedId = useProjectStore((s) => s.selectedId);
   const fileRef = useRef<HTMLInputElement>(null);
   if (!track || !frameItem) return null;
+  const cells = cellsOf(project.tracks, track.group!);
+  const cellNo = cellNoOf(project.tracks, track);
+  const rows = rowsOfCell(project.tracks, track);
+  const rowNo = rows.findIndex((r) => r.id === track.id) + 1;
+  const rowControls = (
+    <div className="zone-soft" data-testid="cell-rows">
+      <div className="zone-title">
+        格與列{rows.length > 1 ? `（這一格有 ${rows.length} 列，這是第 ${rowNo} 列）` : ''}
+      </div>
+      <div className="chips" role="group" aria-label="改成第幾格">
+        {cells.map((c) => (
+          <button
+            key={c.no}
+            className={`chip${c.no === cellNo ? ' active' : ''}`}
+            aria-label={`改成第 ${c.no} 格`}
+            disabled={c.no === cellNo}
+            onClick={() => {
+              if (setCellNo(trackId, c.no)) {
+                useUI.getState().player?.refresh();
+                toast(`已移到第 ${c.no} 格`);
+                onClose();
+              }
+            }}
+          >
+            第 {c.no} 格
+          </button>
+        ))}
+      </div>
+      <div className="sheet-row">
+        <button
+          className="btn grow"
+          data-testid="cell-row-add"
+          aria-label="這一格再加一列"
+          onClick={() => {
+            if (addCellRow(trackId)) toast('已加一列');
+          }}
+        >
+          加一列
+        </button>
+        <button
+          className="btn grow"
+          data-testid="cell-row-remove"
+          aria-label="刪除這一列"
+          disabled={rows.length < 2}
+          onClick={() => {
+            if (removeCellRow(trackId)) onClose();
+          }}
+        >
+          刪除這列
+        </button>
+      </div>
+    </div>
+  );
   if (!item) {
     // 這一格還是空的：選一個專案裡已有的素材，或從相簿匯入新的
     const choices = project.assets.filter(
@@ -95,6 +152,7 @@ export function CellSheet({
             data-testid="cell-file"
             onChange={(e) => void onFiles(e.target.files)}
           />
+          {rowControls}
         </div>
       </Sheet>
     );
@@ -159,6 +217,7 @@ export function CellSheet({
                     className="cell-item-main"
                     aria-label={`第 ${n + 1} 段 ${itemTitle(it, a)}`}
                     onClick={() => {
+                      setDraft(null);
                       useProjectStore.getState().select(it.id);
                       useUI.getState().player?.seek(it.start + 0.02);
                       if (isColor) {
@@ -234,8 +293,16 @@ export function CellSheet({
           <button className="btn" data-testid="cell-add-open" onClick={() => setAdding(true)}>
             ＋ 加素材
           </button>
+          {rowControls}
           <div className="panel-head">
-            <span>換第 1 段的素材</span>
+            <span>
+              換第{' '}
+              {Math.max(
+                all.findIndex((x) => x.id === item.id),
+                0,
+              ) + 1}{' '}
+              段的素材
+            </span>
           </div>
           <div className="cover-strip" data-testid="cell-assets">
             {choices.map((a) => (
@@ -342,7 +409,7 @@ export function CellSheet({
               className="btn primary grow"
               data-testid="cell-apply"
               onClick={() => {
-                if (applyCell(trackId, d)) {
+                if (applyCell(trackId, d, item.id)) {
                   setDraft(null);
                   useUI.getState().player?.refresh();
                   toast('已套用');

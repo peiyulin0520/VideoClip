@@ -360,3 +360,44 @@ describe('migrateLayoutTracks（版型 v2）', () => {
     expect(migrateLayoutTracks(r.project).changed).toBe(false);
   });
 });
+
+describe('版型裡的文字不會在載入時跑出版型', () => {
+  it('版型成員文字重新載入（migrateProject）後還有 group、還在成員軌上', async () => {
+    const { migrateProject } = await import('./migrate');
+    const { createProject, createTextItem } = await import('./defaults');
+    const base = createProject('x');
+    const frame = {
+      id: 'f',
+      type: 'image',
+      assetId: 'a',
+      start: 0,
+      duration: 5,
+      speed: 1,
+      trimIn: 0,
+      volume: 1,
+      fit: 'contain',
+      transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
+      group: 'g',
+    };
+    const tx = { ...createTextItem(0, 'hi'), group: 'g' };
+    const p = {
+      ...base,
+      tracks: [
+        { id: 't1', kind: 'media', name: 'm', hidden: false, locked: false, items: [frame] },
+        {
+          id: 't2',
+          kind: 'text',
+          name: 't',
+          hidden: false,
+          locked: false,
+          group: 'g',
+          groupRole: 'member',
+          items: [tx],
+        },
+      ],
+    } as never;
+    const out = migrateProject(p).project;
+    const m = out.tracks.find((t) => t.groupRole === 'member')!;
+    expect((m.items[0] as { group?: string }).group).toBe('g');
+  });
+});

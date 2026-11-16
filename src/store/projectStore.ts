@@ -1,5 +1,6 @@
-import { normalizeGroupTracks } from '../engine/layoutTracks';
+import { ensureCellNos, normalizeGroupTracks } from '../engine/layoutTracks';
 import { syncCaptions } from '../engine/cellOps';
+import { repairMemberItems } from '../engine/memberRepair';
 import { normalizeLayers } from '../engine/timeline';
 import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
@@ -49,7 +50,9 @@ export const useProjectStore = create<State>((set, get) => ({
       recipe(d);
     });
     // 版型的格子軌永遠貼在外框那一列的正下方、成員軌（文字、貼圖）貼在正上方（外框被搬到別列、軌道順序改了之後也一樣）；音訊軌永遠排最後
-    const fixed = syncCaptions(normalizeLayers(normalizeGroupTracks(next.tracks)));
+    const fixed = syncCaptions(
+      normalizeLayers(normalizeGroupTracks(repairMemberItems(ensureCellNos(next.tracks)))),
+    );
     if (fixed !== next.tracks) next = { ...next, tracks: fixed };
     if (next === project) return;
     const stamped = { ...next, updatedAt: Date.now() };

@@ -61,6 +61,27 @@ const useRecent = () => useSyncExternalStore(subscribe, () => recent);
 
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
+/** 兩個色碼幾乎一樣（每個通道差 ≤ 6）：「最近用過」不要同時出現兩個看起來一樣的顏色 */
+export function nearColor(a: string, b: string, tol = 6): boolean {
+  const x = normalizeHex(a);
+  const y = normalizeHex(b);
+  if (!x || !y) return false;
+  for (let i = 1; i < 7; i += 2)
+    if (Math.abs(parseInt(x.slice(i, i + 2), 16) - parseInt(y.slice(i, i + 2), 16)) > tol) return false;
+  return true;
+}
+
+/** 「最近用過」要顯示哪些：去掉幾乎一樣的重複、去掉已經在「常用」那排的顏色（每個顏色只出現一次） */
+export function shownRecents(recents: string[], basic: string[]): string[] {
+  const out: string[] = [];
+  for (const c of recents) {
+    if (basic.some((b) => nearColor(b, c, 0))) continue;
+    if (out.some((o) => nearColor(o, c))) continue;
+    out.push(c);
+  }
+  return out;
+}
+
 export function ColorPicker({
   value,
   label,
@@ -78,6 +99,7 @@ export function ColorPicker({
   const recents = useRecent();
   const basic = PALETTE[0]!.colors;
   const first = extra && !basic.some((c) => same(c, extra)) ? [extra, ...basic.slice(0, 7)] : basic;
+  const shown = shownRecents(recents, first);
   const pick = (c: string) => {
     onPick(c);
     pushRecent(c);
@@ -94,12 +116,13 @@ export function ColorPicker({
   );
   return (
     <div className="color-picker" data-testid="color-picker">
-      {recents.length > 0 && (
+      {shown.length > 0 && (
         <>
           <span className="color-tag">最近用過</span>
           <div className="color-row" aria-label="最近用過的顏色">
-            {recents.map((c) => swatch(c, '最近用過'))}
+            {shown.map((c) => swatch(c, '最近用過'))}
           </div>
+          <span className="color-tag">常用</span>
         </>
       )}
       <div className="color-row">{first.map((c) => swatch(c, label))}</div>

@@ -1,6 +1,7 @@
 import { newId, TRACK_NAMES } from './defaults';
 import type { Project, Track, TrackKind } from './types';
 import { isFrameItem, normalizeGroupTracks } from '../engine/layoutTracks';
+import { repairMemberItems } from '../engine/memberRepair';
 import { normalizeZones } from '../engine/timeline';
 import { LEGACY_TRANSITIONS } from '../engine/transitions';
 
@@ -42,7 +43,13 @@ export function markLegacyGroups(p: Project): { project: Project; changed: boole
   const fixed = repairGroups(marked);
   const stk = migrateStickers(fixed.project);
   const v2 = migrateLayoutTracks(stk.project);
-  return { project: v2.project, changed: changed || fixed.changed || stk.changed || v2.changed };
+  // 版型成員（文字、貼圖）一定在自己版型的成員軌上、帶著 group（舊版載入會清掉文字的 group、拖移也可能把它搬出去）
+  const mt = repairMemberItems(v2.project.tracks);
+  const project = mt === v2.project.tracks ? v2.project : { ...v2.project, tracks: mt };
+  return {
+    project,
+    changed: changed || fixed.changed || stk.changed || v2.changed || mt !== v2.project.tracks,
+  };
 }
 
 /**
@@ -197,10 +204,15 @@ export function repairGroups(p: Project): { project: Project; changed: boolean }
     }
     const items = tr.items.map((it) => {
       if (it.type === 'text') {
-        if (!it.fontCycle && !it.group) return it;
+        // 舊的動態模板文字（有字體輪播）：拿掉字體輪播和 group；其他文字的 group 只在「版型已經不在了」（孤兒）時才清掉——
+        // 版型裡的文字（成員）要保留 group，不然每次打開專案它就跑出版型（2026-11-16 修）
+        const dropGroup = !!it.group && (!hasFrame.has(it.group) || !!it.fontCycle);
+        if (!it.fontCycle && !dropGroup) return it;
         changed = true;
-        const { fontCycle: _c, group: _gg, ...rest } = it;
+        const { fontCycle: _c, ...rest0 } = it;
         void _c;
+        if (!dropGroup) return rest0;
+        const { group: _gg, ...rest } = rest0;
         void _gg;
         return rest;
       }

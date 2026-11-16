@@ -358,11 +358,24 @@ button {
   inset: 0;
   z-index: 90;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
   background: rgba(0, 0, 0, 0.6);
+}
+/* 載入中：中間一張實心卡片，底下的畫面（空專案的說明字等）不會透出來疊在字上 */
+.busy-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 80vw;
+  padding: 22px 28px;
+  color: var(--fg);
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 .spinner {
   width: 36px;
@@ -446,7 +459,10 @@ button {
   position: absolute;
   top: 6px;
   right: 6px;
-  background: rgba(0, 0, 0, 0.55);
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
 }
 .fab {
   position: fixed;
@@ -3924,6 +3940,53 @@ button:not(:disabled):active,
 .lr-card {
   z-index: 10;
 }
+/* 拖格子大小：每格一個虛線框（編號在左上）、格子之間的線上有把手 */
+.lc-cell {
+  position: absolute;
+  z-index: 9;
+  pointer-events: none;
+  outline: 2px dashed var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.lc-cell i {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: var(--fs-note);
+  font-style: normal;
+  color: #fff;
+  text-shadow: 0 0 3px #000;
+}
+.lc-card {
+  top: 8px;
+  transform: translateX(-50%);
+}
+.lc-handle {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  pointer-events: auto;
+  touch-action: none;
+}
+.lc-handle i {
+  display: block;
+  background: var(--accent);
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.lc-handle.v i {
+  width: 10px;
+  height: 30px;
+}
+.lc-handle.h i {
+  width: 30px;
+  height: 10px;
+}
 
 /* ---- L6 按鈕分區：功能層級不同的按鈕用「分區＋細線」隔開 ---- */
 .btn-zone {
@@ -4040,8 +4103,25 @@ button:not(:disabled):active,
 .layer-row {
   flex-wrap: wrap;
 }
-.layer-row.sub {
-  margin-left: 1em;
+/* 版型展開後：裡面的圖層縮排、左邊一條線把同一組連起來；每列的按鈕固定寬度，上下對齊 */
+.layer-group > .layer-children {
+  padding: 0 0 0 0.9em;
+  margin: 0 0 4px 0.7em;
+  list-style: none;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.layer-group-head {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.layer-spacer {
+  width: 88px;
+  height: 44px;
+  visibility: hidden;
+}
+.layer-spacer-btn {
+  display: inline-block;
+  width: 44px;
+  height: 44px;
 }
 .layer-main {
   display: flex;
@@ -4210,4 +4290,201 @@ button:not(:disabled):active,
 }
 .cell-item-edit {
   flex-basis: 100%;
+}
+
+/* Y1：版型分頁的區塊標題、大小那一列 */
+.zone-title {
+  margin-bottom: 4px;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+.size-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.size-row .btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+.size-now {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: var(--fs-note);
+  white-space: nowrap;
+}
+/* 色票在窄區塊裡（版型分頁的 zone-soft）也不要超出：每顆跟著欄寬縮小 */
+.color-row {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.color-row .swatch,
+.panel.text-panel .color-row .swatch {
+  width: 100%;
+  max-width: 40px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+
+/* Y3：預覽上每一格的編號、換畫質時頂著的舊畫面 */
+.cell-badge {
+  position: absolute;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5em;
+  height: 1.5em;
+  padding: 0 0.3em;
+  border-radius: 999px;
+  font-size: var(--fs-note);
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+.frame-hold {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Y4：標題列的文字與按鈕往右捲也留在左邊（overflow:hidden 會讓裡面的 sticky 失效，改成 clip）；選取的片段外框明顯 */
+.cat-head,
+.group-head,
+.sub-head {
+  overflow: clip;
+}
+.clip.selected {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px #fff inset,
+    0 0 0 1px #000;
+}
+.fx-circle.head {
+  position: sticky;
+  left: 9em;
+  flex: none;
+  top: auto;
+  transform: none;
+}
+
+/* 標題列裡的鈕包成一塊一起黏在左邊（各自 sticky 會互相重疊） */
+.head-inner {
+  position: sticky;
+  left: 4px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 8px);
+}
+.head-inner > .cat-toggle,
+.head-inner > .grp-add,
+.head-inner > .cat-mixed,
+.head-inner > .fx-circle.head {
+  position: static;
+  left: auto;
+}
+.cat-head .head-inner,
+.sub-head .head-inner {
+  height: 100%;
+}
+.group-head,
+.sub-head {
+  right: 0; /* 標題列拉到跟播放軸一樣寬，裡面的 sticky 才有地方黏（不然只有內容那麼寬，往右捲就消失） */
+}
+
+/* Y5：特效分頁——「作用在」（分段式切換）跟「效果」（有標題的區塊）分開，一眼看出是不同階層 */
+.fx-where {
+  margin: 0 0 8px;
+}
+.seg {
+  display: flex;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-ctl);
+  overflow: hidden;
+}
+.seg-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 4px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--fs-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.seg-btn + .seg-btn {
+  border-left: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.seg-btn.on {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+/* Y11：找不到檔案的素材，用到它的片段標「素材遺失」 */
+.clip-lost {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  overflow: hidden;
+  font-size: var(--fs-note);
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(176, 42, 42, 0.78);
+  pointer-events: none;
+}
+
+/* 字卡的文字特效（整段一直動）：片段頂端的整條色帶 */
+.fx-span.style {
+  background: repeating-linear-gradient(135deg, #a8688a 0 4px, rgba(236, 206, 222, 0.9) 4px 8px);
+}
+.fx-span.style.sel {
+  background: repeating-linear-gradient(135deg, #5d2a47 0 4px, rgba(168, 104, 138, 0.9) 4px 8px);
+}
+/* 動態字卡的卡片：縮圖是那一式的代表畫面（選中的會動） */
+.tr-card .kn-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #111;
+}
+.kn-set {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+/* 特效分頁「作用在」：名稱太長（例：文字特效 ·巨字橫移）就用刪節號，不把後面的按鈕擠出去 */
+.fx-where .seg-btn {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 動態字卡的顯示範圍：虛線框；拖框裡面＝整個框移動（框裡的 body 接手指，把手疊在上面） */
+.ka-frame .ka-body {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: move;
+}
+.ka-frame .crop-h {
+  z-index: 1;
 }

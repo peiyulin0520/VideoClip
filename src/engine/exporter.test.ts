@@ -11,6 +11,9 @@ describe('outputSize', () => {
     expect(outputSize({ width: 1920, height: 1080 }, 1280)).toEqual({ width: 1280, height: 720 });
     expect(outputSize({ width: 1080, height: 1080 }, 1280)).toEqual({ width: 1080, height: 1080 }); // 長邊是上限，不放大
     expect(outputSize({ width: 540, height: 960 }, 1920)).toEqual({ width: 540, height: 960 });
+    // 4K 是明確要的：專案畫面 1080×1920 → 2160×3840（放大 2 倍）；專案畫面再小也畫到 4K
+    expect(outputSize({ width: 1080, height: 1920 }, 3840)).toEqual({ width: 2160, height: 3840 });
+    expect(outputSize({ width: 1920, height: 1080 }, 3840)).toEqual({ width: 3840, height: 2160 });
     const s = outputSize({ width: 1080, height: 1440 }, 1280);
     expect(s.width % 2).toBe(0);
     expect(s.height % 2).toBe(0);
@@ -23,6 +26,9 @@ describe('videoBitrate / estimateBytes', () => {
     expect(videoBitrate(1080, 1920, 30, 'high')).toBe(14_000_000);
     expect(videoBitrate(1080, 1920, 60, 'standard')).toBe(12_000_000);
     expect(videoBitrate(720, 1280, 30, 'standard')).toBeCloseTo(3_555_556, -3);
+    // 4K 位元率跟著像素放大（4 倍）
+    expect(videoBitrate(2160, 3840, 30, 'standard')).toBe(32_000_000);
+    expect(videoBitrate(2160, 3840, 60, 'high')).toBe(60_000_000); // 上限 60 Mbps
   });
   it('預估大小＝（影片＋聲音）位元率 × 長度', () => {
     const p: Project = createProject('x');

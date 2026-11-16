@@ -426,24 +426,84 @@ export function cellGap(windows: Rect[]): number | undefined {
   return best;
 }
 
+/** 這一格（windows[i]）某一邊外面那條「框線」有多寬：隔壁有格子＝兩格之間的空隙；沒有＝這一格離外框邊的距離 */
+function edgeLine(
+  windows: Rect[],
+  i: number,
+  side: 'l' | 'r' | 't' | 'b',
+  outer: Rect | null,
+): { width: number; inner: boolean } {
+  const w = windows[i]!;
+  let best: number | undefined;
+  windows.forEach((n, j) => {
+    if (j === i) return;
+    const overlapY = Math.min(w.y + w.h, n.y + n.h) - Math.max(w.y, n.y);
+    const overlapX = Math.min(w.x + w.w, n.x + n.w) - Math.max(w.x, n.x);
+    let g: number | undefined;
+    if (side === 'l' && overlapY > 1) g = w.x - (n.x + n.w);
+    if (side === 'r' && overlapY > 1) g = n.x - (w.x + w.w);
+    if (side === 't' && overlapX > 1) g = w.y - (n.y + n.h);
+    if (side === 'b' && overlapX > 1) g = n.y - (w.y + w.h);
+    if (g !== undefined && g > -0.5 && (best === undefined || g < best)) best = Math.max(g, 0);
+  });
+  if (best !== undefined) return { width: best, inner: true };
+  if (!outer) return { width: 0, inner: false };
+  const m =
+    side === 'l'
+      ? w.x - outer.x
+      : side === 'r'
+        ? outer.x + outer.w - (w.x + w.w)
+        : side === 't'
+          ? w.y - outer.y
+          : outer.y + outer.h - (w.y + w.h);
+  return { width: Math.max(m, 0), inner: false };
+}
+
 /**
- * 格子之間框線粗細改成原本的 scale 倍：每一格往內縮（變粗）或往外長（變細，0＝貼在一起）。
- * 沒有相鄰格子（只有一格）就不動。
+ * 框線粗細改成原本的 scale 倍（0＝沒有框線）：每一格四周的框線都一起變——格子之間的空隙變 scale 倍、
+ * 格子離外框邊的距離也變 scale 倍（拍立得的白邊也是）。每一格往內縮（變粗）或往外長（變細）。
+ * 完全沒有框線可調的版型（格子貼滿又沒有外框）就不動。
  */
 export function applyLineScale(b: ReturnType<LayoutDef['build']>, scale: number) {
-  const gap = cellGap(b.windows);
   const s = Math.min(Math.max(scale, 0), LINE_MAX);
-  if (gap === undefined || Math.abs(s - 1) < 1e-3) return b;
-  const d = (gap * (s - 1)) / 2;
+  if (Math.abs(s - 1) < 1e-3 || !hasFrameLine(b)) return b;
+  const outer = b.panels.length ? unionRect(b.panels) : null;
   return {
     ...b,
-    windows: b.windows.map((w) => ({
-      x: w.x + d,
-      y: w.y + d,
-      w: Math.max(w.w - 2 * d, 1),
-      h: Math.max(w.h - 2 * d, 1),
-    })),
+    windows: b.windows.map((w, i) => {
+      // 隔壁有格子：空隙兩邊各負擔一半；外框邊：整條都是這一格的
+      const grow = (side: 'l' | 'r' | 't' | 'b') => {
+        const e = edgeLine(b.windows, i, side, outer);
+        return (e.width * (1 - s)) / (e.inner ? 2 : 1); // 往外長為正、往內縮為負
+      };
+      const gl = grow('l');
+      const gr = grow('r');
+      const gt = grow('t');
+      const gb = grow('b');
+      return {
+        x: w.x - gl,
+        y: w.y - gt,
+        w: Math.max(w.w + gl + gr, 1),
+        h: Math.max(w.h + gt + gb, 1),
+      };
+    }),
   };
+}
+
+function unionRect(rs: Rect[]): Rect {
+  const l = Math.min(...rs.map((r) => r.x));
+  const t = Math.min(...rs.map((r) => r.y));
+  return rect(l, t, Math.max(...rs.map((r) => r.x + r.w)) - l, Math.max(...rs.map((r) => r.y + r.h)) - t);
+}
+
+/** 這個版型有沒有可以調粗細的框線（格子之間有空隙，或格子離外框邊有距離） */
+export function hasFrameLine(b: ReturnType<LayoutDef['build']>): boolean {
+  if (cellGap(b.windows) !== undefined) return true;
+  if (!b.panels.length) return false;
+  const outer = unionRect(b.panels);
+  return b.windows.some((w) =>
+    (['l', 'r', 't', 'b'] as const).some((side) => edgeLine([w], 0, side, outer).width > 0.5),
+  );
 }
 
 /** 照形狀找出版型定義（自訂格數＝依列欄產生） */
@@ -462,9 +522,14 @@ export function buildIn(
   H: number,
   box?: { w: number; h: number },
   line?: number,
+  cells?: Rect[],
 ): ReturnType<LayoutDef['build']> {
   const b0 = buildBox(def, W, H, box);
-  return line === undefined ? b0 : applyLineScale(b0, line);
+  const b = line === undefined ? b0 : applyLineScale(b0, line);
+  // 使用者在預覽上拖過格子大小：格子範圍照記下來的（比例 × 畫面），外框的底板不動
+  if (cells && cells.length === b.windows.length)
+    return { ...b, windows: cells.map((c) => ({ x: c.x * W, y: c.y * H, w: c.w * W, h: c.h * H })) };
+  return b;
 }
 
 function buildBox(
@@ -506,8 +571,9 @@ export function paintFrame(
   opacity = 1,
   box?: { w: number; h: number },
   line?: number,
+  cells?: Rect[],
 ) {
-  const b = buildIn(def, W, H, box, line);
+  const b = buildIn(def, W, H, box, line, cells);
   const rr = (r: Rect, radius: number) => {
     ctx.roundRect(r.x, r.y, r.w, r.h, Math.min(radius, r.w / 2, r.h / 2));
   };
@@ -538,11 +604,12 @@ export async function renderFramePng(
   opacity = 1,
   box?: { w: number; h: number },
   line?: number,
+  cells?: Rect[],
 ): Promise<Blob> {
   const c = document.createElement('canvas');
   c.width = Math.round(W);
   c.height = Math.round(H);
-  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity, box, line);
+  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity, box, line, cells);
   return new Promise((ok, bad) =>
     c.toBlob((b) => (b ? ok(b) : bad(new Error('外框轉成圖片失敗'))), 'image/png'),
   );
@@ -576,7 +643,7 @@ export function coverCrop(asset: Pick<Asset, 'width' | 'height'>, win: Rect): Cr
   return isNoCrop(crop) ? undefined : crop;
 }
 
-/** 一格的疊加物件：素材置中裁好、填滿那個洞；記下格子的位置（之後在裁切模式調整範圍時，畫面還是填滿這個洞） */
+/** 一格的疊加物件：整張素材置中、蓋滿那個洞（不裁切，畫面被格子範圍遮住）；記下格子的位置（之後在裁切模式調整範圍時，畫面還是填滿這個洞） */
 export function cellItem(
   asset: Asset,
   win: Rect,
@@ -587,10 +654,10 @@ export function cellItem(
   group: string,
 ): VideoItem {
   const item = createOverlayClip(asset, start);
-  const crop = coverCrop(asset, win);
   item.duration = Math.max(duration, 0.2);
-  if (crop) item.crop = crop;
-  item.transform = cellTransform(asset, crop, win, W, H);
+  // 不預先裁切（2026-11-16）：整張素材蓋滿這一格的大小放進去，畫面用格子範圍遮住（scene 的 groupClipFor）；
+  // 拖移、放大縮小時露出的是同一張素材在格子外的部分，不會露出底下的影像
+  item.transform = cellTransform(asset, undefined, win, W, H);
   item.cell = { x: win.x / W, y: win.y / H, w: win.w / W, h: win.h / H };
   item.group = group;
   return item;

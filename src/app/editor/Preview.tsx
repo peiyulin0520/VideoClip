@@ -1,4 +1,7 @@
-import { cellTracksOf, frameOfGroup, isFrameItem } from '../../engine/layoutTracks';
+import { cellItems } from '../../engine/cellGap';
+import type { GeoCtx } from '../../engine/geometry';
+import { cellsOf, frameOfGroup, isFrameItem } from '../../engine/layoutTracks';
+import type { Item, Project } from '../../model/types';
 import { groupClipArea } from '../../engine/scene';
 import { showPlaceholders } from '../../engine/placeholder';
 import { Layers, Maximize, Minimize, ShieldCheck } from 'lucide-react';
@@ -23,6 +26,8 @@ import { useSmooth } from '../../engine/previewQuality';
 import { useQuality } from '../../store/qualityStore';
 import { AspectOverlay } from './AspectOverlay';
 import { LayoutResize } from './LayoutResize';
+import { LayoutCellResize } from './LayoutCellResize';
+import { KineticAreaEdit } from './KineticAreaEdit';
 import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
 import { useCrop } from '../../store/cropStore';
@@ -85,6 +90,11 @@ export function Preview({
   const [kfTime, setKfTime] = useState(0); // 專案裡有定格（關鍵影格）時，跟著播放頭更新選取框與觸控區的位置
   const [hitIds, setHitIds] = useState(''); // 這一秒可以拖的物件（逗號分隔），給觸控區用
   const [peek, setPeek] = useState(false); // 「查看圖層」清單
+  const [playing, setPlaying] = useState(false); // 播放中：編輯用的框線、編號全部收起來
+  const [curT, setCurT] = useState(0); // 暫停時播放頭的時間（格子編號只畫這一刻看得到的版型）
+  const [holdSnap, setHoldSnap] = useState<string | null>(null); // 換預覽畫質、重建預覽引擎時，先頂著舊畫面
+  const [dim, setDim] = useState({ ww: 0, wh: 0, bw: 0, bh: 0 }); // 預覽區與底的大小（斜線要蓋到底的外面）
+  const wrapRef = useRef<HTMLDivElement>(null);
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
@@ -96,6 +106,20 @@ export function Preview({
   const [slow, setSlow] = useState(false);
   const smooth = useSmooth(quality, project, slow);
   const fontEpoch = useFonts((s) => s.epoch); // 字體載入完成：字卡大小可能變，選取框要重算
+  // 換畫質會重建預覽引擎（新的畫布一開始是空的）：換之前先把現在這一格存起來頂著，新的畫好才拿掉，不會跳一下
+  const snapshotNow = useRef(() => {});
+  useEffect(() => {
+    snapshotNow.current = () => {
+      const c = canvasRef.current;
+      if (!c || c.width < 2) return;
+      try {
+        setHoldSnap(c.toDataURL('image/jpeg', 0.8));
+      } catch {
+        /* 存不了就算了（會閃一下） */
+      }
+    };
+  });
+  useEffect(() => useQuality.subscribe(() => snapshotNow.current()), []);
 
   // ---- 建立 / 銷毀播放引擎（含 Pixi 合成器）----
   // 比例改了（寬高變了）會重建；記住舊的播放時間，重建後回到同一個位置（換專案則歸 0）
@@ -114,6 +138,7 @@ export function Preview({
       smooth,
       onSlow: () => {
         if (useQuality.getState().q === 'auto') {
+          snapshotNow.current();
           setSlow(true);
           toast('播放有點吃力，預覽自動改成「流暢」（匯出不受影響）', 6000);
         }
@@ -125,6 +150,14 @@ export function Preview({
       useUI.setState({ player });
       const resume = resumeRef.current;
       player.seek(resume && resume.projectId === projectId ? resume.time : 0);
+      // 舊畫面頂到新的畫好為止（最多 2 秒）
+      const t0 = performance.now();
+      const wait = () => {
+        if (cancelled) return;
+        if (player.settled || performance.now() - t0 > 2000) setHoldSnap(null);
+        else requestAnimationFrame(wait);
+      };
+      requestAnimationFrame(wait);
       const unsubProject = useProjectStore.subscribe((s, prev) => {
         if (s.project !== prev.project) player.refresh();
       });
@@ -150,8 +183,15 @@ export function Preview({
   useEffect(() => {
     const el = baseRef.current!;
     const frame = stageRef.current!;
-    const ro = new ResizeObserver(() => setCssW(frame.clientWidth || 1));
+    const wrap = wrapRef.current!;
+    const measure = () => {
+      setCssW(frame.clientWidth || 1);
+      setDim({ ww: wrap.clientWidth, wh: wrap.clientHeight, bw: el.clientWidth, bh: el.clientHeight });
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(frame);
+    ro.observe(wrap);
+    ro.observe(el);
     // iOS Safari：雙指在預覽上不要變成整頁縮放（touch-action 之外的保險）
     const stop = (e: Event) => e.preventDefault();
     el.addEventListener('gesturestart', stop);
@@ -177,6 +217,8 @@ export function Preview({
         lastKf = now;
         setKfTime(p && p.tracks.some((tr) => tr.items.some(hasKeyframes)) ? t : 0);
       }
+      setPlaying(!!playing);
+      if (!playing) setCurT(t);
       setSelVisible(!!f && t >= f.item.start && t < f.item.start + f.item.duration);
       // 字串相同 React 不會重畫，播放時不會每一格都重畫
       setHitIds(
@@ -202,6 +244,10 @@ export function Preview({
   const box = sel && selVisible ? selectionBox(sel.item, geo) : null;
   const selLocked = !!sel?.track.locked || !!sel?.track.hidden;
   const layoutEdit = useUI((s) => s.layoutEdit);
+  const cellEdit = useUI((s) => s.cellEdit);
+  const kineticEdit = useUI((s) => s.kineticEdit);
+  const keItem = kineticEdit ? findItem(rproject, kineticEdit.id)?.item : undefined;
+  const ceFrame = cellEdit ? (frameOfGroup(rproject.tracks, cellEdit.group)?.item ?? null) : null;
   const lrFrame = layoutEdit ? (frameOfGroup(rproject.tracks, layoutEdit.group)?.item ?? null) : null;
   // 選到版型裡的素材（素材層）：把「畫面只露出來的範圍」畫成虛線框（版型旋轉也跟著轉），知道超出去的部分不會出現
   const clipPts = useMemo(() => {
@@ -243,12 +289,27 @@ export function Preview({
   const hitsAt = (pt: Pt) => {
     const st = useProjectStore.getState();
     const t = useUI.getState().player?.time ?? 0;
-    return hitTestAll(visibleLayers(timeResolved(st.project!, t), t), geo, pt.x, pt.y, 40 / k);
+    const rp = timeResolved(st.project!, t);
+    const hits = hitTestAll(visibleLayers(rp, t), geo, pt.x, pt.y, 40 / k);
+    // 格子裡的影像沒有預先裁切，方框可能超出那一格：只有點在自己那一格的範圍內才算點到它
+    return hits.filter((l) => {
+      const it = l.item;
+      if (it.type === 'text' || it.type === 'audio' || !it.cell || !it.group) return true;
+      const fr = frameOfGroup(rp.tracks, it.group);
+      const poly = fr ? groupClipArea(it, fr.item, geo, width, height, { x: 0, y: 0 }) : undefined;
+      return !poly || pointInPoly(poly, pt.x, pt.y);
+    });
   };
 
   const onPointerDown = (e: RPointerEvent) => {
     if ((e.target as HTMLElement).closest('[data-handle]')) return;
-    if (useUI.getState().frameEdit || useUI.getState().layoutEdit) return; // 正在調自訂比例／版型大小：預覽上的東西先不能動
+    if (
+      useUI.getState().frameEdit ||
+      useUI.getState().layoutEdit ||
+      useUI.getState().cellEdit ||
+      useUI.getState().kineticEdit
+    )
+      return; // 正在調自訂比例／版型大小：預覽上的東西先不能動
     baseRef.current!.setPointerCapture(e.pointerId);
     const pt = toProj(e);
     pointers.current.set(e.pointerId, pt);
@@ -418,8 +479,23 @@ export function Preview({
   const fr = fl + lay.fx * 100;
   const fb = ft + lay.fy * 100;
 
+  // 斜線：預覽區裡所有不會輸出的地方（底裡面版面外面、底左右兩側的黑邊）；中間挖掉版面
+  const bx0 = (dim.ww - dim.bw) / 2;
+  const by0 = (dim.wh - dim.bh) / 2;
+  const fx0 = bx0 + (fl / 100) * dim.bw;
+  const fy0 = by0 + (ft / 100) * dim.bh;
+  const fx1 = bx0 + (fr / 100) * dim.bw;
+  const fy1 = by0 + (fb / 100) * dim.bh;
+  const sideBars = dim.ww - dim.bw > 1 || dim.wh - dim.bh > 1;
+  const hatch =
+    dim.ww > 0 && (hasOut || sideBars)
+      ? `polygon(evenodd, 0 0, ${dim.ww}px 0, ${dim.ww}px ${dim.wh}px, 0 ${dim.wh}px, 0 0, ${fx0}px ${fy0}px, ${fx0}px ${fy1}px, ${fx1}px ${fy1}px, ${fx1}px ${fy0}px, ${fx0}px ${fy0}px)`
+      : null;
+  // 預覽上每一格的編號（暫停、編輯時才有；匯出不會有）
+  const badges = !playing && !cropping ? cellBadges(rproject, curT, geo, width, height) : [];
+
   return (
-    <div className="stage-wrap">
+    <div className="stage-wrap" ref={wrapRef}>
       <div
         ref={baseRef}
         className="stage-base"
@@ -435,6 +511,9 @@ export function Preview({
           ref={canvasRef}
           data-testid="preview-canvas"
         />
+        {holdSnap && (
+          <img className="frame-hold" data-testid="frame-hold" src={holdSnap} alt="" aria-hidden="true" />
+        )}
         <div ref={poolRef} className="pool" aria-hidden="true" />
         <PerfOverlay player={player} />
         {gradePeek && (
@@ -445,14 +524,6 @@ export function Preview({
         <AspectOverlay baseRef={baseRef} />
         {hasOut && (
           <>
-            <div
-              className="out-hatch"
-              data-testid="out-hatch"
-              aria-hidden="true"
-              style={{
-                clipPath: `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${fl}% ${ft}%, ${fl}% ${fb}%, ${fr}% ${fb}%, ${fr}% ${ft}%, ${fl}% ${ft}%)`,
-              }}
-            />
             <div className="out-label" aria-hidden="true">
               框內是影片輸出範圍 · {aspectLabel(project)}
             </div>
@@ -479,10 +550,10 @@ export function Preview({
               </div>
             </div>
           )}
-          {guides.x !== null && <div className="guide v" style={{ left: guides.x * k }} />}
-          {guides.y !== null && <div className="guide h" style={{ top: guides.y * k }} />}
+          {!playing && guides.x !== null && <div className="guide v" style={{ left: guides.x * k }} />}
+          {!playing && guides.y !== null && <div className="guide h" style={{ top: guides.y * k }} />}
 
-          {clipPts && !cropping && (
+          {clipPts && !cropping && !playing && (
             <>
               <svg
                 className="clip-area"
@@ -493,25 +564,25 @@ export function Preview({
               >
                 <polygon points={clipPts.map((p) => p.join(',')).join(' ')} />
               </svg>
-              <span
-                className="clip-tag"
-                style={{
-                  left: Math.min(...clipPts.map((p) => p[0])) * k + 4,
-                  top: Math.min(...clipPts.map((p) => p[1])) * k + 4,
-                }}
-              >
-                {sel &&
-                sel.item.type !== 'text' &&
-                sel.item.type !== 'audio' &&
-                sel.item.cell &&
-                sel.item.group
-                  ? `第 ${cellTracksOf(rproject.tracks, sel.item.group).findIndex((t) => t.id === sel.track.id) + 1} 格`
-                  : '只露出這個範圍'}
-              </span>
+              {!(sel && sel.item.type !== 'text' && sel.item.type !== 'audio' && sel.item.cell) && (
+                <span
+                  className="clip-tag"
+                  style={{
+                    left: Math.min(...clipPts.map((p) => p[0])) * k + 4,
+                    top: Math.min(...clipPts.map((p) => p[1])) * k + 4,
+                  }}
+                >
+                  只露出這個範圍
+                </span>
+              )}
             </>
           )}
-          {lrFrame && <LayoutResize frame={lrFrame} geo={geo} k={k} />}
-          {box && sel && !cropping && (
+          {lrFrame && !playing && <LayoutResize frame={lrFrame} geo={geo} k={k} />}
+          {ceFrame && !playing && <LayoutCellResize frame={ceFrame} geo={geo} k={k} W={width} H={height} />}
+          {keItem && keItem.type === 'text' && !playing && (
+            <KineticAreaEdit item={keItem} k={k} W={width} H={height} />
+          )}
+          {box && sel && !cropping && !playing && (
             <div
               className={`selbox${selLocked ? ' locked' : ''}${sel.item.group && !isFrameItem(sel.item) ? ' member' : ''}`}
               data-level={sel.item.group ? (isFrameItem(sel.item) ? 'group' : 'member') : undefined}
@@ -525,6 +596,17 @@ export function Preview({
               }}
             />
           )}
+          {badges.map((b) => (
+            <span
+              key={b.key}
+              className="cell-badge"
+              data-testid="preview-cell-no"
+              aria-hidden="true"
+              style={{ left: b.x * k + 5, top: b.y * k + 5 }}
+            >
+              {b.n}
+            </span>
+          ))}
           {!cropping &&
             hitBoxes.map(({ id, b }) => {
               const pad = id === selectedId ? 40 / k : 0; // 選取中的物件觸控區外擴 40px，雙指比較好放（再大就擋住預覽上的捲頁面）
@@ -552,6 +634,9 @@ export function Preview({
             })}
         </div>
       </div>
+      {hatch && (
+        <div className="out-hatch" data-testid="out-hatch" aria-hidden="true" style={{ clipPath: hatch }} />
+      )}
       {emptyAction && (
         <button className="empty-import" onClick={emptyAction}>
           ＋ 匯入影片或照片
@@ -596,3 +681,39 @@ export function Preview({
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
+/** 這一刻看得到的版型，每一格左上角的位置（專案座標）與編號；版型旋轉、縮放也跟著 */
+function cellBadges(
+  p: Project,
+  t: number,
+  ctx: GeoCtx,
+  W: number,
+  H: number,
+): { key: string; n: number; x: number; y: number }[] {
+  const out: { key: string; n: number; x: number; y: number }[] = [];
+  for (const tr of p.tracks)
+    for (const it of tr.items) {
+      if (!isFrameItem(it) || t < it.start || t >= it.start + it.duration) continue;
+      // 一格有好幾列時只標一個編號（格號 cellNo）
+      for (const cell of cellsOf(p.tracks, it.group!)) {
+        const c = cell.tracks[0]!;
+        const box = cell.rect ?? cellItems(c)[0]?.cell;
+        if (!box) continue;
+        const probe = { type: 'image', group: it.group, cell: box } as unknown as Item;
+        const pts = groupClipArea(probe, it, ctx, W, H, { x: 0, y: 0 }, true);
+        if (pts) out.push({ key: c.id, n: cell.no, x: pts[0]![0], y: pts[0]![1] });
+      }
+    }
+  return out;
+}
+
+/** 點是不是在多邊形裡（射線法） */
+function pointInPoly(poly: [number, number][], x: number, y: number): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]!;
+    const [xj, yj] = poly[j]!;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}

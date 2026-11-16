@@ -82,4 +82,13 @@ describe('motionOffset：捲動、滑入滑出', () => {
   it('沒有動畫＝不動', () => {
     expect(motionOffset(undefined, 1, 4)).toEqual({ x: 0, y: 0 });
   });
+  it('捲動（有大小）：開頭剛好整個在畫面下面外面、中間在正中、結尾剛好整個在畫面上面外面（持續整段）', () => {
+    const size = { w: 1, h: 0.4 };
+    const reach = 0.5 + 0.4 / 2;
+    expect(motionOffset('drift', 0, 8, size).y).toBeCloseTo(reach);
+    expect(motionOffset('drift', 4, 8, size).y).toBeCloseTo(0);
+    expect(motionOffset('drift', 8, 8, size).y).toBeCloseTo(-reach);
+    // 整段一直在動（不是只有進場／出場那一小段）
+    expect(motionOffset('drift', 3, 8, size).y).toBeGreaterThan(motionOffset('drift', 5, 8, size).y);
+  });
 });

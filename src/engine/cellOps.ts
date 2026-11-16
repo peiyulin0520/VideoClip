@@ -1,7 +1,7 @@
 import type { Asset, Item, Track, VideoItem } from '../model/types';
 import { cellItems } from './cellGap';
 import { cellRect, cellItem } from './layouts';
-import { cellTracksOf, frameOfGroup } from './layoutTracks';
+import { cellNoOf, cellsOf, cellTracksOf, frameOfGroup } from './layoutTracks';
 import { findFreeStart } from './timeline';
 
 // 版型的一格可以有多個素材（影片、照片、色塊）。這裡是「排時間」的純函式（不碰 store），store 的動作包起來用。
@@ -72,8 +72,9 @@ export function rippleAfter(
   const cells = cellTracksOf(tracks, group);
   const mine = cells[index];
   if (!mine) return tracks;
+  const myNo = cellNoOf(tracks, mine);
   let next = shiftFrom(tracks, new Set([mine.id]), at, delta);
-  const later = new Set(cells.slice(index + 1).map((c) => c.id));
+  const later = new Set(cells.filter((c) => cellNoOf(tracks, c) > myNo).map((c) => c.id));
   next = shiftFrom(next, later, -Infinity, delta);
   return fitFrameToCells(next, group);
 }
@@ -140,10 +141,17 @@ export function arrangeCells(tracks: Track[], group: string, mode: 'sync' | 'seq
   if (!fr) return tracks;
   let next = tracks;
   let cursor = fr.item.start;
-  for (const c of cellTracksOf(tracks, group)) {
-    if (cellItems(c).length === 0) continue;
-    next = packCell(next, c.id, mode === 'seq' ? cursor : fr.item.start);
-    if (mode === 'seq') cursor = cellEnd(next.find((t) => t.id === c.id)!) ?? cursor;
+  // 一格可以有好幾列（同時疊在一起播）：每一列都從這一格的起點排，這一格結束＝最晚結束的那一列
+  for (const cell of cellsOf(tracks, group)) {
+    const from = mode === 'seq' ? cursor : fr.item.start;
+    let end: number | null = null;
+    for (const c of cell.tracks) {
+      if (cellItems(c).length === 0) continue;
+      next = packCell(next, c.id, from);
+      const e = cellEnd(next.find((t) => t.id === c.id)!);
+      if (e !== null) end = Math.max(end ?? e, e);
+    }
+    if (mode === 'seq' && end !== null) cursor = end;
   }
   next = fitFrameToCells(next, group);
   const f2 = frameOfGroup(next, group)!;

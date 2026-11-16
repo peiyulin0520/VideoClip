@@ -173,7 +173,9 @@ test('版型：素材比版型短，剩下的秒數顯示色塊——反黑，�
     .toBe(true);
 });
 
-test('版型動畫：捲動——不同時間整組的位置不同；選「不動」就回到原位', async ({ page }) => {
+test('整段效果：捲動——不同時間整組的位置不同（開頭在畫面外、一路捲過、中間回到原位）；選「無」就回到原位', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '三格', ['solid-red.webm', 'solid-green.webm', 'solid-blue.webm'], '捲動');
@@ -185,16 +187,17 @@ test('版型動畫：捲動——不同時間整組的位置不同；選「不�
   const ny = cell.y + cell.h / 2;
   await seekTo(page, 0.2);
   const a = await samplePreview(page, nx, ny);
-  await seekTo(page, 2); // 捲動到中間時整組回到原位：第 1 格是紅色
+  await seekTo(page, 2.5); // 捲動到中間（5 秒的正中間）時整組回到原位：第 1 格是紅色
   await expect.poll(async () => isRed(await samplePreview(page, nx, ny))).toBe(true);
   // 開頭整組被推到畫面下方，同一個點看到的不是紅色
   expect(isRed(a)).toBe(false);
   await page.screenshot({ path: `${SHOT}/drift.png` });
-  // 動畫在特效分頁：選到整個版型（時間軸上的版型片段）→ 動畫選「不動」
+  // 整段效果在特效分頁：選到整個版型（時間軸上的版型片段）→ 整段選「無」
   await showTimeline(page);
   await page.locator(`[data-testid="clip"][data-item-id="${frame.id}"]`).tap();
   await openTab(page, '特效');
-  await page.getByRole('radio', { name: '動畫 不動' }).tap();
+  await page.getByTestId('fx-part-whole').tap();
+  await page.getByRole('radio', { name: '整段 無' }).tap();
   const frame2 = (await tracks(page)).find(isFrameTrack)!.items[0]!;
   expect(frame2.motion).toBeUndefined();
   void clips;

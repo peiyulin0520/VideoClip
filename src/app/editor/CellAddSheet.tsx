@@ -20,24 +20,29 @@ export function CellAddSheet({
   const [color, setColor] = useState('#ffd23f');
   return (
     <Sheet open title={`加到第 ${index + 1} 格`} onClose={onClose}>
-      <button className="menu-item" data-testid="cell-add-media" onClick={() => fileRef.current?.click()}>
-        影片／照片
-      </button>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="video/*,image/*"
-        multiple
-        hidden
-        data-testid="cell-add-file"
-        onChange={(e) => {
-          const files = e.target.files ? Array.from(e.target.files) : [];
-          e.target.value = '';
-          onClose();
-          void addFilesToCell(projectId, trackId, files);
-        }}
-      />
-      <div className="zone-soft" data-testid="cell-add-color-zone">
+      <section className="zone-soft" data-testid="cell-add-media-zone" aria-label="影片或照片">
+        <div className="zone-title">影片／照片</div>
+        <button className="btn" data-testid="cell-add-media" onClick={() => fileRef.current?.click()}>
+          從相簿選
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="video/*,image/*"
+          multiple
+          hidden
+          data-testid="cell-add-file"
+          onChange={(e) => {
+            const files = e.target.files ? Array.from(e.target.files) : [];
+            e.target.value = '';
+            onClose();
+            void addFilesToCell(projectId, trackId, files);
+          }}
+        />
+      </section>
+      <hr className="zone-line" aria-hidden="true" />
+      <section className="zone-soft" data-testid="cell-add-color-zone" aria-label="色塊">
+        <div className="zone-title">色塊</div>
         <ColorPicker label="色塊顏色" value={color} onPick={setColor} />
         <button
           className="btn primary"
@@ -49,7 +54,7 @@ export function CellAddSheet({
         >
           加入色塊
         </button>
-      </div>
+      </section>
     </Sheet>
   );
 }

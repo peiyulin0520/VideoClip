@@ -202,8 +202,8 @@ export function seamAudioExtent(
 
 /** 一軌上緊接在一起的同類片段（接縫處）：可以在這裡加轉場 */
 export function seamsOf(items: Item[]): { prev: Item; next: Item }[] {
-  // 版型的外框跟一般片段一樣可以接轉場；格子、版型裡的文字不行
-  const vids = items.filter((x) => x.type !== 'audio' && (!x.group || (x.type !== 'text' && !x.cell)));
+  // 版型的外框跟一般片段一樣可以接轉場；格子裡前後兩段素材之間也可以；版型裡的文字、貼圖不行
+  const vids = items.filter((x) => x.type !== 'audio' && (!x.group || (x.type !== 'text' && !x.member)));
   const out: { prev: Item; next: Item }[] = [];
   for (const next of vids) {
     const prev = vids.find(

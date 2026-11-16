@@ -15,7 +15,7 @@ type UI = {
   /** 要求底部工具列切到某個分頁（例如點時間軸上的轉場小圓圈 → 特效）；工具列切完會清掉 */
   requestTab: string | null;
   /** 特效分頁／時間軸上目前選的是哪一塊（進場、出場、跟前一段的轉場）：時間軸的圓圈用它顯示「選取中」的顏色 */
-  fxFocus: { id: string; role: 'in' | 'out' | 'seam' | 'style' } | null;
+  fxFocus: { id: string; role: 'in' | 'out' | 'seam' | 'style' | 'whole' } | null;
   /** 播放列的 👁：暫時看原色（整個專案不套調色；不改專案資料） */
   gradePeek: boolean;
   /** 時間軸目前每秒幾 px：決定「播放線碰到菱形」的範圍 */
@@ -28,6 +28,10 @@ type UI = {
   addToGroupOff: boolean;
   /** 調整版型大小：預覽上正在拖版型的邊（sx、sy＝相對於開始時的寬、高倍數）；沒有＝沒在調 */
   layoutEdit: { group: string; sx: number; sy: number } | null;
+  /** 預覽上拖格子大小：cells＝草稿（每格佔畫面寬、高的比例，照格號順序） */
+  /** 預覽上調動態字卡的顯示範圍：草稿（中心 x、y 與大小 w、h，都是佔畫面的比例） */
+  kineticEdit: { id: string; x: number; y: number; w: number; h: number } | null;
+  cellEdit: { group: string; cells: { x: number; y: number; w: number; h: number }[] } | null;
 };
 
 export const useUI = create<UI>((set, get) => ({
@@ -49,6 +53,8 @@ export const useUI = create<UI>((set, get) => ({
   frameEdit: null,
   addToGroupOff: false,
   layoutEdit: null,
+  cellEdit: null,
+  kineticEdit: null,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

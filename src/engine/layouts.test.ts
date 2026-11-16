@@ -11,6 +11,7 @@ import {
   coverCrop,
   defOf,
   GRID_MAX,
+  hasFrameLine,
   LINE_MAX,
   gridDef,
   LAYOUTS,
@@ -66,7 +67,7 @@ const asset = (w: number, h: number, kind: Asset['kind'] = 'video'): Asset => ({
   thumbs: [],
 });
 
-describe('每一格的物件：素材裁好、剛好填滿格子', () => {
+describe('每一格的物件：整張素材蓋滿格子（不預先裁切）', () => {
   const W = 1080;
   const H = 1920;
   const ctx = (a: Asset): GeoCtx => ({
@@ -88,12 +89,15 @@ describe('每一格的物件：素材裁好、剛好填滿格子', () => {
     [3840, 2160],
   ] as const)
     for (const win of wins)
-      it(`素材 ${aw}×${ah} 放進 ${Math.round(win.w)}×${Math.round(win.h)} 的格子：方框剛好等於格子`, () => {
+      it(`素材 ${aw}×${ah} 放進 ${Math.round(win.w)}×${Math.round(win.h)} 的格子：整張蓋滿格子、不裁切`, () => {
         const a = asset(aw, ah);
         const item = cellItem(a, win, W, H, 0, 3, 'g1');
         const box = itemBox(item, ctx(a))!;
-        expect(box.w).toBeCloseTo(win.w, 1);
-        expect(box.h).toBeCloseTo(win.h, 1);
+        // 不預先裁切：整張素材蓋滿格子（至少一邊剛好等於格子、另一邊超出，超出的部分由格子範圍遮住）
+        expect(box.w).toBeGreaterThanOrEqual(win.w - 0.01);
+        expect(box.h).toBeGreaterThanOrEqual(win.h - 0.01);
+        expect(Math.min(box.w - win.w, box.h - win.h)).toBeCloseTo(0, 1);
+        expect(item.crop).toBeUndefined();
         expect(box.cx).toBeCloseTo(win.x + win.w / 2, 1);
         expect(box.cy).toBeCloseTo(win.y + win.h / 2, 1);
         expect(item.type).toBe(a.kind);
@@ -203,13 +207,37 @@ describe('格子之間的框線粗細', () => {
     expect(gapOf(applyLineScale(b0, 99))).toBeCloseTo(g * LINE_MAX, 3); // 上限 3 倍
     for (const w of applyLineScale(b0, 3).windows) expect(w.w).toBeGreaterThan(0);
   });
-  it('buildIn 帶 line；每個內建多格版型都有框線可調，拍立得（一格）沒有', () => {
-    for (const d of LAYOUTS) {
-      const gap = cellGap(d.build(1080, 1920).windows);
-      if (d.cells === 1) expect(gap).toBeUndefined();
-      else expect(gap).toBeGreaterThan(0);
-    }
-    const thick = buildIn(gridDef(1, 2), 1000, 1000, undefined, 2);
-    expect(gapOf(thick)).toBeCloseTo(gapOf(b0) * 2, 3);
+  it('applyLineScale：格子離外框邊的距離也一起變（拍立得的白邊）；每個內建版型都有框線可調', () => {
+    for (const d of LAYOUTS) expect(hasFrameLine(d.build(1080, 1920))).toBe(true);
+    // 兩格：外圍邊距也變 2 倍
+    const m0 = b0.windows[0]!.x - b0.panels[0]!.x;
+    const t2 = applyLineScale(b0, 2);
+    expect(t2.windows[0]!.x - b0.panels[0]!.x).toBeCloseTo(m0 * 2, 3);
+    expect(applyLineScale(b0, 0).windows[0]!.x).toBeCloseTo(b0.panels[0]!.x, 3);
+    // 一格（拍立得）：四邊的白邊都變
+    const pol = LAYOUTS.find((d) => d.cells === 1)!.build(1080, 1920);
+    const thick = applyLineScale(pol, 2);
+    expect(thick.windows[0]!.w).toBeLessThan(pol.windows[0]!.w);
+    // 完全沒有框線（格子貼滿、沒有外框）的版型不動
+    const flat = { windows: [{ x: 0, y: 0, w: 100, h: 100 }], panels: [], holes: [], radius: 0 };
+    expect(applyLineScale(flat, 2)).toBe(flat);
+    const thick2 = buildIn(gridDef(1, 2), 1000, 1000, undefined, 2);
+    expect(gapOf(thick2)).toBeCloseTo(gapOf(b0) * 2, 3);
+  });
+});
+
+describe('自訂每一格的範圍（拖格子大小）', () => {
+  it('buildIn 有 cells 且格數對＝格子照 cells（比例 × 畫面）、外框底板不動；格數不對就忽略', () => {
+    const d = gridDef(1, 2);
+    const base = buildIn(d, 1000, 2000);
+    const cells = [
+      { x: 0.1, y: 0.1, w: 0.8, h: 0.5 },
+      { x: 0.1, y: 0.65, w: 0.8, h: 0.2 },
+    ];
+    const b = buildIn(d, 1000, 2000, undefined, undefined, cells);
+    expect(b.windows[0]).toEqual({ x: 100, y: 200, w: 800, h: 1000 });
+    expect(b.windows[1]).toEqual({ x: 100, y: 1300, w: 800, h: 400 });
+    expect(b.panels).toEqual(base.panels);
+    expect(buildIn(d, 1000, 2000, undefined, undefined, [cells[0]!]).windows).toEqual(base.windows);
   });
 });

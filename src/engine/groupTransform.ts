@@ -56,10 +56,16 @@ export function motionOffset(
   motion: 'drift' | 'slide' | undefined,
   localT: number,
   duration: number,
+  /** 這個東西占畫面寬、高的比例（0–1）。捲動用它算「剛好從畫面外面進來、捲到剛好出去」；沒給＝舊的小幅度捲動（±0.35） */
+  size?: { w: number; h: number },
 ): { x: number; y: number } {
   if (!motion || duration <= 0) return { x: 0, y: 0 };
   const p = Math.min(Math.max(localT / duration, 0), 1);
-  if (motion === 'drift') return { x: 0, y: 0.35 - 0.7 * p };
+  if (motion === 'drift') {
+    if (!size) return { x: 0, y: 0.35 - 0.7 * p };
+    const reach = 0.5 + Math.min(size.h, 2) / 2; // 中心離畫面中心多遠＝剛好整個在畫面外
+    return { x: 0, y: reach - 2 * reach * p };
+  }
   const inLen = Math.min(0.8, duration / 3);
   const outLen = Math.min(0.6, duration / 3);
   const enter = Math.min(Math.max(localT / inLen, 0), 1);

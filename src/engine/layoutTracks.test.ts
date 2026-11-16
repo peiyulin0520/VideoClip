@@ -55,3 +55,40 @@ describe('layoutTracks', () => {
     expect(normalizeGroupTracks(tracks)).toBe(tracks);
   });
 });
+
+describe('格號：cellsOf／ensureCellNos', () => {
+  const T = (id: string, extra: Partial<Track> = {}) =>
+    ({ id, kind: 'media', name: id, hidden: false, locked: false, items: [], ...extra }) as Track;
+  it('舊資料沒有 cellNo：照順序補 1、2、3；已經有的不動；都有了回傳同一個陣列', async () => {
+    const { ensureCellNos, cellNoOf } = await import('./layoutTracks');
+    const tracks = [
+      T('a', { group: 'g', groupRole: 'cell' }),
+      T('b', { group: 'g', groupRole: 'cell' }),
+      T('m'),
+    ];
+    expect(tracks.map((t) => cellNoOf(tracks, t))).toEqual([1, 2, 0]); // 還沒補之前照順序
+    const fixed = ensureCellNos(tracks);
+    expect(fixed.map((t) => t.cellNo)).toEqual([1, 2, undefined]);
+    expect(ensureCellNos(fixed)).toBe(fixed);
+    const keep = ensureCellNos([
+      T('x', { group: 'g', groupRole: 'cell', cellNo: 2 }),
+      T('y', { group: 'g', groupRole: 'cell' }),
+    ]);
+    expect(keep.map((t) => t.cellNo)).toEqual([2, 1]);
+  });
+  it('cellsOf：同一格的列併在一起，格子照格號排；rowsOfCell 回傳同一格的列', async () => {
+    const { cellsOf, rowsOfCell } = await import('./layoutTracks');
+    const tracks = [
+      T('r1', { group: 'g', groupRole: 'cell', cellNo: 1, cell: { x: 0, y: 0, w: 0.5, h: 1 } }),
+      T('r3', { group: 'g', groupRole: 'cell', cellNo: 2, cell: { x: 0.5, y: 0, w: 0.5, h: 1 } }),
+      T('r2', { group: 'g', groupRole: 'cell', cellNo: 1 }),
+    ];
+    const cells = cellsOf(tracks, 'g');
+    expect(cells.map((c) => [c.no, c.tracks.map((t) => t.id)])).toEqual([
+      [1, ['r1', 'r2']],
+      [2, ['r3']],
+    ]);
+    expect(cells[0]!.rect).toEqual({ x: 0, y: 0, w: 0.5, h: 1 });
+    expect(rowsOfCell(tracks, tracks[2]!).map((t) => t.id)).toEqual(['r1', 'r2']);
+  });
+});

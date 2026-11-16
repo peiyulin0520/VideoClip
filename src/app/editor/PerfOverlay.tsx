@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Player } from '../../engine/player';
+import { QUALITY_LABELS } from '../../engine/previewQuality';
+import { useQuality } from '../../store/qualityStore';
 
 export const PERF_KEY = 'vc-perf';
 export const isPerfOn = (): boolean => {
@@ -28,6 +30,7 @@ export function PerfOverlay({ player }: { player: Player | null }) {
     const id = window.setInterval(() => setS(player.stats()), 500);
     return () => window.clearInterval(id);
   }, [player]);
+  const q = useQuality((x) => x.q);
   if (!player || !isPerfOn() || !s) return null;
   const f = (n: number) => n.toFixed(1);
   return (
@@ -38,7 +41,17 @@ export function PerfOverlay({ player }: { player: Player | null }) {
       <div>
         場景 {f(s.buildMs)}｜影片上傳 {f(s.uploadMs)}｜合成 {f(s.compMs)}
       </div>
-      <div>掉格 {s.dropped}</div>
+      <div>
+        掉格 {s.dropped}｜最低 {f(s.fpsMin)} fps
+      </div>
+      <div>
+        畫質 {QUALITY_LABELS[q]} {s.canvas}｜解碼器 {s.decoders}/{s.pool}
+      </div>
+      {s.sources.map((x, i) => (
+        <div key={i}>
+          影片{i + 1} {x}
+        </div>
+      ))}
       {s.transition.frames > 0 && (
         <div>
           最近轉場 {s.transition.frames} 格｜卡頓 {s.transition.drops}｜硬跳 {s.transition.hardSeeks}
