@@ -77,7 +77,7 @@ export const FX_SWAP: KineticDef[] = [
       for (let i = 0; i < n; i++) {
         const dur = 0.35 + i * 0.28;
         let ch: string;
-        let sy = 1;
+        let sy: number;
         if (tt < dur) {
           const st = tt * rate;
           const si = Math.floor(st);
