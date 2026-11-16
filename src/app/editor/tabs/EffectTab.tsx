@@ -230,9 +230,7 @@ function StyleBlock({ item }: { item: Item }) {
               />
             ))}
       </div>
-      {kin && kdef && item.type === 'text' && (
-        <KineticSettings item={item} def={kdef} wordCount={words.length} />
-      )}
+      {kin && kdef && item.type === 'text' && <KineticSettings item={item} def={kdef} words={words} />}
     </>
   );
 }
@@ -253,10 +251,10 @@ const KINETIC_FADES: [KineticFade, string][] = [
 ];
 
 /** 動態字卡的設定：顏色（字色、強調色、底色，都能自訂）、顯示範圍（調整範圍、邊緣淡出）、速度與一輪幾秒 */
-function KineticSettings({ item, def, wordCount }: { item: TextItem; def: KineticDef; wordCount: number }) {
+function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef; words: string[] }) {
   const k = item.kinetic!;
   const sch = SCHEMES[def.scheme];
-  const len = def.len(wordCount);
+  const len = def.len(words);
   const speed = k.speed ?? 1;
   const fade = k.fade ?? def.fade ?? 'none';
   const bg = resolveBg(k.bg);

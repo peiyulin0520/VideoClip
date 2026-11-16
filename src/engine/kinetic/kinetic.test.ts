@@ -22,6 +22,7 @@ function fakeCtx() {
     },
     set(_t, k: string, v) {
       state[k] = v;
+      log.push(`set ${k}=${typeof v === 'number' ? v.toFixed(3) : String(v)}`);
       if (k === 'font') font = String(v);
       return true;
     },
@@ -105,7 +106,9 @@ describe('動態字卡：每一式', () => {
         f.draw(s, t);
         return log.join('\n');
       };
-      for (const t of [0, f.poster, 1.1, 3.7, 9.2]) expect(run(t).length, `t=${t}`).toBeGreaterThan(0);
+      // 代表秒數一定畫得出東西；其他時間（例如剛開始、兩輪之間的空檔）可以是空的，但不能出錯
+      expect(run(f.poster).length, `poster=${f.poster}`).toBeGreaterThan(0);
+      for (const t of [0, 1.1, 3.7, 9.2]) expect(() => run(t), `t=${t}`).not.toThrow();
       expect(run(f.poster)).toBe(run(f.poster));
       // 真的在動：不同時間點之間至少有兩種不同的畫面
       expect(new Set([0.1, 0.25, f.poster, 1.3, 4.1].map((t) => run(t))).size).toBeGreaterThan(1);

@@ -37,8 +37,8 @@ export type KineticDef = {
   words: string[];
   /** 代表畫面的秒數（卡片縮圖用） */
   poster: number;
-  /** 一輪多少秒（n＝詞的數量）；連續跑的（跑馬燈）回傳 null */
-  len: (n: number) => number | null;
+  /** 一輪多少秒（words＝字卡拆出來的詞）；連續跑的（跑馬燈）回傳 null */
+  len: (words: string[]) => number | null;
   /** 預設框：wide＝16:9 一條（預設）、full＝整個畫面、lyrics＝歌詞框 */
   area?: KineticArea;
   /** 預設的邊緣淡出（沒給＝不淡） */
@@ -90,7 +90,7 @@ export function splitWords(text: string): string[] {
 }
 
 // ---------- 畫字 ----------
-const font = (s: Stage, px: number, weight = 900) => `${weight} ${Math.max(px, 1)}px ${s.family}`;
+export const fontOf = (s: Stage, px: number, weight = 900) => `${weight} ${Math.max(px, 1)}px ${s.family}`;
 
 /** 在 (x, y) 置中畫一個詞（y＝這一行的垂直中心）；scaleX／scaleY／rotate（度）以詞的中心為基準 */
 export function drawWord(
@@ -99,19 +99,32 @@ export function drawWord(
   x: number,
   y: number,
   px: number,
-  o: { color?: string; alpha?: number; sx?: number; sy?: number; rot?: number; weight?: number } = {},
+  o: {
+    color?: string;
+    alpha?: number;
+    sx?: number;
+    sy?: number;
+    rot?: number;
+    /** 水平歪斜（度，CSS skewX） */
+    skew?: number;
+    weight?: number;
+    /** 變形的基準點在字框（行高 1.1）上緣往下幾成處（預設 0.5＝中心；原版 transform-origin） */
+    originY?: number;
+  } = {},
 ) {
   const { g } = s;
+  const oy = ((o.originY ?? 0.5) - 0.5) * px * 1.1;
   g.save();
   g.globalAlpha *= o.alpha ?? 1;
-  g.translate(x, y);
+  g.translate(x, y + oy);
   if (o.rot) g.rotate((o.rot * Math.PI) / 180);
+  if (o.skew) g.transform(1, 0, Math.tan((o.skew * Math.PI) / 180), 1, 0, 0);
   g.scale(o.sx ?? 1, o.sy ?? 1);
-  g.font = font(s, px, o.weight);
+  g.font = fontOf(s, px, o.weight);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillStyle = o.color ?? s.fg;
-  g.fillText(word, 0, 0);
+  g.fillText(word, 0, -oy);
   g.restore();
 }
 
@@ -137,7 +150,7 @@ export function marquee(
   g.beginPath();
   g.rect(box.x, box.y, box.w, box.h);
   g.clip();
-  g.font = font(s, px, o.weight);
+  g.font = fontOf(s, px, o.weight);
   g.fillStyle = o.color ?? s.fg;
   if (!o.vertical) {
     const w = g.measureText(str).width;
@@ -213,5 +226,122 @@ export function fadeEdges(g: CanvasRenderingContext2D, W: number, H: number, fad
     if (v) g.fillRect(0, a, W, len);
     else g.fillRect(a, 0, len, H);
   }
+  g.restore();
+}
+
+// ---------- 更多共用工具（K1） ----------
+
+/** 原版 keys()：依關鍵格 [時間, 值, 緩動?] 內插；緩動套在「到這一格」的那一段 */
+export type KeyPt = [number, number, ((p: number) => number)?];
+export function keys(t: number, pts: KeyPt[]): number {
+  if (t <= pts[0]![0]) return pts[0]![1];
+  for (let i = 1; i < pts.length; i++) {
+    if (t <= pts[i]![0]) {
+      const a = pts[i - 1]!;
+      const b = pts[i]!;
+      const p = (t - a[0]) / (b[0] - a[0]);
+      return lerp(a[1], b[1], b[2] ? b[2](p) : p);
+    }
+  }
+  return pts[pts.length - 1]![1];
+}
+
+const lumaOf = (hex: string) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return 1;
+  const n = parseInt(m[1]!, 16);
+  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+};
+/** 放在某個顏色上的字用深色還是白色（原版的 var(--bg)、--hifg 那種對比色） */
+export const inkOn = (hex: string) => (lumaOf(hex) > 0.55 ? '#14161b' : '#ffffff');
+export const lightness = lumaOf;
+
+/** 一個字一個字畫（每個字各自變形；原版 .chars span）：字置中排成一行，字的變形以「字框的 (50%, oyk)」為基準（預設 88%，字的底部附近） */
+export type CharFx = {
+  sx?: number;
+  sy?: number;
+  rot?: number;
+  dx?: number;
+  dy?: number;
+  alpha?: number;
+  color?: string;
+  skew?: number;
+};
+export function drawChars(
+  s: Stage,
+  str: string,
+  cx: number,
+  cy: number,
+  px: number,
+  f: (i: number, ch: string, n: number) => CharFx,
+  o: { originY?: number; weight?: number } = {},
+) {
+  const { g } = s;
+  const chars = cs(str);
+  g.save();
+  g.font = fontOf(s, px, o.weight);
+  const ws = chars.map((c) => g.measureText(c).width);
+  const total = ws.reduce((a, b) => a + b, 0);
+  // 字框高＝行高 1.1；原點在字框上緣往下 originY（0～1）處，換算成離字框中心的距離
+  const oy = ((o.originY ?? 0.88) - 0.5) * px * 1.1;
+  let x = cx - total / 2;
+  chars.forEach((ch, i) => {
+    const c = f(i, ch, chars.length);
+    const mx = x + ws[i]! / 2 + (c.dx ?? 0);
+    const my = cy + (c.dy ?? 0);
+    g.save();
+    g.globalAlpha *= c.alpha ?? 1;
+    g.translate(mx, my + oy);
+    if (c.rot) g.rotate((c.rot * Math.PI) / 180);
+    if (c.skew) g.transform(1, 0, Math.tan((c.skew * Math.PI) / 180), 1, 0, 0);
+    g.scale(c.sx ?? 1, c.sy ?? 1);
+    g.font = fontOf(s, px, o.weight);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = c.color ?? s.fg;
+    g.fillText(ch, 0, -oy);
+    g.restore();
+    x += ws[i]!;
+  });
+  g.restore();
+}
+
+/**
+ * 一條帶子（原版的 .sband／.tape／.r-s 那種：一個有底色的長方形，裡面一條跑馬燈）：
+ * 中心在 (cx, cy)、寬 w、高 h，轉 rot 度。bg 沒給＝沒有底色（只有字）。
+ */
+export function band(
+  s: Stage,
+  o: {
+    cx: number;
+    cy: number;
+    w: number;
+    h: number;
+    rot?: number;
+    bg?: string;
+    color: string;
+    unit: string;
+    dist: number;
+    px: number;
+    min: number;
+    weight?: number;
+  },
+) {
+  const { g } = s;
+  g.save();
+  g.translate(o.cx, o.cy);
+  if (o.rot) g.rotate((o.rot * Math.PI) / 180);
+  if (o.bg) {
+    g.fillStyle = o.bg;
+    g.fillRect(-o.w / 2, -o.h / 2, o.w, o.h);
+  }
+  marquee(
+    s,
+    o.unit,
+    o.dist,
+    o.px,
+    { x: -o.w / 2, y: -o.h / 2, w: o.w, h: o.h },
+    { min: o.min, color: o.color, weight: o.weight },
+  );
   g.restore();
 }

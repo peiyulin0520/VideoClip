@@ -7,7 +7,9 @@ import { __setProxyMaker } from './proxyQueue';
 import { exportProject, type ExportOptions } from './exporter';
 import { renderFrame } from './exportFrame';
 import { lastImportErrors } from './importMedia';
-import { renderText } from './textRender';
+import { renderText, canvasFamily } from './textRender';
+import { kineticById, KINETIC, SCHEMES } from './kinetic';
+import { paintKinetic } from './kinetic/render';
 import type { Player } from './player';
 
 let editorRenders = 0;
@@ -27,6 +29,30 @@ export function installDebugHook(player: Player) {
   })();
   if (!on) return;
   const hook = {
+    /** 測試／比對用：動態字卡某一式在 t 秒、W×H 畫布、指定的詞（沒給＝範例字）畫出來的圖（PNG dataURL，用原版配色、不淡出） */
+    kineticPaint: (id: string, t: number, W: number, H: number, words?: string[]) => {
+      const def = kineticById(id);
+      if (!def) return null;
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const sch = SCHEMES[def.scheme];
+      paintKinetic(
+        c,
+        def,
+        {
+          words: words ?? def.words,
+          fg: sch.fg,
+          hi: sch.hi,
+          hifg: sch.hifg,
+          bg: sch.bg,
+          family: canvasFamily(''),
+        },
+        t,
+      );
+      return c.toDataURL('image/png');
+    },
+    kineticList: () => KINETIC.map((f) => ({ id: f.id, zh: f.zh, group: f.group, poster: f.poster })),
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,
     /** 測試用：把某個素材的縮圖變回「舊版」的樣子（只剩 1 張、沒有補滿的記號）；存檔後重新整理會在背景補滿 */

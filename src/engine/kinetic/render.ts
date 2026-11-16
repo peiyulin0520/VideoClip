@@ -2,7 +2,7 @@
 import { cssFamily, requestFont } from '../../fonts/fontStore';
 import type { TextItem } from '../../model/types';
 import { canvasFamily } from '../textRender';
-import { fadeEdges, splitWords, type KineticDef, type Stage } from './core';
+import { fadeEdges, inkOn, splitWords, type KineticDef, type Stage } from './core';
 import { kineticContent, kineticFrame } from './hit';
 import { kineticById, resolveBg, SCHEMES } from './index';
 
@@ -29,13 +29,6 @@ export function kineticWords(item: TextItem, example: string[]): string[] {
   return w.length ? w : example;
 }
 
-const luma = (hex: string) => {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return 1;
-  const n = parseInt(m[1]!, 16);
-  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
-};
-
 /** t＝字卡自己的時間（開始後幾秒）；W、H＝合成畫布（畫面）大小。回傳 null＝這個 id 還沒改寫好（不畫） */
 export function renderKinetic(item: TextItem, t: number, W: number, H: number): KineticRender | null {
   const k = item.kinetic;
@@ -50,7 +43,7 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   const words = kineticWords(item, def.words);
   const fg = run?.color ?? sch.fg;
   const hi = k.accent ?? sch.hi;
-  const hifg = k.accent ? (luma(k.accent) > 0.55 ? '#14161b' : '#ffffff') : sch.hifg;
+  const hifg = k.accent ? inkOn(k.accent) : sch.hifg;
   const bg = resolveBg(k.bg);
   const fade = k.fade ?? def.fade ?? 'none';
   const fr = kineticFrame(item, W, H);

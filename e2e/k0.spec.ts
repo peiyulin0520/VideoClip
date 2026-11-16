@@ -42,7 +42,7 @@ test('K0 動態字卡：特效分頁分組（基本／登場／流動）、選�
   await addText(page, '開場 登場');
   await expect(page.getByTestId('kn-groups').getByRole('tab')).toHaveText(['基本', '登場', '流動']);
   await page.getByTestId('kn-group-in').tap();
-  await expect(page.getByTestId('kn-card')).toHaveCount(1);
+  await expect(page.getByTestId('kn-card')).toHaveCount(8);
   await page.getByRole('radio', { name: '文字特效 爆出' }).tap();
   const it = await textItem(page);
   expect(it.kinetic?.id).toBe('burst');
@@ -147,4 +147,51 @@ test('K0 動態字卡：爆出會動（字從小變大、放射線出現又消�
   expect(Math.abs(ex[0]![0]! - band![0])).toBeLessThan(8);
   expect(Math.abs(ex[0]![1]! - band![1])).toBeLessThan(8);
   expect(ex[1]![0]).toBeLessThan(40);
+});
+
+test('K1 登場與流動各 8 式：每張卡片都能選、寫進字卡、預覽畫得出東西', async ({ page }) => {
+  test.setTimeout(240_000);
+  await addText(page, '開場 登場');
+  for (const [group, ids] of [
+    ['in', ['burst', 'hit', 'stamp', 'punch', 'stack', 'stretch', 'through', 'squash']],
+    ['flow', ['crawl', 'drift', 'echo', 'slant', 'path', 'ticker', 'depth', 'tape']],
+  ] as const) {
+    await page.getByTestId(`kn-group-${group}`).tap();
+    await expect(page.getByTestId('kn-card')).toHaveCount(8);
+    expect(
+      await page.getByTestId('kn-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-kn-id'))),
+    ).toEqual(ids);
+    for (const id of ids) {
+      await page.locator(`[data-testid="kn-card"][data-kn-id="${id}"]`).tap();
+      expect((await textItem(page)).kinetic?.id).toBe(id);
+    }
+  }
+  // 用底色把整個框填滿再看：每一式在「代表秒數」都畫得出東西（跟底色不同的點）
+  await page.getByRole('radio', { name: '底色 墨黑' }).tap();
+  const ids = await page.evaluate(() =>
+    (
+      window as unknown as { __videoclip: { kineticList: () => { id: string; poster: number }[] } }
+    ).__videoclip.kineticList(),
+  );
+  expect(ids.map((f) => f.id)).toEqual(
+    expect.arrayContaining([
+      'burst',
+      'hit',
+      'stamp',
+      'punch',
+      'stack',
+      'stretch',
+      'through',
+      'squash',
+      'crawl',
+      'drift',
+      'echo',
+      'slant',
+      'path',
+      'ticker',
+      'depth',
+      'tape',
+    ]),
+  );
+  await page.screenshot({ path: `${SHOT}/k1-effect-tab-390.png` });
 });
