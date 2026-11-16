@@ -18,6 +18,8 @@ export type Stage = {
   words: string[];
   /** 主文字色（原版的 --fg）、強調色（--hi）、強調色上的字色（--hifg）、舞台底色（--bg，透明時是 null） */
   fg: string;
+  /** 原版的 var(--bg)：這一式配色的「紙色」（舞台底色透明、或使用者換了底色時，方牌上的字、反白帶子上的字還是用它，跟原版一樣） */
+  paper: string;
   hi: string;
   hifg: string;
   bg: string | null;
@@ -39,6 +41,9 @@ export type KineticDef = {
   poster: number;
   /** 一輪多少秒（words＝字卡拆出來的詞）；連續跑的（跑馬燈）回傳 null */
   len: (words: string[]) => number | null;
+  /** 原版的固定標籤（標題輪替的「速報」）、預設數字（跳錶）：字卡文字裡沒有時用它 */
+  label?: string;
+  num?: string;
   /** 預設框：wide＝16:9 一條（預設）、full＝整個畫面、lyrics＝歌詞框 */
   area?: KineticArea;
   /** 預設的邊緣淡出（沒給＝不淡） */
@@ -80,6 +85,10 @@ export const pick = <T>(W: T[], i: number): T => W[((i % W.length) + W.length) %
 export const fit = (s: Stage, word: string, max: number, w: number) =>
   Math.min(max * s.cqmin, (w / Math.max(wlen(word), 1)) * s.cqw);
 
+/** 原版 fitN()：字大小（px）＝ min(max cqmin, w÷n cqw)；n 是「有幾個字寬」 */
+export const fitN = (s: Stage, n: number, max: number, w: number) =>
+  Math.min(max * s.cqmin, (w / Math.max(n, 1)) * s.cqw);
+
 /** 把字卡的文字拆成詞：空白、逗號、頓號、換行分開，最多 8 個詞、每個詞最多 14 個字（跟原版一樣） */
 export function splitWords(text: string): string[] {
   return text
@@ -110,6 +119,12 @@ export function drawWord(
     weight?: number;
     /** 變形的基準點在字框（行高 1.1）上緣往下幾成處（預設 0.5＝中心；原版 transform-origin） */
     originY?: number;
+    /** 只畫字框的這一段高度（上緣往下的百分比，例 [0, 50]＝上半；原版 clip-path inset，在變形之前裁） */
+    clip?: [number, number];
+    /** 空心字：描邊寬度（px），不填色（原版 -webkit-text-stroke） */
+    stroke?: number;
+    /** 發光：一串模糊半徑（px，原版 drop-shadow 的半徑），每個半徑疊一層同色的光暈 */
+    glow?: number[];
   } = {},
 ) {
   const { g } = s;
@@ -120,12 +135,47 @@ export function drawWord(
   if (o.rot) g.rotate((o.rot * Math.PI) / 180);
   if (o.skew) g.transform(1, 0, Math.tan((o.skew * Math.PI) / 180), 1, 0, 0);
   g.scale(o.sx ?? 1, o.sy ?? 1);
-  g.font = fontOf(s, px, o.weight);
+  if (o.clip) {
+    const bh = px * 1.1;
+    const top = -oy - bh / 2;
+    g.beginPath();
+    g.rect(-s.W * 3, top + (o.clip[0] / 100) * bh, s.W * 6, ((o.clip[1] - o.clip[0]) / 100) * bh);
+    g.clip();
+  }
+  paintText(s, word, -oy, px, o.color ?? s.fg, o.weight, o.stroke, o.glow);
+  g.restore();
+}
+
+/** 在目前座標的 (0, y) 置中畫一段字：填色，或空心描邊（可疊發光）；共用給 drawWord、drawChars */
+function paintText(
+  s: Stage,
+  str: string,
+  y: number,
+  px: number,
+  color: string,
+  weight?: number,
+  stroke?: number,
+  glow?: number[],
+) {
+  const { g } = s;
+  g.font = fontOf(s, px, weight);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillStyle = o.color ?? s.fg;
-  g.fillText(word, 0, -oy);
-  g.restore();
+  if (stroke) {
+    g.strokeStyle = color;
+    g.lineWidth = stroke;
+    g.lineJoin = 'round';
+    for (const r of glow ?? [0]) {
+      g.shadowColor = r ? color : 'transparent';
+      g.shadowBlur = r; // CSS drop-shadow 的模糊半徑與 canvas shadowBlur 一樣（高斯標準差都是它的一半）
+      g.strokeText(str, 0, y);
+    }
+    g.shadowColor = 'transparent';
+    g.shadowBlur = 0;
+    return;
+  }
+  g.fillStyle = color;
+  g.fillText(str, 0, y);
 }
 
 /**
@@ -266,6 +316,9 @@ export type CharFx = {
   alpha?: number;
   color?: string;
   skew?: number;
+  /** 空心字描邊寬度（px）／發光半徑（px，可多層），同 drawWord */
+  stroke?: number;
+  glow?: number[];
 };
 export function drawChars(
   s: Stage,
@@ -295,11 +348,7 @@ export function drawChars(
     if (c.rot) g.rotate((c.rot * Math.PI) / 180);
     if (c.skew) g.transform(1, 0, Math.tan((c.skew * Math.PI) / 180), 1, 0, 0);
     g.scale(c.sx ?? 1, c.sy ?? 1);
-    g.font = fontOf(s, px, o.weight);
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillStyle = c.color ?? s.fg;
-    g.fillText(ch, 0, -oy);
+    paintText(s, ch, -oy, px, c.color ?? s.fg, o.weight, c.stroke, c.glow);
     g.restore();
     x += ws[i]!;
   });
@@ -344,4 +393,97 @@ export function band(
     { min: o.min, color: o.color, weight: o.weight },
   );
   g.restore();
+}
+
+// ---------- 更多共用工具（K2） ----------
+
+let scratchCv: HTMLCanvasElement | null = null;
+/** 共用的暫存畫布（清乾淨、大小 w×h）：一個一個用，用完立刻畫回主畫布；不可以同時拿兩張 */
+export function scratch(w: number, h: number): HTMLCanvasElement {
+  scratchCv ??= document.createElement('canvas');
+  if (scratchCv.width !== w || scratchCv.height !== h) {
+    scratchCv.width = w;
+    scratchCv.height = h;
+  }
+  // 上一個人用完的畫法狀態（合成方式、透明度、變形、陰影）全部還原，再清乾淨
+  const c = scratchCv.getContext('2d')!;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'source-over';
+  c.globalAlpha = 1;
+  c.shadowBlur = 0;
+  c.shadowColor = 'transparent';
+  c.clearRect(0, 0, w, h);
+  return scratchCv;
+}
+
+const canFilter = () =>
+  typeof CanvasRenderingContext2D !== 'undefined' && 'filter' in CanvasRenderingContext2D.prototype;
+
+/** 模糊（原版 filter: blur）：支援 ctx.filter 就直接用；不支援（舊版 Safari）就把同一張圖疊好幾次、各偏一點、降低透明度，看起來也是糊的 */
+export function blurred(g: CanvasRenderingContext2D, blur: number, draw: () => void) {
+  if (blur < 0.3) return draw();
+  if (canFilter()) {
+    g.save();
+    g.filter = `blur(${blur.toFixed(2)}px)`;
+    draw();
+    g.restore();
+    return;
+  }
+  const n = 12;
+  g.save();
+  const a = g.globalAlpha;
+  g.globalAlpha = a / 4;
+  for (let i = 0; i < n; i++) {
+    const ang = (i / n) * Math.PI * 2;
+    g.save();
+    g.translate(Math.cos(ang) * blur * 0.8, Math.sin(ang) * blur * 0.8);
+    draw();
+    g.restore();
+  }
+  g.restore();
+}
+
+/**
+ * 把一張圖繞垂直軸轉 deg 度（原版 perspective(P) rotateY）：切成細條，每條依距離放大縮小，做出透視。
+ * src 以 (cx, cy) 為中心畫出來，大小 w×h。
+ */
+export function drawRotY(
+  g: CanvasRenderingContext2D,
+  src: HTMLCanvasElement,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  deg: number,
+  persp: number,
+) {
+  const a = (deg * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  if (Math.abs(cos) < 0.02) return;
+  const N = 20;
+  for (let i = 0; i < N; i++) {
+    const x0 = -w / 2 + (w * i) / N;
+    const x1 = -w / 2 + (w * (i + 1)) / N;
+    const proj = (x: number) => {
+      const z = x * sin; // 轉過去之後離鏡頭的距離（朝鏡頭為正）
+      const k = persp / (persp - z);
+      return { x: x * cos * k, k };
+    };
+    const p0 = proj(x0);
+    const p1 = proj(x1);
+    const kk = (p0.k + p1.k) / 2;
+    const dw = Math.abs(p1.x - p0.x);
+    g.drawImage(
+      src,
+      (src.width * i) / N,
+      0,
+      src.width / N,
+      src.height,
+      cx + Math.min(p0.x, p1.x),
+      cy - (h * kk) / 2,
+      dw + 0.6,
+      h * kk,
+    );
+  }
 }

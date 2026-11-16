@@ -43,6 +43,7 @@ export function installDebugHook(player: Player) {
         {
           words: words ?? def.words,
           fg: sch.fg,
+          paper: sch.bg,
           hi: sch.hi,
           hifg: sch.hifg,
           bg: sch.bg,

@@ -36,7 +36,15 @@ export function KineticCard({
     c.width = Math.round(SIZE * scale);
     c.height = Math.round(SIZE * scale * (area === 'full' ? 1 : area === 'lyrics' ? 0.4 : 9 / 16));
     const sch = SCHEMES[def.scheme];
-    const p = { words, fg: sch.fg, hi: sch.hi, hifg: sch.hifg, bg: sch.bg, family: canvasFamily(fontId) };
+    const p = {
+      words,
+      fg: sch.fg,
+      paper: sch.bg,
+      hi: sch.hi,
+      hifg: sch.hifg,
+      bg: sch.bg,
+      family: canvasFamily(fontId),
+    };
     paintKinetic(c, def, p, def.poster, def.fade ?? 'none');
     if (!active || reduced()) return;
     let raf = 0;

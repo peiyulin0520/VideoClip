@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：文字特效 64 式：K0、K0.5、K1（登場＋流動共 16 式）已做，下一個 K2（切換＋強調 16 式）→ K3（空間＋歌詞）→ K4（綜藝＋恐怖）；使用者說「先做剩下的其他文字特效」；PR #17 已合併；Y10 等使用者 iPhone 數字
+- **下一步**：文字特效 64 式：K0、K0.5、K1、K2（登場、流動、切換、強調共 32 式）已做，下一個 K3（空間＋歌詞）→ K4（綜藝＋恐怖）；PR #17 已合併；Y10 等使用者 iPhone 數字
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,14 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-16 文字特效 K2：切換 8 式＋強調 8 式（Sonnet）
+  - 做了什麼：**切換**：翻牌看板 flap、翻卡 flip（繞垂直軸＋透視，用 20 條細條模擬 `drawRotY`）、打字機 type（太長自動換行、字不小於 8cqmin）、拉霸 slot、跳錶 odo（字裡有數字就用它，沒有用 36,920）、標題輪替 swapline（固定標籤「速報」）、點陣看板 led（燈點遮罩用圖案＋`destination-in`）、上下裂開 split；**強調**：訊號故障 glitch、螢光筆 marker、抖動 shake、霓虹燈管 neon（空心描邊＋雙層發光）、波浪起伏 bob、字距拉開 track、空心填滿 fill、對焦 focus（`ctx.filter` blur，舊版 Safari 沒有就用「疊 12 次、各偏一點」模擬）。共用工具新增：`drawWord` 的 `clip`（只畫字框的某段高度）／`stroke`／`glow`、`drawChars` 同樣、`scratch`（共用暫存畫布，每次先還原狀態）、`blurred`、`drawRotY`、`fitN`；`Stage.paper`＝原版的 `var(--bg)`（方牌上的字、反白帶子上的字用它，使用者換底色也不變）。
+  - 並排比對（16 式）：動作、構圖、顏色、隨機位置（同一組種子）都跟原版一致。抓到的錯：①`scratch` 用完沒還原合成方式，第二次畫就空白（led）；②發光半徑單位：CSS drop-shadow 半徑＝canvas shadowBlur（不是 2 倍）；③方牌字色要用原版的紙色而不是「對比色」。neon 的描邊比原版略粗（沙盒備用字型字形較粗），已縮細到 .028em。
+  - 與原版不同：打字機太長會換行（原版是縮小字）；不另外用明體；框外不顯示
+  - 動了哪些檔：`engine/kinetic/{core,render,index,fx/swap,fx/em,fx/in,fx/flow}.ts`、`engine/debug.ts`、`app/editor/KineticCards.tsx`、測試 `kinetic.test.ts`（假的 canvas 也接 scratch）、`e2e/k0.spec.ts`
+  - 驗證：✅ 單元（43）、e2e（32 張卡都能選）；對照圖目測
+  - 下一步：K3（空間 8＋歌詞 8）
+
 - 2026-11-16 文字特效 K1：登場剩 7 式＋流動剩 7 式，並排比對工具（Sonnet）
   - 做了什麼：①**登場**：逐字重擊 hit、蓋章 stamp、衝向鏡頭 punch、左右疊字 stack、拉長 stretch、穿過去 through、落地回彈 squash；**流動**：直排對流 drift、重複波浪 echo、斜帶 slant、彎道 path、多層跑馬燈 ticker、遠近直書 depth、交叉封條 tape。全部照原碼的時間、緩動、數字改寫成 canvas（`fx/in.ts`、`fx/flow.ts`）；②**共用工具**（`core.ts`）：`keys`（原版關鍵格內插）、`drawChars`（每個字各自變形，基準點可設）、`band`（有底色的帶子＋跑馬燈，可旋轉）、`inkOn`（放在某色上的對比字色）、`drawWord` 加 `skew`、`originY`；`len` 改成吃詞陣列（逐字重擊的一輪看字數）；③**預設框**：流動組多數 `full`（當背景鋪滿），遠近直書 `wide`（原版要寬度）；④**並排比對工具**：`window.__videoclip.kineticPaint`＋`e2e/kinetic-compare.spec.ts`（`KINETIC_COMPARE=1` 才跑，可用 `KINETIC_IDS=burst,hit` 指定）＋`scripts/kinetic-compare.py` 拼成「上排原版、下排我們」5 個時間點的對照圖（輸出在 `.kinetic-compare/`，不進 git）。16 式對照後動作、構圖、時間、顏色都跟原版一致；字重在沙盒偏細（沙盒的備用字型沒有粗體，真機用字卡選的字體）。
   - 與原版不同：不另外用明體（原版有些式子用 Noto Serif，這裡一律用字卡選的字體，使用者換字體就會全部跟著換）；框外不顯示

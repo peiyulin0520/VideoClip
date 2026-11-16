@@ -70,7 +70,13 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
     canvases.set(ck, canvas);
     if (canvases.size > MAX_CANVASES) canvases.delete(canvases.keys().next().value!);
   }
-  paintKinetic(canvas, def, { words, fg, hi, hifg, bg, family: canvasFamily(fontId) }, step / STEP, fade);
+  paintKinetic(
+    canvas,
+    def,
+    { words, fg, paper: sch.bg, hi, hifg, bg, family: canvasFamily(fontId) },
+    step / STEP,
+    fade,
+  );
   return { canvas, w: fr.w, h: fr.h, key, content: kineticContent(item, W, H) };
 }
 
@@ -78,7 +84,7 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
 export function paintKinetic(
   canvas: HTMLCanvasElement,
   def: KineticDef,
-  p: Pick<Stage, 'words' | 'fg' | 'hi' | 'hifg' | 'bg' | 'family'>,
+  p: Pick<Stage, 'words' | 'fg' | 'paper' | 'hi' | 'hifg' | 'bg' | 'family'>,
   t: number,
   fade: 'none' | 'v' | 'h' = 'none',
 ) {

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { clamp, E, fit, marquee, rnd, seg, splitWords, wlen, type Stage } from './core';
+import { beforeAll } from 'vitest';
 import { KINETIC, kineticById } from './index';
 
+// jsdom 沒有真的 canvas：暫存畫布（scratch／圖案）也用假的 2D（只記呼叫）
+beforeAll(() => {
+  HTMLCanvasElement.prototype.getContext = (() => fakeCtx().ctx) as never;
+});
+
 /** 假的 canvas 2D：記下所有呼叫（名稱＋參數），不真的畫；measureText 用字數×字級估寬度 */
-function fakeCtx() {
-  const log: string[] = [];
+function fakeCtx(log: string[] = []) {
   let font = '12px x';
   const state: Record<string, unknown> = {};
   const ctx = new Proxy(state, {
@@ -12,9 +17,9 @@ function fakeCtx() {
       if (k === 'measureText')
         return (s: string) => ({ width: s.length * (parseFloat(font.split(' ')[1] ?? '12') || 12) * 0.9 });
       if (k in state) return state[k];
-      if (k === 'createLinearGradient')
+      if (k === 'createLinearGradient' || k === 'createRadialGradient')
         return (...a: unknown[]) => {
-          log.push(`createLinearGradient(${a.join(',')})`);
+          log.push(`${k}(${a.join(',')})`);
           return { addColorStop: () => {} };
         };
       return (...a: unknown[]) =>
@@ -31,6 +36,8 @@ function fakeCtx() {
 }
 const stage = (words: string[], W = 540, H = 960): { s: Stage; log: string[] } => {
   const { ctx, log } = fakeCtx();
+  // 暫存畫布（scratch、圖案）的呼叫也記到同一份紀錄
+  HTMLCanvasElement.prototype.getContext = (() => fakeCtx(log).ctx) as never;
   return {
     log,
     s: {
@@ -42,6 +49,7 @@ const stage = (words: string[], W = 540, H = 960): { s: Stage; log: string[] } =
       cqh: H / 100,
       words,
       fg: '#f4f5f7',
+      paper: '#14161b',
       hi: '#ff4d2e',
       hifg: '#14161b',
       bg: null,

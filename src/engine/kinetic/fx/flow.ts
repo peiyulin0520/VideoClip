@@ -1,5 +1,5 @@
 // 流動（09–16）。改寫自 claude-animated-text（MIT，© 2026 pound / POUND0423）。
-import { band, clamp, cs, drawWord, fontOf, inkOn, marquee, pick, wlen, type KineticDef } from '../core';
+import { band, clamp, cs, drawWord, fontOf, marquee, pick, wlen, type KineticDef } from '../core';
 
 // 彎道（path）的帶子：原版 SVG 的路徑（座標系 320×180，S 形曲線），兩段三次貝茲曲線
 const RIB: [number, number, number, number, number, number, number, number][] = [
@@ -199,7 +199,7 @@ export const FX_FLOW: KineticDef[] = [
         h: bh,
         rot,
         bg: s.fg,
-        color: inkOn(s.fg),
+        color: s.paper,
         unit: pick(s.words, 1) + '・',
         dist: -t * 1.1,
         px: 13 * cqmin,
@@ -291,7 +291,7 @@ export const FX_FLOW: KineticDef[] = [
           h: 6.2 * cqmin * 1.15 + 2 * cqmin,
           sp: 2.6,
           weight: 700,
-          color: inkOn(s.fg),
+          color: s.paper,
           bg: s.fg,
         },
         { px: 13 * cqmin, h: 13 * cqmin * 1.1, sp: -1.4, weight: 900, color: s.fg, bg: undefined },
@@ -383,7 +383,7 @@ export const FX_FLOW: KineticDef[] = [
         h: bh,
         rot: -10,
         bg: s.fg,
-        color: inkOn(s.fg),
+        color: s.paper,
         unit: pick(s.words, 1) + '・',
         dist: -t * 1.3,
         px: 11 * cqmin,

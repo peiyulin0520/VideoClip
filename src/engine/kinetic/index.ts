@@ -1,9 +1,11 @@
 // 動態字卡（64 式）的登錄表：照原版順序。已經改寫好的才會出現在介面（KINETIC）；其餘 id 先留在型別裡。
 import type { KineticDef, KineticGroup } from './core';
+import { FX_EM } from './fx/em';
 import { FX_FLOW } from './fx/flow';
 import { FX_IN } from './fx/in';
+import { FX_SWAP } from './fx/swap';
 
-export const KINETIC: KineticDef[] = [...FX_IN, ...FX_FLOW];
+export const KINETIC: KineticDef[] = [...FX_IN, ...FX_FLOW, ...FX_SWAP, ...FX_EM];
 export const kineticById = (id: string): KineticDef | undefined => KINETIC.find((f) => f.id === id);
 export const KINETIC_GROUPS: { id: KineticGroup; name: string }[] = [
   { id: 'in', name: '登場' },
