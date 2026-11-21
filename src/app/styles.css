@@ -518,8 +518,12 @@ button {
 }
 .stage-wrap {
   position: relative;
-  /* 預覽的底＝預覽區整塊（不管專案比例；版面在裡面等比放到最大）：預覽和下面的播放列、時間軸位置才不會跳。高度最高＝一個螢幕扣掉頂列與播放列。用 svh：Safari 網址列伸縮時不會抖 */
-  height: max(300px, min(calc(100vw * 16 / 9), calc(100svh - var(--top-h) - var(--playbar-h))));
+  /* 預覽的底＝預覽區整塊（不管專案比例；版面在裡面等比放到最大）：預覽和下面的播放列、時間軸位置才不會跳。
+     高度適中（約螢幕的 54%，使用者參考 VideoClip_2）：預覽不會過大，往下就是播放列、時間軸、功能列，不用滑很遠。用 svh：Safari 網址列伸縮時不會抖 */
+  height: max(
+    300px,
+    min(calc(100vw * 16 / 9), calc(100svh - var(--top-h) - var(--playbar-h)), calc(100svh * 0.54))
+  );
   display: flex;
   align-items: center;
   justify-content: center;

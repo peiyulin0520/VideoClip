@@ -27,8 +27,9 @@ test('預覽很大而且大小永遠不變：每個分頁、面板開合、選�
   await createProjectWith(page, ['solid-blue.webm']);
   const top = await previewBox(page);
   const vh = await page.evaluate(() => window.innerHeight);
-  // 捲到最上面：9:16 預覽高 ≥ 80% 螢幕，預覽和播放鈕都在畫面內
-  expect(top.height / vh).toBeGreaterThan(0.8);
+  // 捲到最上面：預覽高約螢幕的 54%（適中，往下就是播放列和時間軸），預覽和播放鈕都在畫面內
+  expect(top.height / vh).toBeGreaterThan(0.45);
+  expect(top.height / vh).toBeLessThan(0.62);
   const play = (await page.getByRole('button', { name: '播放' }).boundingBox())!;
   expect(play.y + play.height).toBeLessThanOrEqual(vh + 1);
   await page.screenshot({ path: `${SHOT}/top.png` });

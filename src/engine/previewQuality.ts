@@ -1,4 +1,5 @@
 import type { Project } from '../model/types';
+import { stageLayout } from './stage';
 
 // 預覽畫質：清楚（長邊 960）／流暢（長邊 480，手機畫面小，肉眼差不多）／自動。
 // 只影響預覽用的合成畫布；匯出走自己的合成器與輸出解析度，完全不受影響。
@@ -49,11 +50,17 @@ export function useSmooth(q: PreviewQuality, p: Project, slow: boolean): boolean
   return slow || maxVideoOverlap(p) >= 3;
 }
 
-/** 預覽合成畫布的大小（長邊 960，流暢＝480） */
+/**
+ * 預覽「版面」的大小（專案縮小成這樣來合成）：整張畫布（底，含版面外面）的長邊 960，流暢＝480。
+ * 有給 aspect（預覽區的寬高比）才把底算進去；沒給就只看版面本身的長邊。
+ */
 export function previewSizeFor(
   p: Pick<Project, 'width' | 'height'>,
   smooth: boolean,
+  aspect?: number,
 ): { width: number; height: number } {
-  const k = (smooth ? 480 : 960) / Math.max(p.width, p.height);
+  const lay = aspect ? stageLayout(p.width, p.height, aspect) : null;
+  const long = lay ? Math.max(lay.baseW, lay.baseH) : Math.max(p.width, p.height);
+  const k = (smooth ? 480 : 960) / long;
   return { width: Math.round(p.width * k), height: Math.round(p.height * k) };
 }

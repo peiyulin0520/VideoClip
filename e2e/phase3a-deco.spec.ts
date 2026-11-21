@@ -241,7 +241,7 @@ test('裝飾的長度、透明度、放大後的範圍：底線可以縮短、�
   await page.screenshot({ path: `${SHOT}/deco-length-opacity-panel.png` });
 
   // 預設：長度 100%（沒有 length 欄位），沒有「靠哪一邊」
-  await expect.poll(cyan).toBeGreaterThan(80);
+  await expect.poll(cyan).toBeGreaterThan(40); // 預覽畫布比以前小（底＝預覽區整塊、長邊 480），線的像素數也少一點
   const full = await cyan();
   expect((await d()).length).toBeUndefined();
   await expect(page.getByRole('radiogroup', { name: '虛線靠哪一邊' })).toHaveCount(0);

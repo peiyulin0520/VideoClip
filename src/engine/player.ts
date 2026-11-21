@@ -48,8 +48,9 @@ export { driftPlan };
 export function previewSize(
   p: Pick<Project, 'width' | 'height'>,
   smooth = false,
+  aspect?: number,
 ): { width: number; height: number } {
-  return previewSizeFor(p, smooth);
+  return previewSizeFor(p, smooth, aspect);
 }
 
 /**
@@ -115,7 +116,7 @@ export class Player {
     opts: { host: HTMLElement; canvas: HTMLCanvasElement; aspect?: number } & Deps,
   ): Promise<Player> {
     const p = opts.getProject();
-    const size = p ? previewSize(p, opts.smooth) : { width: 540, height: 960 };
+    const size = p ? previewSize(p, opts.smooth, opts.aspect) : { width: 540, height: 960 };
     const lay = stageLayout(size.width, size.height, opts.aspect);
     const compositor = await Compositor.create({
       ...size,
