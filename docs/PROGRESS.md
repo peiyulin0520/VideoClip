@@ -91,8 +91,9 @@
 ## 日誌（最新在最上面）
 - 2026-11-21 feedback-14：版型殘影、版型大小按鈕、筆刷視圖、副標、停在最後畫面、斜線、進專案捲到最上（Sonnet）
   - 做了什麼：①**拖邊調整整體大小／拖各格大小後，舊版型還留在底下、兩個疊在一起**：根因是 compositor 畫圖片用的 `frameCanvas` 重畫時沒先清掉，外框圖（有透明區）換成新的以後舊圖還在底下；重畫前先 `clearRect`（重新進專案才正常＝畫布重建）。②版型分頁「大小與格數」：分成「整個版型」（顯示現在 % × %、［調整整體大小］［重置］）和「各格」（［調整各格大小］［重置］）兩組，組間有空隙，名稱講清楚是外框整體還是各格。③調整版型大小的「寬 × 高、套用、✕」改成一排小條，放在框上面／下面放得下的地方（占滿畫面時放在上邊把手下面），不再蓋住兩格中間的左右把手。④特效分頁「作用在」五個按鈕照字長分寬（「文字特效」不被切掉）、選了特效不再把名字接在後面。⑤裁切：筆刷、橡皮擦時畫面就是「檢查結果」的樣子（去掉的地方是棋盤格、沒有粉紅框線），直接在上面刷；切回自由／一般才看得到框線。⑥動態字卡 `kinetic.sub` 副標（巨字橫移的底帶小字、環繞的圈上字、標題輪替的標籤；空白＝照原來的）、`kinetic.end`（loop 重複播放／hold 停在最後畫面：播到最後一個詞「字完整呈現」那一刻就停，不消失；一直在跑的跑馬燈類沒有這個選項）；停點表 `engine/kinetic/hold.ts`（每一式一輪的比例，`KINETIC_HOLD=1` 的 e2e 量墨量當起點、再手動修正）。⑦預覽斜線只蓋「底裡面、版面外面」，底左右兩側的黑邊不再蓋斜線；進專案、重新整理一律捲到最上面。⑧轉場卡：從螢幕錄影量到轉場中間有 ~0.1 秒停格（B 影片還沒開始送畫面），把轉場前的暖機提早到 0.8 秒（原 0.4）；真機是否改善要使用者回報。
-  - 沒做／要回報：預覽底仍固定 9:16（改比例時播放列不跳），所以非 9:16 專案上下還是有斜線；若要「底跟著專案比例」是另一個比較大的改動（預覽高度會隨比例變）。轉場卡只能靠真機的效能框數字確認。
-  - 動了哪些檔：`engine/compositor.ts`、`engine/player.ts`、`engine/kinetic/{core,render,hold,fx/flow,fx/sp,fx/swap}.ts`、`engine/debug.ts`、`model/types.ts`、`store/actions.ts`、`app/pages/Editor.tsx`、`app/editor/{CropEditor,LayoutResize,Preview}.tsx`、`app/editor/tabs/{LayoutTab,EffectTab}.tsx`、`app/styles.css`、測試 `kinetic.test.ts`、`e2e/{feedback14,kinetic-hold,i6,y3,x4}.spec.ts`
+  - 預覽改成使用者 VideoClip_2 截圖的樣子（使用者指定）：預覽區（寬 × 固定高度）整塊就是「底」，專案版面在裡面等比放到最大、置中，其餘全部蓋斜線（16:9 橫的占滿寬度、上下斜線；9:16 直的左右斜線）。底的寬高比＝預覽區現在的寬 ÷ 高（`Preview` 量到後 `setBaseAspect`＋傳給 `Player.create`，寬高比變了才重建引擎），不再是固定 9:16；`stageLayout(w,h,aspect)`、自訂比例的 `AspectOverlay` 都改用它。預覽區高度公式沒變（改比例時播放列不跳）。取代前面「左右黑邊不蓋斜線」的做法。
+  - 要回報：轉場卡只能靠真機的效能框數字確認；底變寬後 Pixi 畫布比以前大（9:16 專案約 +50% 像素），若預覽變卡要回報。
+  - 動了哪些檔：`engine/{compositor,player,stage}.ts`、`engine/kinetic/{core,render,hold,fx/flow,fx/sp,fx/swap}.ts`、`engine/debug.ts`、`model/types.ts`、`store/actions.ts`、`app/pages/Editor.tsx`、`app/editor/{CropEditor,LayoutResize,Preview,AspectOverlay}.tsx`、`app/editor/tabs/{LayoutTab,EffectTab}.tsx`、`app/styles.css`、測試 `kinetic.test.ts`、`e2e/{feedback14,kinetic-hold,i6,y3,x4}.spec.ts`
   - 驗證：✅ `npm run check`、完整 e2e（見下）
   - 下一步：使用者 iPhone 驗收
 

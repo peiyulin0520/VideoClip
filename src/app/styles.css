@@ -518,7 +518,7 @@ button {
 }
 .stage-wrap {
   position: relative;
-  /* 預覽的底永遠是 9:16（不管專案比例）：預覽和下面的播放列、時間軸位置才不會跳。高度最高＝一個螢幕扣掉頂列與播放列。用 svh：Safari 網址列伸縮時不會抖 */
+  /* 預覽的底＝預覽區整塊（不管專案比例；版面在裡面等比放到最大）：預覽和下面的播放列、時間軸位置才不會跳。高度最高＝一個螢幕扣掉頂列與播放列。用 svh：Safari 網址列伸縮時不會抖 */
   height: max(300px, min(calc(100vw * 16 / 9), calc(100svh - var(--top-h) - var(--playbar-h))));
   display: flex;
   align-items: center;
@@ -528,8 +528,8 @@ button {
 }
 .stage-base {
   position: relative;
-  width: min(100cqw, calc(100cqh * 9 / 16));
-  aspect-ratio: 9 / 16;
+  width: 100cqw;
+  height: 100cqh;
   overflow: hidden;
   background: #000;
   /* 預覽空白處上下滑＝捲頁面；物件上有看不見的觸控區（.hit，touch-action:none）可以拖 */

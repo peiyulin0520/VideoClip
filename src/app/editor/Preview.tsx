@@ -21,7 +21,7 @@ import {
 } from '../../engine/geometry';
 import { Player } from '../../engine/player';
 import { aspectLabel } from '../../model/defaults';
-import { stageLayout } from '../../engine/stage';
+import { setBaseAspect, stageLayout } from '../../engine/stage';
 import { useSmooth } from '../../engine/previewQuality';
 import { useQuality } from '../../store/qualityStore';
 import { AspectOverlay } from './AspectOverlay';
@@ -81,7 +81,7 @@ export function Preview({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const poolRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null); // 版面（輸出範圍）
-  const baseRef = useRef<HTMLDivElement>(null); // 底：固定 9:16，手勢都在這裡收
+  const baseRef = useRef<HTMLDivElement>(null); // 底：預覽區整塊，手勢都在這裡收
   const [cssW, setCssW] = useState(1);
   const [safe, setSafe] = useState(readSafe);
   const [dragging, setDragging] = useState(false); // 拖移/縮放中：安全區參考線暫時出現
@@ -95,6 +95,8 @@ export function Preview({
   const [holdSnap, setHoldSnap] = useState<string | null>(null); // 換預覽畫質、重建預覽引擎時，先頂著舊畫面
   const [dim, setDim] = useState({ ww: 0, wh: 0, bw: 0, bh: 0 }); // 預覽區與底的大小（斜線要蓋到底的外面）
   const wrapRef = useRef<HTMLDivElement>(null);
+  // 預覽的底＝預覽區整塊：寬高比就是預覽區現在的寬 ÷ 高（還沒量到＝0，先不建預覽引擎）
+  const baseA = dim.ww > 0 && dim.wh > 0 ? Math.round((dim.ww / dim.wh) * 100) / 100 : 0;
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
   const player = useUI((s) => s.player);
@@ -125,10 +127,13 @@ export function Preview({
   // 比例改了（寬高變了）會重建；記住舊的播放時間，重建後回到同一個位置（換專案則歸 0）
   const resumeRef = useRef<{ projectId: string; time: number } | null>(null);
   useEffect(() => {
+    if (!baseA) return;
+    setBaseAspect(baseA);
     let cancelled = false;
     let created: Player | null = null;
     let unsub = () => {};
     void Player.create({
+      aspect: baseA,
       host: poolRef.current!,
       canvas: canvasRef.current!,
       getProject: () => useProjectStore.getState().project,
@@ -177,7 +182,7 @@ export function Preview({
       created?.destroy();
       useUI.setState({ player: null });
     };
-  }, [projectId, width, height, smooth]); // 比例改了、預覽畫質改了就重建預覽引擎
+  }, [projectId, width, height, smooth, baseA]); // 比例改了、預覽畫質改了、預覽區的寬高比變了就重建預覽引擎
 
   // ---- 舞台大小（CSS px）----
   useEffect(() => {
@@ -471,7 +476,7 @@ export function Preview({
   // 從時間軸選了一個現在不在畫面上的物件：沒有觸控區（選取框也不會顯示）
   const minHit = 44 / k;
   // 預覽的底固定 9:16；版面在底裡面置中，外面蓋斜線（範圍外的東西也看得到、可以拖）
-  const lay = stageLayout(width, height);
+  const lay = stageLayout(width, height, baseA || undefined);
   const hasOut = lay.fx < 0.999 || lay.fy < 0.999;
   const pc = (n: number) => `${(n * 100).toFixed(4)}%`;
   const fl = (lay.offX / lay.baseW) * 100;
@@ -508,7 +513,7 @@ export function Preview({
       >
         {/* key：比例改變就換一個新的 canvas（舊的 WebGL 環境被 Pixi 銷毀後不能在同一個 canvas 上重建） */}
         <canvas
-          key={`${width}x${height}-${smooth ? 's' : 'c'}`}
+          key={`${width}x${height}-${smooth ? 's' : 'c'}-${baseA}`}
           ref={canvasRef}
           data-testid="preview-canvas"
         />

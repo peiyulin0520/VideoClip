@@ -111,10 +111,12 @@ export class Player {
     readonly audio: AudioOut = new AudioOut(),
   ) {}
 
-  static async create(opts: { host: HTMLElement; canvas: HTMLCanvasElement } & Deps): Promise<Player> {
+  static async create(
+    opts: { host: HTMLElement; canvas: HTMLCanvasElement; aspect?: number } & Deps,
+  ): Promise<Player> {
     const p = opts.getProject();
     const size = p ? previewSize(p, opts.smooth) : { width: 540, height: 960 };
-    const lay = stageLayout(size.width, size.height);
+    const lay = stageLayout(size.width, size.height, opts.aspect);
     const compositor = await Compositor.create({
       ...size,
       canvas: opts.canvas,
