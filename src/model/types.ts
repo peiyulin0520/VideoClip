@@ -420,6 +420,10 @@ export type TextItem = ItemBase & {
     fade?: KineticFade;
     /** 速度倍數（0.5、1、1.5、2）；沒有＝1 */
     speed?: number;
+    /** 副標（有副標的那幾式：巨字橫移的底帶小字、環繞的圈上字、標題輪替的標籤）；沒有或空白＝照那一式原來的 */
+    sub?: string;
+    /** 字卡比一輪長的時候：loop 重複播放（預設）、hold 播到字完整呈現就停在那一格（不消失） */
+    end?: 'loop' | 'hold';
   };
 };
 

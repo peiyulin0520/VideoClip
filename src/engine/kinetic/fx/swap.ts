@@ -347,11 +347,12 @@ export const FX_SWAP: KineticDef[] = [
     scheme: 'ink',
     words: ['颱風轉向', '明日放晴', '票已售完'],
     label: '速報',
+    sub: '速報',
     poster: 0.8,
     len: (w) => 1.8 * w.length,
     draw(s, t) {
       const { g, W, H } = s;
-      const label = '速報';
+      const label = s.sub ?? '速報';
       const maxw = Math.max(...s.words.map(wlen));
       const px = fitN(s, maxw + wlen(label) + 2.2, 21, 84);
       const D = 1.8;

@@ -60,7 +60,17 @@ export function LayoutResize({ frame, geo, k }: { frame: VideoItem; geo: GeoCtx;
   };
   const bw = Math.round(box.w * edit.sx * 100);
   const bh = Math.round(box.h * edit.sy * 100);
-
+  // 「寬 × 高、套用」那一排放在不會蓋住把手的地方（把手都在框裡面靠邊：上邊、四角在框的上緣往下 44px，左右中間在正中央）：
+  // 框的上面放得下就放上面，不然下面放得下放下面，都放不下（框占滿畫面）才放在框裡面、上邊把手的下面
+  const CARD_H = 56;
+  const frameTop = (cy - (vh0 * edit.sy) / 2) * k;
+  const frameBottom = (cy + (vh0 * edit.sy) / 2) * k;
+  const cardTop =
+    frameTop - CARD_H - 6 >= 4
+      ? frameTop - CARD_H - 6
+      : frameBottom + 6 + CARD_H <= geo.canvasH * k
+        ? frameBottom + 6
+        : Math.max(frameTop, 0) + 48;
   return (
     <>
       <div
@@ -89,7 +99,7 @@ export function LayoutResize({ frame, geo, k }: { frame: VideoItem; geo: GeoCtx;
           </div>
         ))}
       </div>
-      <div className="ao-card lr-card" data-handle="layout">
+      <div className="ao-card lr-card" data-handle="layout" style={{ top: cardTop }}>
         <div className="ao-head">
           <b>調整版型大小</b>
           <button

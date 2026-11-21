@@ -33,13 +33,16 @@ test('Y3 預覽：不播放時每一格有編號；播放時所有編輯框（�
   await expect(page.getByTestId('selbox')).toBeVisible();
 });
 
-test('Y3 斜線：3:4 專案，預覽區裡所有不輸出的地方（含底左右兩側）都蓋斜線，只挖掉版面', async ({ page }) => {
+test('Y3 斜線：3:4 專案，預覽底裡面不輸出的地方蓋斜線（底左右兩側的黑邊不蓋），只挖掉版面', async ({
+  page,
+}) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm']);
   await setRatio(page, /3:4/);
   await page.evaluate(() => window.scrollTo(0, 0));
   const wrap = (await page.locator('.stage-wrap').boundingBox())!;
   const hatch = (await page.getByTestId('out-hatch').boundingBox())!;
+  // 斜線元素鋪滿預覽區，clip-path 只留底（9:16）裡面版面外面的部分
   expect(Math.abs(hatch.x - wrap.x)).toBeLessThan(1);
   expect(Math.abs(hatch.width - wrap.width)).toBeLessThan(1);
   expect(Math.abs(hatch.height - wrap.height)).toBeLessThan(1);

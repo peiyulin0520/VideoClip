@@ -38,7 +38,7 @@ const PREFETCH_S = 1.0;
 /** 有轉場的片段多提前這麼多秒開始準備（要同時解兩支影片，來不及會卡） */
 const PREFETCH_TRANSITION_S = 1.5;
 /** 轉場的 B 提早這麼多秒開始（靜音）播放暖機 */
-const WARM_S = 0.4;
+const WARM_S = 0.8;
 const POOL_SIZE = 6;
 const MUSIC_POOL_SIZE = 3;
 

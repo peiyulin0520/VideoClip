@@ -23,6 +23,8 @@ export type Stage = {
   hi: string;
   hifg: string;
   bg: string | null;
+  /** 使用者自己打的副標（空白＝沒有，用那一式原來的） */
+  sub?: string;
   /** 字體（canvas font 的 family 部分，含備用字體）與字重（原版用 900 的地方請求 900，沒有的字體會用最接近的） */
   family: string;
 };
@@ -43,6 +45,8 @@ export type KineticDef = {
   poster: number;
   /** 一輪多少秒（words＝字卡拆出來的詞）；連續跑的（跑馬燈）回傳 null */
   len: (words: string[]) => number | null;
+  /** 這一式有副標可以改：輸入框裡灰色提示字（沒打副標時用什麼） */
+  sub?: string;
   /** 原版的固定標籤（標題輪替的「速報」）、預設數字（跳錶）：字卡文字裡沒有時用它 */
   label?: string;
   num?: string;

@@ -479,17 +479,18 @@ export function Preview({
   const fr = fl + lay.fx * 100;
   const fb = ft + lay.fy * 100;
 
-  // 斜線：預覽區裡所有不會輸出的地方（底裡面版面外面、底左右兩側的黑邊）；中間挖掉版面
+  // 斜線：預覽底裡面、版面外面（不會輸出的地方），中間挖掉版面。底左右兩側的黑邊（預覽區比底寬時）不蓋斜線，維持一般的黑底，少一點花紋
   const bx0 = (dim.ww - dim.bw) / 2;
   const by0 = (dim.wh - dim.bh) / 2;
+  const bx1 = bx0 + dim.bw;
+  const by1 = by0 + dim.bh;
   const fx0 = bx0 + (fl / 100) * dim.bw;
   const fy0 = by0 + (ft / 100) * dim.bh;
   const fx1 = bx0 + (fr / 100) * dim.bw;
   const fy1 = by0 + (fb / 100) * dim.bh;
-  const sideBars = dim.ww - dim.bw > 1 || dim.wh - dim.bh > 1;
   const hatch =
-    dim.ww > 0 && (hasOut || sideBars)
-      ? `polygon(evenodd, 0 0, ${dim.ww}px 0, ${dim.ww}px ${dim.wh}px, 0 ${dim.wh}px, 0 0, ${fx0}px ${fy0}px, ${fx0}px ${fy1}px, ${fx1}px ${fy1}px, ${fx1}px ${fy0}px, ${fx0}px ${fy0}px)`
+    dim.ww > 0 && hasOut
+      ? `polygon(evenodd, ${bx0}px ${by0}px, ${bx1}px ${by0}px, ${bx1}px ${by1}px, ${bx0}px ${by1}px, ${bx0}px ${by0}px, ${fx0}px ${fy0}px, ${fx0}px ${fy1}px, ${fx1}px ${fy1}px, ${fx1}px ${fy0}px, ${fx0}px ${fy0}px)`
       : null;
   // 預覽上每一格的編號（暫停、編輯時才有；匯出不會有）
   const badges = !playing && !cropping ? cellBadges(rproject, curT, geo, width, height) : [];

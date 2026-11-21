@@ -80,6 +80,43 @@ export function installDebugHook(player: Player) {
         return { id: def.id, ms: (performance.now() - t0) / 24 };
       });
     },
+    /** 測試用：每一式（一輪有長度的）第一個詞那一輪，每個時間點畫面上「有墨」的比例（跟配色底色不同的像素），用來找「字完整呈現」的時間 */
+    kineticInk: () =>
+      KINETIC.flatMap((def) => {
+        const cycle = def.len([def.words[0]!]);
+        if (cycle === null) return [];
+        const full = def.area === 'full';
+        const W = full ? 180 : 320;
+        const H = full ? 320 : 180;
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        const sch = schemeOf(def);
+        const p = {
+          words: def.words,
+          fg: sch.fg,
+          paper: sch.bg,
+          hi: sch.hi,
+          hifg: sch.hifg,
+          bg: sch.bg,
+          family: canvasFamily(''),
+        };
+        const bg = parseInt(sch.bg.slice(1), 16);
+        const br = (bg >> 16) & 255;
+        const bgG = (bg >> 8) & 255;
+        const bb = bg & 255;
+        const series: number[] = [];
+        const n = 120;
+        for (let i = 0; i <= n; i++) {
+          paintKinetic(c, def, p, (i / n) * cycle, def.fade ?? 'none');
+          const d = c.getContext('2d')!.getImageData(0, 0, W, H).data;
+          let ink = 0;
+          for (let j = 0; j < d.length; j += 4)
+            if (Math.abs(d[j]! - br) + Math.abs(d[j + 1]! - bgG) + Math.abs(d[j + 2]! - bb) > 90) ink++;
+          series.push(ink / (W * H));
+        }
+        return [{ id: def.id, cycle, series }];
+      }),
     kineticList: () => KINETIC.map((f) => ({ id: f.id, zh: f.zh, group: f.group, poster: f.poster })),
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,

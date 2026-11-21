@@ -22,9 +22,9 @@ test('X4 預覽的底固定 9:16：改比例時底、播放列的位置都不動
   const b0 = await base(page);
   expect(b0.width / b0.height).toBeCloseTo(9 / 16, 2);
   const playTop = (await page.getByRole('button', { name: /^(播放|暫停)$/ }).boundingBox())!.y;
-  // 9:16 剛好填滿底：底裡面沒有斜線、也沒有「框內是影片輸出範圍」；預覽區比底寬時，底左右兩側的黑邊也畫斜線（不會輸出）
+  // 9:16 剛好填滿底：底裡面沒有斜線、也沒有「框內是影片輸出範圍」；預覽區比底寬時，底左右兩側只是黑邊（不蓋斜線）
   await expect(page.getByText(/框內是影片輸出範圍/)).toHaveCount(0);
-  await expect(page.getByTestId('out-hatch')).toBeVisible();
+  await expect(page.getByTestId('out-hatch')).toHaveCount(0);
 
   for (const [name, ratio] of [
     [/4:3/, 4 / 3],

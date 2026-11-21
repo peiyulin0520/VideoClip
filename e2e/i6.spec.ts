@@ -105,7 +105,10 @@ test('按下去先不畫：快速點一下不會留下一點；移動超過 4px 
   // 復原一步：只有「按住」的那一筆（快速點的那下沒有留下筆畫），所以復原一次就乾淨了
   await page.getByTestId('crop-undo').tap();
   await expect.poll(() => erasedAt(page, 0.5, 0.5)).toBe(false);
-  await expect(page.getByTestId('crop-polygon')).toBeVisible(); // 圈選的形狀還在
+  await expect(page.getByTestId('crop-polygon')).toHaveCount(0); // 筆刷、橡皮擦時不顯示粉紅框線（直接看結果）
+  await page.getByTestId('crop-tool-lasso').tap();
+  await expect(page.getByTestId('crop-polygon')).toBeVisible(); // 圈選的形狀還在（切回自由才看得到）
+  await page.getByTestId('crop-tool-erase').tap();
   await page.getByTestId('crop-redo').tap();
   await expect.poll(() => erasedAt(page, 0.5, 0.5)).toBe(true);
   await page.screenshot({ path: `${SHOT}/hold-dot.png` });

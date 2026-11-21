@@ -4,6 +4,7 @@ import type { TextItem } from '../../model/types';
 import { canvasFamily } from '../textRender';
 import { fadeEdges, inkOn, splitWords, type KineticDef, type Stage } from './core';
 import { kineticContent, kineticFrame } from './hit';
+import { holdTime } from './hold';
 import { kineticById, resolveBg, schemeOf } from './index';
 
 export type KineticRender = {
@@ -37,10 +38,16 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   const run = item.card.runs[0];
   const fontId = run?.fontId ?? '';
   requestFont(fontId);
-  const tt = Math.max(t, 0) * (k.speed ?? 1);
-  const step = Math.floor(tt * STEP + 1e-6);
   const sch = schemeOf(def);
   const words = kineticWords(item, def.words);
+  let tt = Math.max(t, 0) * (k.speed ?? 1);
+  // 播到字完整呈現就停在那一格（字卡比一輪長、而且選了「停在最後畫面」；一直在跑的那幾式沒有「最後」，不適用）
+  if (k.end === 'hold') {
+    const hold = holdTime(def, words);
+    if (hold !== null) tt = Math.min(tt, hold);
+  }
+  const step = Math.floor(tt * STEP + 1e-6);
+  const sub = k.sub?.trim() || undefined;
   const fg = run?.color ?? sch.fg;
   const hi = k.accent ?? sch.hi;
   const hifg = k.accent ? inkOn(k.accent) : sch.hifg;
@@ -54,6 +61,7 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
     fr.w,
     fr.h,
     words.join('|'),
+    sub ?? '',
     fg,
     hi,
     bg ?? '',
@@ -73,7 +81,7 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   paintKinetic(
     canvas,
     def,
-    { words, fg, paper: sch.bg, hi, hifg, bg, family: canvasFamily(fontId) },
+    { words, sub, fg, paper: sch.bg, hi, hifg, bg, family: canvasFamily(fontId) },
     step / STEP,
     fade,
   );
@@ -84,7 +92,7 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
 export function paintKinetic(
   canvas: HTMLCanvasElement,
   def: KineticDef,
-  p: Pick<Stage, 'words' | 'fg' | 'paper' | 'hi' | 'hifg' | 'bg' | 'family'>,
+  p: Pick<Stage, 'words' | 'fg' | 'paper' | 'hi' | 'hifg' | 'bg' | 'family'> & { sub?: string },
   t: number,
   fade: 'none' | 'v' | 'h' = 'none',
 ) {

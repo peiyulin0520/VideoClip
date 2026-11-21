@@ -38,6 +38,16 @@ export function Editor() {
 function EditorLoader({ projectId }: { projectId: string }) {
   const [status, setStatus] = useState<'loading' | 'missing' | 'ready'>('loading');
 
+  // 每次點進專案都從最上面開始看（首頁捲到哪、上次離開時捲到哪，都不帶進來）
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [projectId]);
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const raf = requestAnimationFrame(() => window.scrollTo(0, 0));
+    return () => cancelAnimationFrame(raf);
+  }, [status]);
+
   useEffect(() => {
     let cancelled = false;
     let autosave: ReturnType<typeof startAutosave> | null = null;

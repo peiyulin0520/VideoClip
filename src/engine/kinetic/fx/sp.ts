@@ -124,13 +124,14 @@ export const FX_SP: KineticDef[] = [
     words: ['循環', '日復一日', '周而復始'],
     poster: 1,
     area: 'wide',
+    sub: '同主標',
     len: () => null,
     draw(s, t) {
       const { g, W, H } = s;
       // 原版是 320×180 的 SVG（meet：整個放進去置中）
       const k = Math.min(W / 320, H / 180);
       const center = s.words[0]!;
-      const unit = (s.words.length > 1 ? s.words.slice(1) : s.words).join('・') + '・';
+      const unit = (s.sub ?? (s.words.length > 1 ? s.words.slice(1) : s.words).join('・')) + '・';
       let str = unit;
       while (wlen(str + unit) <= 27) str += unit;
       const chars = cs(str);
