@@ -518,8 +518,12 @@ button {
 }
 .stage-wrap {
   position: relative;
-  /* 預覽的底永遠是 9:16（不管專案比例）：預覽和下面的播放列、時間軸位置才不會跳。高度最高＝一個螢幕扣掉頂列與播放列。用 svh：Safari 網址列伸縮時不會抖 */
-  height: max(300px, min(calc(100vw * 16 / 9), calc(100svh - var(--top-h) - var(--playbar-h))));
+  /* 預覽的底＝預覽區整塊（不管專案比例；版面在裡面等比放到最大）：預覽和下面的播放列、時間軸位置才不會跳。
+     高度適中（約螢幕的 54%，使用者參考 VideoClip_2）：預覽不會過大，往下就是播放列、時間軸、功能列，不用滑很遠。用 svh：Safari 網址列伸縮時不會抖 */
+  height: max(
+    300px,
+    min(calc(100vw * 16 / 9), calc(100svh - var(--top-h) - var(--playbar-h)), calc(100svh * 0.54))
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -528,8 +532,8 @@ button {
 }
 .stage-base {
   position: relative;
-  width: min(100cqw, calc(100cqh * 9 / 16));
-  aspect-ratio: 9 / 16;
+  width: 100cqw;
+  height: 100cqh;
   overflow: hidden;
   background: #000;
   /* 預覽空白處上下滑＝捲頁面；物件上有看不見的觸控區（.hit，touch-action:none）可以拖 */
@@ -3939,6 +3943,32 @@ button:not(:disabled):active,
 }
 .lr-card {
   z-index: 10;
+  /* 一排小條：位置由程式依框的上邊決定（不蓋住把手） */
+  transform: translateX(-50%);
+  width: min(92%, 340px);
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.4em 0.6em;
+}
+.lr-card .ao-head {
+  order: 3;
+}
+.lr-card .ao-head b {
+  display: none;
+}
+.lr-card .ao-hint {
+  display: none;
+}
+.lr-card > span {
+  flex: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.lr-card .btn {
+  flex: none;
+  min-height: 44px;
+  padding-inline: 1.1em;
 }
 /* 拖格子大小：每格一個虛線框（編號在左上）、格子之間的線上有把手 */
 .lc-cell {
@@ -4298,6 +4328,18 @@ button:not(:disabled):active,
   font-size: var(--fs-body);
   font-weight: 700;
 }
+.size-group + .size-group {
+  margin-top: 12px;
+}
+.size-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: var(--fs-note);
+  color: var(--muted);
+}
 .size-row {
   display: flex;
   flex-wrap: wrap;
@@ -4472,6 +4514,9 @@ button:not(:disabled):active,
 }
 /* 特效分頁「作用在」：名稱太長（例：文字特效 ·巨字橫移）就用刪節號，不把後面的按鈕擠出去 */
 .fx-where .seg-btn {
+  /* 照字的長度分配寬度（5 格等寬的話「文字特效」在窄螢幕會被切掉） */
+  flex: 1 1 auto;
+  padding-inline: 6px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

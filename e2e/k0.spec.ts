@@ -62,7 +62,7 @@ test('K0 動態字卡：特效分頁分組（基本／登場／流動）、選�
   await expect(page.getByTestId('fx-circle-style')).toHaveText('爆');
   await expect(page.getByTestId('fx-circle-style')).toHaveAttribute('aria-label', '文字特效 爆出');
   await expect(page.locator('.fx-span.style')).toHaveCount(1);
-  await expect(page.getByTestId('fx-part-style')).toContainText('爆出');
+  await expect(page.getByTestId('fx-part-style')).toHaveText('文字特效'); // 名字太長會被切掉，特效名稱看效果區的卡片
   // 設定：強調色、底色、速度、一輪幾秒（2 個詞 × 2.2 秒）
   await expect(page.getByTestId('kn-settings')).toContainText('一輪 4.4 秒');
   await page.screenshot({ path: `${SHOT}/k0-effect-tab-390.png` });

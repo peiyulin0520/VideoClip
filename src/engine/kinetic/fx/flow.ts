@@ -59,11 +59,13 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1.5,
     area: 'full',
     fade: 'h',
+    sub: '同主標',
     len: () => null,
     hit: [0, 0.2, 1, 0.6],
     draw(s, t) {
       const { g, W, H, cqmin } = s;
       const unit = s.words.join('・') + '・';
+      const subUnit = (s.sub ?? s.words.join('・')) + '・';
       // 超大的字（字高 58cqmin，範圍＝整個畫面扣掉底下 10cqmin），由右往左慢慢橫移
       marquee(
         s,
@@ -79,7 +81,7 @@ export const FX_FLOW: KineticDef[] = [
       g.fillRect(0, H - sh, W, sh);
       marquee(
         s,
-        unit,
+        subUnit,
         -t * 2.4,
         5.6 * cqmin,
         { x: 0, y: H - sh, w: W, h: sh },

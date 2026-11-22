@@ -13,17 +13,19 @@ async function setRatio(page: Page, name: RegExp) {
   await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
 }
 
-test('X4 預覽的底固定 9:16：改比例時底、播放列的位置都不動；版面在底裡面置中，外面有斜線', async ({
+test('X4 預覽的底＝預覽區整塊：改比例時底、播放列的位置都不動；版面在底裡面置中，外面有斜線', async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm']); // 直式 → 9:16
   await page.evaluate(() => window.scrollTo(0, 0));
   const b0 = await base(page);
-  expect(b0.width / b0.height).toBeCloseTo(9 / 16, 2);
+  const wrap0 = (await page.locator('.stage-wrap').boundingBox())!;
+  expect(Math.abs(b0.width - wrap0.width)).toBeLessThan(1); // 底就是預覽區整塊
+  expect(Math.abs(b0.height - wrap0.height)).toBeLessThan(1);
   const playTop = (await page.getByRole('button', { name: /^(播放|暫停)$/ }).boundingBox())!.y;
-  // 9:16 剛好填滿底：底裡面沒有斜線、也沒有「框內是影片輸出範圍」；預覽區比底寬時，底左右兩側的黑邊也畫斜線（不會輸出）
-  await expect(page.getByText(/框內是影片輸出範圍/)).toHaveCount(0);
+  // 9:16 的版面比預覽區窄：左右兩側（版面外面）蓋斜線、有「框內是影片輸出範圍」
+  await expect(page.getByText(/框內是影片輸出範圍/)).toBeVisible();
   await expect(page.getByTestId('out-hatch')).toBeVisible();
 
   for (const [name, ratio] of [
@@ -178,7 +180,7 @@ test('X4 自訂比例：套用後在預覽上拖右邊把手 → 寬:高即時�
   const t1 = await page.getByTestId('aspect-text').innerText();
   expect(t1).not.toBe(t0);
   const fb2 = (await page.getByTestId('aspect-frame').boundingBox())!;
-  const expected = (fb2.width / fb2.height) * (16 / 9) * (9 / 16); // 框的寬高比（CSS 像素）
+  const expected = fb2.width / fb2.height; // 框的寬高比（CSS 像素）
   await page.getByTestId('aspect-apply').tap();
   await expect(page.getByTestId('aspect-overlay')).toHaveCount(0);
   const m = await meta();

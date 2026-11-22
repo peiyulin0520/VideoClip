@@ -21,3 +21,26 @@ describe('stageLayout', () => {
     expect(l.offY).toBe(0);
   });
 });
+
+describe('預覽底的寬高比', () => {
+  it('previewSizeFor：有給預覽區寬高比時，整張底（含版面外面）的長邊才是 480／960', async () => {
+    const { previewSizeFor } = await import('./previewQuality');
+    // 沒給：版面自己的長邊（舊行為）
+    expect(previewSizeFor({ width: 1080, height: 1920 }, true)).toEqual({ width: 270, height: 480 });
+    // 預覽區比 9:16 寬（0.86）：底 ＝ 高度填滿、寬 1652×1920 → 長邊還是高
+    const a = previewSizeFor({ width: 1080, height: 1920 }, true, 0.86);
+    expect(a.height).toBe(480);
+    // 預覽區比版面「更寬更矮」（1.09）：底的寬比高長 → 長邊是底的寬，版面縮得比較小
+    const b = previewSizeFor({ width: 1080, height: 1920 }, true, 1.09);
+    expect(b.height).toBeLessThan(480);
+    const lay = stageLayout(b.width, b.height, 1.09);
+    expect(Math.max(lay.baseW, lay.baseH)).toBeLessThanOrEqual(481);
+  });
+  it('stageLayout：給預覽區寬高比時，版面在底裡面等比放最大、置中', () => {
+    const l = stageLayout(960, 540, 0.86); // 16:9 的版面放進 0.86 的底：寬度填滿
+    expect(l.baseW).toBe(960);
+    expect(l.baseH).toBe(Math.round(960 / 0.86));
+    expect(l.offX).toBe(0);
+    expect(l.fx).toBe(1);
+  });
+});

@@ -322,6 +322,8 @@ export class Compositor {
         const sw = Math.max(layer.srcW * (1 - crop.l - crop.r), 1);
         const sh = Math.max(layer.srcH * (1 - crop.t - crop.b), 1);
         try {
+          // 先清掉：版型外框這種有透明區的圖換了新的以後，舊的圖不能留在底下（會出現兩個版型疊在一起）
+          o.frameCtx.clearRect(0, 0, fw, fh);
           o.frameCtx.drawImage(layer.source, sx, sy, sw, sh, 0, 0, fw, fh);
           o.textureSource?.update();
           o.hasFrame = true;

@@ -1243,6 +1243,8 @@ export function patchKinetic(
     bg?: string | undefined;
     speed?: number | undefined;
     fade?: KineticFade | undefined;
+    sub?: string | undefined;
+    end?: 'loop' | 'hold' | undefined;
   },
 ): void {
   editItem(

@@ -1,8 +1,14 @@
-// 預覽的「底」永遠是 9:16（預覽和下面的播放列、時間軸位置才不會因為改比例而跳動）。
+// 預覽的「底」＝預覽區整塊（寬 × 固定高度；預覽和下面的播放列、時間軸位置才不會因為改比例而跳動）。
 // 專案的輸出範圍（版面）在底裡面置中、等比放到最大；範圍外的東西也畫，只是蓋一層斜線。
+// 底的寬高比＝預覽區現在的寬高比（量出來之後用 setBaseAspect 記著；還沒量到之前用 9:16）。
 
-export const BASE_W = 9;
-export const BASE_H = 16;
+export const DEFAULT_BASE_ASPECT = 9 / 16;
+let baseAspect = DEFAULT_BASE_ASPECT;
+export const getBaseAspect = () => baseAspect;
+/** 預覽區的寬 ÷ 高（四捨五入到 0.01，量到的比例差一點點不用重建預覽引擎） */
+export function setBaseAspect(a: number) {
+  baseAspect = Number.isFinite(a) && a > 0.2 && a < 5 ? Math.round(a * 100) / 100 : DEFAULT_BASE_ASPECT;
+}
 
 export type StageLayout = {
   /** 底（canvas）的寬高，單位跟輸入的版面寬高一樣 */
@@ -16,10 +22,10 @@ export type StageLayout = {
   fy: number;
 };
 
-export function stageLayout(w: number, h: number): StageLayout {
-  const wider = w * BASE_H >= h * BASE_W; // 版面比 9:16 寬（或一樣）→ 寬度填滿；比較窄 → 高度填滿
-  const baseW = wider ? w : Math.round((h * BASE_W) / BASE_H);
-  const baseH = wider ? Math.round((w * BASE_H) / BASE_W) : h;
+export function stageLayout(w: number, h: number, aspect = baseAspect): StageLayout {
+  const wider = w >= h * aspect; // 版面比底寬（或一樣）→ 寬度填滿；比較窄 → 高度填滿
+  const baseW = wider ? w : Math.round(h * aspect);
+  const baseH = wider ? Math.round(w / aspect) : h;
   return {
     baseW,
     baseH,

@@ -38,7 +38,7 @@ const PREFETCH_S = 1.0;
 /** 有轉場的片段多提前這麼多秒開始準備（要同時解兩支影片，來不及會卡） */
 const PREFETCH_TRANSITION_S = 1.5;
 /** 轉場的 B 提早這麼多秒開始（靜音）播放暖機 */
-const WARM_S = 0.4;
+const WARM_S = 0.8;
 const POOL_SIZE = 6;
 const MUSIC_POOL_SIZE = 3;
 
@@ -48,8 +48,9 @@ export { driftPlan };
 export function previewSize(
   p: Pick<Project, 'width' | 'height'>,
   smooth = false,
+  aspect?: number,
 ): { width: number; height: number } {
-  return previewSizeFor(p, smooth);
+  return previewSizeFor(p, smooth, aspect);
 }
 
 /**
@@ -111,10 +112,12 @@ export class Player {
     readonly audio: AudioOut = new AudioOut(),
   ) {}
 
-  static async create(opts: { host: HTMLElement; canvas: HTMLCanvasElement } & Deps): Promise<Player> {
+  static async create(
+    opts: { host: HTMLElement; canvas: HTMLCanvasElement; aspect?: number } & Deps,
+  ): Promise<Player> {
     const p = opts.getProject();
-    const size = p ? previewSize(p, opts.smooth) : { width: 540, height: 960 };
-    const lay = stageLayout(size.width, size.height);
+    const size = p ? previewSize(p, opts.smooth, opts.aspect) : { width: 540, height: 960 };
+    const lay = stageLayout(size.width, size.height, opts.aspect);
     const compositor = await Compositor.create({
       ...size,
       canvas: opts.canvas,

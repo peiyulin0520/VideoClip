@@ -190,66 +190,76 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
   return (
     <div className="zone-soft" data-testid="layout-shape">
       <div className="zone-title">大小與格數</div>
-      <div className="size-row">
-        <button
-          className="btn"
-          data-testid="layout-resize"
-          onClick={() => {
-            player?.pause();
-            useUI.setState({ layoutEdit: { group, sx: 1, sy: 1 } });
-          }}
-        >
-          拖邊調整大小
-        </button>
-        <span className="size-now" data-testid="layout-size-now">
-          {Math.round(box.w * 100)}% × {Math.round(box.h * 100)}%
-        </span>
-        <button
-          className="btn"
-          data-testid="layout-size-reset"
-          disabled={full}
-          onClick={() => void reshapeLayout(group, { box: { w: 1, h: 1 } })}
-        >
-          重置大小
-        </button>
+      <div className="size-group">
+        <div className="size-label">
+          <span>整個版型</span>
+          <span className="size-now" data-testid="layout-size-now">
+            {Math.round(box.w * 100)}% × {Math.round(box.h * 100)}%
+          </span>
+        </div>
+        <div className="size-row">
+          <button
+            className="btn"
+            data-testid="layout-resize"
+            onClick={() => {
+              player?.pause();
+              useUI.setState({ layoutEdit: { group, sx: 1, sy: 1 } });
+            }}
+          >
+            調整整體大小
+          </button>
+          <button
+            className="btn"
+            data-testid="layout-size-reset"
+            disabled={full}
+            onClick={() => void reshapeLayout(group, { box: { w: 1, h: 1 } })}
+          >
+            重置
+          </button>
+        </div>
       </div>
-      <div className="size-row">
-        <button
-          className="btn"
-          data-testid="layout-cell-resize"
-          onClick={() => {
-            player?.pause();
-            const b = buildIn(
-              defOf(style),
-              project.width,
-              project.height,
-              style.box,
-              style.line,
-              style.cells,
-            );
-            useUI.setState({
-              cellEdit: {
-                group,
-                cells: b.windows.map((w) => ({
-                  x: w.x / project.width,
-                  y: w.y / project.height,
-                  w: w.w / project.width,
-                  h: w.h / project.height,
-                })),
-              },
-            });
-          }}
-        >
-          拖格子大小
-        </button>
-        <button
-          className="btn"
-          data-testid="layout-cell-reset"
-          disabled={!style.cells}
-          onClick={() => void reshapeLayout(group, { cells: undefined })}
-        >
-          重置格子大小
-        </button>
+      <div className="size-group">
+        <div className="size-label">
+          <span>各格</span>
+        </div>
+        <div className="size-row">
+          <button
+            className="btn"
+            data-testid="layout-cell-resize"
+            onClick={() => {
+              player?.pause();
+              const b = buildIn(
+                defOf(style),
+                project.width,
+                project.height,
+                style.box,
+                style.line,
+                style.cells,
+              );
+              useUI.setState({
+                cellEdit: {
+                  group,
+                  cells: b.windows.map((w) => ({
+                    x: w.x / project.width,
+                    y: w.y / project.height,
+                    w: w.w / project.width,
+                    h: w.h / project.height,
+                  })),
+                },
+              });
+            }}
+          >
+            調整各格大小
+          </button>
+          <button
+            className="btn"
+            data-testid="layout-cell-reset"
+            disabled={!style.cells}
+            onClick={() => void reshapeLayout(group, { cells: undefined })}
+          >
+            重置
+          </button>
+        </div>
       </div>
       {style.layout === 'grid' && (
         <div className="grid-steppers" data-testid="shape-steppers">

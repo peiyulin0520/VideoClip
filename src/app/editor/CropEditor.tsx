@@ -173,6 +173,9 @@ function Editor() {
   const dimTile = useMemo(() => tile('dim'), []);
   const checkTile = useMemo(() => tile('check'), []);
 
+  // 筆刷、橡皮擦時看到的就是「檢查結果」的樣子（去掉的地方是棋盤格、沒有粉紅框線），直接在上面刷
+  const checkLook = (st: { checking: boolean; tool: string }) =>
+    st.checking || st.tool === 'brush' || st.tool === 'erase';
   const rebuild = (checking: boolean) => {
     const cur = useCrop.getState().s;
     const tint = tintRef.current;
@@ -189,10 +192,11 @@ function Editor() {
     g.drawImage(keep, 0, 0);
     g.globalCompositeOperation = 'source-over';
   };
+  const looksChecked = checkLook(s);
   useEffect(() => {
-    rebuild(s.checking);
+    rebuild(looksChecked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s.crop, s.mask, s.strokes, s.base, s.checking, keep]);
+  }, [s.crop, s.mask, s.strokes, s.base, looksChecked, keep]);
 
   /** 刷的時候：只畫這一小段（keep 和 tint 都增量更新，不重畫整張、不動 React 狀態） */
   const paintSeg = (a: Pt, b: Pt, mode: 'keep' | 'erase', w: number) => {
@@ -201,7 +205,7 @@ function Editor() {
     const g = tintRef.current?.getContext('2d');
     if (!g) return;
     // 留下＝tint 把這裡挖掉；去掉＝tint 把這裡蓋回斜線
-    const pat = g.createPattern(dimTile, 'repeat')!;
+    const pat = g.createPattern(checkLook(useCrop.getState().s!) ? checkTile : dimTile, 'repeat')!;
     drawStroke(
       g,
       { ...seg, mode: mode === 'keep' ? 'erase' : 'keep' },
@@ -364,7 +368,7 @@ function Editor() {
     };
     abortRef.current = () => {
       done();
-      if (drawing) rebuild(useCrop.getState().s!.checking); // 這一筆不算：整張重畫回來
+      if (drawing) rebuild(checkLook(useCrop.getState().s!)); // 這一筆不算：整張重畫回來
     };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
@@ -558,7 +562,7 @@ function Editor() {
               <div className="ce-media ce-nomedia">（沒有預覽畫面）</div>
             )}
             <canvas ref={tintRef} className="crop-tint" data-testid="crop-tint" aria-hidden="true" />
-            {poly && poly.length >= 2 && showTools && (
+            {poly && poly.length >= 2 && showTools && s.tool !== 'brush' && s.tool !== 'erase' && (
               <svg className="crop-poly" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
                 {lassoPts ? (
                   <polyline points={poly.map((p) => p.join(',')).join(' ')} />

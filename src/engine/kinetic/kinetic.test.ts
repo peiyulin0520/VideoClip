@@ -248,3 +248,44 @@ describe('動態字卡：K4 的共用工具', () => {
     expect(schemeOf(kineticById('star')!).hi).toBe('#2340ff');
   });
 });
+
+describe('動態字卡：副標、停在最後畫面', () => {
+  it('副標：巨字橫移的底帶、環繞的圈上字、標題輪替的標籤用使用者打的副標；沒打就用原來的', () => {
+    for (const [id, words] of [
+      ['crawl', ['主標']],
+      ['orbit', ['中間', '圈上']],
+      ['swapline', ['新聞一', '新聞二']],
+    ] as const) {
+      const def = kineticById(id)!;
+      expect(def.sub, id).toBeTruthy();
+      const base = stage([...words]);
+      def.draw(base.s, 1.5);
+      const withSub = stage([...words]);
+      withSub.s.sub = '獨家副標';
+      def.draw(withSub.s, 1.5);
+      expect(withSub.log.join('\n'), id).toContain('獨'); // 有的式子一個字一個字畫
+      expect(base.log.join('\n'), id).not.toContain('獨');
+    }
+    // 沒有副標可改的式子沒有 sub
+    expect(kineticById('cube')!.sub).toBeUndefined();
+  });
+  it('holdTime：最後一個詞那一輪裡字完整呈現的那一刻；一直在跑的式子（跑馬燈）沒有', async () => {
+    const { holdTime, HOLD_F } = await import('./hold');
+    const vpop = kineticById('vpop')!; // 每個詞 2.2 秒
+    expect(holdTime(vpop, ['a', 'b', 'c'])).toBeCloseTo(4.4 + HOLD_F.vpop! * 2.2, 6);
+    expect(holdTime(vpop, ['a'])).toBeCloseTo(HOLD_F.vpop! * 2.2, 6);
+    const emph = kineticById('emph')!; // 兩個詞一組、一組 2.8 秒
+    expect(holdTime(emph, ['a', 'b', 'c', 'd'])).toBeCloseTo(2.8 + HOLD_F.emph! * 2.8, 6);
+    expect(holdTime(kineticById('crawl')!, ['a'])).toBeNull();
+    // 每一式（一輪有長度的）都有停點、在最後一輪裡面
+    for (const f of KINETIC) {
+      const w = f.words;
+      const total = f.len(w);
+      if (total === null) continue;
+      const h = holdTime(f, w)!;
+      const last = f.len([w[w.length - 1]!])!;
+      expect(h, f.id).toBeGreaterThanOrEqual(total - last);
+      expect(h, f.id).toBeLessThanOrEqual(total);
+    }
+  });
+});

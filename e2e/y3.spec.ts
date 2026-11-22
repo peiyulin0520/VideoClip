@@ -33,7 +33,7 @@ test('Y3 預覽：不播放時每一格有編號；播放時所有編輯框（�
   await expect(page.getByTestId('selbox')).toBeVisible();
 });
 
-test('Y3 斜線：3:4 專案，預覽區裡所有不輸出的地方（含底左右兩側）都蓋斜線，只挖掉版面', async ({ page }) => {
+test('Y3 斜線：3:4 專案，預覽區裡所有不輸出的地方都蓋斜線，只挖掉版面', async ({ page }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm']);
   await setRatio(page, /3:4/);

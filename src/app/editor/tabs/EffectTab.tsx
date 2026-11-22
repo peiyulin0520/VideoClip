@@ -29,7 +29,7 @@ import { KINETIC, KINETIC_GROUPS, kineticById, resolveBg, schemeOf } from '../..
 import { kineticFrame } from '../../../engine/kinetic/hit';
 import type { KineticDef, KineticGroup } from '../../../engine/kinetic/core';
 import { kineticWords } from '../../../engine/kinetic/render';
-import { TEXT_FXS, textFxName } from '../../../engine/textFx';
+import { TEXT_FXS } from '../../../engine/textFx';
 import { ColorPicker } from '../../../ui/ColorPicker';
 import { KineticCard } from '../KineticCards';
 import { useProjectStore } from '../../../store/projectStore';
@@ -92,9 +92,6 @@ export function EffectTab({ found }: { found: Found }) {
                   {k === 'in' && item.inEffect ? ` ·${transitionName(item.inEffect.kind)}` : ''}
                   {k === 'out' && item.outEffect ? ` ·${transitionName(item.outEffect.kind)}` : ''}
                   {k === 'seam' && item.transitionIn ? ` ·${transitionName(item.transitionIn.kind)}` : ''}
-                  {k === 'style' && item.type === 'text' && (item.kinetic || item.textFx)
-                    ? ` ·${item.kinetic ? (kineticById(item.kinetic.id)?.zh ?? '') : textFxName(item.textFx!.kind)}`
-                    : ''}
                   {k === 'whole' && item.motion ? ` ·${item.motion === 'drift' ? '捲動' : '滑入滑出'}` : ''}
                 </button>
               ))}
@@ -344,8 +341,22 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
           ))}
         </div>
       </div>
+      {def.sub && (
+        <div className="zone-soft" data-testid="kn-sub">
+          <div className="zone-title">副標</div>
+          <input
+            className="text-input"
+            data-testid="kn-sub-input"
+            aria-label="副標文字"
+            maxLength={40}
+            placeholder={def.sub}
+            value={k.sub ?? ''}
+            onChange={(e) => patchKinetic(item.id, { sub: e.target.value || undefined })}
+          />
+        </div>
+      )}
       <div className="zone-soft" data-testid="kn-speed">
-        <div className="zone-title">速度</div>
+        <div className="zone-title">速度與播放</div>
         <div className="chips" role="radiogroup" aria-label="動態字卡速度">
           {KINETIC_SPEEDS.map((v) => (
             <button
@@ -361,6 +372,31 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
           ))}
         </div>
         {len !== null && <div className="slider-label">一輪 {(len / speed).toFixed(1)} 秒</div>}
+        {len !== null && (
+          <>
+            <div className="slider-label">字卡比一輪長時</div>
+            <div className="chips" role="radiogroup" aria-label="字卡比一輪長時">
+              {(
+                [
+                  ['loop', '重複播放'],
+                  ['hold', '停在最後畫面'],
+                ] as const
+              ).map(([id, name]) => (
+                <button
+                  key={id}
+                  role="radio"
+                  aria-checked={(k.end ?? 'loop') === id}
+                  aria-label={name}
+                  data-testid={`kn-end-${id}`}
+                  className={`chip${(k.end ?? 'loop') === id ? ' active' : ''}`}
+                  onClick={() => patchKinetic(item.id, { end: id === 'loop' ? undefined : id })}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

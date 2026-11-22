@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { useRef, type PointerEvent as RPointerEvent } from 'react';
 import { ratioText } from '../../model/defaults';
+import { getBaseAspect } from '../../engine/stage';
 import { setProjectCustomRatio } from '../../store/actions';
 import { useUI } from '../../store/uiStore';
 
@@ -16,7 +17,7 @@ export function AspectOverlay({ baseRef }: { baseRef: React.RefObject<HTMLDivEle
   const edit = useUI((s) => s.frameEdit);
   const start = useRef<{ x: number; y: number; fx: number; fy: number } | null>(null);
   if (!edit) return null;
-  const ratio = (edit.fx * 9) / (edit.fy * 16); // 框的寬高比（底是 9:16）
+  const ratio = (edit.fx * getBaseAspect()) / edit.fy; // 框的寬高比（底的寬高比 × 框占底的寬 ÷ 高）
   const text = ratioText(Math.round(ratio * 1000), 1000);
   const set = (fx: number, fy: number) =>
     useUI.setState({ frameEdit: { ...edit, fx: clamp(fx, MIN, 1), fy: clamp(fy, MIN, 1) } });
