@@ -41,10 +41,9 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   const sch = schemeOf(def);
   const words = kineticWords(item, def.words);
   let tt = Math.max(t, 0) * (k.speed ?? 1);
-  // 播到字完整呈現就停在那一格（字卡比一輪長、而且選了「停在最後畫面」；一直在跑的那幾式沒有「最後」，不適用）
+  // 播到字完整呈現就停在那一格（字卡比一輪長、而且選了「停在最後畫面」；一直在跑的那幾式跑到代表畫面就停）
   if (k.end === 'hold') {
-    const hold = holdTime(def, words);
-    if (hold !== null) tt = Math.min(tt, hold);
+    tt = Math.min(tt, holdTime(def, words));
   }
   const step = Math.floor(tt * STEP + 1e-6);
   const sub = k.sub?.trim() || undefined;

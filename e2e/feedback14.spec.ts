@@ -10,7 +10,9 @@ import {
   isWhite,
   openTab,
   project,
+  regionHash,
   samplePreview,
+  seekTo,
   selectFrame,
 } from './helpers';
 
@@ -220,7 +222,9 @@ test('回報14 副標：有副標的特效多一個副標輸入框，打了就�
   await page.screenshot({ path: `${SHOT}/kinetic-sub-390.png` });
 });
 
-test('回報14 字卡比一輪長時：重複播放／停在最後畫面（一直在跑的特效沒有這個選項）', async ({ page }) => {
+test('回報14 字卡比一輪長時：重複播放／停在最後畫面（每一式都有，一直在跑的停在代表畫面）', async ({
+  page,
+}) => {
   test.setTimeout(150_000);
   await addKinetic(page);
   await page.getByTestId('kn-group-in').tap();
@@ -233,6 +237,32 @@ test('回報14 字卡比一輪長時：重複播放／停在最後畫面（一�
   await expect.poll(async () => (await textItem(page)).kinetic?.end).toBeUndefined();
   await page.getByTestId('kn-group-flow').tap();
   await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
-  await expect(page.getByTestId('kn-end-hold')).toHaveCount(0);
+  await expect(page.getByTestId('kn-end-hold')).toBeVisible();
   await page.screenshot({ path: `${SHOT}/kinetic-end-390.png` });
+});
+
+test('回報14 停在最後畫面：選了之後過了停點畫面不再動；重複播放照舊一直動（含一直在跑的巨字橫移）', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await addKinetic(page);
+  await page.getByTestId('kn-group-flow').tap();
+  await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
+  const it = await textItem(page);
+  const dur = ((await project(page)).tracks as unknown as { items: { id: string; duration: number }[] }[])
+    .flatMap((t) => t.items)
+    .find((i) => i.id === it.id)!.duration;
+  expect(dur).toBeGreaterThan(2.8);
+  const full: [number, number, number, number] = [0, 0, 1, 1];
+  const at = async (t: number) => {
+    await seekTo(page, t);
+    await page.waitForTimeout(400);
+    return regionHash(page, full);
+  };
+  // 重複播放：一直在動
+  expect(await at(1.9)).not.toBe(await at(2.8));
+  // 停在最後畫面：停點（巨字橫移＝代表畫面 1.5 秒）之後不再動
+  await page.getByTestId('kn-end-hold').tap();
+  expect(await at(1.9)).toBe(await at(2.8));
+  expect(await at(0.5)).not.toBe(await at(1.9)); // 停點之前照樣在動
 });

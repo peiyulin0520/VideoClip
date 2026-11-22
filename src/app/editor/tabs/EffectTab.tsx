@@ -372,31 +372,29 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
           ))}
         </div>
         {len !== null && <div className="slider-label">一輪 {(len / speed).toFixed(1)} 秒</div>}
-        {len !== null && (
-          <>
-            <div className="slider-label">字卡比一輪長時</div>
-            <div className="chips" role="radiogroup" aria-label="字卡比一輪長時">
-              {(
-                [
-                  ['loop', '重複播放'],
-                  ['hold', '停在最後畫面'],
-                ] as const
-              ).map(([id, name]) => (
-                <button
-                  key={id}
-                  role="radio"
-                  aria-checked={(k.end ?? 'loop') === id}
-                  aria-label={name}
-                  data-testid={`kn-end-${id}`}
-                  className={`chip${(k.end ?? 'loop') === id ? ' active' : ''}`}
-                  onClick={() => patchKinetic(item.id, { end: id === 'loop' ? undefined : id })}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+        <>
+          <div className="slider-label">字卡比一輪長時</div>
+          <div className="chips" role="radiogroup" aria-label="字卡比一輪長時">
+            {(
+              [
+                ['loop', '重複播放'],
+                ['hold', '停在最後畫面'],
+              ] as const
+            ).map(([id, name]) => (
+              <button
+                key={id}
+                role="radio"
+                aria-checked={(k.end ?? 'loop') === id}
+                aria-label={name}
+                data-testid={`kn-end-${id}`}
+                className={`chip${(k.end ?? 'loop') === id ? ' active' : ''}`}
+                onClick={() => patchKinetic(item.id, { end: id === 'loop' ? undefined : id })}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </>
       </div>
     </div>
   );
