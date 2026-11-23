@@ -12,15 +12,11 @@ import { findItem } from '../../../engine/timeline';
 import { BLEND_LABELS } from '../../../engine/geometry';
 import type { BlendMode } from '../../../model/types';
 
-export type Tab = 'edit' | 'overlay' | 'text' | 'layers' | 'layout' | 'effect' | 'color' | 'assets' | 'audio';
-export type Panel = 'speed' | 'volume' | 'trim' | null;
+export type Panel = 'speed' | 'volume' | 'fade' | 'trim' | null;
 export type Found = ReturnType<typeof findItem>;
 
-/** 功能列第一層的 7 個類別（docs/plans/2026-11-23-roadmap-ui.md §1.2） */
+/** 功能列第一層的 7 個類別（docs/plans/2026-11-23-u6-function-bar.md） */
 export type CatId = 'edit' | 'add' | 'text' | 'layout' | 'effect' | 'color' | 'audio';
-/** 第三層升起的小視窗：每個都是原本某個分頁（或分頁的一部分）的內容 */
-export type ToolId = 'clip' | 'layers' | 'sticker' | 'textedit' | 'layout' | 'effect' | 'color' | 'audio';
-
 export const CATS: { id: CatId; label: string; icon: LucideIcon }[] = [
   { id: 'edit', label: '剪輯', icon: Scissors },
   { id: 'add', label: '加入', icon: ImagePlus },
@@ -31,47 +27,25 @@ export const CATS: { id: CatId; label: string; icon: LucideIcon }[] = [
   { id: 'audio', label: '音訊', icon: Music },
 ];
 
-/** 只有一個工具的類別：點了類別就直接升起那個視窗 */
-export const SINGLE_TOOL: Partial<Record<CatId, ToolId>> = {
-  layout: 'layout',
-  effect: 'effect',
-  color: 'color',
-  audio: 'audio',
-};
+/** 工具按鈕圖示那一格要顯示的「目前的值」（項目名固定不變，只換這一格） */
+export type Badge =
+  | { type: 'char'; text: string } // 特效的代表字小圓圈（跟時間軸上的同款）
+  | { type: 'swatch'; color: string; opacity?: number } // 顏色小色塊
+  | { type: 'text'; text: string } // 很短的值（音量「80%」、變速「2x」）
+  | { type: 'dot' }; // 有設定，值要打開視窗才看得到（圖示右上角小圓點）
 
-export const TOOL_TITLE: Record<ToolId, string> = {
-  clip: '片段設定',
-  layers: '位置與大小',
-  sticker: '貼圖',
-  textedit: '文字',
-  layout: '版型',
-  effect: '特效',
-  color: '色調',
-  audio: '音訊',
-};
-
-/** 舊的分頁 id（別處用 requestTab 要求切分頁）對應到新的類別／視窗 */
-export function targetOfTab(t: Tab): { cat: CatId; tool: ToolId | null } {
-  switch (t) {
-    case 'edit':
-      return { cat: 'edit', tool: null };
-    case 'overlay':
-      return { cat: 'add', tool: null };
-    case 'assets':
-      return { cat: 'add', tool: 'sticker' };
-    case 'text':
-      return { cat: 'text', tool: 'textedit' };
-    case 'layers':
-      return { cat: 'edit', tool: 'layers' };
-    case 'layout':
-      return { cat: 'layout', tool: 'layout' };
-    case 'effect':
-      return { cat: 'effect', tool: 'effect' };
-    case 'color':
-      return { cat: 'color', tool: 'color' };
-    case 'audio':
-      return { cat: 'audio', tool: 'audio' };
-  }
+export function BadgeView({ badge }: { badge: Badge }) {
+  if (badge.type === 'char') return <i className="badge-char">{badge.text}</i>;
+  if (badge.type === 'swatch')
+    return (
+      <i
+        className="badge-swatch"
+        style={{ background: badge.color, opacity: badge.opacity ?? 1 }}
+        aria-hidden="true"
+      />
+    );
+  if (badge.type === 'text') return <i className="badge-text">{badge.text}</i>;
+  return null;
 }
 
 export function ToolButton({
@@ -81,7 +55,9 @@ export function ToolButton({
   onClick,
   active,
   fill,
-  disabled,
+  dim,
+  danger,
+  badge,
   testId,
 }: {
   icon: LucideIcon;
@@ -90,21 +66,32 @@ export function ToolButton({
   ariaLabel?: string;
   onClick: () => void;
   active?: boolean;
-  /** 圖示實心（例如這個時間有定格時的菱形） */
+  /** 圖示實心（例如這個時間有關鍵格時的菱形） */
   fill?: boolean;
-  disabled?: boolean;
+  /** 現在不能用：按鈕變淡，但還是點得到（點了提示要先選什麼） */
+  dim?: boolean;
+  danger?: boolean;
+  badge?: Badge | null;
   testId?: string;
 }) {
+  const showBadge = badge && badge.type !== 'dot';
   return (
     <button
-      className={`tool${active ? ' active' : ''}`}
+      className={`tool${active ? ' active' : ''}${dim ? ' dim' : ''}${danger ? ' danger' : ''}`}
       onClick={onClick}
       aria-label={ariaLabel ?? label}
       aria-pressed={fill === undefined ? undefined : fill}
-      disabled={disabled}
+      aria-disabled={dim ? true : undefined}
       data-testid={testId}
     >
-      <Icon size={22} fill={fill ? 'currentColor' : 'none'} aria-hidden="true" />
+      <span className="tool-ico">
+        {showBadge ? (
+          <BadgeView badge={badge} />
+        ) : (
+          <Icon size={22} fill={fill ? 'currentColor' : 'none'} aria-hidden="true" />
+        )}
+        {badge?.type === 'dot' && <i className="badge-dot" aria-hidden="true" />}
+      </span>
       <span>{label}</span>
     </button>
   );

@@ -43,7 +43,11 @@ export function ClipPanel({
       setTrackItems(f.track.id, next, coalesce ? { coalesce } : undefined);
     };
     return (
-      <div className="panel" role="group" aria-label={panel === 'speed' ? '變速' : '音量'}>
+      <div
+        className="panel"
+        role="group"
+        aria-label={panel === 'speed' ? '變速' : panel === 'fade' ? '淡入淡出' : '音量'}
+      >
         {panel === 'speed' ? (
           <>
             <div className="panel-head">
@@ -72,6 +76,27 @@ export function ClipPanel({
                 </button>
               ))}
             </div>
+          </>
+        ) : panel === 'fade' ? (
+          <>
+            <Slider
+              label="淡入"
+              value={selected.fadeIn ?? 0}
+              min={0}
+              max={Math.max(Math.min(5, Math.round((selected.duration / 2) * 10) / 10), 0.1)}
+              step={0.1}
+              format={(v) => `${v.toFixed(1)} 秒`}
+              onChange={(v) => setVideo({ fadeIn: v }, `fi:${selected.id}`)}
+            />
+            <Slider
+              label="淡出"
+              value={selected.fadeOut ?? 0}
+              min={0}
+              max={Math.max(Math.min(5, Math.round((selected.duration / 2) * 10) / 10), 0.1)}
+              step={0.1}
+              format={(v) => `${v.toFixed(1)} 秒`}
+              onChange={(v) => setVideo({ fadeOut: v }, `fo:${selected.id}`)}
+            />
           </>
         ) : (
           <>
@@ -106,24 +131,6 @@ export function ClipPanel({
                 </button>
               ))}
             </div>
-            <Slider
-              label="淡入"
-              value={selected.fadeIn ?? 0}
-              min={0}
-              max={Math.max(Math.min(5, Math.round((selected.duration / 2) * 10) / 10), 0.1)}
-              step={0.1}
-              format={(v) => `${v.toFixed(1)} 秒`}
-              onChange={(v) => setVideo({ fadeIn: v }, `fi:${selected.id}`)}
-            />
-            <Slider
-              label="淡出"
-              value={selected.fadeOut ?? 0}
-              min={0}
-              max={Math.max(Math.min(5, Math.round((selected.duration / 2) * 10) / 10), 0.1)}
-              step={0.1}
-              format={(v) => `${v.toFixed(1)} 秒`}
-              onChange={(v) => setVideo({ fadeOut: v }, `fo:${selected.id}`)}
-            />
           </>
         )}
         <button className="btn primary done" onClick={() => setPanel(null)}>

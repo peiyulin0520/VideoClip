@@ -4673,3 +4673,56 @@ button:not(:disabled):active,
   border-radius: 2px;
   background: var(--accent);
 }
+
+/* ---- 功能列工具按鈕：圖示那一格換成「目前的值」；現在不能用的變淡 ---- */
+.tool-ico {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+}
+.tool.dim {
+  opacity: 0.4;
+}
+.tool.danger {
+  color: #ff6b6b;
+}
+.badge-char {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-style: normal;
+  font-size: var(--fs-note);
+  line-height: 1;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 50%;
+}
+.badge-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--fg) 45%, transparent);
+}
+.badge-text {
+  font-style: normal;
+  font-size: var(--fs-note);
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.badge-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border: 1.5px solid var(--panel);
+  border-radius: 50%;
+}

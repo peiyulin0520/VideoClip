@@ -1,16 +1,13 @@
-import { Palette } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ADJUST_KEYS, ADJUST_LABELS, fullAdjust, gradeRGB, LOOKS, type LookDef } from '../../engine/grade';
 import { hasKeyframes, keyframeNear, manualAdjustAt } from '../../engine/keyframes';
 import { thumbOf } from '../../engine/labels';
 import type { Item, Project } from '../../model/types';
 import {
-  applyGradeToAll,
   clearKeyframeGrade,
   gradeScopeOf,
   keyframeHasGrade,
   keyframeTarget,
-  resetGrade,
   setAdjust,
   setLook,
 } from '../../store/actions';
@@ -114,7 +111,16 @@ function LookCard({
   );
 }
 
-export function ColorPanel({ item, project }: { item: Item; project: Project }) {
+export function ColorPanel({
+  item,
+  project,
+  part,
+}: {
+  item: Item;
+  project: Project;
+  /** look＝色調組合（含強度）；adjust＝11 條調整滑桿（功能列每一項各自一個視窗） */
+  part: 'look' | 'adjust';
+}) {
   const player = useUI((s) => s.player);
   const asset =
     item.type !== 'text' && item.type !== 'audio'
@@ -165,11 +171,6 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
 
   return (
     <div className="color-panel" data-testid="color-panel">
-      <div className="panel-head">
-        <span>
-          <Palette size={16} /> 色調
-        </span>
-      </div>
       {hasKf && (
         <div className="grade-scope" role="radiogroup" aria-label="套用到">
           <span>套用到</span>
@@ -200,24 +201,26 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
             : '改的是播放線碰到的這個定格，兩個定格之間的色調會漸漸變過去。'}
         </p>
       )}
-      <div className="look-row" role="radiogroup" aria-label="色調組合">
-        <LookCard
-          look={null}
-          src={src}
-          active={!between && !shownLook}
-          onPick={() => setLook(item.id, null)}
-        />
-        {LOOKS.map((l) => (
+      {part === 'look' && (
+        <div className="look-row" role="radiogroup" aria-label="色調組合">
           <LookCard
-            key={l.id}
-            look={l}
+            look={null}
             src={src}
-            active={!between && shownLook?.id === l.id}
-            onPick={() => setLook(item.id, l.id)}
+            active={!between && !shownLook}
+            onPick={() => setLook(item.id, null)}
           />
-        ))}
-      </div>
-      {shownLook && !between && (
+          {LOOKS.map((l) => (
+            <LookCard
+              key={l.id}
+              look={l}
+              src={src}
+              active={!between && shownLook?.id === l.id}
+              onPick={() => setLook(item.id, l.id)}
+            />
+          ))}
+        </div>
+      )}
+      {part === 'look' && shownLook && !between && (
         <Slider
           label="強度"
           value={Math.round(shownLook.amount * 100)}
@@ -228,34 +231,22 @@ export function ColorPanel({ item, project }: { item: Item; project: Project }) 
           onChange={(v) => setLook(item.id, shownLook.id, v / 100, `look:${item.id}`)}
         />
       )}
-      <div className="slider-label">調整{keyMode ? '（定格：改的是播放線碰到的定格）' : ''}</div>
-      {ADJUST_KEYS.map((k) => (
-        <Slider
-          key={k}
-          label={ADJUST_LABELS[k].label}
-          value={Math.round(adj[k] * 100)}
-          min={Math.round(ADJUST_LABELS[k].min * 100)}
-          max={100}
-          step={1}
-          format={(v) => `${v}`}
-          onChange={(v) => setAdjust(item.id, { [k]: v / 100 }, `adj-${k}:${item.id}`)}
-        />
-      ))}
-      <div className="chips">
-        <button className="btn" data-testid="grade-reset" onClick={() => resetGrade(item.id)}>
-          全部歸零
-        </button>
-        <button
-          className="btn"
-          data-testid="grade-all"
-          onClick={() => {
-            const n = applyGradeToAll(item.id);
-            toast(n > 0 ? `已套用到另外 ${n} 個` : '沒有其他同類的素材');
-          }}
-        >
-          套用到全部同類
-        </button>
-      </div>
+      {part === 'adjust' && (
+        <>
+          {ADJUST_KEYS.map((k) => (
+            <Slider
+              key={k}
+              label={ADJUST_LABELS[k].label}
+              value={Math.round(adj[k] * 100)}
+              min={Math.round(ADJUST_LABELS[k].min * 100)}
+              max={100}
+              step={1}
+              format={(v) => `${v}`}
+              onChange={(v) => setAdjust(item.id, { [k]: v / 100 }, `adj-${k}:${item.id}`)}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 }

@@ -1,48 +1,80 @@
-import { ArrowLeft, Move, Shapes, Smile, Type as TypeIcon, X, ImagePlus, Pencil } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, X } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { isFrameItem } from '../../engine/layoutTracks';
 import { findItem } from '../../engine/timeline';
-import { addText } from '../../store/actions';
 import { cancelCrop } from '../../store/cropStore';
 import { useProjectStore } from '../../store/projectStore';
-import { useUI } from '../../store/uiStore';
-import { GradePeekButton } from './GradePeekButton';
-import { KeyframeButton } from './KeyframeButton';
-import { AssetsTab } from './tabs/AssetsTab';
-import { AudioTab } from './tabs/AudioTab';
-import { EditTab } from './tabs/EditTab';
-import { LayersTab } from './tabs/LayersTab';
-import { LayoutTab } from './tabs/LayoutTab';
-import { EffectTab } from './tabs/EffectTab';
-import {
-  CATS,
-  SINGLE_TOOL,
-  TOOL_TITLE,
-  ToolButton,
-  targetOfTab,
-  type CatId,
-  type Panel,
-  type ToolId,
-} from './tabs/shared';
-import { ColorTab } from './tabs/ColorTab';
-import { TextTab } from './tabs/TextTab';
+import { toast, useUI } from '../../store/uiStore';
+import { importMusicFiles } from './musicImport';
+import { CATS, ToolButton, type CatId } from './tabs/shared';
+import { TOOLS, toolById, type ToolDef, type ToolEnv } from './tools';
 
-import type { Tab } from './tabs/shared';
-export type { Tab };
+/** 背景音樂的檔案選擇器（隱藏的 input；〔背景音樂〕按鈕呼叫 pickMusicFile 打開它） */
+let pickMusicFile: () => void = () => undefined;
+function MusicInput() {
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    pickMusicFile = () => input.current?.click();
+    return () => {
+      pickMusicFile = () => undefined;
+    };
+  }, []);
+  return (
+    <input
+      ref={input}
+      type="file"
+      accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac,.caf"
+      multiple
+      hidden
+      data-testid="music-input"
+      onChange={(e) => {
+        const files = Array.from(e.target.files ?? []);
+        e.target.value = '';
+        void importMusicFiles(files);
+      }}
+    />
+  );
+}
 
-type Sel = 'text' | 'audio' | 'media';
+type Sel = 'text' | 'audio' | 'frame' | 'media';
 
 /**
- * 選了東西，功能列自動跳到那個東西的工具：字卡→文字、音樂→音訊；
- * 影片／照片從文字、音訊或第一層選到時→剪輯。其他類別（加入、版型、特效）保持原樣：
- * 在那裡加東西時會自動選取新的，不應該被帶走；色調類別選別的影像（非音樂）也留著。
+ * 選了東西，功能列自動跳到那個東西的類別（不自動升起視窗，免得蓋住時間軸）：
+ * 字卡→文字、音樂→音訊、整個版型→版型、其他（影片、照片、貼圖、版型裡的一格）→剪輯。
+ * 例外：正在特效、色調、加入時點別的素材，留在原類別（方便一個一個套用；加東西時會自動選取新的，不該被帶走）。
  */
-export function targetForSelection(cat: CatId | null, kind: Sel): { cat: CatId; tool: ToolId | null } | null {
-  if (cat === 'color' && kind !== 'audio') return null;
-  // 只換類別（工具列），不自動升起視窗：視窗會蓋住時間軸，選了片段就想再選別的片段會點不到
-  if (kind === 'text') return { cat: 'text', tool: null };
-  if (kind === 'audio') return { cat: 'audio', tool: null };
-  if (cat === null || cat === 'text' || cat === 'audio') return { cat: 'edit', tool: null };
-  return null;
+export function targetForSelection(cat: CatId | null, kind: Sel): CatId | null {
+  if (kind !== 'audio' && (cat === 'effect' || cat === 'color')) return null;
+  if (cat === 'add' && kind !== 'text' && kind !== 'audio') return null;
+  const to: CatId =
+    kind === 'text' ? 'text' : kind === 'audio' ? 'audio' : kind === 'frame' ? 'layout' : 'edit';
+  return to === cat ? null : to;
+}
+
+/** 別處（時間軸的特效圓圈、色調…）要求切到某個類別與視窗 */
+function requestTarget(tab: string): { cat: CatId; popup: string | null } | null {
+  switch (tab) {
+    case 'edit':
+      return { cat: 'edit', popup: null };
+    case 'effect': {
+      const f = useUI.getState().fxFocus;
+      const popup =
+        f?.role === 'out'
+          ? 'fx.out'
+          : f?.role === 'seam'
+            ? 'fx.seam'
+            : f?.role === 'whole'
+              ? 'fx.whole'
+              : f?.role === 'style'
+                ? 'fx.textfx'
+                : 'fx.in';
+      return { cat: 'effect', popup };
+    }
+    case 'color':
+      return { cat: 'color', popup: 'color.look' };
+    default:
+      return null;
+  }
 }
 
 export function BottomBar({
@@ -54,12 +86,9 @@ export function BottomBar({
 }) {
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
-  const player = useUI((s) => s.player);
-  // 第一層：選了哪個類別（null＝只看到 7 個類別）；第三層：升起的視窗（null＝收起，可以直接拖播放軸）
+  // 第一層：選了哪個類別（null＝只看到 7 個類別）；第三層：升起的視窗（工具 id；null＝收起，可以直接拖播放軸）
   const [cat, setCat] = useState<CatId | null>(null);
-  const [tool, setTool] = useState<ToolId | null>(null);
-  const [panel, setPanel] = useState<Panel>(null);
-
+  const [popup, setPopup] = useState<string | null>(null);
   const found = findItem(project, selectedId);
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -67,65 +96,78 @@ export function BottomBar({
   useEffect(() => {
     catRef.current = cat;
   }, [cat]);
-  const goto = (c: CatId | null, t: ToolId | null) => {
+  const goto = (c: CatId | null, p: string | null = null) => {
     catRef.current = c;
     setCat(c);
-    setTool(t);
-    setPanel(null);
+    setPopup(p);
     cancelCrop();
   };
 
-  // 選取的東西換了：自動跳到對應的類別／工具。
-  // 晚一點才跳：手指放開後瀏覽器還會補送一個 click；如果馬上換版面，那個 click 會落在別的按鈕上
+  const env: ToolEnv = {
+    project,
+    found,
+    onImportMain,
+    onImportOverlay,
+    pickMusic: pickMusicFile,
+    openPopup: (id) => setPopup(id),
+    closePopup: () => {
+      setPopup(null);
+      cancelCrop();
+    },
+  };
+
+  // 選取的東西換了：自動跳到對應的類別；開著的視窗對新選到的東西不適用就收起來。
+  // 晚一點才處理：手指放開後瀏覽器還會補送一個 click；如果馬上換版面，那個 click 會落在別的按鈕上
   useEffect(() => {
-    if (!selectedId) {
-      // 取消選取：文字視窗沒東西可改了就收起來
-      const close = setTimeout(() => setTool((t) => (t === 'textedit' ? null : t)), 0);
-      return () => clearTimeout(close);
-    }
     const catAtSelect = catRef.current;
     const timer = setTimeout(() => {
-      if (catRef.current !== catAtSelect) return; // 這段時間使用者自己切了：不要再把人帶走
       const st = useProjectStore.getState();
       const f = st.project && findItem(st.project, st.selectedId);
-      if (!f || st.selectedId !== selectedId) return;
-      const kind: Sel = f.item.type === 'text' ? 'text' : f.item.type === 'audio' ? 'audio' : 'media';
+      if (!f || st.selectedId !== selectedId) {
+        // 取消選取：視窗要選到東西才有內容的，收起來
+        setPopup((p) => (p && toolById(p)?.enabled ? null : p));
+        return;
+      }
+      if (catRef.current !== catAtSelect) return; // 這段時間使用者自己切了：不要再把人帶走
+      const kind: Sel =
+        f.item.type === 'text'
+          ? 'text'
+          : f.item.type === 'audio'
+            ? 'audio'
+            : isFrameItem(f.item)
+              ? 'frame'
+              : 'media';
       const to = targetForSelection(catRef.current, kind);
-      if (!to) return;
-      if (to.cat === catRef.current && to.tool === null) return;
-      goto(to.cat, to.tool);
+      if (to) return goto(to);
+      // 留在原類別：視窗那一項對新選到的東西不能用了就收起來
+      const tool = popup ? toolById(popup) : undefined;
+      const e2: ToolEnv = { ...env, project: st.project!, found: f };
+      if (tool?.enabled && !tool.enabled(e2)) setPopup(null);
     }, 250);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  // 其他地方要求切分頁（點時間軸的轉場小圓圈 → 特效；色調 → 色調視窗…）
+  // 其他地方要求切類別（點時間軸的特效圓圈 → 特效；色調 → 色調視窗…）
   const requestTab = useUI((s) => s.requestTab);
   useEffect(() => {
     if (!requestTab) return;
     useUI.setState({ requestTab: null });
-    const to = targetOfTab(requestTab as Tab);
-    setTimeout(() => goto(to.cat, to.tool), 250);
+    const to = requestTarget(requestTab);
+    if (to) setTimeout(() => goto(to.cat, to.popup), 250);
   }, [requestTab]);
 
-  // 剪輯工具列開關變速、音量、片段範圍（panel）：升起／收起「片段設定」視窗
-  const setClipPanel = (p: Panel) => {
-    setPanel(p);
-    setTool((t) => (p ? 'clip' : t === 'clip' ? null : t));
-  };
-
-  // 點第一層的類別：剪輯、加入、文字＝換成它的工具列（第二層）；其餘只有一個工具＝直接升起視窗，再點一次收起
-  const pickCat = (c: CatId) => {
-    const only = SINGLE_TOOL[c];
-    if (only) {
-      if (cat === c) {
-        setTool((t) => (t ? null : only));
-        setPanel(null);
-        return;
-      }
-      goto(c, only);
+  const press = (t: ToolDef) => {
+    if (t.enabled && !t.enabled(env)) return toast(t.need ?? '先點一個片段');
+    const g = t.guard?.(env);
+    if (g) return toast(g);
+    if (t.kind === 'popup') {
+      cancelCrop();
+      setPopup((p) => (p === t.id ? null : t.id));
       return;
     }
-    goto(c, null);
+    setPopup(null);
+    t.run?.(env);
   };
 
   // 目前選中的類別捲進畫面（窄螢幕第一層可以左右滑）
@@ -135,59 +177,32 @@ export function BottomBar({
       ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   }, [cat]);
 
-  const row2 = cat !== null && !SINGLE_TOOL[cat];
-  const closePopup = () => {
-    setTool(null);
-    setPanel(null);
-    cancelCrop();
-  };
-  const addAt = () => player?.time ?? 0;
-
-  const edit = (part: 'row' | 'panel', extra?: React.ReactNode) => (
-    <EditTab
-      panel={panel}
-      setPanel={setClipPanel}
-      onImport={onImportMain}
-      found={found}
-      part={part}
-      extra={extra}
-    />
-  );
+  const tool = popup ? toolById(popup) : undefined;
+  const list = cat ? TOOLS[cat] : [];
+  const catLabel = CATS.find((c) => c.id === cat)?.label ?? '';
+  const body = tool?.popup?.(env);
 
   return (
     <div className="bottombar" ref={barRef}>
-      {tool && (
-        <div
-          className="panel-sheet"
-          data-testid="panel-sheet"
-          role="region"
-          aria-label={`${TOOL_TITLE[tool]}面板`}
-        >
+      <MusicInput />
+      {tool && body && tool.bare && body}
+      {tool && body && !tool.bare && (
+        <div className="panel-sheet" data-testid="panel-sheet" role="region" aria-label={`${tool.label}面板`}>
           <div className="ps-head">
-            <b>{TOOL_TITLE[tool]}</b>
-            {tool === 'color' && <GradePeekButton />}
+            <b>{tool.label}</b>
             <button
               className="sheet-close"
               aria-label="收起面板"
               data-testid="panel-close"
-              onClick={closePopup}
+              onClick={env.closePopup}
             >
               <X size={20} aria-hidden="true" />
             </button>
           </div>
-          <div className="ps-body">
-            {tool === 'clip' && edit('panel')}
-            {tool === 'layers' && <LayersTab />}
-            {tool === 'sticker' && <AssetsTab />}
-            {tool === 'textedit' && <TextTab found={found} />}
-            {tool === 'layout' && <LayoutTab found={found} />}
-            {tool === 'effect' && <EffectTab found={found} />}
-            {tool === 'color' && <ColorTab found={found} />}
-            {tool === 'audio' && <AudioTab found={found} panel={panel} setPanel={setPanel} />}
-          </div>
+          <div className="ps-body">{body}</div>
         </div>
       )}
-      {row2 ? (
+      {cat ? (
         <div className="fb-row" data-testid="fb-tools">
           <button
             className="fb-back"
@@ -197,56 +212,32 @@ export function BottomBar({
           >
             <ArrowLeft size={20} aria-hidden="true" />
           </button>
-          {cat === 'edit' &&
-            edit(
-              'row',
-              <>
-                <ToolButton
-                  icon={Move}
-                  label="位置大小"
-                  active={tool === 'layers'}
-                  onClick={() => setTool((t) => (t === 'layers' ? null : 'layers'))}
-                />
-                <KeyframeButton />
-              </>,
-            )}
-          {cat === 'add' && (
-            <div className="toolbar" role="toolbar" aria-label="加入">
-              <ToolButton icon={ImagePlus} label="影片照片" onClick={onImportOverlay} />
-              <ToolButton
-                icon={Smile}
-                label="貼圖"
-                active={tool === 'sticker'}
-                onClick={() => setTool((t) => (t === 'sticker' ? null : 'sticker'))}
-              />
-            </div>
-          )}
-          {cat === 'text' && (
-            <div className="toolbar" role="toolbar" aria-label="文字">
-              <ToolButton
-                icon={TypeIcon}
-                label="新增文字"
-                onClick={() => {
-                  addText(addAt());
-                  setTool('textedit'); // 剛新增：直接升起文字視窗讓人打字
-                }}
-              />
-              <ToolButton
-                icon={Shapes}
-                label="新增圖形"
-                onClick={() => {
-                  addText(addAt(), true);
-                  setTool('textedit');
-                }}
-              />
-              <ToolButton
-                icon={Pencil}
-                label="編輯文字"
-                active={tool === 'textedit'}
-                onClick={() => setTool((t) => (t === 'textedit' ? null : 'textedit'))}
-              />
-            </div>
-          )}
+          <div className="toolbar" role="toolbar" aria-label={catLabel}>
+            {list.map((t, i) => {
+              const sep = i > 0 && list[i - 1]!.zone !== t.zone;
+              const dim = !!t.enabled && !t.enabled(env);
+              return (
+                <Fragment key={t.id}>
+                  {sep && <span className="zone-sep tool-sep" aria-hidden="true" />}
+                  {t.custom ? (
+                    t.custom()
+                  ) : (
+                    <ToolButton
+                      icon={t.icon}
+                      label={t.label}
+                      testId={`tool-${t.id}`}
+                      active={t.kind === 'popup' ? popup === t.id : undefined}
+                      fill={t.kind === 'toggle' ? !!t.on?.(env) : undefined}
+                      dim={dim}
+                      danger={t.danger}
+                      badge={dim ? null : t.badge?.(env)}
+                      onClick={() => press(t)}
+                    />
+                  )}
+                </Fragment>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div className="tabs" role="tablist">
@@ -254,10 +245,9 @@ export function BottomBar({
             <button
               key={c.id}
               role="tab"
-              aria-selected={cat === c.id}
-              aria-expanded={cat === c.id && !!tool}
-              className={`tab${cat === c.id ? ' active' : ''}`}
-              onClick={() => pickCat(c.id)}
+              aria-selected={false}
+              className="tab"
+              onClick={() => goto(c.id, null)}
             >
               <c.icon size={20} aria-hidden="true" />
               <span>{c.label}</span>

@@ -31,18 +31,18 @@ export function KeyframeButton() {
   return (
     <ToolButton
       icon={Diamond}
-      label="定格"
-      ariaLabel={has ? '刪除這個時間的定格' : '在這個時間新增定格'}
+      label="關鍵格"
+      ariaLabel={has ? '刪除這個時間的關鍵格' : '在這個時間新增關鍵格'}
       testId="kf-btn"
       active={has}
       fill={has}
-      disabled={!target}
+      dim={!target}
       onClick={() => {
-        if (!selectedId) return;
+        if (!selectedId || !target) return toast('先點一個影片、照片、貼圖或文字');
         player?.pause();
         const r = toggleKeyframe(selectedId);
         if (r === 'added')
-          toast('已新增定格。換個時間再拖或縮放會自動多一個；播放線碰到菱形時，只會改那一個', 3500);
+          toast('已新增關鍵格。換個時間再拖或縮放會自動多一個；播放線碰到菱形時，只會改那一個', 3500);
       }}
     />
   );
