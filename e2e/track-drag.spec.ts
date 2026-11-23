@@ -60,7 +60,7 @@ test('軌道圖示：往下拖超過最底、往上拖超過字卡，都夾在�
   await addOverlays(page, ['solid-green.webm']);
   await addOverlays(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await showTimeline(page);
   const [red, green, blue, text] = await order(page); // 陣列由下到上：影像 ×3、字卡
   // 綠（中間那條影像軌）往下拖很遠：最多到影像區最底（紅的下面），不會掉到音訊或別處

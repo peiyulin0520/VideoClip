@@ -15,10 +15,7 @@ const section = (page: Page, name: string) =>
 async function newText(page: Page) {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
 }
 
 test('文字顏色：基本色、展開 32 色、每一格都點得動、最近用過、重新整理後最近用過還在', async ({ page }) => {

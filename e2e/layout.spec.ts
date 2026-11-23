@@ -174,7 +174,7 @@ test('版型的格子可以用裁切調整露出的範圍：預設鎖定格子�
   // 剛加好版型時，第 1 格已經被選取（時間軸上各格藏起來，由「版型」分頁選格子）
   await expect.poll(() => selectedItemId(page)).toBe(it.id);
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
   await expect(page.getByRole('radio', { name: '格子比例' })).toHaveAttribute('aria-checked', 'true');
   // 鎖定比例後拖保留區域的角（縮小），再按套用裁切

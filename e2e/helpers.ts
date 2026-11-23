@@ -379,14 +379,14 @@ export async function finishLayout(page: Page, files: string[], opts: { motion?:
   await page.getByTestId('layout-confirm').tap();
   // 選項區收起來＝新版型已經加好、而且選到它了（不然讀到的是上一個版型的示意圖）
   await expect(page.getByTestId('layout-options')).toHaveCount(0, { timeout: 30_000 });
+  await openTool(page, 'layout.cells'); // 新版型選到了：升起〔各格〕視窗（示意圖）
   const cells = page.getByTestId('ld-cell');
   await expect(cells.first()).toBeVisible({ timeout: 30_000 });
   const n = await cells.count();
   if (opts.motion) {
-    await openTab(page, '特效');
-    await page.getByTestId('fx-part-whole').tap();
+    await openTool(page, 'fx.whole');
     await page.getByRole('radio', { name: `整段 ${opts.motion}` }).tap();
-    await openTab(page, '版型');
+    await openTool(page, 'layout.cells');
   }
   for (let i = 0; i < n; i++) {
     await cells.nth(i).tap();

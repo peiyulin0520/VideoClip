@@ -21,7 +21,7 @@ const setRange = (page: Page, label: string, v: number) =>
 test('裝飾面板：縮圖都有畫出來、點選加／拿掉、改顏色與粗細、可疊多個', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('尾端有圈圈');
   await page.getByRole('tab', { name: '裝飾', exact: true }).tap();
 
@@ -169,10 +169,7 @@ test('驗收截圖：13 種裝飾總覽、尾端圈圈跟示意圖的樣子（�
 test('裝飾的「與文字距離」「大小」滑桿：資料與預覽都會變；波浪線變粗不會碰到字', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('吃飯');
   await page.getByRole('tab', { name: '裝飾', exact: true }).tap();
   await page.getByRole('button', { name: '裝飾 波浪底線' }).tap();
@@ -211,10 +208,7 @@ test('裝飾的長度、透明度、放大後的範圍：底線可以縮短、�
 }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('今天吃很多飯');
   await page.getByRole('tab', { name: '裝飾', exact: true }).tap();
   await page.getByRole('button', { name: '裝飾 虛線' }).tap();

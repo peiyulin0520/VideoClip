@@ -114,7 +114,7 @@ test('L4 選到版型時，文字分頁新增文字／素材分頁加貼圖都�
     'aria-checked',
     'true',
   );
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   const ms = await members();
   expect(ms.filter((t) => t.kind === 'text')).toHaveLength(1);
   expect(ms[0]!.items[0]!.group).toBe(await frameGroup());
@@ -150,7 +150,7 @@ test('L4 選到版型時，文字分頁新增文字／素材分頁加貼圖都�
   // 關掉切換：新增的文字就在一般的字卡軌道
   await openTab(page, '文字');
   await page.getByRole('switch', { name: /新增的文字加到版型/ }).tap();
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   const plain = (await tracks(page)).filter((t) => t.kind === 'text' && !t.groupRole);
   expect(plain).toHaveLength(1);
   expect(plain[0]!.items[0]!.group).toBeUndefined();

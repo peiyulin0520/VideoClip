@@ -27,10 +27,7 @@ const yellow = (page: Page) => countColor(page, YELLOW, 30, region);
 test('字塊：填滿與框線分開，各自有顏色與透明度；可以不要底色只留框線；框線可調粗細', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('框線測試');
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
   await page.getByRole('radio', { name: '方形' }).tap();
@@ -95,10 +92,7 @@ test('字塊：填滿與框線分開，各自有顏色與透明度；可以不�
 test('框線不再被填滿的透明度牽動；填滿透明度可以到 0%', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('點兩下編輯文字'); // 新文字一開始是空的提示狀態；打字後才是實心字
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
   await page.getByRole('radio', { name: '方形' }).tap();

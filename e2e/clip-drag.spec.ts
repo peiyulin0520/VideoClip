@@ -64,7 +64,7 @@ test('長按影像片段拖到另一條影像軌、時間往右：換軌道、�
 test('影像片段拖到字卡軌：變灰、放開彈回原位並提示「只能放在…的軌道上」', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   const [media, text] = await tracks(page);
   const clipA = media!.items[0]!.id;
   await showTimeline(page);

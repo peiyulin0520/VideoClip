@@ -43,7 +43,7 @@ test('兩個專案各匯入 2 個素材：重新整理後都還在，編輯一�
   await page.getByRole('link', { name: '開啟 新專案 1' }).tap();
   await expect(clips(page)).toHaveCount(2);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '刪除並補齊', exact: true }).tap(); // 後面的往前接上，總長度才會變短
+  await page.getByTestId('tool-edit.delete').tap(); // 後面的往前接上，總長度才會變短
   await expect(clips(page)).toHaveCount(1);
   await page.getByRole('link', { name: '回首頁' }).tap();
   // 首頁是從資料庫讀的：封面角落的長度變成剩下那段（clip-b 1.6 秒）＝ 離開編輯器時已立即存檔
@@ -75,7 +75,7 @@ test('專案卡片選單：改名、複製、刪除', async ({ page }) => {
   await expect(page.getByTestId('project-card').filter({ hasText: '旅行 vlog' })).toBeVisible();
 
   await page.getByRole('button', { name: '旅行 vlog 的選單' }).tap();
-  await page.getByRole('button', { name: '複製' }).tap();
+  await page.getByTestId('tool-edit.copy').tap();
   await expect(page.getByTestId('project-card')).toHaveCount(2);
   await expect(page.getByTestId('project-card').filter({ hasText: '旅行 vlog 副本' })).toBeVisible();
 
@@ -85,7 +85,7 @@ test('專案卡片選單：改名、複製、刪除', async ({ page }) => {
   await page.getByRole('link', { name: '回首頁' }).tap();
 
   await page.getByRole('button', { name: '旅行 vlog 的選單' }).tap();
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   await page.getByRole('dialog').getByRole('button', { name: '刪除', exact: true }).tap();
   await expect(page.getByTestId('project-card')).toHaveCount(1);
   await page.reload();
@@ -98,7 +98,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
 
   // 沒選片段時，需要選取的按鈕會提示
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   await expectToast(page, '請先點選一個片段');
 
   // 點選片段
@@ -106,14 +106,14 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   expect(await selectedIndex(page)).toBe(0);
 
   // 複製：複製品放在原片段後面最近的空位（後面被占住就接在最後）；自由擺放，其他片段不動
-  await page.getByRole('button', { name: '複製' }).tap();
+  await page.getByTestId('tool-edit.copy').tap();
   await expect(clips(page)).toHaveCount(4);
   expect(await selectedIndex(page)).toBe(3);
   expect((await project(page)).tracks[0]!.items.map((i) => i.start).slice(0, 3)).toEqual([0, 2, 3.6]);
 
   // 變速：2 倍速 → 這個 2 秒的片段變 1 秒
   const totalBefore = await timeText(page);
-  await page.getByRole('button', { name: '變速' }).tap();
+  await page.getByTestId('tool-edit.speed').tap();
   await expect(page.getByTestId('speed-value')).toHaveText('1x');
   await page.getByRole('button', { name: '2x', exact: true }).tap();
   await expect(page.getByTestId('speed-value')).toHaveText('2x');
@@ -140,20 +140,20 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   const n = await clips(page).count();
   const start = (await clipsStartSeconds(page))[1]!;
   await seekTo(page, start + 0.8);
-  await page.getByRole('button', { name: '分割' }).tap();
+  await page.getByTestId('tool-edit.split').tap();
   await expect(clips(page)).toHaveCount(n + 1);
   // 播放頭在邊緣不能分割
   await seekTo(page, 0);
   await page.waitForTimeout(450);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '分割' }).tap();
+  await page.getByTestId('tool-edit.split').tap();
   await expectToast(page, '播放頭要在片段中間');
 
   // 刪除 / 復原 / 重做（隔一下再點同一個片段：連點兩下會跳出命名面板）
   await page.waitForTimeout(450);
   await clips(page).first().tap();
   const count = await clips(page).count();
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   await expect(clips(page)).toHaveCount(count - 1);
   await undo(page);
   await expect(clips(page)).toHaveCount(count);
@@ -273,7 +273,7 @@ test('照片素材：預設 3 秒、預覽會顯示、不能變速', async ({ pa
   // photo.png 正中間是白色圓
   await expect.poll(async () => isWhite(await samplePreview(page, 0.5, 0.5)), { timeout: 8000 }).toBe(true);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '變速' }).tap();
+  await page.getByTestId('tool-edit.speed').tap();
   await expectToast(page, '照片不能變速');
   await page.getByRole('button', { name: '音量' }).tap();
   await expectToast(page, '照片沒有聲音');

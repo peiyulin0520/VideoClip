@@ -43,10 +43,7 @@ test('預覽很大而且大小永遠不變：每個分頁、面板開合、選�
     expect(await stageSize(page)).toEqual(base);
   }
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   expect(await stageSize(page)).toEqual(base);
   await expect(page.getByLabel('文字內容')).toBeVisible(); // 剛新增文字：文字視窗直接升起
   expect(await stageSize(page)).toEqual(base);
@@ -55,10 +52,7 @@ test('預覽很大而且大小永遠不變：每個分頁、面板開合、選�
 test('整頁不捲動；視窗裡面可以上下滑、最後的控制項點得到；預覽大小不變', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByRole('tablist', { name: '字卡設定' }).getByRole('tab', { name: '裝飾', exact: true }).tap();
   for (const k of ['尾端圈圈', '波浪底線', '愛心'])
     await page.getByRole('button', { name: `裝飾 ${k}` }).tap();
@@ -82,10 +76,7 @@ test('整頁不捲動；視窗裡面可以上下滑、最後的控制項點得�
 test('按在文字上拖＝移動文字，整頁不捲', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await closePanel(page);
   await page.waitForTimeout(300);
   const st2 = await previewBox(page);
@@ -103,10 +94,7 @@ test('按在文字上拖＝移動文字，整頁不捲', async ({ page }) => {
 test('雙指：手指放在框外也能縮放；沒有選取時雙指會選到中點下的物件；沒有任何圓點', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await closePanel(page);
   const st = await previewBox(page);
   const cx = st.x + st.width * 0.5;
@@ -131,10 +119,7 @@ test('多條軌道：時間軸裡面可以上下滑，每一列都點得到', as
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm', 'solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await closePanel(page);
   await expect(clips(page)).toHaveCount(4);
   // 時間軸佔剩下的高度、軌道多了就在時間軸裡上下滑（整頁不捲）；每一列都滑得到
@@ -148,10 +133,7 @@ test('多條軌道：時間軸裡面可以上下滑，每一列都點得到', as
 test('很小的文字也點得到；文字面板的「刪除」；全螢幕預覽', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('小');
   await closePanel(page);
   const st = await previewBox(page);
@@ -195,10 +177,7 @@ test('不用手勢也能調：圖層分頁與文字「版面」的整體大小�
 }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   const setRange = (label: string, v: number) =>
     page.getByRole('slider', { name: label, exact: true }).evaluate((el, val) => {
       const input = el as HTMLInputElement;
@@ -248,10 +227,7 @@ test('沒有影片、只有字卡時：預覽中央不放大的匯入鈕（不�
   await page.getByRole('button', { name: '建立空白專案' }).tap();
   await expect(page.locator('.empty-import')).toBeVisible(); // 完全空的：有大匯入鈕
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('吃水餃');
   await expect(page.locator('.empty-import')).toHaveCount(0); // 有字卡了：不要蓋住
   // 預覽中間有白色的字，而且選取框看得到、沒有被別的東西蓋住

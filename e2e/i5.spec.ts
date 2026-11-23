@@ -117,10 +117,7 @@ test('字卡：文字也能用 32 種特效；「打字」進場一個字一個�
   const { countColor } = await import('./helpers');
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('甲乙丙丁戊己');
   const d = (
     (await project(page)).tracks.flatMap((t) => t.items).find((i) => i.type === 'text') as unknown as {
@@ -165,10 +162,7 @@ test('字卡文字特效：閃爍（亮光掃過，不同時間亮的地方不�
   const { countColor } = await import('./helpers');
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('閃爍的字');
   await openTab(page, '特效');
   await page.getByTestId('fx-part-style').tap();

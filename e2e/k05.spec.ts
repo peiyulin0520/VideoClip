@@ -25,10 +25,7 @@ const textItem = async (page: Page) =>
 async function setup(page: Page, kid: string, group = 'in') {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('開場');
   await openTab(page, '特效');
   await page.getByTestId('fx-part-style').tap();

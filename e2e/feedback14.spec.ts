@@ -159,7 +159,7 @@ test('回報14 裁切：筆刷、橡皮擦時沒有粉紅框線（直接看結�
   await addOverlays(page, ['solid-green.webm']);
   await openTab(page, '剪輯');
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await page.getByTestId('crop-tool-lasso').tap();
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;
@@ -195,10 +195,7 @@ test('回報14 裁切：筆刷、橡皮擦時沒有粉紅框線（直接看結�
 async function addKinetic(page: Page) {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('蔡氏家族聚餐');
   await openTab(page, '特效');
   await page.getByTestId('fx-part-style').tap();

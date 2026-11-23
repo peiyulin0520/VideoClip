@@ -13,7 +13,7 @@ test('Y11 素材檔不見了：沒用到的素材安靜地從清單拿掉、不�
   const clips = page.getByTestId('clip');
   await clips.nth(1).tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除', exact: true }).first().tap();
+  await page.getByTestId('tool-edit.delete').first().tap();
   await expect(clips).toHaveCount(1);
   expect((await project(page)).assets.length).toBe(2);
   await page.waitForTimeout(1500); // 等自動儲存

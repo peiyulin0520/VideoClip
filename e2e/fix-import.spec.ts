@@ -64,7 +64,7 @@ test('OPFS 和 IndexedDB 都寫不進去 → 先放記憶體：照樣能剪、�
   expect((await project(page)).assets[0]!.unsaved).toBe(true);
   // 還能繼續剪：分割
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '複製', exact: true }).tap();
+  await page.getByTestId('tool-edit.copy').tap();
   await expect(clips(page)).toHaveCount(2);
 });
 

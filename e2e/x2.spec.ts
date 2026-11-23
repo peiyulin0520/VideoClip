@@ -37,7 +37,7 @@ test('每種彈出視窗右上角都有 ❌（關閉），底部沒有「取消�
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '命名', exact: true }).tap();
   await check('片段命名');
-  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
+  await page.getByTestId('tool-edit.trim').tap();
   await check('剪取片段');
   // 進階：聲音範圍
   await openTab(page, '音訊');
@@ -71,12 +71,12 @@ test('片段範圍視窗：拖旗標後按 ❌ → 專案沒變；重新打開�
     await page.mouse.move(x + dx, y, { steps: 4 });
     await page.mouse.up();
   };
-  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
+  await page.getByTestId('tool-edit.trim').tap();
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
   await drag('range-flag-end-0', -strip.width * 0.5);
   await page.getByRole('button', { name: '關閉', exact: true }).tap(); // ❌：不存
   expect(await dur()).toBeCloseTo(4, 1);
-  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
+  await page.getByTestId('tool-edit.trim').tap();
   await drag('range-flag-end-0', -strip.width * 0.5);
   // 復原、重做
   const body = () => page.getByTestId('range-body-0').boundingBox();
@@ -108,7 +108,7 @@ test('片段預覽：按播放後聲音打開；白線在沒選取的地方預�
   await createProjectWith(page, ['clip-a.webm']); // 2 秒、有聲音
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
+  await page.getByTestId('tool-edit.trim').tap();
   const video = page.getByTestId('rm-video');
   await expect(page.getByTestId('rm-state')).toContainText('選取中 第 1 組');
   expect(await video.evaluate((v) => getComputedStyle(v).filter)).not.toContain('grayscale');
@@ -187,7 +187,7 @@ test('設定型彈出視窗都有「套用」或「儲存」；沒按就按 ❌ 
 
   // 字體
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   const fontOf = async () => {
     const p = await project(page);
     return p.tracks.flatMap((t) => t.items).find((i) => i.type === 'text')!.card!.runs[0]!.fontId;

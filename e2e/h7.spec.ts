@@ -59,7 +59,7 @@ async function lassoCircle(page: Page) {
 test('自由形狀圈完之後：橡皮擦擦掉中間一條（可調粗細）→ 完成後那一條透明；筆刷再補回來', async ({ page }) => {
   test.setTimeout(90_000);
   await setup(page);
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await lassoCircle(page);
 
   // 橡皮擦：粗細調到 10%，在正中間橫畫一條
@@ -81,7 +81,7 @@ test('自由形狀圈完之後：橡皮擦擦掉中間一條（可調粗細）�
   expect(isGreen(await samplePreview(page, 0.5, 0.64))).toBe(true);
 
   // 再進裁切：用筆刷把中間補回來
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await page.getByTestId('crop-tool-brush').tap();
   await page.getByLabel('粗細').fill('10');
   await stroke(page, [0.3, 0.5], [0.7, 0.5]);
@@ -97,7 +97,7 @@ test('自由形狀圈完之後：橡皮擦擦掉中間一條（可調粗細）�
 test('粗細：同樣一筆，粗細不同、擦掉的範圍就不同；復原；再進去形狀還在', async ({ page }) => {
   test.setTimeout(90_000);
   await setup(page);
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await lassoCircle(page);
   await page.getByTestId('crop-tool-erase').tap();
   const tint = page.getByTestId('crop-tint');
@@ -124,7 +124,7 @@ test('粗細：同樣一筆，粗細不同、擦掉的範圍就不同；復原�
   await page.getByTestId('crop-apply').tap();
   expect((await overlay(page)).maskBitmap).toBeDefined();
   // 再進去：圈選的形狀還在（筆畫也存著，可以接著改）
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await expect(page.getByTestId('crop-polygon')).toBeVisible(); // 圈選的形狀還在
   await page.getByTestId('crop-close').tap();
 });
@@ -132,7 +132,7 @@ test('粗細：同樣一筆，粗細不同、擦掉的範圍就不同；復原�
 test('匯出：筆刷／橡皮擦畫的遮罩也套用（單格匯出中間是被擦掉露出的紅色）', async ({ page }) => {
   test.setTimeout(90_000);
   await setup(page);
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await lassoCircle(page);
   await page.getByTestId('crop-tool-erase').tap();
   await page.getByLabel('粗細').fill('10');

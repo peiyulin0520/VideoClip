@@ -89,7 +89,7 @@ test('X6 一格多素材：列尾 ＋ 加色塊、加照片；格子編號；空
   const colorItem = (await cells(page))[0]!.items.find((i) => i.start > 3.9 && i.start < 4.1)!;
   await page.locator(`[data-testid="clip"][data-item-id="${colorItem.id}"]`).tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除', exact: true }).first().tap();
+  await page.getByTestId('tool-edit.delete').first().tap();
   expect(await row(page, 0)).toEqual([
     [0, 4],
     [6, 4],

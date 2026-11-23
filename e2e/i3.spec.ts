@@ -12,10 +12,7 @@ async function buildBusyProject(page: Page) {
   await addOverlays(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   for (let i = 0; i < 3; i++) {
-    await page
-      .getByRole('button', { name: /新增文字/ })
-      .first()
-      .tap();
+    await page.getByTestId('tool-text.add').tap();
     await page.getByLabel('文字內容').fill(`字${i}`);
   }
   await openTab(page, '音訊');

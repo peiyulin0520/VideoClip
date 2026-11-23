@@ -18,10 +18,7 @@ const setRange = (page: Page, label: string, v: number) =>
 test('圖形庫：4 個分類、每個圖形都點得動、縮圖有畫、對話框尾巴方向、字塊外框', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('哈囉你好');
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
 
@@ -84,7 +81,7 @@ test('圖形庫：4 個分類、每個圖形都點得動、縮圖有畫、對話
 test('獨立圖形：新增、用內距調大小、時間軸顯示「圖形」、文字面板仍可改', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增圖形/ }).tap();
+  await page.getByTestId('tool-text.shape').tap();
   await expect(page.locator('[data-testid="clip"][data-kind="text"]')).toContainText('圖形');
   const cardOf = async () =>
     (await project(page)).tracks[1]!.items[0]!.card as unknown as { box: { shape: string } };
@@ -112,10 +109,7 @@ test('驗收截圖：每個圖形裡放「文字」的總覽', async ({ page }) 
     .toBe(true);
   // 用 UI 取得全部 id：逐一展開分類讀 data-shape
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
   const all: string[] = [];
   for (const c of ['基本', '對話框', '星形', '標籤箭頭']) {

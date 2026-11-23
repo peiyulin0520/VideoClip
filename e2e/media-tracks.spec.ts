@@ -27,7 +27,7 @@ test('舊專案（v1：主軌＋疊加，字卡在疊加下面）打開後自動
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
   await addOverlays(page, ['solid-green.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   const before = await tracks(page);
   expect(before.map((t) => t.kind)).toEqual(['media', 'media', 'text']);
   const startsBefore = before.flatMap((t) => t.items.map((i) => i.start));
@@ -79,14 +79,14 @@ test('刪除只刪這一段、留空位；刪除並補齊讓後面的往前接�
   expect(await starts()).toEqual([0, 2, 3.6]);
 
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   expect(await starts()).toEqual([2, 3.6]); // 後面的沒動，前面是空位
   await expect(page.getByTestId('gap')).toHaveCount(1); // 開場留白的虛線框
   await undo(page);
   expect(await starts()).toEqual([0, 2, 3.6]);
 
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '刪除並補齊', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   expect(await starts()).toEqual([0, 1.6]);
   await undo(page);
   expect(await starts()).toEqual([0, 2, 3.6]);
@@ -100,7 +100,7 @@ test('軌道預設順序：新增字卡、音樂、影像後是 影像 → 字�
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
   await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await addOverlays(page, ['solid-green.webm']); // 最後加的影像軌：仍在字卡下面
   await addOverlays(page, ['solid-blue.webm']);
   expect((await tracks(page)).map((t) => t.kind)).toEqual(['media', 'media', 'media', 'text', 'audio']);

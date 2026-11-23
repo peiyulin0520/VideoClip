@@ -97,7 +97,7 @@ test('L0 版型不能分割；拖到別列時格子軌跟著、時間也一起',
   await page.locator(`[data-testid="clip"][data-item-id="${frameId}"]`).tap();
   await openTab(page, '剪輯');
   await seekTo(page, 2);
-  await page.getByRole('button', { name: '分割', exact: true }).tap();
+  await page.getByTestId('tool-edit.split').tap();
   await expect(page.locator('.toast').filter({ hasText: '版型不能分割' })).toBeVisible();
   expect((await tracks(page)).flatMap((t) => t.items).filter((i) => i.group && !i.cell)).toHaveLength(1);
   expect(clips(page)).toBeTruthy();
@@ -112,7 +112,7 @@ test('L1 空的格子：刪掉格子素材 → 格子還在（示意圖虛線、
   await page.getByTestId('ld-cell').nth(1).tap();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   const cellTracks = (await tracks(page)).filter((t) => t.groupRole === 'cell');
   expect(cellTracks).toHaveLength(2); // 格子軌都還在
   expect(cellTracks.filter((t) => t.items.length === 0)).toHaveLength(1);

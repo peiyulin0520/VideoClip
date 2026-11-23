@@ -26,7 +26,7 @@ async function sandwichProject(page: Page) {
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   // 預設：影像（紅）、影像（綠）、字卡 → 字卡在最上面
   expect(await kinds(page)).toBe('media,media,text');
 }

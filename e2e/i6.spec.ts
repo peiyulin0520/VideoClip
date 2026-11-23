@@ -8,7 +8,7 @@ async function setup(page: Page) {
   await addOverlays(page, ['solid-green.webm']);
   await openTab(page, '剪輯');
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await page.getByTestId('crop-tool-lasso').tap();
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;

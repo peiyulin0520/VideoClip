@@ -65,7 +65,7 @@ test('選了東西功能列自動跳：字卡→文字、音樂→音訊、從�
   await createProjectWith(page, ['solid-red.webm']);
   // 新增文字（在文字分頁）→ 留在文字
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await expectTab(page, '文字');
   // 點影片 → 從文字切到剪輯
   const video = page.locator('[data-testid="clip"][data-kind="video"]').first();

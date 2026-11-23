@@ -18,7 +18,7 @@ const setRange = (page: Page, label: string, v: number) =>
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, String(val));
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, v);
-const addTextBtn = (page: Page) => page.getByRole('button', { name: /新增文字/ }).first();
+const addTextBtn = (page: Page) => page.getByTestId('tool-text.add');
 
 test('文字透明度：滑桿讓字變淡（描邊不會從字裡透出來）；套用樣式到所有文字；新增文字沿用上一次的樣式', async ({
   page,
@@ -124,9 +124,7 @@ test('三層選單長得不一樣：底部分頁、區塊分段控制、分類�
   expect(l2).not.toBe(l3);
   expect(l3).not.toBe(accent);
   // 「＋」新增是圓形按鈕，不是跟區塊同樣的膠囊
-  const r = await page
-    .getByRole('button', { name: '新增文字', exact: true })
-    .evaluate((el) => getComputedStyle(el).borderRadius);
+  const r = await page.getByTestId('tool-text.add').evaluate((el) => getComputedStyle(el).borderRadius);
   expect(r).toBe('50%');
   await page.screenshot({ path: `${SHOT}/three-levels.png` });
 });

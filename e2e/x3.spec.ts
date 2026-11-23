@@ -27,7 +27,7 @@ async function setup(page: Page) {
   await addOverlays(page, ['solid-green.webm']); // 綠色疊在紅色上，置中、縮小一半
   await openTab(page, '剪輯');
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
 }
 
@@ -111,7 +111,7 @@ test('4:3 專案裁直式影片：畫面一樣是大的（不是縮在小小的�
   await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   const st = (await page.getByTestId('crop-stage').boundingBox())!;
   const fr = await frame(page);
   expect(fr.height).toBeGreaterThanOrEqual(st.height * 0.9);
@@ -150,7 +150,7 @@ test('四個工具獨立、可一起用：先拉框、再用筆刷補框外、�
   expect((await overlay(page)).crop).toBeUndefined();
   expect((await overlay(page)).cropEdit).toBeUndefined();
   // 重新來：只用筆刷（底是空的，只留刷到的）→ 套用
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await page.getByTestId('crop-tool-brush').tap();
   await page.getByLabel('粗細').fill('15');
   await page.getByLabel('距離').fill('0');
@@ -166,7 +166,7 @@ test('四個工具獨立、可一起用：先拉框、再用筆刷補框外、�
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
   expect(isRed(await samplePreview(page, 0.5, 0.33))).toBe(true);
   // 再進來：筆畫還在（可以 ↩ 復原不了——歷史是新的——但筆刷的範圍還在）
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   expect(await keepAlpha(page, 0.5, 0.5)).toBe(true);
   expect(await keepAlpha(page, 0.5, 0.1)).toBe(false);
   await page.getByTestId('crop-close').tap();

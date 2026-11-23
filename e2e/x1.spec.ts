@@ -47,10 +47,7 @@ test('X1-3 新文字是空的、輸入框有淺灰提示字；預覽有半透明
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   const input = page.getByLabel('文字內容');
   await expect(input).toHaveValue('');
   await expect(input).toHaveAttribute('placeholder', '點兩下編輯文字');
@@ -136,7 +133,7 @@ test('X1-7/8/9/10 片段範圍視窗：圖示播放鈕、秒數等寬、播放�
   await createProjectWith(page, ['clip-a.webm']);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
+  await page.getByTestId('tool-edit.trim').tap();
   const play = page.getByTestId('rm-play');
   await expect(play.locator('svg')).toHaveCount(1);
   expect(((await play.innerText()) ?? '').trim()).toBe('');

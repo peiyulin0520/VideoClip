@@ -124,10 +124,7 @@ test('字卡也能調色：色調分頁選字卡 → 選黑白，look 寫進字�
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await openTab(page, '色調');
   await expect(page.getByTestId('color-panel')).toBeVisible();
   await page.getByRole('radio', { name: '色調 黑白' }).tap();

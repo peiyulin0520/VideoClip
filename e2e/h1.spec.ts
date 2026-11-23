@@ -35,7 +35,7 @@ test('「刪除並補齊」刪掉版型的外框＝整個版型（含各格）�
   const frameId = (await tracks(page)).find(isFrameTrack)!.items[0]!.id;
   await page.locator(`[data-testid="clip"][data-item-id="${frameId}"]`).tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除並補齊' }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   const left = await tracks(page);
   expect(left.filter((t) => t.groupRole)).toHaveLength(0);
   expect(left.flatMap((t) => t.items).filter((i) => i.group)).toHaveLength(0);
@@ -82,7 +82,7 @@ test('裁切畫面的按鈕字在淺色主題下也看得清楚（跟底色的�
   await createProjectWith(page, ['solid-red.webm']);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
   const contrast = await page.evaluate(() => {
     const rgb = (c: string) => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);

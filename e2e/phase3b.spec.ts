@@ -101,7 +101,7 @@ test('字卡換字體：選單每個字體用自己的字形；沒下載過的�
 }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('ㄅㄆㄇ 大波浪圓體');
   // 中間那條的白色像素數：系統字體
   const band: [number, number, number, number] = [0, 0.4, 1, 0.6];
@@ -151,7 +151,7 @@ test('字卡換字體：選單每個字體用自己的字形；沒下載過的�
 test('匯入自己的字體：選了檔案就能用，存在這台裝置，重新整理後還在', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByRole('button', { name: '字體', exact: true }).tap();
   await page.getByTestId('font-file-input').setInputFiles(fixture('mini-font.ttf'));
   await expect(

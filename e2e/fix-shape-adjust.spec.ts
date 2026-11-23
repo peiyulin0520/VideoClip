@@ -18,10 +18,7 @@ const setRange = (page: Page, label: string, v: number) =>
 async function startWithShape(page: Page, cat: string, shapeLabel: string) {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('吃飯');
   await page.getByRole('tab', { name: '字塊', exact: true }).tap();
   if (cat !== '基本') await page.getByRole('button', { name: `圖形分類 ${cat}` }).tap();

@@ -38,7 +38,7 @@ const section = (page: Page, name: string) => page.getByRole('tab', { name, exac
 test('字卡面板：文字／版面／字塊／描邊陰影，每個按鈕都有反應', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('字卡測試');
 
   // ---- 文字：粗體、斜體 ----

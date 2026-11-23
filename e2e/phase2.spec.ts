@@ -33,7 +33,7 @@ test('同一秒疊 3 支影片＋1 個字卡：換圖層順序後預覽正確，
 
   // 加一個文字
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await expect(clips(page)).toHaveCount(4);
   await expect(page.getByTestId('track')).toHaveCount(4);
   await page.getByLabel('文字內容').fill('疊圖測試');
@@ -135,7 +135,7 @@ test('預覽上的選取框：只有框線（沒有圓點）、拖移、雙指�
 
   // 刪除：用剪輯分頁的刪除鈕（預覽上不放 ✕）
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   await expect(clips(page)).toHaveCount(1);
   await expect(page.getByTestId('selbox')).toHaveCount(0);
 });
@@ -270,7 +270,7 @@ test('圖層屬性：透明度、混合模式、圓角、外框、裁切', async
   // 留下來的那一半在畫面上的位置不變（x≈0.6 還是綠）
   await expect(page.getByLabel('裁切左')).toHaveCount(0); // 圖層分頁沒有裁切滑桿了
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const hl = (await page.getByTestId('crop-h-l').boundingBox())!;
   await page.mouse.move(hl.x + hl.width / 2, hl.y + hl.height / 2);
@@ -294,7 +294,7 @@ test('圖層屬性：透明度、混合模式、圓角、外框、裁切', async
 test('文字：新增、改內容與顏色、在預覽上可拖移，也能分割', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('哈囉\n第二行');
   await page.getByRole('button', { name: '文字顏色 #111111' }).tap();
   const p = await project(page);
@@ -311,7 +311,7 @@ test('文字：新增、改內容與顏色、在預覽上可拖移，也能分�
   // 分割：把播放頭移到文字中間（1.5 秒）再按分割
   await page.getByTestId('timeline-scroll').evaluate((el) => void (el.scrollLeft = 90));
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '分割', exact: true }).tap();
+  await page.getByTestId('tool-edit.split').tap();
   await expect(clips(page)).toHaveCount(3);
 });
 
