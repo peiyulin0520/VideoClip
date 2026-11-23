@@ -4,7 +4,7 @@ import { cellsOf, frameOfGroup, isFrameItem } from '../../engine/layoutTracks';
 import type { Item, Project } from '../../model/types';
 import { groupClipArea } from '../../engine/scene';
 import { showPlaceholders } from '../../engine/placeholder';
-import { Layers, Maximize, Minimize, ShieldCheck } from 'lucide-react';
+import { Layers, Lock, LockOpen, Maximize, Minimize, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { urlFor } from '../../engine/assetUrls';
 import { installDebugHook } from '../../engine/debug';
@@ -102,6 +102,9 @@ export function Preview({
   const player = useUI((s) => s.player);
   const cropping = useCrop((s) => !!s.s);
   const previewFull = useUI((s) => s.previewFull);
+  const previewLock = useUI((s) => s.previewLock);
+  // 離開編輯器：鎖定、全螢幕都回到預設（鎖定只管這一次編輯）
+  useEffect(() => () => useUI.setState({ previewLock: false, previewFull: false }), []);
   const gradePeek = useUI((s) => s.gradePeek);
   // 預覽畫質：自動／清楚／流暢（設定頁可改）；自動時同時 3 支以上影片、或偵測到播放太慢就用流暢
   const quality = useQuality((s) => s.q);
@@ -247,7 +250,7 @@ export function Preview({
   const rproject = useMemo(() => timeResolved(shown, kfTime), [shown, kfTime]);
   const sel = findItem(rproject, selectedId);
   const box = sel && selVisible ? selectionBox(sel.item, geo) : null;
-  const selLocked = !!sel?.track.locked || !!sel?.track.hidden;
+  const selLocked = !!sel?.track.locked || !!sel?.track.hidden || previewLock;
   const layoutEdit = useUI((s) => s.layoutEdit);
   const cellEdit = useUI((s) => s.cellEdit);
   const kineticEdit = useUI((s) => s.kineticEdit);
@@ -306,8 +309,16 @@ export function Preview({
     });
   };
 
+  const lockToast = useRef(0);
   const onPointerDown = (e: RPointerEvent) => {
     if ((e.target as HTMLElement).closest('[data-handle]')) return;
+    if (useUI.getState().previewLock) {
+      // 鎖定中：預覽上的素材不能點、拖、縮放（選取框保留），提醒怎麼解開
+      const now = Date.now();
+      if (now - lockToast.current > 2500) toast('已鎖定，按右上角鎖頭解開');
+      lockToast.current = now;
+      return;
+    }
     if (
       useUI.getState().frameEdit ||
       useUI.getState().layoutEdit ||
@@ -478,6 +489,17 @@ export function Preview({
   // 預覽的底固定 9:16；版面在底裡面置中，外面蓋斜線（範圍外的東西也看得到、可以拖）
   const lay = stageLayout(width, height, baseA || undefined);
   const hasOut = lay.fx < 0.999 || lay.fy < 0.999;
+  // 「框內是影片輸出範圍」只在剛換比例後出現 3 秒（進專案時不顯示，斜線已經夠清楚）
+  const ratioKey = `${project.width}x${project.height}`;
+  const lastRatio = useRef(ratioKey);
+  const [showOut, setShowOut] = useState(false);
+  useEffect(() => {
+    if (lastRatio.current === ratioKey) return;
+    lastRatio.current = ratioKey;
+    setShowOut(true);
+    const t = setTimeout(() => setShowOut(false), 3000);
+    return () => clearTimeout(t);
+  }, [ratioKey]);
   const pc = (n: number) => `${(n * 100).toFixed(4)}%`;
   const fl = (lay.offX / lay.baseW) * 100;
   const ft = (lay.offY / lay.baseH) * 100;
@@ -528,7 +550,7 @@ export function Preview({
           </div>
         )}
         <AspectOverlay baseRef={baseRef} />
-        {hasOut && (
+        {hasOut && showOut && (
           <>
             <div className="out-label" aria-hidden="true">
               框內是影片輸出範圍 · {aspectLabel(project)}
@@ -649,30 +671,42 @@ export function Preview({
         </button>
       )}
       {!cropping && (
-        <button
-          className="peek-toggle"
-          aria-label="查看圖層"
-          aria-pressed={peek}
-          onClick={() => {
-            player?.pause();
-            setPeek((v) => !v);
-          }}
-        >
-          <Layers size={18} />
-          <span>圖層</span>
-        </button>
+        <div className="preview-tools" data-testid="preview-tools">
+          <button
+            className="peek-toggle"
+            aria-label="查看圖層"
+            aria-pressed={peek}
+            onClick={() => {
+              player?.pause();
+              setPeek((v) => !v);
+            }}
+          >
+            <Layers size={18} />
+            <span>圖層</span>
+          </button>
+          <button
+            className="lock-toggle"
+            aria-label={previewLock ? '解除鎖定預覽' : '鎖定預覽'}
+            aria-pressed={previewLock}
+            data-testid="lock-toggle"
+            onClick={() => {
+              useUI.setState({ previewLock: !previewLock });
+              toast(previewLock ? '已解鎖' : '已鎖定，預覽上的素材不會被拖動');
+            }}
+          >
+            {previewLock ? <Lock size={20} /> : <LockOpen size={20} />}
+          </button>
+          <button
+            className="full-toggle"
+            aria-label={previewFull ? '結束全螢幕預覽' : '全螢幕預覽'}
+            aria-pressed={previewFull}
+            onClick={() => useUI.setState({ previewFull: !previewFull })}
+          >
+            {previewFull ? <Minimize size={20} /> : <Maximize size={20} />}
+          </button>
+        </div>
       )}
       {peek && <LayerPeek project={project} time={player?.time ?? 0} onClose={() => setPeek(false)} />}
-      {!cropping && (
-        <button
-          className="full-toggle"
-          aria-label={previewFull ? '結束全螢幕預覽' : '全螢幕預覽'}
-          aria-pressed={previewFull}
-          onClick={() => useUI.setState({ previewFull: !previewFull })}
-        >
-          {previewFull ? <Minimize size={20} /> : <Maximize size={20} />}
-        </button>
-      )}
       <button
         className={`safe-toggle${safe ? ' on' : ''}`}
         aria-label="安全區參考線"
@@ -680,7 +714,6 @@ export function Preview({
         onClick={toggleSafe}
       >
         <ShieldCheck size={18} />
-        <span>安全區</span>
       </button>
     </div>
   );

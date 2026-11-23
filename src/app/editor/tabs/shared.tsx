@@ -77,17 +77,34 @@ export function targetOfTab(t: Tab): { cat: CatId; tool: ToolId | null } {
 export function ToolButton({
   icon: Icon,
   label,
+  ariaLabel,
   onClick,
   active,
+  fill,
+  disabled,
+  testId,
 }: {
   icon: LucideIcon;
   label: string;
+  /** 螢幕閱讀器／測試用的完整名稱（預設就是 label） */
+  ariaLabel?: string;
   onClick: () => void;
   active?: boolean;
+  /** 圖示實心（例如這個時間有定格時的菱形） */
+  fill?: boolean;
+  disabled?: boolean;
+  testId?: string;
 }) {
   return (
-    <button className={`tool${active ? ' active' : ''}`} onClick={onClick} aria-label={label}>
-      <Icon size={22} />
+    <button
+      className={`tool${active ? ' active' : ''}`}
+      onClick={onClick}
+      aria-label={ariaLabel ?? label}
+      aria-pressed={fill === undefined ? undefined : fill}
+      disabled={disabled}
+      data-testid={testId}
+    >
+      <Icon size={22} fill={fill ? 'currentColor' : 'none'} aria-hidden="true" />
       <span>{label}</span>
     </button>
   );

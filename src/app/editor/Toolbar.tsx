@@ -5,6 +5,8 @@ import { addText } from '../../store/actions';
 import { cancelCrop } from '../../store/cropStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useUI } from '../../store/uiStore';
+import { GradePeekButton } from './GradePeekButton';
+import { KeyframeButton } from './KeyframeButton';
 import { AssetsTab } from './tabs/AssetsTab';
 import { AudioTab } from './tabs/AudioTab';
 import { EditTab } from './tabs/EditTab';
@@ -164,6 +166,7 @@ export function BottomBar({
         >
           <div className="ps-head">
             <b>{TOOL_TITLE[tool]}</b>
+            {tool === 'color' && <GradePeekButton />}
             <button className="sheet-close" aria-label="收起面板" data-testid="panel-close" onClick={closePopup}>
               <X size={20} aria-hidden="true" />
             </button>
@@ -188,12 +191,15 @@ export function BottomBar({
           {cat === 'edit' &&
             edit(
               'row',
-              <ToolButton
-                icon={Move}
-                label="位置大小"
-                active={tool === 'layers'}
-                onClick={() => setTool((t) => (t === 'layers' ? null : 'layers'))}
-              />,
+              <>
+                <ToolButton
+                  icon={Move}
+                  label="位置大小"
+                  active={tool === 'layers'}
+                  onClick={() => setTool((t) => (t === 'layers' ? null : 'layers'))}
+                />
+                <KeyframeButton />
+              </>,
             )}
           {cat === 'add' && (
             <div className="toolbar" role="toolbar" aria-label="加入">

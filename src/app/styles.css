@@ -4610,3 +4610,66 @@ button:not(:disabled):active,
 .ka-frame .crop-h {
   z-index: 1;
 }
+
+/* 色調視窗標題列的「看原色」 */
+.ps-peek {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  min-height: 36px;
+  margin: 0 4px 0 auto;
+  padding: 0 0.8em;
+  font-size: var(--fs-note);
+  white-space: nowrap;
+}
+.ps-peek.on {
+  color: #fff;
+  background: var(--accent);
+}
+/* 預覽右上角：圖層、鎖定、全螢幕 靠右排成一列；安全區只剩小圖示 */
+.preview-tools {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+}
+.preview-tools > button {
+  position: static;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+}
+.safe-toggle {
+  padding: 0;
+  width: 44px;
+  justify-content: center;
+}
+.out-label {
+  transition: opacity 0.4s;
+}
+
+/* 全螢幕預覽：播放列上方的細進度條 */
+.progress-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 14px;
+  touch-action: none;
+  background: var(--panel);
+}
+.pg-track {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+}
+.pg-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: var(--accent);
+}
