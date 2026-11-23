@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, fixture, openTab, project, seekTo, undo } from './helpers';
+import { clips, createProjectWith, fixture, openTab, pressPlay, project, seekTo, undo } from './helpers';
 
 type Item = {
   id: string;
@@ -209,7 +209,7 @@ test('預覽播放背景音樂：有聲音；音樂軌道靜音就沒有聲音',
     return m;
   };
   await seekTo(page, 0);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await expect.poll(peak, { timeout: 8000 }).toBeGreaterThan(0.05);
   await page.getByRole('button', { name: '暫停' }).tap();
 
@@ -219,7 +219,7 @@ test('預覽播放背景音樂：有聲音；音樂軌道靜音就沒有聲音',
   await chip.tap();
   await page.getByRole('button', { name: '這條軌道靜音' }).tap();
   await seekTo(page, 0);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await page.waitForTimeout(800);
   expect(await peak()).toBeLessThan(0.01);
   await page.getByRole('button', { name: '暫停' }).tap();

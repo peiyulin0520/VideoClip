@@ -293,6 +293,38 @@ export async function redo(page: Page) {
   await page.getByRole('button', { name: '重做' }).tap();
 }
 
+/** 雙指縮放時間軸（用真的 touch 事件；factor＞1＝放大、＜1＝縮小） */
+export async function zoomTimeline(page: Page, factor: number) {
+  await page.getByTestId('timeline-scroll').evaluate((el, f) => {
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const touch = (id: number, x: number) =>
+      new Touch({ identifier: id, target: el, clientX: x, clientY: cy });
+    const fire = (type: string, d: number) => {
+      const touches = [touch(1, cx - d), touch(2, cx + d)];
+      el.dispatchEvent(
+        new TouchEvent(type, {
+          touches,
+          targetTouches: touches,
+          changedTouches: touches,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    };
+    fire('touchstart', 50);
+    fire('touchmove', 50 * f);
+    el.dispatchEvent(new TouchEvent('touchend', { bubbles: true }));
+  }, factor);
+}
+
+/** 按播放（視窗開著會蓋住播放列，先收起來） */
+export async function pressPlay(page: Page) {
+  await closePanel(page);
+  await page.getByRole('button', { name: '播放', exact: true }).tap();
+}
+
 /** 把整頁捲到看得到時間軸（不會動到時間軸的水平捲動／播放頭） */
 export async function showTimeline(page: Page) {
   await closePanel(page);

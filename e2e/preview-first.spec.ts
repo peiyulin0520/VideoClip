@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
   clips,
+  closePanel,
   countColor,
   createProjectWith,
   deselect,
@@ -37,7 +38,7 @@ test('預覽很大而且大小永遠不變：每個分頁、面板開合、選�
   await page.screenshot({ path: `${SHOT}/top.png` });
 
   const base = await stageSize(page);
-  for (const tab of ['疊加', '文字', '圖層', '版型', '特效', '素材', '音訊', '剪輯'] as const) {
+  for (const tab of ['疊加', '圖層', '版型', '特效', '素材', '音訊', '剪輯'] as const) {
     await openTab(page, tab);
     expect(await stageSize(page)).toEqual(base);
   }
@@ -47,14 +48,11 @@ test('預覽很大而且大小永遠不變：每個分頁、面板開合、選�
     .first()
     .tap();
   expect(await stageSize(page)).toEqual(base);
-  await page.locator('.tabs').getByRole('tab', { name: '文字', exact: true }).tap(); // 再點一次：面板不收合
-  await expect(page.getByLabel('文字內容')).toBeVisible();
+  await expect(page.getByLabel('文字內容')).toBeVisible(); // 剛新增文字：文字視窗直接升起
   expect(await stageSize(page)).toEqual(base);
 });
 
-test('整頁往下滑看設定：頂列與分頁列黏在上面、捲到最下面點得到最後的控制項、捲回頂端預覽完整', async ({
-  page,
-}) => {
+test('整頁不捲動；視窗裡面可以上下滑、最後的控制項點得到；預覽大小不變', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await page
@@ -64,49 +62,33 @@ test('整頁往下滑看設定：頂列與分頁列黏在上面、捲到最下�
   await page.getByRole('tablist', { name: '字卡設定' }).getByRole('tab', { name: '裝飾', exact: true }).tap();
   for (const k of ['尾端圈圈', '波浪底線', '愛心'])
     await page.getByRole('button', { name: `裝飾 ${k}` }).tap();
-  // 頁面比螢幕長，可以往下捲
+  // 整頁剛好一個螢幕高，不能捲
   const { sh, ih } = await page.evaluate(() => ({
     sh: document.documentElement.scrollHeight,
     ih: window.innerHeight,
   }));
-  expect(sh).toBeGreaterThan(ih + 300);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  // 最後一個控制項（愛心大小）按得到
-  await expect(page.getByRole('slider', { name: '愛心大小', exact: true })).toBeInViewport();
-  // 頂列（復原）與分頁列黏在上面
-  const undo = (await page.getByRole('button', { name: '復原' }).boundingBox())!;
-  expect(undo.y).toBeLessThan(60);
-  const tabs = (await page.locator('.tabs').boundingBox())!;
-  expect(tabs.y).toBeLessThan(110);
-  await page.screenshot({ path: `${SHOT}/scrolled-to-settings.png` });
-  // 切分頁時停在分頁列的位置（不跳回頁首）
-  await page.locator('.tabs').getByRole('tab', { name: '圖層', exact: true }).tap();
-  await expect.poll(() => scrollY(page)).toBeGreaterThan(200);
-  // 捲回頂端：預覽完整、大小沒變
+  expect(sh).toBeLessThanOrEqual(ih + 1);
   const before = await stageSize(page);
-  await page.evaluate(() => window.scrollTo(0, 0));
-  const s = (await page.getByTestId('stage').boundingBox())!;
-  expect(s.y).toBeGreaterThanOrEqual(40);
+  // 視窗裡面往下滑：最後一個控制項（愛心大小）按得到
+  const slider = page.getByRole('slider', { name: '愛心大小', exact: true });
+  await slider.scrollIntoViewIfNeeded();
+  await expect(slider).toBeInViewport();
+  const sheet = (await page.getByTestId('panel-sheet').boundingBox())!;
+  expect(sheet.y + sheet.height).toBeLessThanOrEqual(ih + 1);
+  await page.screenshot({ path: `${SHOT}/scrolled-to-settings.png` });
   expect(await stageSize(page)).toEqual(before);
 });
 
-test('在預覽空白處上下滑＝捲頁面；按在文字上拖＝移動文字，頁面不捲', async ({ page }) => {
+test('按在文字上拖＝移動文字，整頁不捲', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await page
     .getByRole('button', { name: /新增文字/ })
     .first()
     .tap();
-  const st = await previewBox(page);
-  // 空白處（預覽下方 85% 的地方）往上滑 → 頁面往下捲
-  const x = st.x + st.width * 0.5;
-  await touchDrag(page, { x, y: st.y + st.height * 0.85 }, { x, y: st.y + st.height * 0.35 });
-  await expect.poll(() => scrollY(page)).toBeGreaterThan(50);
-
-  // 等慣性捲動停下來，再回到頂端；按在文字上往右下拖 → 文字移動、頁面不捲
-  await page.waitForTimeout(1200);
-  const st2 = await previewBox(page);
+  await closePanel(page);
   await page.waitForTimeout(300);
+  const st2 = await previewBox(page);
   const t0 = await textTransform(page);
   const cx = st2.x + st2.width * 0.5;
   const cy = st2.y + st2.height * 0.5;
@@ -125,6 +107,7 @@ test('雙指：手指放在框外也能縮放；沒有選取時雙指會選到�
     .getByRole('button', { name: /新增文字/ })
     .first()
     .tap();
+  await closePanel(page);
   const st = await previewBox(page);
   const cx = st.x + st.width * 0.5;
   const cy = st.y + st.height * 0.5;
@@ -144,7 +127,7 @@ test('雙指：手指放在框外也能縮放；沒有選取時雙指會選到�
   await page.screenshot({ path: `${SHOT}/frame-only.png` });
 });
 
-test('多條軌道：時間軸全部列都顯示，不在裡面上下捲', async ({ page }) => {
+test('多條軌道：時間軸裡面可以上下滑，每一列都點得到', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm', 'solid-blue.webm']);
   await openTab(page, '文字');
@@ -152,13 +135,13 @@ test('多條軌道：時間軸全部列都顯示，不在裡面上下捲', async
     .getByRole('button', { name: /新增文字/ })
     .first()
     .tap();
+  await closePanel(page);
   await expect(clips(page)).toHaveCount(4);
-  const sc = await page
-    .locator('.tl-scroll')
-    .evaluate((el) => ({ sh: el.scrollHeight, ch: el.clientHeight }));
-  expect(sc.sh).toBeLessThanOrEqual(sc.ch + 1);
-  await page.locator('.timeline').evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  for (let i = 0; i < 4; i++) await expect(clips(page).nth(i)).toBeInViewport({ ratio: 0.1 });
+  // 時間軸佔剩下的高度、軌道多了就在時間軸裡上下滑（整頁不捲）；每一列都滑得到
+  for (let i = 0; i < 4; i++) {
+    await clips(page).nth(i).scrollIntoViewIfNeeded();
+    await expect(clips(page).nth(i)).toBeInViewport({ ratio: 0.1 });
+  }
   await page.screenshot({ path: `${SHOT}/timeline-all-rows.png` });
 });
 
@@ -170,6 +153,7 @@ test('很小的文字也點得到；文字面板的「刪除」；全螢幕預�
     .first()
     .tap();
   await page.getByLabel('文字內容').fill('小');
+  await closePanel(page);
   const st = await previewBox(page);
   const cx = st.x + st.width * 0.5;
   const cy = st.y + st.height * 0.5;
@@ -180,6 +164,7 @@ test('很小的文字也點得到；文字面板的「刪除」；全螢幕預�
   await page.mouse.click(cx + 12, cy); // 點在字旁邊 12px 內
   await expect(page.getByTestId('selbox')).toBeVisible();
 
+  await openTab(page, '文字');
   await page.getByRole('button', { name: '刪除這個文字' }).tap();
   await expect(clips(page)).toHaveCount(1);
 

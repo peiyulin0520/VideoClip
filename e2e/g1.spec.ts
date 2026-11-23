@@ -110,7 +110,6 @@ test('三層選單長得不一樣：底部分頁、區塊分段控制、分類�
       .locator(sel)
       .first()
       .evaluate((el) => getComputedStyle(el).backgroundColor);
-  const l1 = await bg('.tab.active');
   const l2 = await bg('.seg.on');
   const l3 = await bg('.chip3.on');
   const accent = await page.evaluate(() => {
@@ -124,7 +123,6 @@ test('三層選單長得不一樣：底部分頁、區塊分段控制、分類�
   expect(l2).not.toBe(accent);
   expect(l2).not.toBe(l3);
   expect(l3).not.toBe(accent);
-  void l1;
   // 「＋」新增是圓形按鈕，不是跟區塊同樣的膠囊
   const r = await page
     .getByRole('button', { name: '新增文字', exact: true })

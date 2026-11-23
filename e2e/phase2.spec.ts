@@ -17,6 +17,7 @@ import {
   selectedItemId,
   type RGBA,
   undo,
+  zoomTimeline,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/phase2';
@@ -167,9 +168,8 @@ test('點預覽畫面會選到最上面那個物件；鎖定的軌道不會被�
 test('疊加素材：長按拖曳移動時間、修剪、軌道選單', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
-  // 縮小時間軸兩次（60 → 26.7 px/秒），4 秒的素材才完整落在手機螢幕內
-  await page.getByRole('button', { name: '縮小時間軸' }).tap();
-  await page.getByRole('button', { name: '縮小時間軸' }).tap();
+  // 雙指縮小時間軸（60 → 26.7 px/秒），4 秒的素材才完整落在手機螢幕內
+  await zoomTimeline(page, 1 / 2.25);
   const PPS = 60 / 2.25;
   const overlay = page.locator('[data-testid="clip"][data-kind="video"]').nth(0); // 疊加軌在主軌上面，DOM 順序在前
   const id = (await project(page)).tracks[1]!.items[0]!.id;
@@ -315,14 +315,16 @@ test('文字：新增、改內容與顏色、在預覽上可拖移，也能分�
   await expect(clips(page)).toHaveCount(3);
 });
 
-test('底部分頁：再點目前的分頁面板不會收合，預覽大小永遠不變（使用者：預覽不能被擠小）', async ({ page }) => {
+test('功能列：升起視窗、再點類別收起來，預覽大小永遠不變（使用者：預覽不能被擠小）', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
-  await openTab(page, '文字');
   const stage = page.getByTestId('stage');
-  const h1 = (await stage.boundingBox())!.height;
-  const w1 = (await stage.boundingBox())!.width;
-  await page.getByRole('tab', { name: '文字' }).tap(); // 再點一次：面板不會收合
-  await expect(page.getByRole('button', { name: /新增文字/ })).toBeVisible();
-  expect((await stage.boundingBox())!.height).toBeCloseTo(h1, 0);
-  expect((await stage.boundingBox())!.width).toBeCloseTo(w1, 0);
+  const h0 = (await stage.boundingBox())!.height;
+  const w0 = (await stage.boundingBox())!.width;
+  await openTab(page, '色調');
+  await expect(page.getByTestId('panel-sheet')).toBeVisible();
+  expect((await stage.boundingBox())!.height).toBeCloseTo(h0, 0);
+  expect((await stage.boundingBox())!.width).toBeCloseTo(w0, 0);
+  await page.locator('.tabs').getByRole('tab', { name: '色調', exact: true }).tap(); // 再點一次：收起
+  await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
+  expect((await stage.boundingBox())!.height).toBeCloseTo(h0, 0);
 });

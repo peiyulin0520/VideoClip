@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, samplePreview, seekTo } from './helpers';
+import { createProjectWith, pressPlay, samplePreview, seekTo } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-9/t-smooth';
 
@@ -48,7 +48,7 @@ test('播放通過轉場：每支影片的 currentTime 不會突然跳回前面�
   await page.addInitScript(() => localStorage.setItem('vc-perf', '1'));
   await setup(page);
   await seekTo(page, 3.0);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   const jumps = await page.evaluate(
     () =>
       new Promise<number[]>((resolve) => {

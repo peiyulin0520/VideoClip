@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { createProjectWith, isGreen, isRed, openTab, samplePreview, seekTo, showTimeline } from './helpers';
+import {
+  createProjectWith,
+  isGreen,
+  isRed,
+  openTab,
+  pressPlay,
+  samplePreview,
+  seekTo,
+  showTimeline,
+} from './helpers';
 
 const notBlack = (c: number[] | null) => !!c && c[0]! + c[1]! + c[2]! > 90;
 
@@ -30,7 +39,7 @@ test('轉場播放：接縫前後一路播過去，每個取樣點都有畫面�
   await page.getByLabel('轉場長度').fill('10');
   await openTab(page, '剪輯');
   await seekTo(page, 3.0);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   let blank = 0;
   const t0 = Date.now();
   while (Date.now() - t0 < 2800) {

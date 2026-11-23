@@ -7,6 +7,8 @@ import {
   isGray,
   isRed,
   isWhite,
+  openTab,
+  pressPlay,
   project,
   redo,
   samplePreview,
@@ -15,6 +17,7 @@ import {
   showTimeline,
   timeText,
   undo,
+  zoomTimeline,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/phase1';
@@ -57,7 +60,7 @@ test('兩個專案各匯入 2 個素材：重新整理後都還在，編輯一�
   // 重新整理後素材檔還在、能播放
   await page.reload();
   await expect(clips(page)).toHaveCount(1);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await expect.poll(async () => timeText(page), { timeout: 5000 }).not.toMatch(/^0:00\.0/);
 });
 
@@ -94,6 +97,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await expect(page.getByTestId('time')).toContainText('/ 0:06.6');
 
   // 沒選片段時，需要選取的按鈕會提示
+  await openTab(page, '剪輯');
   await page.getByRole('button', { name: '刪除', exact: true }).tap();
   await expectToast(page, '請先點選一個片段');
 
@@ -158,9 +162,9 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
 
   // 縮放時間軸
   const w0 = (await clips(page).first().boundingBox())!.width;
-  await page.getByRole('button', { name: '放大時間軸' }).tap();
+  await zoomTimeline(page, 1.5);
   await expect.poll(async () => (await clips(page).first().boundingBox())!.width).toBeGreaterThan(w0 * 1.3);
-  await page.getByRole('button', { name: '縮小時間軸' }).tap();
+  await zoomTimeline(page, 1 / 1.5);
 
   // 匯入：從工具列再加一張照片
   const [chooser] = await Promise.all([
@@ -253,7 +257,7 @@ test('播放：時間前進、影片真的在解碼、跨片段會無縫換到�
 
   // 從第 1.5 秒開始播，會跨過 2.0 秒進入第 2 支
   await seekTo(page, 1.5);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await expect(page.getByRole('button', { name: '暫停' })).toBeVisible();
   await expect.poll(async () => isGray(await samplePreview(page, 0.1, 0.5)), { timeout: 6000 }).toBe(true);
   await page.screenshot({ path: `${SHOT}/playing-second-clip.png` });

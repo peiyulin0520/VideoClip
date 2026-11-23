@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, fixture, project } from './helpers';
+import { createProjectWith, fixture, pressPlay, project } from './helpers';
 
 type Asset = { id: string; codec?: string; proxy?: { status: string; width?: number; height?: number } };
 const assets = async (page: Page) => (await project(page)).assets as Asset[];
@@ -22,7 +22,7 @@ test('大影片匯入後自動做預覽用輕量影片：預覽播放用它（�
     )
     .toContain(960);
   // 播放照常
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await page.waitForTimeout(600);
   expect(
     await page.evaluate(() =>
@@ -56,7 +56,7 @@ test('播放效能框：設定頁打開才有；播放時顯示每秒幾格與�
   await expect(page.getByTestId('perf-overlay')).toHaveCount(0);
   await page.evaluate(() => localStorage.setItem('vc-perf', '1'));
   await page.reload();
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   const box = page.getByTestId('perf-overlay');
   await expect(box).toBeVisible({ timeout: 8000 });
   await expect(box).toContainText('fps');

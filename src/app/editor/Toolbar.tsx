@@ -32,7 +32,7 @@ export type { Tab };
 type Sel = 'text' | 'audio' | 'media';
 
 /**
- * 選了東西，功能列自動跳到那個東西的工具：字卡→文字（升起文字視窗）、音樂→音訊；
+ * 選了東西，功能列自動跳到那個東西的工具：字卡→文字、音樂→音訊；
  * 影片／照片從文字、音訊或第一層選到時→剪輯。其他類別（加入、版型、特效）保持原樣：
  * 在那裡加東西時會自動選取新的，不應該被帶走；色調類別選別的影像（非音樂）也留著。
  */
@@ -41,8 +41,9 @@ export function targetForSelection(
   kind: Sel,
 ): { cat: CatId; tool: ToolId | null } | null {
   if (cat === 'color' && kind !== 'audio') return null;
-  if (kind === 'text') return { cat: 'text', tool: 'textedit' };
-  if (kind === 'audio') return { cat: 'audio', tool: 'audio' };
+  // 只換類別（工具列），不自動升起視窗：視窗會蓋住時間軸，選了片段就想再選別的片段會點不到
+  if (kind === 'text') return { cat: 'text', tool: null };
+  if (kind === 'audio') return { cat: 'audio', tool: null };
   if (cat === null || cat === 'text' || cat === 'audio') return { cat: 'edit', tool: null };
   return null;
 }
@@ -215,8 +216,22 @@ export function BottomBar({
           )}
           {cat === 'text' && (
             <div className="toolbar" role="toolbar" aria-label="文字">
-              <ToolButton icon={TypeIcon} label="新增文字" onClick={() => addText(addAt())} />
-              <ToolButton icon={Shapes} label="新增圖形" onClick={() => addText(addAt(), true)} />
+              <ToolButton
+                icon={TypeIcon}
+                label="新增文字"
+                onClick={() => {
+                  addText(addAt());
+                  setTool('textedit'); // 剛新增：直接升起文字視窗讓人打字
+                }}
+              />
+              <ToolButton
+                icon={Shapes}
+                label="新增圖形"
+                onClick={() => {
+                  addText(addAt(), true);
+                  setTool('textedit');
+                }}
+              />
               <ToolButton
                 icon={Pencil}
                 label="編輯文字"

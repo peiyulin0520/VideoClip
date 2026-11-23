@@ -33,8 +33,8 @@ test('X4 預覽的底＝預覽區整塊：改比例時底、播放列的位置�
   expect(Math.abs(b0.width - wrap0.width)).toBeLessThan(1); // 底就是預覽區整塊
   expect(Math.abs(b0.height - wrap0.height)).toBeLessThan(1);
   const playTop = (await page.getByRole('button', { name: /^(播放|暫停)$/ }).boundingBox())!.y;
-  // 9:16 的版面比預覽區窄：左右兩側（版面外面）蓋斜線、有「框內是影片輸出範圍」
-  await expect(page.getByText(/框內是影片輸出範圍/)).toBeVisible();
+  // 9:16 的版面比預覽區窄：左右兩側（版面外面）蓋斜線；「框內是影片輸出範圍」只在剛換比例後出現幾秒
+  await expect(page.getByText(/框內是影片輸出範圍/)).toHaveCount(0);
   await expect(page.getByTestId('out-hatch')).toBeVisible();
 
   for (const [name, ratio] of [
@@ -43,6 +43,7 @@ test('X4 預覽的底＝預覽區整塊：改比例時底、播放列的位置�
     [/1:1/, 1],
   ] as const) {
     await setRatio(page, name);
+    if (ratio === 4 / 3) await expect(page.getByText(/框內是影片輸出範圍/)).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     const b = await base(page);
     expect(Math.abs(b.x - b0.x)).toBeLessThan(1);

@@ -2,40 +2,44 @@ import { expect, test, type Page } from '@playwright/test';
 import { addOverlays, clips, createProjectWith, fixture, openTab, showTimeline } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-6/tabs';
-const NAMES = ['剪輯', '疊加', '文字', '圖層', '版型', '特效', '色調', '素材', '音訊'] as const;
+const NAMES = ['剪輯', '加入', '文字', '版型', '特效', '色調', '音訊'] as const;
+// 目前的類別：第一層看選中的類別；剪輯、加入、文字進到第二層後看工具列的名稱
+const activeTab = async (page: Page) => {
+  const sel = page.getByRole('tab', { selected: true });
+  if (await sel.count()) return sel.first().textContent();
+  const row = await page.getByTestId('fb-tools').getByRole('toolbar').getAttribute('aria-label');
+  return row === '剪輯工具' ? '剪輯' : row;
+};
 const expectTab = (page: Page, name: string) =>
-  expect.poll(async () => activeTab(page), { message: `目前的分頁應該是 ${name}` }).toBe(name);
-const activeTab = async (page: Page) => page.getByRole('tab', { selected: true }).first().textContent();
+  expect.poll(async () => activeTab(page), { message: `目前的類別應該是 ${name}` }).toBe(name);
 
-test('九個分頁都在、390 寬點得到每一個（放不下時分頁列可以左右滑）；每一頁有該有的內容', async ({ page }) => {
+test('七個類別都在、390 寬點得到每一個；每一個有該有的內容', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   const tabs = page.getByRole('tab');
-  await expect(tabs).toHaveCount(9);
+  await expect(tabs).toHaveCount(7);
   expect(await tabs.allTextContents()).toEqual([...NAMES]);
 
   const want: Record<(typeof NAMES)[number], string | RegExp> = {
     剪輯: '分割',
-    疊加: /加入影片或照片/,
-    文字: /新增文字/,
-    圖層: '這一秒的圖層',
+    加入: '貼圖',
+    文字: '新增文字',
     版型: '拍貼機直條',
     特效: /轉場/,
     色調: /色調組合/,
-    素材: '貼圖',
     音訊: /加入背景音樂/,
   };
   for (const name of NAMES) {
-    await page.getByRole('tab', { name }).tap();
-    await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true');
+    await openTab(page, name === '加入' ? '疊加' : name);
+    await expectTab(page, name);
     if (name === '版型')
       await expect(page.getByRole('button', { name: `版型 ${want[name] as string}` })).toBeVisible();
-    else if (name === '剪輯') await expect(page.getByRole('button', { name: '分割' })).toBeVisible();
+    else if (name === '剪輯' || name === '加入' || name === '文字')
+      await expect(
+        page.getByTestId('fb-tools').getByRole('button', { name: want[name] as string }),
+      ).toBeVisible();
     else await expect(page.getByText(want[name]).first()).toBeVisible();
     await page.screenshot({ path: `${SHOT}/tab-${name}.png` });
   }
-  // 每個分頁都在畫面內，或可以捲進畫面
-  const bar = await page.locator('.tabs').evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }));
-  expect(bar.sw).toBeGreaterThanOrEqual(bar.cw);
 });
 
 test('剪輯分頁只留跟剪輯影片有關的（含刪除並補齊）；沒有前後移；移除版型在版型、全部靜音在音訊', async ({
@@ -55,7 +59,7 @@ test('剪輯分頁只留跟剪輯影片有關的（含刪除並補齊）；沒�
   await expect(page.getByRole('button', { name: '全部影片靜音' })).toBeVisible();
 });
 
-test('選了東西自動切分頁：字卡→文字、音樂→音訊、從文字／音訊點影片→剪輯；在疊加分頁加素材不被帶走', async ({
+test('選了東西功能列自動跳：字卡→文字、音樂→音訊、從文字／音訊點影片→剪輯；在加入加素材不被帶走', async ({
   page,
 }) => {
   await createProjectWith(page, ['solid-red.webm']);
@@ -84,5 +88,5 @@ test('選了東西自動切分頁：字卡→文字、音樂→音訊、從文�
   await expectTab(page, '音訊');
   // 疊加分頁加素材：自動選取新的，但分頁不變
   await addOverlays(page, ['solid-green.webm']);
-  await expectTab(page, '疊加');
+  await expectTab(page, '加入');
 });

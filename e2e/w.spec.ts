@@ -7,6 +7,7 @@ import {
   isGreen,
   isRed,
   openTab,
+  pressPlay,
   project,
   samplePreview,
   seekTo as rawSeekTo,
@@ -54,6 +55,7 @@ const first = async (page: Page) => (await project(page)).tracks[0]!.items[0] as
 
 async function addKf(page: Page, sec: number) {
   await seekTo(page, sec);
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
 }
 
@@ -164,6 +166,7 @@ test('W4：播放線碰到菱形＝選到那個定格（菱形變白底）；調
   expect(mid.keyframes![0]!.look).toBeUndefined();
   expect(mid.keyframes![2]!.look).toBeUndefined();
   // 「定格」按鈕：沒有剛好對齊 → 在播放線的時間再新增一個
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await expect.poll(async () => (await first(page)).keyframes?.length).toBe(4);
   // 新的定格變成選到的（白色），原本那個變回橘色
@@ -187,6 +190,7 @@ test('W4：點菱形跳到剛好那個時間 → 按「定格」按鈕就是刪�
   await addKf(page, 2);
   await addKf(page, 3.5);
   await page.getByTestId('kf-dot').nth(1).tap();
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await expect.poll(async () => (await first(page)).keyframes?.length).toBe(2);
   // 細部調整的刪除：先碰到第二個（剩下的最後一個 3.5 秒），按「刪除這個定格」
@@ -202,7 +206,7 @@ test('W3 順暢度：有色調漂移的片段播放，渲染耗時跟整段同�
   await clips(page).first().tap();
   const play = async () => {
     await seekTo(page, 0.1);
-    await page.getByRole('button', { name: '播放', exact: true }).tap();
+    await pressPlay(page);
     await page.waitForTimeout(2200);
     const s = await page.evaluate(() =>
       (
@@ -236,8 +240,10 @@ test('W5：定格小特效「彈一下」——彈起來的時候綠色疊加素
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
   const ov = async () => (await project(page)).tracks[1]!.items[0] as unknown as It;
   await seekTo(page, 0.02);
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await seekTo(page, 1);
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await expect.poll(async () => (await ov()).keyframes?.length).toBe(2);
   const t1 = (await ov()).keyframes![1]!.t;

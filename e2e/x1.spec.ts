@@ -14,8 +14,9 @@ async function nameFirstClip(page: Page, name: string) {
 
 test('X1-1 播放列按鈕叫「定格」；整個頁面看不到「定位」', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
-  await expect(page.getByTestId('kf-btn')).toContainText('定格');
   await clips(page).first().tap();
+  await openTab(page, '剪輯');
+  await expect(page.getByTestId('kf-btn')).toContainText('定格');
   await openTab(page, '圖層');
   await expect(page.getByTestId('kf-panel')).toContainText('定格細部調整');
   await expect(page.locator('body')).not.toContainText('定位');
@@ -116,12 +117,15 @@ test('X1-4 按鈕、選單、輸入框都是圓角，不是膠囊（圓形白名
   expect(bad).toEqual([]);
 });
 
-test('X1-6 再點一次目前的分頁，面板不會收合', async ({ page }) => {
+test('X1-6 再點一次目前的類別：升起的視窗收起來；再點又升起來', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
-  await openTab(page, '色調');
   await clips(page).first().tap();
+  await openTab(page, '色調');
   await expect(page.getByTestId('color-panel')).toBeVisible();
-  await page.locator('.tabs').getByRole('tab', { name: '色調', exact: true }).tap();
+  const tab = page.locator('.tabs').getByRole('tab', { name: '色調', exact: true });
+  await tab.tap();
+  await expect(page.getByTestId('color-panel')).toHaveCount(0);
+  await tab.tap();
   await expect(page.getByTestId('color-panel')).toBeVisible();
 });
 
@@ -239,11 +243,15 @@ for (const w of WIDTHS) {
             if (h.scrollWidth > h.clientWidth + 1 && !inScrollRow) out.push(`字被截 ${label}`);
           }
         }
-        const tabs = document.querySelector('.tabs') as HTMLElement;
-        if (tabs.scrollWidth > tabs.clientWidth + 1)
+        const tabs = document.querySelector('.tabs') as HTMLElement | null;
+        if (tabs && tabs.scrollWidth > tabs.clientWidth + 1)
           out.push(`分頁列放不下 ${tabs.scrollWidth}>${tabs.clientWidth}`);
-        // 字級統一：分頁、按鈕、chip、卡片名稱同一個大小
-        const tabFs = parseFloat(getComputedStyle(document.querySelector('.tab')!).fontSize);
+        // 字級統一：按鈕、chip、卡片名稱同一個大小（＝內文字級 --fs-body）
+        const probe = document.createElement('i');
+        probe.style.fontSize = 'var(--fs-body)';
+        document.body.appendChild(probe);
+        const tabFs = parseFloat(getComputedStyle(probe).fontSize);
+        probe.remove();
         for (const el of Array.from(
           document.querySelectorAll(
             '.bottombar .btn, .bottombar .chip, .bottombar .chip3, .bottombar .look-card span',
@@ -265,14 +273,16 @@ for (const w of WIDTHS) {
       await openTab(page, tab);
       await scan(tab);
     }
+    // 第一層的類別字級（--fs-note）是內文的 0.86 倍
+    await page
+      .getByTestId('fb-back')
+      .tap()
+      .catch(() => undefined);
     const fs = await page.evaluate(() => ({
-      btn: parseFloat(
-        getComputedStyle(document.querySelector('.bottombar .btn, .bottombar .chip, .tab')!).fontSize,
-      ),
       tab: parseFloat(getComputedStyle(document.querySelector('.tab')!).fontSize),
     }));
-    if (w === 320) expect(fs.tab).toBeCloseTo(12, 0);
-    if (w >= 390) expect(fs.tab).toBeCloseTo(14, 0);
+    if (w === 320) expect(fs.tab).toBeCloseTo(12 * 0.86, 0);
+    if (w >= 390) expect(fs.tab).toBeCloseTo(14 * 0.86, 0);
     expect(problems).toEqual([]);
   });
 }
