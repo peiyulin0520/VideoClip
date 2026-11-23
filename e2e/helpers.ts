@@ -148,15 +148,20 @@ export const exportFrame = async (page: Page, t: number, pts: [number, number][]
     [t, pts] as const,
   );
 
-/** 切到底部分頁 */
+/** 切到底部分頁，並讓它的面板升起來（面板平常收起來；已經是這個分頁而且面板開著就不用再點） */
 export async function openTab(
   page: Page,
   name: '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '色調' | '素材' | '音訊',
 ) {
   const tab = page.locator('.tabs').getByRole('tab', { name, exact: true }); // 只找底部分頁列（文字面板裡也有叫「文字」的小分頁）
-  // 已經在這個分頁就不用再點（再點也不會收合）
-  if ((await tab.getAttribute('aria-selected')) === 'true') return;
+  if (
+    (await tab.getAttribute('aria-selected')) === 'true' &&
+    (await tab.getAttribute('aria-expanded')) === 'true'
+  )
+    return;
   await tab.tap();
+  // 原本就在這個分頁但面板是收起來的：那一下點擊已經把它升起來；原本面板開著、卻是別的分頁：點了就切過去
+  if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.tap();
 }
 
 /** 疊加分頁 →「加入影片或照片」→ 選檔案 */

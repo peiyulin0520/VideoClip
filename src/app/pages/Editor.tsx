@@ -214,7 +214,10 @@ function EditorBody() {
   const empty = project.tracks.every((t) => t.items.length === 0);
 
   return (
-    <main className={`editor${previewFull ? ' preview-full' : ''}`}>
+    <main
+      className={`editor${previewFull ? ' preview-full' : ''}`}
+      style={{ ['--proj-aspect' as string]: String(project.width / project.height) }}
+    >
       <header className="ed-top">
         <div className="btn-zone grow" data-testid="zone-nav">
           <Link className="icon-btn" to="/" aria-label="回首頁">

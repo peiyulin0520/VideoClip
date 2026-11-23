@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { findItem } from '../../engine/timeline';
 import { cancelCrop } from '../../store/cropStore';
@@ -39,6 +40,8 @@ export function BottomBar({
   const selectedId = useProjectStore((s) => s.selectedId);
   const [tab, setTab] = useState<Tab>('edit');
   const [panel, setPanel] = useState<Panel>(null);
+  // 面板（各分頁的內容）平常收起來，點分頁才從下面升起；關掉後就能直接拖播放軸看效果
+  const [open, setOpen] = useState(false);
 
   const found = findItem(project, selectedId);
   const barRef = useRef<HTMLDivElement>(null);
@@ -78,23 +81,20 @@ export function BottomBar({
     setTimeout(() => {
       tabRef.current = want;
       setTab(want);
+      setOpen(true);
       setPanel(null);
       cancelCrop();
     }, 250);
   }, [requestTab]);
 
-  // 點目前的分頁＝收合/展開下面的面板（讓出空間給預覽畫面）
+  // 點分頁：升起那一頁的面板；再點同一個分頁＝收起來
   const switchTab = (t: Tab) => {
     setPanel(null);
     cancelCrop(); // 離開剪輯分頁就結束裁切模式（不套用）
-    // 再點一次目前的分頁：什麼都不做（面板不收合）
-    if (t !== tab) setTab(t);
-    // 分頁列黏在頂端時（已經往下捲過），切分頁後停在分頁列的位置，不要停在新面板的一半
-    const el = barRef.current;
-    if (el) {
-      const stickTop = parseFloat(getComputedStyle(el).getPropertyValue('--top-h')) || 52;
-      if (el.getBoundingClientRect().top <= stickTop + 1)
-        requestAnimationFrame(() => window.scrollTo({ top: el.offsetTop - stickTop }));
+    if (t === tab) setOpen((o) => !o);
+    else {
+      setTab(t);
+      setOpen(true);
     }
   };
 
@@ -105,6 +105,7 @@ export function BottomBar({
       ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   }, [tab]);
 
+  const label = TABS.find((x) => x.id === tab)?.label ?? '';
   return (
     <div className="bottombar" ref={barRef}>
       <div className="tabs" role="tablist">
@@ -113,6 +114,7 @@ export function BottomBar({
             key={t.id}
             role="tab"
             aria-selected={tab === t.id}
+            aria-expanded={tab === t.id && open}
             className={`tab${tab === t.id ? ' active' : ''}`}
             onClick={() => switchTab(t.id)}
           >
@@ -120,15 +122,34 @@ export function BottomBar({
           </button>
         ))}
       </div>
-      {tab === 'edit' && <EditTab panel={panel} setPanel={setPanel} onImport={onImportMain} found={found} />}
-      {tab === 'overlay' && <OverlayTab onImportOverlay={onImportOverlay} />}
-      {tab === 'text' && <TextTab found={found} />}
-      {tab === 'layers' && <LayersTab />}
-      {tab === 'layout' && <LayoutTab found={found} />}
-      {tab === 'effect' && <EffectTab found={found} />}
-      {tab === 'color' && <ColorTab found={found} />}
-      {tab === 'assets' && <AssetsTab />}
-      {tab === 'audio' && <AudioTab found={found} panel={panel} setPanel={setPanel} />}
+      {open && (
+        <div className="panel-sheet" data-testid="panel-sheet" role="region" aria-label={`${label}面板`}>
+          <div className="ps-head">
+            <b>{label}</b>
+            <button
+              className="sheet-close"
+              aria-label="收起面板"
+              data-testid="panel-close"
+              onClick={() => setOpen(false)}
+            >
+              <X size={20} aria-hidden="true" />
+            </button>
+          </div>
+          <div className="ps-body">
+            {tab === 'edit' && (
+              <EditTab panel={panel} setPanel={setPanel} onImport={onImportMain} found={found} />
+            )}
+            {tab === 'overlay' && <OverlayTab onImportOverlay={onImportOverlay} />}
+            {tab === 'text' && <TextTab found={found} />}
+            {tab === 'layers' && <LayersTab />}
+            {tab === 'layout' && <LayoutTab found={found} />}
+            {tab === 'effect' && <EffectTab found={found} />}
+            {tab === 'color' && <ColorTab found={found} />}
+            {tab === 'assets' && <AssetsTab />}
+            {tab === 'audio' && <AudioTab found={found} panel={panel} setPanel={setPanel} />}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

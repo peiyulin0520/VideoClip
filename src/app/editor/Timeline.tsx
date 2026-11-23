@@ -792,11 +792,9 @@ export function Timeline({
   };
 
   const menuTrack = project.tracks.find((t) => t.id === menuTrackId) ?? null;
-  // 時間軸高度＝全部軌道（不在裡面上下捲；上下交給整頁捲動）
-  const viewH = contentH; // 跟著內容長高、不留白（2026-11-16 使用者：新專案播放軸下面一大塊空白）
-
+  // 時間軸吃掉播放列和功能列中間剩下的高度，軌道多的時候在裡面上下滑（整頁不捲動）
   return (
-    <div className="timeline" style={{ height: viewH, minHeight: viewH }}>
+    <div className="timeline">
       {multi && (
         <MultiBar
           project={project}
