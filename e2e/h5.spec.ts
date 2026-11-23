@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addOverlays, createProjectWith, project, showTimeline } from './helpers';
+import { addOverlays, createProjectWith, project, showTimeline, undo } from './helpers';
 
 type Tr = { id: string; items: { assetId: string }[] };
 const tracks = async (page: Page) => (await project(page)).tracks as unknown as Tr[];
@@ -51,7 +51,7 @@ test('長按軌道圖示進入多選：打勾幾條 → 一起上移、一起刪
   await page.getByRole('button', { name: '刪除選到的軌道' }).tap();
   expect((await tracks(page)).length).toBe(2);
   await expect(page.getByTestId('multi-bar')).toHaveCount(0);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await tracks(page)).length).toBe(3);
 });
 

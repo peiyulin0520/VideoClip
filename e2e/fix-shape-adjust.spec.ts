@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
-import { countColor, createProjectWith, legacyBox, openTab, project, regionHash } from './helpers';
+import { countColor, createProjectWith, legacyBox, openTab, project, regionHash, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/fix-feedback-2';
 
@@ -60,7 +60,7 @@ test('雲朵：凹槽深度／圓滑／凸起數量可調，預覽跟著變，�
     .toBeGreaterThan(30);
 
   // 復原：回到上一個調整值
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await boxOf(page)).adj).not.toMatchObject({ count: 12 });
 
   // 還原預設／換圖形：調整值清掉

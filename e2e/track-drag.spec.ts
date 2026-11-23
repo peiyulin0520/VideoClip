@@ -9,6 +9,7 @@ import {
   samplePreview,
   showTimeline,
   touchDrag,
+  undo,
 } from './helpers';
 
 const order = async (page: Page) => (await project(page)).tracks.map((t) => t.id);
@@ -42,7 +43,7 @@ test('軌道圖示按住上下拖＝換圖層順序（觸控）；點一下仍�
   await page.screenshot({ path: 'docs/screenshots/feedback-5/track-drag-after.png' });
 
   // 一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await order(page)).join(',')).toBe([main, green, blue].join(','));
 
   // 點一下（沒有拖）：開軌道選單

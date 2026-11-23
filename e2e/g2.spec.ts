@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { clips, createProjectWith, openTab, showTimeline } from './helpers';
+import { clips, createProjectWith, openTab, showTimeline, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g2';
 
@@ -36,7 +36,7 @@ test('片段命名：剪輯分頁「命名」、時間軸顯示「序號 名稱�
   await page.getByRole('button', { name: '儲存', exact: true }).tap();
   await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
   await expect(clips(page).first()).toContainText('1 影片'); // 空白＝預設名稱
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   await expect(clips(page).first()).toContainText('1 開場・揮手');
 
   // 連點兩下片段 → 命名面板

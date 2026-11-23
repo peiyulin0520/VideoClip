@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addOverlays, createProjectWith, exportFrame, isGreen, openTab, project, touchDrag } from './helpers';
+import {
+  addOverlays,
+  createProjectWith,
+  exportFrame,
+  isGreen,
+  openTab,
+  project,
+  touchDrag,
+  undo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
 
@@ -116,7 +125,7 @@ test('X4 改比例「保持原樣」：疊加的綠色塊在預覽上的位置�
   expect(tr1.scale).not.toBeCloseTo(tr0.scale, 2); // 座標換算過了
 
   // 復原 → 座標回到原來的
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const tr2 = ((await project(page)).tracks[1]!.items[0] as unknown as { transform: { scale: number } })
     .transform;
   expect(tr2.scale).toBeCloseTo(tr0.scale, 4);
@@ -195,6 +204,6 @@ test('X4 自訂比例：套用後在預覽上拖右邊把手 → 寬:高即時�
   await page.screenshot({ path: `${SHOT}/ratio-custom.png` });
 
   // 復原 → 回到 9:16
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect(await meta()).toMatchObject({ aspect: '9:16', width: 1080, height: 1920 });
 });

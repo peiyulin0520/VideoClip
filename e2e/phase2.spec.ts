@@ -9,12 +9,14 @@ import {
   isGreen,
   isRed,
   openTab,
+  pinch,
+  previewBox,
   project,
+  redo,
   samplePreview,
   selectedItemId,
   type RGBA,
-  previewBox,
-  pinch,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/phase2';
@@ -108,11 +110,11 @@ test('預覽上的選取框：只有框線（沒有圓點）、拖移、雙指�
   expect(Math.abs(tf1.rotation - 90)).toBeLessThan(0.01); // 88° 吸附到 90°
   await page.screenshot({ path: `${SHOT}/selection-box-scaled.png` });
   // 一次雙指手勢＝一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const tfu = (await project(page)).tracks[1]!.items[0]!.transform;
   expect(tfu.scale).toBeCloseTo(0.5);
   expect(tfu.rotation).toBe(0);
-  await page.getByRole('button', { name: '重做' }).tap();
+  await redo(page);
 
   // 拖框內 → 移動位置
   const st2 = await previewBox(page);
@@ -126,7 +128,7 @@ test('預覽上的選取框：只有框線（沒有圓點）、拖移、雙指�
   expect(tf2.y).toBeGreaterThan(0.5);
 
   // 一次拖曳 = 一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const tf3 = (await project(page)).tracks[1]!.items[0]!.transform;
   expect(tf3.x).toBeCloseTo(tf1.x, 1);
 

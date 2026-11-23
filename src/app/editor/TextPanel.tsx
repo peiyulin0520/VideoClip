@@ -70,7 +70,7 @@ export function TextPanel({
     <>
       <div className="seg-row sticky-tabs">
         <Segmented options={SECTIONS} value={section} onChange={setSection} label="字卡設定" />
-        <button className="add-circle" aria-label="新增文字" onClick={onAdd}>
+        <button className="add-circle" aria-label="新增另一段文字" onClick={onAdd}>
           ＋
         </button>
       </div>

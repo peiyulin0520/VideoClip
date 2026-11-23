@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addOverlays, createProjectWith, openTab, project, showTimeline } from './helpers';
+import { addOverlays, createProjectWith, openTab, project, showTimeline, undo } from './helpers';
 
 // 2026-11-12 使用者：「直接在拖拉軸長按拖移各種素材到不同圖層及不同位置……影像只能放影像、音效只能放音效、字卡只能放字卡」
 
@@ -55,7 +55,7 @@ test('長按影像片段拖到另一條影像軌、時間往右：換軌道、�
   const moved = after[1]!.items.find((i) => i.id === clipA)!;
   expect(moved.start).toBeGreaterThan(4.5); // 影像 2 的綠色 0–4 秒，所以放在後面的空位
 
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const undone = await tracks(page);
   expect(undone[0]!.items.map((i) => i.id)).toEqual([clipA]);
   expect(undone[0]!.items[0]!.start).toBe(0);

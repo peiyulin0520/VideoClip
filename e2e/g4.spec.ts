@@ -2,20 +2,21 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
   createProjectWith,
-  isRed,
+  finishLayout,
   fixture,
+  isFrameTrack,
+  isRed,
   openTab,
   pinch,
   previewBox,
   project,
   samplePreview,
   seekTo,
+  selectFrame,
   selectedItemId,
   showTimeline,
-  isFrameTrack,
-  finishLayout,
   trimClipEnd,
-  selectFrame,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g4';
@@ -126,7 +127,7 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   // 刪掉外框＝整個版型拿掉（復原回來）
   await page.getByRole('button', { name: '移除版型' }).tap();
   expect((await tracks(page)).length).toBe(1);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await tracks(page)).length).toBe(5);
 });
 

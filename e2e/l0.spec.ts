@@ -3,6 +3,7 @@ import {
   clips,
   createProjectWith,
   exportFrame,
+  finishLayout,
   fixture,
   isFrameTrack,
   isGreen,
@@ -12,7 +13,7 @@ import {
   samplePreview,
   seekTo,
   showTimeline,
-  finishLayout,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
@@ -169,6 +170,6 @@ test('L2 版型分頁只挑版型：沒有特效／動畫／長度；按鈕寫�
   await openTab(page, '特效');
   await expect(page.getByTestId('fx-where')).toBeVisible();
   await expect(page.getByTestId('layout-motion')).toHaveCount(0);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await tracks(page)).filter((t) => t.groupRole === 'cell')).toHaveLength(0);
 });

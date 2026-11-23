@@ -1,5 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addOverlays, createProjectWith, isGreen, isRed, openTab, project, samplePreview } from './helpers';
+import {
+  addOverlays,
+  createProjectWith,
+  isGreen,
+  isRed,
+  openTab,
+  project,
+  redo,
+  samplePreview,
+  undo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-5';
 type Crop = { l: number; t: number; r: number; b: number };
@@ -64,7 +74,7 @@ test('裁切在剪輯分頁：預覽上拖四邊拉霸，切完留下的畫面�
   await page.screenshot({ path: `${SHOT}/crop-done.png` });
 
   // 一步復原：回到沒裁切，位置大小回來
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const undone = await overlay(page);
   expect(undone.crop).toBeUndefined();
   expect(undone.transform.x).toBeCloseTo(before.transform.x, 5);
@@ -180,13 +190,13 @@ test('自由形狀（描邊）：手指畫一圈，只留圈裡面，外面透�
   await page.screenshot({ path: `${SHOT}/crop-lasso-done.png` });
 
   // 一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const undone = await overlay(page);
   expect(undone.mask).toBeUndefined();
   expect(undone.crop).toBeUndefined();
 
   // 重做後重新進入裁切模式：看得到形狀的輪廓；「清除形狀」可以去掉
-  await page.getByRole('button', { name: '重做' }).tap();
+  await redo(page);
   expect((await overlay(page)).mask).toBeDefined();
   await page.getByRole('button', { name: '裁切' }).tap();
   await expect(page.getByTestId('crop-polygon')).toBeVisible();

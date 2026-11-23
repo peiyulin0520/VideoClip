@@ -9,6 +9,7 @@ import {
   project,
   samplePreview,
   showTimeline,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
@@ -67,7 +68,7 @@ test('X9 夾心：圖層分頁把文字往下一層＝夾在兩個影像中間�
   ).toHaveCount(0);
   await page.screenshot({ path: `${SHOT}/x9-timeline-mixed-390.png` });
 
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect(await kinds(page)).toBe('media,media,text');
 });
 

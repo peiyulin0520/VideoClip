@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, fixture, openTab, project, seekTo } from './helpers';
+import { clips, createProjectWith, fixture, openTab, project, seekTo, undo } from './helpers';
 
 type Item = {
   id: string;
@@ -128,7 +128,7 @@ test('選到音樂：只有音樂用得到的工具；音量 0–200%、淡入�
 
   // 一步復原（淡出、淡入各自一步，連續拖同一個滑桿併成一步）
   await page.waitForTimeout(1500);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await audioTrack(page))!.items[0]!.fadeOut ?? 0).toBe(0);
 });
 

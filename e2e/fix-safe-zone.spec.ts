@@ -19,7 +19,7 @@ test('安全區參考線：預設不顯示；開關有文字；打開後常駐�
   await page.screenshot({ path: `${SHOT}/after-default.png` });
 
   const toggle = page.getByRole('button', { name: '安全區參考線' });
-  await expect(toggle).toContainText('安全區');
+  await expect(toggle).toBeVisible(); // 只剩小圖示（U3），沒有文字
   const b = (await toggle.boundingBox())!;
   expect(b.width).toBeGreaterThanOrEqual(44);
   expect(b.height).toBeGreaterThanOrEqual(44);

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, fixture, openTab, project, showTimeline } from './helpers';
+import { clips, createProjectWith, fixture, openTab, project, showTimeline, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g3';
 type It = {
@@ -100,7 +100,7 @@ test('修剪面板：再加一段（多段）→ 完成後拆成兩個片段，�
   expect(items[1]!.trimIn).toBeCloseTo(2, 1);
   expect(items[1]!.duration).toBeCloseTo(1, 1);
   await expect(page.locator('.toast').filter({ hasText: '已拆成 2 段' })).toBeVisible();
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await tracks(page))[0]!.items).toHaveLength(1);
 });
 

@@ -13,6 +13,7 @@ import {
   seekTo,
   selectFrame,
   showTimeline,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
@@ -195,7 +196,7 @@ test('L7 調整版型大小：預覽上拖右邊把手往左 → 套用 → 版�
     .toBe(true);
   await page.screenshot({ path: `${SHOT}/layout-resized.png` });
   // 復原 → 回到整個畫面
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   await expect.poll(async () => (await frameOf()).frameStyle?.box).toBeUndefined();
 });
 
@@ -230,8 +231,8 @@ test('L7 格子框線粗細：滑桿 0%＝格子貼在一起、300%＝框線變�
     .toBe(true);
   await page.screenshot({ path: `${SHOT}/layout-line-0.png` });
   // 一步復原（滑桿的連續調整合併成一步）→ 回到 300% 或原本；再復原到原本粗細
-  await page.getByRole('button', { name: '復原' }).tap();
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
+  await undo(page);
   await expect.poll(gap, { timeout: 5000 }).toBeCloseTo(g1, 3);
 });
 

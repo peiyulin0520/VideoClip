@@ -18,14 +18,7 @@ export function TextTab({ found }: { found: Found }) {
           </>
         </>
       ) : (
-        <>
-          <button className="btn primary done" onClick={add}>
-            ＋ 新增文字（放在目前這一秒）
-          </button>
-          <button className="btn done" onClick={() => addText(player?.time ?? 0, true)}>
-            ＋ 新增圖形（星形、對話框、雲朵…）
-          </button>
-        </>
+        <p className="hint">先點選一段文字</p>
       )}
     </div>
   );

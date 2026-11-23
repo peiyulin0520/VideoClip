@@ -11,6 +11,7 @@ import {
   samplePreview,
   seekTo,
   showTimeline,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g5';
@@ -130,7 +131,7 @@ test('套用到這一軌全部銜接處；分割後轉場只留在前半；刪�
   expect(it[2]!.transitionIn?.kind).toBe('blackflash');
   expect(it[0]!.transitionIn).toBeUndefined(); // 第一個片段前面沒有
   // 一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await items(page))[2]!.transitionIn).toBeUndefined();
   // 選「無」
   await page.getByRole('radio', { name: '轉場 無' }).tap();

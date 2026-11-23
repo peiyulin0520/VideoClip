@@ -1,15 +1,17 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
-  countColor,
   clips,
+  countColor,
   createProjectWith,
   deselect,
   openTab,
   pinch,
   previewBox,
   project,
+  redo,
   touchDrag,
+  undo,
 } from './helpers';
 
 // 使用者 2026-11-11：「預覽不要太小…頁面可以整體往下滑新增功能，但往上滑可以看到不會縮小的預覽畫面」
@@ -227,11 +229,11 @@ test('不用手勢也能調：圖層分頁與文字「版面」的整體大小�
   expect(tf.scale).toBeCloseTo(1.8);
   expect(tf.rotation).toBe(-30);
   // 拖兩次大小滑桿＝一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
+  await undo(page);
   expect((await textTransform(page)).scale).toBeCloseTo(1);
-  await page.getByRole('button', { name: '重做' }).tap();
-  await page.getByRole('button', { name: '重做' }).tap();
+  await redo(page);
+  await redo(page);
 
   // 圖層分頁：同樣的控制項；置中、轉正
   await openTab(page, '圖層');

@@ -8,6 +8,7 @@ import {
   openTab,
   project,
   samplePreview,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-8';
@@ -89,7 +90,7 @@ test('自由形狀圈完之後：橡皮擦擦掉中間一條（可調粗細）�
   await page.screenshot({ path: `${SHOT}/brush-done.png` });
 
   // 一步復原：回到只有橡皮擦的那一版
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(true);
 });
 

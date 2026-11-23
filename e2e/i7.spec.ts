@@ -3,15 +3,16 @@ import {
   addOverlays,
   createProjectWith,
   exportFrame,
+  finishLayout,
+  isFrameTrack,
   isGreen,
   isRed,
   openTab,
   project,
   samplePreview,
   seekTo as rawSeekTo,
-  isFrameTrack,
-  finishLayout,
   selectFrame,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-9/i7';
@@ -139,7 +140,7 @@ test('定格：預覽上拖物件（有定格時換時間拖，自動多一個�
   expect(o.keyframes).toBeUndefined();
   expect(o.transform.y).toBeCloseTo(0.8, 1);
   await expect(page.getByTestId('kf-dot')).toHaveCount(0);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await overlay(page)).keyframes?.length).toBe(2);
 });
 

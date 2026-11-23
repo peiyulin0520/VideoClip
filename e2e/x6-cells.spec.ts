@@ -9,9 +9,10 @@ import {
   samplePreview,
   seekTo,
   selectFrame,
-  trimClipEnd,
   showTimeline,
+  trimClipEnd,
   type RGBA,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
@@ -129,14 +130,14 @@ test('X6 同步／依序：排好各格素材、版型長度跟著；依序時�
   expect((await row(page, 1))[0]![0]).toBeGreaterThan(6.7);
   expect((await frame(page)).duration).toBeGreaterThan(10.7);
   if (await page.getByRole('dialog').count()) await page.getByTestId('sheet-close').tap();
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect(await row(page, 1)).toEqual([[6, 4]]);
 
   // 切回同步：第 2 格回到版型開頭
   await page.getByRole('radio', { name: '播放方式 同步' }).tap();
   expect(await row(page, 1)).toEqual([[0, 4]]);
   expect((await frame(page)).duration).toBeCloseTo(6, 1);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await frame(page)).layoutPlay).toBe('seq');
   expect(await row(page, 1)).toEqual([[6, 4]]);
 });

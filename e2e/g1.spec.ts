@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { countColor, createProjectWith, fixture, openTab, project } from './helpers';
+import { countColor, createProjectWith, fixture, openTab, project, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g1';
 type Run = { text: string; color: string; opacity?: number; weight: string };
@@ -49,7 +49,7 @@ test('文字透明度：滑桿讓字變淡（描邊不會從字裡透出來）�
   const first = (await cards(page)).find((c) => c.card.runs[0]!.text === '甲甲甲')!;
   expect(first.card.runs[0]!.weight).toBe('normal');
   expect(first.card.runs[0]!.opacity ?? 1).toBe(1);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const undone = (await cards(page)).find((c) => c.card.runs[0]!.text === '甲甲甲')!;
   expect(undone.card.runs[0]!.opacity).toBeCloseTo(0.3);
 });

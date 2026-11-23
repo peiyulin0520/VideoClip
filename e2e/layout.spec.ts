@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   createProjectWith,
+  finishLayout,
   fixture,
+  isFrameTrack,
   isGreen,
   isRed,
   openTab,
@@ -9,8 +11,7 @@ import {
   project,
   samplePreview,
   selectedItemId,
-  isFrameTrack,
-  finishLayout,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-5/layout';
@@ -105,7 +106,7 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
   await openTab(page, '版型');
   await page.getByRole('button', { name: '移除版型' }).tap();
   expect((await tracks(page)).length).toBe(1);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await tracks(page)).length).toBe(6); // 主軌 + 4 格 + 外框
 });
 

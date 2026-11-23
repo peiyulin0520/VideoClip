@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
-import { countColor, createProjectWith, openTab, project } from './helpers';
+import { countColor, createProjectWith, openTab, project, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/phase3a';
 
@@ -71,7 +71,7 @@ test('裝飾面板：縮圖都有畫出來、點選加／拿掉、改顏色與�
   }
   // 復原：回到上一步
   await cells.nth(0).tap();
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect(await decos(page)).toEqual([]);
 });
 

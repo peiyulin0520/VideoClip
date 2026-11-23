@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { addOverlays, clips, createProjectWith, fixture, openTab, project, showTimeline } from './helpers';
+import {
+  addOverlays,
+  clips,
+  createProjectWith,
+  fixture,
+  openTab,
+  project,
+  showTimeline,
+  undo,
+} from './helpers';
 
 // 2026-11-12：主軌與疊加合併成「影像軌」；影像／特效／字卡／音訊分區；刪除並補齊；舊專案（v1）自動轉換
 
@@ -73,13 +82,13 @@ test('刪除只刪這一段、留空位；刪除並補齊讓後面的往前接�
   await page.getByRole('button', { name: '刪除', exact: true }).tap();
   expect(await starts()).toEqual([2, 3.6]); // 後面的沒動，前面是空位
   await expect(page.getByTestId('gap')).toHaveCount(1); // 開場留白的虛線框
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect(await starts()).toEqual([0, 2, 3.6]);
 
   await clips(page).first().tap();
   await page.getByRole('button', { name: '刪除並補齊', exact: true }).tap();
   expect(await starts()).toEqual([0, 1.6]);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect(await starts()).toEqual([0, 2, 3.6]);
 });
 

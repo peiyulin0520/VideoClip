@@ -4,12 +4,13 @@ import {
   clips,
   createProjectWith,
   exportFrame,
+  finishLayout,
   fixture,
   openTab,
   project,
   seekTo,
-  finishLayout,
   selectFrame,
+  undo,
 } from './helpers';
 
 test('播放列：播放鍵只有圖示；定格、縮小、放大是圖示加中文；按住時有顏色回饋；定格開著時是主題色', async ({
@@ -122,7 +123,7 @@ test('版型外框自由選顏色＋透明度：黑色 50% → 外框是半透�
   const after = (await allItems(page)).find((i) => i.frameStyle)!;
   expect(after.assetId).not.toBe(oldAsset);
   expect(after.frameStyle!.opacity).toBe(0.5);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await allItems(page)).find((i) => i.frameStyle)!.frameStyle!.color).toBe('#141414');
 });
 

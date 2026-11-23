@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, fixture } from './helpers';
+import { clips, createProjectWith, fixture, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/fix-safe-zone';
 
@@ -126,7 +126,7 @@ test('編輯器「畫面比例」按鈕：改比例、預覽形狀改變、復�
   await page.screenshot({ path: `${SHOT}/ratio-changed-1x1.png` });
 
   // 復原 → 回到 16:9（連「自動」也一起回來）
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   await expect(btn).toHaveText('16:9');
   expect(await info(page)).toMatchObject({ aspect: '16:9', aspectAuto: true });
   await expect.poll(() => canvasRatio(page)).toBeCloseTo(16 / 9, 1);

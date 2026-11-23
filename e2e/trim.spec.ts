@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, project, samplePreview, seekTo } from './helpers';
+import { clips, createProjectWith, project, samplePreview, seekTo, undo } from './helpers';
 
 type Clip = { id: string; start: number; duration: number; trimIn: number };
 const main = async (page: Page) => (await project(page)).tracks[0]!.items as unknown as Clip[];
@@ -73,7 +73,7 @@ test('補齊空位：開場留白的虛線框點一下選取、再點一下補�
   const m = await main(page);
   expect(m.map((c) => c.start)).toEqual([0, 1]);
   await expect(page.getByTestId('gap')).toHaveCount(0);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await main(page))[0]!.start).toBeCloseTo(1, 1);
 });
 
@@ -117,7 +117,7 @@ test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖�
   expect(m[0]!.start).toBeCloseTo(0, 5); // 位置不變
   expect(m[1]!.start).toBeCloseTo(2, 5); // 後面的片段不動
   // 一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await main(page))[0]!.duration).toBeCloseTo(2, 2);
 });
 

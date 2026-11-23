@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, exportFrame, isRed, openTab, project, samplePreview } from './helpers';
+import {
+  clips,
+  createProjectWith,
+  exportFrame,
+  isRed,
+  openTab,
+  project,
+  samplePreview,
+  undo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/color';
 type G = { look?: { id: string; amount: number }; adjust?: Record<string, number> };
@@ -104,7 +113,7 @@ test('套用到全部同類：兩個影片都套上同一組；一步復原；�
   expect(all.every((i) => i.look?.id === 'vintage')).toBe(true);
   expect(all.every((i) => (i.adjust?.exposure ?? 0) > 0.15)).toBe(true);
   await expect(page.locator('[data-testid="clip"] .clip-label').filter({ hasText: '· 調' })).toHaveCount(2);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const after = await items(page);
   expect(after.filter((i) => i.look).length).toBe(1); // 只剩原本選的那個
 });

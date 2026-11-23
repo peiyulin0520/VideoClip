@@ -170,7 +170,13 @@ export async function openTab(page: Page, name: TabName) {
   const f = FB[name];
   const tab = page.locator('.tabs').getByRole('tab', { name: f.cat, exact: true });
   const popup = page.getByTestId('panel-sheet');
-  const popOk = async () => !f.pop || ((await popup.locator(".ps-head b").first().textContent({ timeout: 300 }).catch(() => "")) === f.pop);
+  const popOk = async () =>
+    !f.pop ||
+    (await popup
+      .locator('.ps-head b')
+      .first()
+      .textContent({ timeout: 300 })
+      .catch(() => '')) === f.pop;
   const back = page.getByTestId('fb-back');
   if (f.tools) {
     const row = page.getByRole('toolbar', { name: f.tools, exact: true });
@@ -270,8 +276,26 @@ export async function touchDrag(page: Page, from: { x: number; y: number }, to: 
   await cdp.detach();
 }
 
+/** 收起升起的視窗（它會蓋住播放列和時間軸；要點復原、播放、時間軸上的片段前先收起來） */
+export async function closePanel(page: Page) {
+  const close = page.getByTestId('panel-close');
+  if (await close.isVisible()) {
+    await close.tap();
+    await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
+  }
+}
+export async function undo(page: Page) {
+  await closePanel(page);
+  await page.getByRole('button', { name: '復原' }).tap();
+}
+export async function redo(page: Page) {
+  await closePanel(page);
+  await page.getByRole('button', { name: '重做' }).tap();
+}
+
 /** 把整頁捲到看得到時間軸（不會動到時間軸的水平捲動／播放頭） */
 export async function showTimeline(page: Page) {
+  await closePanel(page);
   await page.locator('.timeline').evaluate((el) => {
     const r = el.getBoundingClientRect();
     if (r.top < 60 || r.bottom > window.innerHeight) window.scrollBy(0, r.top - window.innerHeight / 3);
@@ -280,6 +304,7 @@ export async function showTimeline(page: Page) {
 
 /** 取消選取：點時間軸某一軌的空白處（預覽上點空白處不會取消選取了） */
 export async function deselect(page: Page) {
+  await closePanel(page);
   const track = page.locator('[data-testid="track"]').first();
   const tb = (await track.boundingBox())!;
   const view = (await page.getByTestId('timeline-scroll').boundingBox())!;

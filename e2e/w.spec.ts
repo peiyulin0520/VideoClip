@@ -11,6 +11,7 @@ import {
   samplePreview,
   seekTo as rawSeekTo,
   type RGBA,
+  undo,
 } from './helpers';
 
 const isGray = (c: RGBA | null) =>
@@ -131,7 +132,7 @@ test('W3：有定格可以改成「整段素材」（清掉定格上的色調，
   const it = await first(page);
   expect(it.look?.id).toBe('vintage');
   expect(it.keyframes).toHaveLength(2); // 沒有新增定格
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await first(page)).look).toBeUndefined();
 });
 

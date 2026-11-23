@@ -8,11 +8,13 @@ import {
   isRed,
   isWhite,
   project,
+  redo,
   samplePreview,
   seekTo,
   selectedIndex,
-  timeText,
   showTimeline,
+  timeText,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/phase1';
@@ -149,9 +151,9 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   const count = await clips(page).count();
   await page.getByRole('button', { name: '刪除', exact: true }).tap();
   await expect(clips(page)).toHaveCount(count - 1);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   await expect(clips(page)).toHaveCount(count);
-  await page.getByRole('button', { name: '重做' }).tap();
+  await redo(page);
   await expect(clips(page)).toHaveCount(count - 1);
 
   // 縮放時間軸
@@ -214,7 +216,7 @@ test('修剪頭尾：拖把手會改片段長度，素材範圍受限', async ({
   // 一次拖曳 = 一步復原
   await drag('trim-end', -60);
   await expect(clips(page).first()).toContainText('1.0s');
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   await expect(clips(page).first()).toContainText('2.0s');
 });
 
