@@ -483,7 +483,7 @@ button {
 .editor {
   --top-h: calc(52px + var(--safe-top));
   --playbar-h: 58px;
-  --tabbar-h: 48px;
+  --tabbar-h: 58px;
   --proj-aspect: 0.5625; /* 專案版面寬 ÷ 高（Editor 依專案設定） */
   display: flex;
   flex-direction: column;
@@ -1086,18 +1086,50 @@ button {
 }
 .tab {
   flex: 1 1 0;
-  min-width: 0;
+  min-width: 44px;
   min-height: 44px;
-  padding: 0 0.2em;
-  font-size: var(--fs-body);
+  padding: 0 0.1em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: var(--fs-note);
   white-space: nowrap;
   color: var(--muted);
   background: transparent;
   border-radius: 0;
 }
 .tab.active {
-  color: var(--fg);
+  color: var(--accent);
   border-bottom: 2px solid var(--accent);
+}
+/* 第二層：返回 ＋ 這個類別的工具（左右滑） */
+.fb-row {
+  display: flex;
+  align-items: stretch;
+  height: var(--tabbar-h);
+  padding-bottom: var(--safe-bottom);
+  box-sizing: content-box;
+  border-top: 1px solid var(--line);
+}
+.fb-back {
+  flex: none;
+  width: 44px;
+  background: transparent;
+  color: var(--muted);
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+}
+.fb-row .toolbar,
+.bottombar .fb-row .toolbar {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 4px;
+  align-items: stretch;
+}
+.fb-row .tool {
+  height: auto;
 }
 .bottombar .toolbar {
   padding-bottom: 6px;

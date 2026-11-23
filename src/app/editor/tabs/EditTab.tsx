@@ -40,11 +40,17 @@ export function EditTab({
   setPanel,
   onImport,
   found,
+  part = 'row',
+  extra,
 }: {
   panel: Panel;
   setPanel: (p: Panel) => void;
   onImport: () => void;
   found: Found;
+  /** row＝功能列第二層的一排工具；panel＝變速、音量、修剪的視窗內容 */
+  part?: 'row' | 'panel';
+  /** 接在工具後面的額外按鈕 */
+  extra?: React.ReactNode;
 }) {
   const project = useProjectStore((s) => s.project)!;
   const player = useUI((s) => s.player);
@@ -112,7 +118,8 @@ export function EditTab({
     setPanel(p);
   };
 
-  if (panelActive(panel, found)) return <ClipPanel panel={panel} setPanel={setPanel} found={found} />;
+  if (part === 'panel')
+    return panelActive(panel, found) ? <ClipPanel panel={panel} setPanel={setPanel} found={found} /> : null;
 
   return (
     <div className="toolbar" role="toolbar" aria-label="剪輯工具">
@@ -165,6 +172,7 @@ export function EditTab({
           </Sheet>
         </>
       )}
+      {extra}
       <PromptSheet
         open={naming && !!selected}
         title="片段命名"

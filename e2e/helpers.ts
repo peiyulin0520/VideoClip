@@ -148,19 +148,52 @@ export const exportFrame = async (page: Page, t: number, pts: [number, number][]
     [t, pts] as const,
   );
 
-/** 切到底部分頁，並讓它的面板升起來（面板平常收起來；已經是這個分頁而且面板開著就不用再點） */
-export async function openTab(
-  page: Page,
-  name: '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '色調' | '素材' | '音訊',
-) {
-  const tab = page.locator('.tabs').getByRole('tab', { name, exact: true }); // 只找底部分頁列（文字面板裡也有叫「文字」的小分頁）
+type TabName = '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '色調' | '素材' | '音訊';
+/** 舊的分頁名稱 → 新的功能列：第一層類別、（第二層才有的）工具、升起的視窗標題 */
+const FB: Record<TabName, { cat: string; tools?: string; open?: string; pop?: string }> = {
+  剪輯: { cat: '剪輯', tools: '剪輯工具' },
+  疊加: { cat: '加入', tools: '加入' },
+  素材: { cat: '加入', tools: '加入', open: '貼圖', pop: '貼圖' },
+  文字: { cat: '文字', tools: '文字', open: '編輯文字', pop: '文字' },
+  圖層: { cat: '剪輯', tools: '剪輯工具', open: '位置大小', pop: '位置與大小' },
+  版型: { cat: '版型', pop: '版型' },
+  特效: { cat: '特效', pop: '特效' },
+  色調: { cat: '色調', pop: '色調' },
+  音訊: { cat: '音訊', pop: '音訊' },
+};
+
+/**
+ * 功能列：切到某個類別（第一層），需要的話再點第二層的工具，讓它的視窗升起來。
+ * 已經在那裡就不重複點（點同一個類別會把只有一個工具的視窗收起來）。
+ */
+export async function openTab(page: Page, name: TabName) {
+  const f = FB[name];
+  const tab = page.locator('.tabs').getByRole('tab', { name: f.cat, exact: true });
+  const popup = page.getByTestId('panel-sheet');
+  const popOk = async () => !f.pop || ((await popup.locator(".ps-head b").first().textContent({ timeout: 300 }).catch(() => "")) === f.pop);
+  const back = page.getByTestId('fb-back');
+  if (f.tools) {
+    const row = page.getByRole('toolbar', { name: f.tools, exact: true });
+    if (!(await row.isVisible())) {
+      if (await back.isVisible()) await back.tap();
+      await tab.tap();
+    }
+    if (f.open && !(await popOk())) {
+      const btn = row.getByRole('button', { name: f.open, exact: true });
+      await btn.tap();
+      if (!(await popOk())) await btn.tap(); // 原本就開著＝被收起了，再點一次
+    }
+    return;
+  }
+  if (await back.isVisible()) await back.tap();
   if (
     (await tab.getAttribute('aria-selected')) === 'true' &&
-    (await tab.getAttribute('aria-expanded')) === 'true'
+    (await tab.getAttribute('aria-expanded')) === 'true' &&
+    (await popOk())
   )
     return;
   await tab.tap();
-  // 原本就在這個分頁但面板是收起來的：那一下點擊已經把它升起來；原本面板開著、卻是別的分頁：點了就切過去
+  // 原本就在這個類別但視窗是收起來的：那一下點擊已經把它升起來；原本是別的視窗：點了就切過去
   if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.tap();
 }
 
@@ -170,7 +203,7 @@ export async function addOverlays(page: Page, files: string[]) {
   const before = await page.getByTestId('clip').count();
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: /加入影片或照片/ }).tap(),
+    page.getByRole('button', { name: '影片照片', exact: true }).tap(),
   ]);
   await chooser.setFiles(files.map(fixture));
   // 匯入是非同步的（讀檔、縮圖），等到時間軸上多出這幾個物件
