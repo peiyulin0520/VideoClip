@@ -1,6 +1,6 @@
 # 交接手冊（HANDOFF）
 
-給接手的 AI／工程師。**目前的總規劃與順序看 `docs/plans/2026-11-23-roadmap-ui.md`（2026-11-23 定案，下一步 U1 介面骨架）。**先讀 `AGENTS.md`（規則）和 `docs/PROGRESS.md`（目前狀態），這份補上「為什麼這樣做」和「程式在哪裡」。
+給接手的 AI／工程師。**目前的總規劃與順序看 `docs/plans/2026-11-23-roadmap-ui.md`（2026-11-23 定案；U1–U5 介面重整已做完，e2e 修綠後給 PR）。**先讀 `AGENTS.md`（規則）和 `docs/PROGRESS.md`（目前狀態），這份補上「為什麼這樣做」和「程式在哪裡」。
 **接手時可以直接對 ChatGPT 等說：**
 > 請先讀 repo 根目錄的 AGENTS.md，再讀 docs/PROGRESS.md 最上面的「交接快照」和 docs/HANDOFF.md，然後從「下一步」繼續。每做完一步都要照 AGENTS.md 的「紀錄規則」更新紀錄、commit 並 push。
 
@@ -231,3 +231,12 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **彈出視窗「套用／儲存」規則（使用者規定）**：設定型視窗（畫面比例、字體、專案名稱、更換封面、改名、命名、選色…）一律在視窗裡放一顆寫著「套用」或「儲存」的主題色按鈕；視窗裡先改的是草稿（state），按了才寫進專案，**視窗不會自動關**（跳 toast「已套用／已儲存」）；按 ❌／點背景關閉＝只放棄「最後一次套用之後」的改動，已套用的保留。例外（套用後一定要關）：自訂比例、裁切編輯器、片段範圍、版型挑素材。新增這類視窗要照做（例：`FontSelect` 的 `draft`、Editor 的 `ratioDraft`）。選單、確認刪除、匯出不在此列
 - **feedback-12 X2 視窗**：所有彈出視窗都用 `ui/Sheet`（標題列有 ❌ `data-testid=sheet-close`、**不要再加底部「取消」**；❌＝不存）；視窗內的修改要嘛是視窗內暫存、按套用才寫入，要嘛像轉場聲音視窗那樣自己在 ❌／取消時還原
 
+
+## U1–U5 介面重整（2026-11-23）新增的東西（給下一位）
+- **版面**：`.editor` 是 `100svh` 直向 flex（頂列／預覽／〔全螢幕時的進度條〕／播放列／時間軸／功能列），整頁不捲；時間軸 `flex:1`、裡面上下滑；預覽高度由 `--proj-aspect` 決定（直式約 54% 高，橫式、方形較矮）。
+- **功能列**：`Toolbar.tsx` `BottomBar`。狀態 `cat`（第一層類別或 null）、`tool`（升起的視窗或 null）、`panel`（變速／音量／範圍）。類別與視窗的定義在 `tabs/shared.tsx`（`CATS`、`SINGLE_TOOL`、`TOOL_TITLE`、`targetOfTab`）。只有一個工具的類別（版型、特效、色調、音訊）點了直接升起視窗；剪輯、加入、文字進第二層工具列（`.fb-row`，`fb-back` 返回）。**新增功能時**：加一個工具＝在對應類別的工具列放 `ToolButton`、需要視窗就加一個 `ToolId` 與 `TOOL_TITLE`。
+- **自動跳**：`targetForSelection`（選到東西只換類別、不自動升起視窗）；`requestTab`（別處呼叫，如時間軸轉場圓圈→特效）經 `targetOfTab` 對應。刻意晚 250ms 才跳（手指放開後瀏覽器補送的 click 會落在新版面的別的按鈕上）。
+- **視窗會蓋住播放列和時間軸**（使用者決定維持，2026-11-23）：e2e 點播放、復原、時間軸片段前先 `closePanel`；`helpers.ts` 有 `undo/redo/pressPlay/zoomTimeline`。
+- **鎖定／全螢幕**：`useUI.previewLock`／`previewFull`（`Preview` 卸載時重設）；鎖定在 `Preview.onPointerDown` 最前面擋；全螢幕進度條 `ProgressBar.tsx`。
+- **字級**：類別按鈕用 `--fs-note`，其餘仍是 `--fs-body`；不要在新元件寫死 px。
+- **沒有說明小字**：使用者偏好（網頁式、簡潔）；空狀態一句提示可以，教學文字不要。

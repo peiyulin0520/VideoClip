@@ -36,10 +36,7 @@ type Sel = 'text' | 'audio' | 'media';
  * 影片／照片從文字、音訊或第一層選到時→剪輯。其他類別（加入、版型、特效）保持原樣：
  * 在那裡加東西時會自動選取新的，不應該被帶走；色調類別選別的影像（非音樂）也留著。
  */
-export function targetForSelection(
-  cat: CatId | null,
-  kind: Sel,
-): { cat: CatId; tool: ToolId | null } | null {
+export function targetForSelection(cat: CatId | null, kind: Sel): { cat: CatId; tool: ToolId | null } | null {
   if (cat === 'color' && kind !== 'audio') return null;
   // 只換類別（工具列），不自動升起視窗：視窗會蓋住時間軸，選了片段就想再選別的片段會點不到
   if (kind === 'text') return { cat: 'text', tool: null };
@@ -169,7 +166,12 @@ export function BottomBar({
           <div className="ps-head">
             <b>{TOOL_TITLE[tool]}</b>
             {tool === 'color' && <GradePeekButton />}
-            <button className="sheet-close" aria-label="收起面板" data-testid="panel-close" onClick={closePopup}>
+            <button
+              className="sheet-close"
+              aria-label="收起面板"
+              data-testid="panel-close"
+              onClick={closePopup}
+            >
               <X size={20} aria-hidden="true" />
             </button>
           </div>
@@ -187,7 +189,12 @@ export function BottomBar({
       )}
       {row2 ? (
         <div className="fb-row" data-testid="fb-tools">
-          <button className="fb-back" aria-label="返回" data-testid="fb-back" onClick={() => goto(null, null)}>
+          <button
+            className="fb-back"
+            aria-label="返回"
+            data-testid="fb-back"
+            onClick={() => goto(null, null)}
+          >
             <ArrowLeft size={20} aria-hidden="true" />
           </button>
           {cat === 'edit' &&

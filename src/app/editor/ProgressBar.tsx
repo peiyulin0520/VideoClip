@@ -10,7 +10,8 @@ export function ProgressBar({ total }: { total: number }) {
   useEffect(() => {
     if (!player) return;
     const show = (t: number) => {
-      if (fillRef.current) fillRef.current.style.width = `${total > 0 ? Math.min(100, (t / total) * 100) : 0}%`;
+      if (fillRef.current)
+        fillRef.current.style.width = `${total > 0 ? Math.min(100, (t / total) * 100) : 0}%`;
     };
     show(player.time);
     return player.subscribe((t) => show(t));
