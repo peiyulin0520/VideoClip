@@ -148,59 +148,65 @@ export const exportFrame = async (page: Page, t: number, pts: [number, number][]
     [t, pts] as const,
   );
 
-type TabName = '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '色調' | '素材' | '音訊';
-/** 舊的分頁名稱 → 新的功能列：第一層類別、（第二層才有的）工具、升起的視窗標題 */
-const FB: Record<TabName, { cat: string; tools?: string; open?: string; pop?: string }> = {
-  剪輯: { cat: '剪輯', tools: '剪輯工具' },
-  疊加: { cat: '加入', tools: '加入' },
-  素材: { cat: '加入', tools: '加入', open: '貼圖', pop: '貼圖' },
-  文字: { cat: '文字', tools: '文字', open: '編輯文字', pop: '文字' },
-  圖層: { cat: '剪輯', tools: '剪輯工具', open: '位置大小', pop: '位置與大小' },
-  版型: { cat: '版型', pop: '版型' },
-  特效: { cat: '特效', pop: '特效' },
-  色調: { cat: '色調', pop: '色調' },
-  音訊: { cat: '音訊', pop: '音訊' },
+/** 功能列的類別（第一層）；工具 id 的前綴對到類別 */
+const CAT_OF: Record<string, string> = {
+  edit: '剪輯',
+  add: '加入',
+  text: '文字',
+  layout: '版型',
+  fx: '特效',
+  color: '色調',
+  audio: '音訊',
 };
 
-/**
- * 功能列：切到某個類別（第一層），需要的話再點第二層的工具，讓它的視窗升起來。
- * 已經在那裡就不重複點（點同一個類別會把只有一個工具的視窗收起來）。
- */
-export async function openTab(page: Page, name: TabName) {
-  const f = FB[name];
-  const tab = page.locator('.tabs').getByRole('tab', { name: f.cat, exact: true });
-  const popup = page.getByTestId('panel-sheet');
-  const popOk = async () =>
-    !f.pop ||
-    (await popup
-      .locator('.ps-head b')
-      .first()
-      .textContent({ timeout: 300 })
-      .catch(() => '')) === f.pop;
+/** 切到某個類別的工具列（第二層）；已經在那裡就不動（按返回再點類別） */
+export async function openCat(page: Page, cat: string) {
+  const row = page.getByRole('toolbar', { name: cat, exact: true });
+  if (await row.isVisible()) return;
   const back = page.getByTestId('fb-back');
-  if (f.tools) {
-    const row = page.getByRole('toolbar', { name: f.tools, exact: true });
-    if (!(await row.isVisible())) {
-      if (await back.isVisible()) await back.tap();
-      await tab.tap();
-    }
-    if (f.open && !(await popOk())) {
-      const btn = row.getByRole('button', { name: f.open, exact: true });
-      await btn.tap();
-      if (!(await popOk())) await btn.tap(); // 原本就開著＝被收起了，再點一次
-    }
-    return;
-  }
   if (await back.isVisible()) await back.tap();
-  if (
-    (await tab.getAttribute('aria-selected')) === 'true' &&
-    (await tab.getAttribute('aria-expanded')) === 'true' &&
-    (await popOk())
-  )
-    return;
-  await tab.tap();
-  // 原本就在這個類別但視窗是收起來的：那一下點擊已經把它升起來；原本是別的視窗：點了就切過去
-  if ((await tab.getAttribute('aria-expanded')) !== 'true') await tab.tap();
+  await page.locator('.tabs').getByRole('tab', { name: cat, exact: true }).tap();
+  await expect(row).toBeVisible();
+}
+
+/**
+ * 功能列：切到工具所在的類別，再點那顆工具（升起它的視窗，或執行它）。
+ * 視窗那一項已經開著（按鈕是強調色）就不再點，免得又收起來。
+ */
+export async function openTool(page: Page, toolId: string) {
+  await openCat(page, CAT_OF[toolId.split('.')[0]!]!);
+  const btn = page.getByTestId(`tool-${toolId}`);
+  if ((await btn.getAttribute('class'))?.includes('active')) return;
+  await btn.tap();
+}
+
+type TabName = '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '色調' | '素材' | '音訊';
+/** 舊的分頁名稱 → 新的功能列（類別，或類別加預設要升起的視窗） */
+export async function openTab(page: Page, name: TabName) {
+  switch (name) {
+    case '剪輯':
+      return openCat(page, '剪輯');
+    case '疊加':
+      return openCat(page, '加入');
+    case '素材':
+      return openTool(page, 'add.sticker');
+    case '圖層':
+      return openTool(page, 'edit.look');
+    case '版型':
+      return openTool(page, 'layout.add');
+    case '特效':
+      return openCat(page, '特效');
+    case '色調':
+      return openTool(page, 'color.look');
+    case '音訊':
+      return openCat(page, '音訊');
+    case '文字': {
+      await openCat(page, '文字');
+      // 選到文字時升起〔內容〕；沒選到文字就只停在文字工具列
+      const content = page.getByTestId('tool-text.content');
+      if (!(await content.getAttribute('class'))?.includes('dim')) await openTool(page, 'text.content');
+    }
+  }
 }
 
 /** 疊加分頁 →「加入影片或照片」→ 選檔案 */
@@ -209,7 +215,7 @@ export async function addOverlays(page: Page, files: string[]) {
   const before = await page.getByTestId('clip').count();
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: '影片照片', exact: true }).tap(),
+    page.getByTestId('tool-add.overlay').tap(),
   ]);
   await chooser.setFiles(files.map(fixture));
   // 匯入是非同步的（讀檔、縮圖），等到時間軸上多出這幾個物件
