@@ -360,7 +360,7 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
   add: [
     {
       id: 'add.append',
-      label: '接在最後',
+      label: '接續',
       icon: ListEnd,
       zone: 'add',
       kind: 'action',
@@ -368,7 +368,7 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
     },
     {
       id: 'add.overlay',
-      label: '畫中畫',
+      label: '疊加',
       icon: PictureInPicture2,
       zone: 'add',
       kind: 'action',
