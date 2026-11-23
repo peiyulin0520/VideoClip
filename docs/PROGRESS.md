@@ -89,6 +89,14 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-23 播放時影片凍住、沒聲音：AudioContext 沒在跑時不接影片（Sonnet）
+  - 使用者回報：有版型疊在影片上時，下方影片播放時不動、拖播放軸卻會動；效能框截圖顯示「影片上傳 0.0」（沒有新畫面進來）、解碼器只有 2～3/6、預覽檔都 ready，而且「從頭到尾都沒有聲音」。判斷：影片被接到 Web Audio（`createMediaElementSource`）之後，WebKit 的播放跟 AudioContext 綁在一起——context 是 suspended／interrupted（iPhone 來電、鎖屏、別的 app 用聲音、螢幕錄影…）時影片會停住（凍住＋沒聲音），拖時間軸是一格一格 seek 所以看得到。原本只在按播放那一下 `resume()` 一次，之後不管。沙盒的 Chromium 重現不出來（Chromium 不會停），所以這是依證據的修正，要使用者在真機確認。
+  - 改了什麼：①`AudioOut.apply` 只在 AudioContext 是 running 的時候才把影片接上去（沒在跑就先用元素本身出聲，iPhone 靜音模式照樣有聲音）；②播放中每一格 `keepAlive()`：context 沒在跑就叫它 `resume()`（最多每 0.4 秒一次），`onstatechange` 時馬上叫；③效能框多一欄「聲音 running／suspended／interrupted／未啟動／元素」，下次還有問題可以直接看。④單元測試（假的 AudioContext：suspended 不接、running 才接、keepAlive 有間隔）。
+  - 沒處理：同一張截圖「合成 25～28 ms」（預覽約 15～20 fps，最低 14.9）：預覽畫布 839×960、轉動的版型外框＋3 支 960×540 影片，合成本身偏慢，是另一件事（Y10）。
+  - 動了哪些檔：`engine/{audio,player}.ts`、`app/editor/PerfOverlay.tsx`、`engine/audio.test.ts`
+  - 驗證：✅ 單元（12）；音訊相關 e2e 32 個過；真機待使用者確認（效能框的「聲音」要是 running）
+  - 下一步：使用者 iPhone 驗收；Y10 合成時間（每格 25 ms）
+
 - 2026-11-22 文字特效「停在最後畫面」每一式都有（Sonnet）
   - 使用者回報：文字特效沒有「循環播放／停在最後完整文字」的選項。原因：選項只給「有一輪長度」的式子，使用者用的巨字橫移（跑馬燈類，共 12 式：crawl、drift、echo、slant、path、ticker、depth、tape、lyrics、crawl3d、orbit、led）沒有顯示。改成每一式都顯示；一直在跑的那幾式沒有「最後」，選「停在最後畫面」＝跑到代表畫面（`poster`，卡片縮圖那一格、字讀得最清楚）就停（`holdTime` 回傳 `def.poster`）。
   - 動了哪些檔：`engine/kinetic/{hold,render}.ts`、`app/editor/tabs/EffectTab.tsx`、`kinetic.test.ts`、`e2e/feedback14.spec.ts`（新增：停點之後畫面不再動、重複播放一直動）

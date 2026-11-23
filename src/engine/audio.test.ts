@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { chooseAudioMode, elementAudioState } from './audio';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AudioOut, chooseAudioMode, elementAudioState } from './audio';
 import { driftPlan } from './player';
 
 describe('chooseAudioMode：靜音模式下影片也要有聲音', () => {
@@ -58,5 +58,67 @@ describe('driftPlan：播放中對時，小差距慢慢追、大差距才硬跳'
   });
   it('變速的片段以它的速度為基準', () => {
     expect(driftPlan(0.2, 2).rate).toBeGreaterThan(2);
+  });
+});
+
+describe('AudioOut：AudioContext 沒在跑時不能把影片接上去（不然影片會跟著停住、沒聲音）', () => {
+  let routed = 0;
+  let resumed = 0;
+  class FakeCtx {
+    state = 'suspended';
+    destination = {};
+    onstatechange: (() => void) | null = null;
+    createGain() {
+      return { connect() {}, gain: { value: 1 } };
+    }
+    createAnalyser() {
+      return { fftSize: 0, connect() {} };
+    }
+    createMediaElementSource() {
+      routed++;
+      return { connect() {} };
+    }
+    resume() {
+      resumed++;
+      return Promise.resolve();
+    }
+    close() {
+      return Promise.resolve();
+    }
+  }
+  const setup = () => {
+    routed = 0;
+    resumed = 0;
+    vi.stubGlobal('AudioContext', FakeCtx);
+    (window as unknown as { AudioContext: unknown }).AudioContext = FakeCtx;
+    const out = new AudioOut({ hasAudioSession: true, isIOS: true });
+    out.unlock();
+    return out;
+  };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('suspended：先用元素自己出聲、不接 Web Audio；running 之後才接', () => {
+    const out = setup();
+    const el = document.createElement('video');
+    out.apply(el, 1, false);
+    expect(routed).toBe(0);
+    expect(el.muted).toBe(false);
+    (out as unknown as { ctx: FakeCtx }).ctx.state = 'running';
+    out.apply(el, 1, false);
+    expect(routed).toBe(1);
+    out.apply(el, 1, false); // 只接一次
+    expect(routed).toBe(1);
+  });
+  it('keepAlive：沒在跑就叫它醒來（有間隔、statechange 時強制）；在跑就不動', () => {
+    const out = setup();
+    expect(resumed).toBe(1); // unlock 那一次
+    out.keepAlive(true);
+    expect(resumed).toBe(2);
+    out.keepAlive(); // 間隔不到 0.4 秒
+    expect(resumed).toBe(2);
+    (out as unknown as { ctx: FakeCtx }).ctx.state = 'running';
+    out.keepAlive(true);
+    expect(resumed).toBe(2);
+    expect(out.state).toBe('running');
   });
 });

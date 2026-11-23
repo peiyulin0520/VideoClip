@@ -297,6 +297,8 @@ export class Player {
     canvas: string;
     /** 這次播放中每秒格數的最低值（0＝還沒播） */
     fpsMin: number;
+    /** 聲音（AudioContext）狀態 */
+    audio: string;
   } {
     let dropped = 0;
     for (const v of this.pool.els) {
@@ -317,6 +319,7 @@ export class Player {
       pool: this.pool.els.length,
       canvas: `${this.compositor.width}×${this.compositor.height}`,
       fpsMin: Number.isFinite(this.fpsMin) ? this.fpsMin : 0,
+      audio: this.audio.state,
     };
   }
 
@@ -600,6 +603,7 @@ export class Player {
     }
     this.pool.pauseAllExcept(used);
     this.syncMusic(p, t);
+    if (this.playing) this.audio.keepAlive();
     const t1 = performance.now();
     this.settledNow = comp.render(scene);
     const t2 = performance.now();

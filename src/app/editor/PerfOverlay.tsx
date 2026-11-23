@@ -45,7 +45,7 @@ export function PerfOverlay({ player }: { player: Player | null }) {
         掉格 {s.dropped}｜最低 {f(s.fpsMin)} fps
       </div>
       <div>
-        畫質 {QUALITY_LABELS[q]} {s.canvas}｜解碼器 {s.decoders}/{s.pool}
+        畫質 {QUALITY_LABELS[q]} {s.canvas}｜解碼器 {s.decoders}/{s.pool}｜聲音 {s.audio}
       </div>
       {s.sources.map((x, i) => (
         <div key={i}>

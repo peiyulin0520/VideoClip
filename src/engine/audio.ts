@@ -68,6 +68,7 @@ export class AudioOut {
   private nodes = new WeakMap<HTMLMediaElement, Node>();
   private analyser: AnalyserNode | null = null;
   private master: GainNode | null = null;
+  private lastResume = 0;
 
   constructor(env = detectEnv()) {
     this.mode = chooseAudioMode(env);
@@ -100,13 +101,32 @@ export class AudioOut {
       }
     }
     if (this.ctx.state !== 'running') void this.ctx.resume().catch(() => {});
+    // iPhone 會把 AudioContext 變成 suspended／interrupted（來電、鎖屏、別的 app 用聲音…）：播放中要一直叫它醒來。
+    // 影片一旦接到 Web Audio，context 不跑的時候影片也會跟著停住（畫面凍住、沒聲音；拖時間軸 seek 還看得到）
+    this.ctx.onstatechange = () => this.keepAlive(true);
+  }
+
+  /** 播放中每一格呼叫：AudioContext 沒在跑就叫它繼續（最多每 0.4 秒一次） */
+  keepAlive(force = false) {
+    const ctx = this.ctx;
+    if (!ctx || this.mode !== 'webaudio' || ctx.state === 'running') return;
+    const now = performance.now();
+    if (!force && now - this.lastResume < 400) return;
+    this.lastResume = now;
+    void ctx.resume().catch(() => {});
+  }
+
+  /** AudioContext 現在的狀態（效能框顯示用）：running／suspended／interrupted／closed；沒有（直接用元素出聲）＝'元素' */
+  get state(): string {
+    return this.ctx ? this.ctx.state : this.mode === 'webaudio' ? '未啟動' : '元素';
   }
 
   /** 套用這個元素現在該有的聲音（音量、關聲音） */
   apply(el: HTMLMediaElement, volume: number, silent: boolean) {
     const st = elementAudioState({ mode: this.mode, volume, silent });
     let node = this.nodes.get(el);
-    if (this.mode === 'webaudio' && this.ctx && this.master && !node) {
+    // 只在 AudioContext 真的在跑的時候才把影片接上去：接上去之後影片的播放會綁著 context，context 沒在跑它就停住（沒聲音、畫面凍住）
+    if (this.mode === 'webaudio' && this.ctx && this.master && !node && this.ctx.state === 'running') {
       try {
         const source = this.ctx.createMediaElementSource(el);
         const gain = this.ctx.createGain();
