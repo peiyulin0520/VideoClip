@@ -46,7 +46,6 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
       <div className="panel-head">
         <span>整個版型 · {frame.label}</span>
       </div>
-      <p className="hint">點示意圖的格子可以改那一格。進出場、轉場在「特效」分頁；長度在播放軸。</p>
       <LayoutDiagram
         project={project}
         group={group}

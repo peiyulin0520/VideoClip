@@ -367,11 +367,7 @@ export function LayersTab() {
             位置、大小、旋轉歸位
           </button>
         </div>
-      ) : (
-        <p className="hint">
-          點一個圖層（或預覽畫面上的物件）後，可以調透明度、混合模式、圓角和外框。裁切在「剪輯」分頁。
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }

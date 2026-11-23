@@ -47,15 +47,11 @@ export function KeyframePanel({ item, project }: { item: Item; project: Project 
     );
   };
   const kfs = target.keyframes?.length ?? 0;
-  const note = hasKeyframes(target)
-    ? `（定格 ${kfs} 個）時間軸上播放線碰到的菱形（白色那個）就是選到的定格，這裡改的只有它；沒碰到就在播放線的時間新增一個`
-    : '沒有定格時改的是物件本身';
   return (
     <div className="props kf-panel" data-testid="kf-panel">
       <div className="panel-head">
         <span>定格細部調整</span>
       </div>
-      <p className="hint">{note}。按播放列的「◇ 定格」新增定格（離別的定格很近也可以新增）。</p>
       <Slider
         label="X 位置"
         value={Math.round(item.transform.x * 100)}

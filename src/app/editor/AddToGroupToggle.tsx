@@ -29,11 +29,6 @@ export function AddToGroupToggle({ what }: { what: string }) {
         {on ? '✓ ' : ''}
         {what}加到版型「{frame.item.label ?? '版型'}」裡
       </button>
-      <p className="hint">
-        {on
-          ? '放在版型的任何位置（可以疊在外框上），時間只能在版型範圍內，跟著整個版型動。'
-          : '不加進版型：照一般方式加在專案裡。'}
-      </p>
     </div>
   );
 }

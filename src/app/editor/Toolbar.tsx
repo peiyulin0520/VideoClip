@@ -82,8 +82,8 @@ export function BottomBar({
   useEffect(() => {
     if (!selectedId) {
       // 取消選取：文字視窗沒東西可改了就收起來
-      setTool((t) => (t === 'textedit' ? null : t));
-      return;
+      const close = setTimeout(() => setTool((t) => (t === 'textedit' ? null : t)), 0);
+      return () => clearTimeout(close);
     }
     const catAtSelect = catRef.current;
     const timer = setTimeout(() => {
@@ -109,10 +109,11 @@ export function BottomBar({
     setTimeout(() => goto(to.cat, to.tool), 250);
   }, [requestTab]);
 
-  // 變速、音量、片段範圍（panel）打開了：升起「片段設定」視窗；關掉就收起
-  useEffect(() => {
-    if (panel) setTool('clip');
-  }, [panel]);
+  // 剪輯工具列開關變速、音量、片段範圍（panel）：升起／收起「片段設定」視窗
+  const setClipPanel = (p: Panel) => {
+    setPanel(p);
+    setTool((t) => (p ? 'clip' : t === 'clip' ? null : t));
+  };
 
   // 點第一層的類別：剪輯、加入、文字＝換成它的工具列（第二層）；其餘只有一個工具＝直接升起視窗，再點一次收起
   const pickCat = (c: CatId) => {
@@ -147,7 +148,7 @@ export function BottomBar({
   const edit = (part: 'row' | 'panel', extra?: React.ReactNode) => (
     <EditTab
       panel={panel}
-      setPanel={setPanel}
+      setPanel={setClipPanel}
       onImport={onImportMain}
       found={found}
       part={part}

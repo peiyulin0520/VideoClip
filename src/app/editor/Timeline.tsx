@@ -1515,9 +1515,6 @@ export function Timeline({
         }}
       />
       <Sheet open={!!addMenuGroup} title="加入到版型裡" onClose={() => setAddMenuGroup(null)}>
-        <p className="hint">
-          加進去的東西屬於這個版型：跟著整個版型移動、縮放、一起刪除；時間只能在版型的範圍裡。貼圖到「素材」分頁加（選到版型時會加進版型裡）。
-        </p>
         <button
           className="menu-item"
           data-testid="group-add-text"

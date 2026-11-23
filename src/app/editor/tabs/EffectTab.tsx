@@ -513,11 +513,6 @@ function SingleBlock({
           }}
         />
       )}
-      <p className="hint">
-        {role === 'in'
-          ? '進場：這個素材從開頭開始出現（素材當 B）。影片照常播，不會等特效做完。'
-          : '出場：特效在素材結尾結束，素材慢慢離開（素材當 A）。'}
-      </p>
     </>
   );
 }
@@ -624,7 +619,6 @@ function AudioFx({ item }: { item: VideoItem }) {
   const max = Math.max(Math.min(10, Math.round((item.duration / 2) * 10) / 10), 0.1);
   return (
     <>
-      <p className="hint">音訊的特效：開頭慢慢變大聲、結尾慢慢變小聲。</p>
       <Slider
         label="淡入（逐漸變大聲）"
         value={item.fadeIn ?? 0}

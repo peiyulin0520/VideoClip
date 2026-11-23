@@ -340,9 +340,6 @@ function EditorBody() {
       <CropEditor />
 
       <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
-        <p className="hint">
-          預覽的底不會變，框內是影片輸出的範圍，框外（斜線）不會輸出。按「套用」才會改；按 ✕ 關閉就不改。
-        </p>
         <div className="chips" role="radiogroup" aria-label="選擇畫面比例">
           <button
             role="radio"
@@ -395,11 +392,6 @@ function EditorBody() {
             影片填滿畫面
           </button>
         </div>
-        <p className="hint">
-          {ratioFill
-            ? '位置、大小照新畫面的比例重新算，主要影片會填滿。'
-            : '每個東西在預覽上的位置、大小不變，超出框的部分留在斜線區。'}
-        </p>
         <div className="sheet-row">
           <button
             className="btn primary grow"

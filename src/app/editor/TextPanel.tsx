@@ -491,9 +491,7 @@ export function TextPanel({
                 onChange={(v) => edit((c) => void (c.box!.nudgeY = v), 'nudge')}
               />
             </>
-          ) : (
-            <p className="hint">選一個形狀，文字後面就會有色塊。內距上下左右可以分開調。</p>
-          )}
+          ) : null}
         </>
       )}
 
@@ -564,7 +562,6 @@ export function TextPanel({
 
       {section === '裝飾' && (
         <>
-          <p className="hint">點一個風格加到字上（可以疊好幾個），再點一次就拿掉。</p>
           <div className="deco-grid" data-testid="deco-grid">
             {DECORATION_KINDS.map((k) => {
               const on = !!card.decorations?.some((d) => d.kind === k.kind);
