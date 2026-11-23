@@ -7,8 +7,8 @@ import { toast, useUI } from '../../store/uiStore';
 import { ToolButton } from './tabs/shared';
 
 /**
- * 剪輯工具列的「定格」按鈕（◇）：選到素材時才亮。播放頭這個時間沒有定格 → 新增（值＝目前畫面上的樣子）；
- * 有 → 變成實心（◆），按了刪除這個定格。版型裡的任何物件＝整個版型（外框）。
+ * 剪輯工具列的「關鍵格」按鈕（◇）：選到素材時才亮。播放頭這個時間沒有關鍵格 → 新增（值＝目前畫面上的樣子）；
+ * 有 → 變成實心（◆），按了刪除這個關鍵格。版型裡的任何物件＝整個版型（外框）。
  */
 export function KeyframeButton() {
   const project = useProjectStore((s) => s.project)!;

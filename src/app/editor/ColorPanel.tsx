@@ -16,7 +16,7 @@ import { Slider } from '../../ui/Slider';
 import { usePlayheadTime } from './usePlayheadTime';
 
 // 調色面板：上面是色調組合卡片（用這個素材自己的畫面示範），下面是 11 條調整滑桿。
-// 有定格（關鍵影格）時，滑桿改的是播放頭這個時間的定格（兩個定格之間漸變）；沒有定格改物件本身。
+// 有關鍵格（關鍵影格）時，滑桿改的是播放頭這個時間的關鍵格（兩個關鍵格之間漸變）；沒有關鍵格改物件本身。
 
 const SIZE = 48;
 const FALLBACK = 'linear-gradient(135deg,#e8a87c,#6aa6c9)';
@@ -64,6 +64,46 @@ function demoPixels(): ImageData {
   g.fillStyle = '#f3ede2';
   g.fillRect(SIZE * 0.08, SIZE * 0.1, SIZE * 0.25, SIZE * 0.12);
   return g.getImageData(0, 0, SIZE, SIZE);
+}
+
+/** 工具列〔色調組合〕按鈕圖示那一格：目前這個素材套上色調組合的小縮圖 */
+export function LookBadge({ item, project }: { item: Item; project: Project }) {
+  const asset =
+    item.type !== 'text' && item.type !== 'audio'
+      ? project.assets.find((a) => a.id === item.assetId)
+      : undefined;
+  const url = thumbOf(item, asset);
+  const [src, setSrc] = useState<ImageData | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const px = url ? await pixelsOf(url) : null;
+      if (alive) setSrc(px ?? demoPixels());
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [url]);
+  const look = item.look ? LOOKS.find((l) => l.id === item.look!.id) : undefined;
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c || !src) return;
+    c.width = c.height = SIZE;
+    const out = new ImageData(new Uint8ClampedArray(src.data), SIZE, SIZE);
+    if (look)
+      for (let i = 0; i < out.data.length; i += 4) {
+        const [r, g, b] = gradeRGB(
+          [out.data[i]! / 255, out.data[i + 1]! / 255, out.data[i + 2]! / 255],
+          look.adjust,
+        );
+        out.data[i] = r * 255;
+        out.data[i + 1] = g * 255;
+        out.data[i + 2] = b * 255;
+      }
+    c.getContext('2d')!.putImageData(out, 0, 0);
+  }, [look, src]);
+  return <canvas ref={ref} className="badge-thumb" width={SIZE} height={SIZE} aria-hidden="true" />;
 }
 
 function LookCard({
@@ -147,10 +187,10 @@ export function ColorPanel({
   const hasKf = !!target && hasKeyframes(target);
   const scope = target ? gradeScopeOf(target) : 'item';
   const keyMode = hasKf && scope === 'key';
-  // 播放線碰到的定格（沒有＝在兩個定格中間或定格之外）
+  // 播放線碰到的關鍵格（沒有＝在兩個關鍵格中間或關鍵格之外）
   const kfIdx = keyMode ? keyframeNear(target!, t - target!.start, 8 / pps) : -1;
   const kfNow = kfIdx >= 0 ? target!.keyframes![kfIdx]! : null;
-  // 目前顯示的色調組合：整段素材＝物件本身的；定格＝播放線碰到的定格的（沒寫就沿用物件的；null＝原色）
+  // 目前顯示的色調組合：整段素材＝物件本身的；關鍵格＝播放線碰到的關鍵格的（沒寫就沿用物件的；null＝原色）
   const shownLook = !keyMode
     ? item.look
     : kfNow
@@ -164,7 +204,7 @@ export function ColorPanel({
     if (!target) return;
     if (next === 'item' && keyframeHasGrade(target)) {
       clearKeyframeGrade(item.id);
-      toast('已清掉各定格上的色調，改成整段素材同一個色調（可以按復原）', 3500);
+      toast('已清掉各關鍵格上的色調，改成整段素材同一個色調（可以按復原）', 3500);
     }
     useUI.setState({ gradeScope: { id: target.id, scope: next } });
   };
@@ -190,15 +230,15 @@ export function ColorPanel({
             data-testid="scope-key"
             onClick={() => chooseScope('key')}
           >
-            這個定格（漸變）
+            這個關鍵格（漸變）
           </button>
         </div>
       )}
       {keyMode && (
         <p className="hint" data-testid="scope-hint">
           {between
-            ? '播放線沒有碰到任何定格：選一個色調會在這裡新增一個定格。'
-            : '改的是播放線碰到的這個定格，兩個定格之間的色調會漸漸變過去。'}
+            ? '播放線沒有碰到任何關鍵格：選一個色調會在這裡新增一個關鍵格。'
+            : '改的是播放線碰到的這個關鍵格，兩個關鍵格之間的色調會漸漸變過去。'}
         </p>
       )}
       {part === 'look' && (

@@ -34,7 +34,8 @@ import { itemHasGrade } from '../../engine/grade';
 import { transitionCode } from '../../engine/transitions';
 import { kineticById } from '../../engine/kinetic';
 import { textFxCode } from '../../engine/textFx';
-import { frameOfGroup } from '../../engine/layoutTracks';
+import { cellItems } from '../../engine/cellGap';
+import { cellsOf, frameOfGroup } from '../../engine/layoutTracks';
 import { findItem, isVideoItem, visibleLayers } from '../../engine/timeline';
 import type { Project } from '../../model/types';
 import {
@@ -60,6 +61,7 @@ import { MuteSheet } from './MuteSheet';
 import { AppearanceTab } from './tabs/AppearanceTab';
 import { AssetsTab } from './tabs/AssetsTab';
 import { ClipPanel } from './tabs/ClipPanel';
+import { LookBadge } from './ColorPanel';
 import { ColorTab } from './tabs/ColorTab';
 import { EffectTab, type FxPart } from './tabs/EffectTab';
 import { LayoutTab, type LayoutPart } from './tabs/LayoutTab';
@@ -154,6 +156,31 @@ function MuteMarks({ e }: { e: ToolEnv }) {
   const asset = it && isVideoItem(it) ? e.project.assets.find((a) => a.id === it.assetId) : undefined;
   if (!it || !isVideoItem(it) || !asset) return null;
   return <MuteSheet item={it} asset={asset} onClose={e.closePopup} />;
+}
+
+/** 工具列〔各格〕按鈕圖示那一格：版型格子的小示意圖 */
+function CellsBadge({ project, group }: { project: Project; group: string }) {
+  const W = 22;
+  const asp = project.width / project.height;
+  const w = asp >= 1 ? W : W * asp;
+  const h = asp >= 1 ? W / asp : W;
+  return (
+    <svg
+      className="badge-cells"
+      width={w}
+      height={h}
+      viewBox="0 0 1 1"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {cellsOf(project.tracks, group).map((c) => {
+        const box = c.rect ?? cellItems(c.tracks[0]!)[0]?.cell;
+        return box ? (
+          <rect key={c.no} x={box.x} y={box.y} width={box.w} height={box.h} rx={0.04} fill="currentColor" />
+        ) : null;
+      })}
+    </svg>
+  );
 }
 
 const clip = (panel: Exclude<Panel, null>) =>
@@ -486,6 +513,12 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
       kind: 'popup',
       enabled: isFrameSel,
       need: NEED_LAYOUT,
+      badge: (e) => {
+        const i = sel(e);
+        return i && i.type !== 'audio' && i.group
+          ? { type: 'node', node: <CellsBadge project={e.project} group={i.group} /> }
+          : null;
+      },
       popup: layout('cells'),
     },
     {
@@ -625,7 +658,9 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
       need: NEED_PIC,
       badge: (e) => {
         const i = sel(e);
-        return i && i.type !== 'audio' && i.look ? { type: 'dot' } : null;
+        return i && i.type !== 'audio' && i.look
+          ? { type: 'node', node: <LookBadge item={i} project={e.project} /> }
+          : null;
       },
       popup: (e) => <ColorTab found={e.found} part="look" />,
     },

@@ -16,7 +16,19 @@ import { CellAddSheet } from './CellAddSheet';
 import { createAudioClip, createTextItem } from '../../model/defaults';
 import { ensureUrls, isAssetMissing } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
-import { Eye, EyeOff, Film, Lock, Music, Plus, Sparkles, Type, Volume2, VolumeX } from 'lucide-react';
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Film,
+  Lock,
+  Music,
+  Plus,
+  Sparkles,
+  Type,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -274,7 +286,6 @@ export function Timeline({
 
   const total = totalDuration(project);
   const baseId = baseMediaTrack(project)?.id;
-  const [gapSel, setGapSel] = useState<{ trackId: string; at: number } | null>(null);
   const [closed, setClosed] = useState<TrackKind[]>(readClosed);
   const groupOpen = useGroupOpen((s) => s.open);
   const groupClosed = useGroupOpen((s) => s.closed);
@@ -902,9 +913,11 @@ export function Timeline({
                     <button
                       className="cat-mixed"
                       data-testid="cat-mixed"
-                      aria-label="這一類有圖層和別類穿插，到圖層分頁看完整順序"
+                      aria-label="這一類有圖層和別類穿插，點預覽右上角的圖層看完整順序"
                       onPointerDown={(e) => e.stopPropagation()}
-                      onClick={() => useUI.setState({ requestTab: 'layers' })}
+                      onClick={() =>
+                        toast('這一類的圖層跟別類穿插：點預覽右上角的〔圖層〕看完整順序、上下換')
+                      }
                     >
                       已穿插
                     </button>
@@ -1074,29 +1087,22 @@ export function Timeline({
                   />
                 )}
 
-                {track.kind === 'media' &&
-                  !sub &&
-                  gapsOf(track.items, track.id === baseId).map((g) => {
-                    const sel = gapSel?.trackId === track.id && Math.abs(gapSel.at - g.start) < 1e-6;
-                    return (
+                {!sub &&
+                  gapsOf(track.items, track.id === baseId)
+                    .filter((g) => g.len * pps >= 24) // 太窄按不到：放大時間軸再按
+                    .map((g) => (
                       <button
                         key={`gap-${g.start}`}
-                        className={`gap-block${sel ? ' sel' : ''}`}
+                        className="gap-block"
                         data-testid="gap"
-                        aria-label={sel ? `補齊空白 ${g.len.toFixed(1)} 秒` : `空白 ${g.len.toFixed(1)} 秒`}
-                        style={{ left: half + g.start * pps, width: Math.max(g.len * pps, 4) }}
+                        aria-label={`往前補齊空白 ${g.len.toFixed(1)} 秒`}
+                        style={{ left: half + g.start * pps, width: g.len * pps }}
                         onPointerDown={(e) => e.stopPropagation()}
-                        onClick={() => {
-                          // 第一下選取（顯示「補齊」），第二下才真的補齊，避免誤觸
-                          if (!sel) return setGapSel({ trackId: track.id, at: g.start });
-                          closeGap(track.id, g.start, g.start + g.len);
-                          setGapSel(null);
-                        }}
+                        onClick={() => closeGap(track.id, g.start, g.start + g.len)}
                       >
-                        {sel ? '補齊' : g.len * pps > 56 && `空白 ${g.len.toFixed(1)}s`}
+                        <ArrowLeft size={16} aria-hidden="true" />
                       </button>
-                    );
-                  })}
+                    ))}
 
                 {track.items.map((it) => {
                   const asset = isVideoItem(it) ? project.assets.find((a) => a.id === it.assetId) : undefined;
@@ -1421,7 +1427,7 @@ export function Timeline({
                         if (menuTrack.groupRole === 'member') {
                           if (!shiftMemberLayer(menuTrack.id, 1)) toast('已經是版型裡最上面的圖層');
                         } else if (!shiftTrackInKind(menuTrack.id, 1))
-                          toast('已經是這一類最上面的軌道。要讓文字夾在影像中間，到「圖層」分頁調整');
+                          toast('已經是這一類最上面的軌道。要讓文字夾在影像中間，點預覽右上角的〔圖層〕調整');
                         setMenuTrackId(null);
                       }}
                     >

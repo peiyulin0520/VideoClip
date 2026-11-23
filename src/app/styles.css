@@ -4726,3 +4726,31 @@ button:not(:disabled):active,
   border: 1.5px solid var(--panel);
   border-radius: 50%;
 }
+
+/* 預覽〔圖層〕清單：每一列右邊有往上／往下一層 */
+.peek li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.peek li .peek-row {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.peek-move {
+  display: flex;
+  flex: none;
+}
+.badge-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--fg) 45%, transparent);
+}
+.badge-cells {
+  color: var(--accent);
+  overflow: visible;
+}

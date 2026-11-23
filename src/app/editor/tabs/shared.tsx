@@ -8,6 +8,7 @@ import {
   Type,
   type LucideIcon,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { findItem } from '../../../engine/timeline';
 import { BLEND_LABELS } from '../../../engine/geometry';
 import type { BlendMode } from '../../../model/types';
@@ -32,7 +33,8 @@ export type Badge =
   | { type: 'char'; text: string } // 特效的代表字小圓圈（跟時間軸上的同款）
   | { type: 'swatch'; color: string; opacity?: number } // 顏色小色塊
   | { type: 'text'; text: string } // 很短的值（音量「80%」、變速「2x」）
-  | { type: 'dot' }; // 有設定，值要打開視窗才看得到（圖示右上角小圓點）
+  | { type: 'dot' } // 有設定，值要打開視窗才看得到（圖示右上角小圓點）
+  | { type: 'node'; node: ReactNode }; // 示意縮圖（色調組合、版型格子）
 
 export function BadgeView({ badge }: { badge: Badge }) {
   if (badge.type === 'char') return <i className="badge-char">{badge.text}</i>;
@@ -45,6 +47,7 @@ export function BadgeView({ badge }: { badge: Badge }) {
       />
     );
   if (badge.type === 'text') return <i className="badge-text">{badge.text}</i>;
+  if (badge.type === 'node') return <>{badge.node}</>;
   return null;
 }
 
