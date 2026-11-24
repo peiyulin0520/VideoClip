@@ -298,13 +298,23 @@ export async function closePanel(page: Page) {
     await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
   }
 }
-export async function undo(page: Page) {
+/** 目前升起視窗的那顆工具（按鈕是強調色）；沒有就回傳 null */
+async function activePopupTool(page: Page): Promise<string | null> {
+  const t = page.locator('.fb-row .tool.active');
+  return (await t.count()) ? await t.first().getAttribute('data-testid') : null;
+}
+/** 復原／重做：視窗會蓋住播放列，先收起來按完再把原本開著的視窗升回來（測試接著還要用它） */
+async function stepHistory(page: Page, name: '復原' | '重做') {
+  const tool = await activePopupTool(page);
   await closePanel(page);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await page.getByRole('button', { name }).tap();
+  if (tool) await page.getByTestId(tool).tap();
+}
+export async function undo(page: Page) {
+  await stepHistory(page, '復原');
 }
 export async function redo(page: Page) {
-  await closePanel(page);
-  await page.getByRole('button', { name: '重做' }).tap();
+  await stepHistory(page, '重做');
 }
 
 /** 雙指縮放時間軸（用真的 touch 事件；factor＞1＝放大、＜1＝縮小） */
