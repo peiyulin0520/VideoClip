@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addOverlays, createProjectWith, openTab, project } from './helpers';
+import { addOverlays, createProjectWith, openTab, openTool, project } from './helpers';
 
 type Inspect = {
   ext: string;
@@ -93,7 +93,7 @@ test('匯出的聲音：有聲音的影片匯出有音軌且量得到音量；�
   // 音量 0
   await page.getByTestId('clip').first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '音量' }).tap();
+  await openTool(page, 'audio.volume');
   await page.getByRole('slider', { name: '音量' }).fill('0');
   const muted = await inspect(page, { longSide: 1280, fps: 30, preferWebm: true }, []);
   expect(muted.hasAudio).toBe(false);

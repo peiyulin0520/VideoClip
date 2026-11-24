@@ -8,6 +8,7 @@ import {
   isRed,
   isWhite,
   openTab,
+  openTool,
   pressPlay,
   project,
   redo,
@@ -123,7 +124,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await expect(clips(page).nth(3)).toContainText('2x');
 
   // 音量：靜音
-  await page.getByRole('button', { name: '音量' }).tap();
+  await openTool(page, 'audio.volume');
   await page.getByRole('button', { name: '關閉聲音', exact: true }).tap();
   await expect(page.getByTestId('volume-value')).toHaveText('0%');
   await page.getByRole('button', { name: '完成' }).tap();
@@ -275,8 +276,8 @@ test('照片素材：預設 3 秒、預覽會顯示、不能變速', async ({ pa
   await clips(page).first().tap();
   await page.getByTestId('tool-edit.speed').tap();
   await expectToast(page, '照片不能變速');
-  await page.getByRole('button', { name: '音量' }).tap();
-  await expectToast(page, '照片沒有聲音');
+  await openTool(page, 'audio.volume');
+  await expectToast(page, '先點一個影片或音樂'); // 照片沒有聲音：音量按鈕變淡
 });
 
 test('不支援的檔案會提示，不會壞掉', async ({ page }) => {
