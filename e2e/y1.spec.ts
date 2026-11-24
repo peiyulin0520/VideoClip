@@ -26,17 +26,18 @@ async function setup(page: Page) {
   await openTab(page, '版型');
 }
 
-test('Y1 版型分頁：播放、外框、大小與格數各自一個有標題的區塊', async ({ page }) => {
+test('Y1 版型工具列：播放方式、外框、大小各自一個視窗', async ({ page }) => {
   test.setTimeout(120_000);
   await setup(page);
-  for (const id of ['layout-play', 'layout-frame', 'layout-shape']) {
-    const zone = page.getByTestId(id);
-    await expect(zone).toBeVisible();
-    await expect(zone.locator('.zone-title')).toHaveCount(1);
+  for (const [tool, id] of [
+    ['layout.play', 'layout-play'],
+    ['layout.frame', 'layout-frame'],
+    ['layout.size', 'layout-shape'],
+  ] as const) {
+    await openTool(page, tool);
+    await expect(page.getByTestId(id)).toBeVisible();
   }
-  await openTool(page, 'layout.frame');
-  await expect(page.getByTestId('layout-frame').locator('.zone-title')).toHaveText('外框');
-  // 外框顏色、透明度、框線粗細都在「外框」區塊裡
+  // 外框顏色、透明度、框線粗細都在〔外框〕視窗裡
   await openTool(page, 'layout.frame');
   const frame = page.getByTestId('layout-frame');
   await expect(frame.getByLabel('格子框線粗細')).toBeVisible();
@@ -46,6 +47,7 @@ test('Y1 版型分頁：播放、外框、大小與格數各自一個有標題�
 test('Y1 外框顏色（含選色器的顏色）都會換；框線粗細連外圍邊距一起變', async ({ page }) => {
   test.setTimeout(150_000);
   await setup(page);
+  await openTool(page, 'layout.frame');
   await page.getByRole('button', { name: '外框顏色 #4dd0ff' }).tap();
   await expect.poll(async () => (await frameOf(page)).frameStyle?.color, { timeout: 15_000 }).toBe('#4dd0ff');
   await page.getByRole('radio', { name: '外框 粉' }).tap();

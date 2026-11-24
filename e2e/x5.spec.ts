@@ -174,16 +174,12 @@ test('X5-2 素材比這一格長：選片段範圍（只拖起點）、快動作
   expect(it2.duration).toBeCloseTo(L, 2);
 });
 
-test('X5-3 多個版型：選到版型時「新增版型」收合成一顆鈕；展開可以再加一個，兩個版型各自是一組', async ({
-  page,
-}) => {
+test('X5-3 多個版型：版型工具列的〔版型〕可以再加一個，兩個版型各自是一組', async ({ page }) => {
   test.setTimeout(180_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '上下雙格', ['solid-red.webm', 'solid-green.webm']);
+  await openTool(page, 'layout.cells');
   await expect(page.getByTestId('group-panel')).toBeVisible();
-  await expect(page.getByTestId('layout-grid')).toHaveCount(0); // 收合了
-  await page.getByTestId('layout-add-more').tap();
-  await expect(page.getByTestId('layout-grid')).toBeVisible();
   await addLayout(page, '三格', ['solid-red.webm', 'solid-green.webm', 'solid-blue.webm']);
   const groups = new Set((await tracks(page)).filter((t) => t.group).map((t) => t.group));
   expect(groups.size).toBe(2);
