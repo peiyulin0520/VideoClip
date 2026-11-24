@@ -163,9 +163,21 @@ const CAT_OF: Record<string, string> = {
 export async function openCat(page: Page, cat: string) {
   const row = page.getByRole('toolbar', { name: cat, exact: true });
   if (await row.isVisible()) return;
-  const back = page.getByTestId('fb-back');
-  if (await back.isVisible()) await back.tap();
-  await page.locator('.tabs').getByRole('tab', { name: cat, exact: true }).tap();
+  // 剛選了東西時功能列會在 250 ms 後自動跳類別：點到一半版面被換掉就重來
+  for (let i = 0; i < 4; i++) {
+    try {
+      const back = page.getByTestId('fb-back');
+      if (await back.isVisible()) await back.tap({ timeout: 3000 });
+      await page
+        .locator('.tabs')
+        .getByRole('tab', { name: cat, exact: true })
+        .tap({ timeout: i === 3 ? 30_000 : 3000 });
+      break;
+    } catch (e) {
+      if (i === 3) throw e;
+      if (await row.isVisible()) return;
+    }
+  }
   await expect(row).toBeVisible();
 }
 

@@ -11,6 +11,7 @@ import {
   openLayerList,
   showTimeline,
   openTab,
+  openTool,
   pinch,
   previewBox,
   project,
@@ -321,16 +322,18 @@ test('文字：新增、改內容與顏色、在預覽上可拖移，也能分�
   await expect(clips(page)).toHaveCount(3);
 });
 
-test('功能列：升起視窗、再點類別收起來，預覽大小永遠不變（使用者：預覽不能被擠小）', async ({ page }) => {
+test('功能列：升起視窗、按 ✕ 收起來，預覽大小永遠不變（使用者：預覽不能被擠小）', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   const stage = page.getByTestId('stage');
   const h0 = (await stage.boundingBox())!.height;
   const w0 = (await stage.boundingBox())!.width;
+  await page.getByTestId('clip').first().tap();
   await openTab(page, '色調');
+  await openTool(page, 'color.look');
   await expect(page.getByTestId('panel-sheet')).toBeVisible();
   expect((await stage.boundingBox())!.height).toBeCloseTo(h0, 0);
   expect((await stage.boundingBox())!.width).toBeCloseTo(w0, 0);
-  await page.locator('.tabs').getByRole('tab', { name: '色調', exact: true }).tap(); // 再點一次：收起
+  await page.getByTestId('panel-close').tap(); // ✕ 收起
   await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
   expect((await stage.boundingBox())!.height).toBeCloseTo(h0, 0);
 });

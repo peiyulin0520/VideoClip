@@ -187,6 +187,8 @@ test('W4：播放線碰到菱形＝選到那個定格（菱形變白底）；調
   await seekTo(page, 1);
   await expect.poll(() => here(1)).toBe('0');
   for (let i = 0; i < 4; i++) expect(await here(i)).toBe('0');
+  await openTab(page, '色調');
+  await openTool(page, 'color.look');
   await expect(page.getByTestId('scope-hint')).toContainText('沒有碰到任何關鍵格');
   await page.screenshot({ path: `${SHOT}/pick-keyframe.png`, fullPage: true });
 });
@@ -207,9 +209,10 @@ test('W4：點菱形跳到剛好那個時間 → 按「定格」按鈕就是刪�
   await page.getByTestId('kf-btn').tap();
   await expect.poll(async () => (await first(page)).keyframes?.length).toBe(2);
   // 細部調整的刪除：先碰到第二個（剩下的最後一個 3.5 秒），按「刪除這個定格」
-  await openTab(page, '圖層');
   await closePanel(page);
   await page.getByTestId('kf-dot').nth(1).tap();
+  await openTab(page, '剪輯');
+  await openTool(page, 'edit.look');
   await page.getByTestId('kf-delete').tap();
   await expect.poll(async () => (await first(page)).keyframes?.length).toBe(1);
 });
@@ -289,6 +292,7 @@ test('W5：定格小特效「彈一下」——彈起來的時候綠色疊加素
   // 取消
   await closePanel(page);
   await page.getByTestId('kf-dot').nth(1).tap(); // 點菱形＝播放線跳到剛好那個定格
+  await openTool(page, 'edit.look');
   await page.getByTestId('pulse-none').tap();
   await expect.poll(async () => (await ov()).keyframes?.[1]?.pulse).toBeUndefined();
   await expect(page.getByTestId('kf-pulse')).toHaveCount(0);

@@ -6,14 +6,14 @@
 - **日期**：2026-11-24
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
-- **測試**：約 870 個單元測試、約 175 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
+- **測試**：1145 個單元測試、339 個 e2e（iPhone 13 尺寸、Chromium；336 過、3 個照原本就跳過）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：**U6 程式已做完（U6-1～U6-4，commit 21e14ee～7c717b0），剩 U6-5：把 e2e 改成新行為**——第四輪完整結果 150 過／188 失敗，修了兩個共用原因（`finishLayout` 要先開〔各格〕、舊按鈕名稱換成 `tool-<id>`）後正在重跑失敗的 61 個檔案（看 `/tmp/e2e-u6e.log`，若環境重啟就重跑）；其餘逐項改寫（不刪、不跳過），全綠後給使用者**一個 PR**（含 U1–U6、hold-for-all-effects、AudioContext 修正）。每輪用 `--timeout=45000` 縮短等待
+- **下一步**：**U1–U6 程式與 e2e 都做完且全綠**（e2e 已改寫成新行為，不刪不跳過）。等使用者說再開**一個 PR**（含 U1–U6、hold-for-all-effects、AudioContext 修正）；合併後照 `docs/plans/2026-11-23-roadmap-ui.md` 做下一階段（預覽變順 Y10 → 備份 → 畫畫 → …）。iPhone 真機驗收清單看 `docs/PLAN.md §7`
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
   - Phase 6 前：建立 Google Cloud OAuth Client ID 與 API key（屆時帶步驟）
-- **目前沒有進行到一半的修改**（工作目錄乾淨、已 push；e2e 還在修）
+- **目前沒有進行到一半的修改**（工作目錄乾淨、已 push）
 
 ## 日誌格式（新增一筆時照這個）
 ```
@@ -89,6 +89,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-24 U6-5 e2e 全部改成新功能列、全綠（claude/zen-tesla-v3brj5）
+  - 做了什麼：把約 45 個 e2e 檔改寫成新行為（不刪、不跳過）：工具改用 `tool-<id>`、要開視窗的步驟先 `openTool`、點時間軸前先收起視窗；音訊／圖層清單／版型各自改成新視窗與預覽右上〔圖層〕；刪除後空白處的 ← 補齊（一步一復原）；預覽高度跟專案比例（x4 改比相對位置）；編輯畫面一個螢幕高、整頁不捲（preview-select 改驗 scrollY=0）；時間軸自己捲動（拖曳測試先 `scrollIntoViewIfNeeded`）。順手修的程式問題：無（只動測試），僅 `Toolbar.tsx` 註解
+  - 動了哪些檔：`e2e/helpers.ts`（`openCat`／`openTool` 冪等、`undo`／`redo` 按完把原本開著的視窗升回來、`finishLayout` 先開〔各格〕）、`e2e/*.spec.ts`
+  - 驗證：✅ `npm run check`（56 檔 1145 單元測試、lint、prettier、build）；✅ 完整 e2e 336 過／3 跳過
+  - 踩到的坑：Playwright 把 `aria-disabled` 的按鈕當作不能點、會一直等 → 變淡改用 `data-dim`；選到東西 250 ms 後功能列才會自動跳類別，測試要等 `toolbar` 出現再切（x1、g3）；`crop` 自由形狀、`h3` 畫布大小、`w` W3 順暢度在 4 個 worker 同時跑時偶爾慢 → poll 逾時放寬（單獨跑都過）
+  - 下一步：使用者看過再要 PR（一個）；iPhone 真機驗收看 `docs/PLAN.md §7`
 - 2026-11-24 U6 功能列每一項一顆按鈕：程式完成，e2e 改寫中（Sonnet）
   - 做了什麼：照 `docs/plans/2026-11-23-u6-function-bar.md`。`src/app/editor/tools.tsx` 的 `TOOLS` 表定義七個類別的每顆按鈕（id、zone、kind＝popup／action／toggle、enabled、need、guard、badge、popup 內容）；`Toolbar.tsx` 照表畫第二層（七個類別都進工具列，←返回，分區細線，沒選到變淡、點了提示 `need`）、第三層（只有那一項的小視窗，`bare` 的是自己就是 Sheet）；`ToolButton` 加 `badge`／`dim`／`danger`（圖示那格顯示目前的值：特效代表字、色塊、色調縮圖 `LookBadge`、版型格子示意圖 `CellsBadge`、%／倍速、角落小圓點）。面板拆成各自的視窗：`TextTab(section)`、`EffectTab(part)`、`LayoutTab(part)`、`ColorTab(part)`、`ClipPanel`（trim／speed／volume／fade）、`AppearanceTab`（外觀）；`EditTab`、`AudioTab`、`LayersTab`、`OverlayTab` 刪除。剪輯拿掉音量、填滿/完整、移至格子、刪除並補齊、匯入（移到加入的〔接續〕〔疊加〕）；「定格」全站改「關鍵格」、「片段範圍」改〔修剪〕、「位置大小」改〔外觀〕。時間軸每一種軌道的空白處有 ← 往前補齊（只移同一軌，`closeGap`）。預覽右上〔圖層〕清單每列加 ▲▼（原圖層分頁的換順序搬過來，`LayerPeek`）。選到東西跳類別：`targetForSelection`（文字→文字、音樂→音訊、整個版型→版型、其他→剪輯；特效／色調／加入時不跳），不自動升起視窗。圖示重新挑過不重複（進場 LogIn、出場 LogOut、整段 MoveVertical、淡入淡出 TrendingUpDown、分離原音 Split…）。
   - 驗證：✅ tsc、lint、截圖（320／390 寬各類別工具列字不換行不被切）。🟡 e2e：改了 `e2e/helpers.ts`（`openCat`、`openTool`、`openTab` 對照表、`closePanel`、`undo/redo/pressPlay/zoomTimeline`）與約 40 個 spec；完整結果見下一步。🔴 手機實機沒試。

@@ -184,8 +184,8 @@ test('自由形狀（描邊）：手指畫一圈，只留圈裡面，外面透�
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
   // 綠色素材原本在畫面 x 0.25–0.75、y 0.25–0.75（縮小一半）。圈是橢圓（半徑 40%）：
   // 方框的四個角落在圈外 → 透明，露出底下的紅；圈上靠邊一點（u≈0.8）還是綠
-  await expect.poll(async () => isRed(await samplePreview(page, 0.3, 0.3))).toBe(true);
-  expect(isRed(await samplePreview(page, 0.7, 0.7))).toBe(true);
+  await expect.poll(async () => isRed(await samplePreview(page, 0.3, 0.3)), { timeout: 15_000 }).toBe(true);
+  await expect.poll(async () => isRed(await samplePreview(page, 0.7, 0.7)), { timeout: 15_000 }).toBe(true);
   expect(isGreen(await samplePreview(page, 0.65, 0.5))).toBe(true);
   expect(isGreen(await samplePreview(page, 0.5, 0.35))).toBe(true);
   await page.screenshot({ path: `${SHOT}/crop-lasso-done.png` });

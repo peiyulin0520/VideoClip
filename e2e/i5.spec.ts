@@ -105,6 +105,8 @@ test('兩段銜接的圓圈寫類型代表字：米色、選取中橘棕；影�
   const c = page.getByTestId('tr-circle');
   await expect(c).toHaveText('左');
   expect(await c.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(184, 85, 58)'); // 選取中＝橘棕
+  await closePanel(page);
+  await page.getByTestId('clip').first().tap();
   await openTool(page, 'fx.in'); // 切到進場：接縫的圓圈變成沒選取的米色
   expect(await c.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(234, 219, 200)');
 });

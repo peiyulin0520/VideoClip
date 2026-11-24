@@ -133,6 +133,7 @@ test('Y5 整段效果：任何影像都能用「捲動」——開頭在畫面�
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(false); // 已經捲出去
   await showTimeline(page);
   await expect(page.getByTestId('fx-circle-whole')).toHaveText('捲');
+  await openTool(page, 'fx.whole');
   await page.getByRole('radio', { name: '整段 無' }).tap();
   expect((await tracks(page)).flatMap((t) => t.items)[0]!.motion).toBeUndefined();
 });

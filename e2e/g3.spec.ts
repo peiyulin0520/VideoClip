@@ -130,6 +130,8 @@ test('音訊工具列：影片原音的音量關掉再打開；分離原音後�
 
   // 關掉影片原音 → volume 0；再打開
   await video.tap();
+  await expect(page.getByRole('toolbar', { name: '剪輯' })).toBeVisible(); // 選到影片：功能列自動跳到〔剪輯〕，等它跳完
+  await openCat(page, '音訊');
   await openTool(page, 'audio.volume');
   await page.getByRole('button', { name: '關閉聲音' }).tap();
   expect((await tracks(page))[0]!.items[0]!.volume).toBe(0);

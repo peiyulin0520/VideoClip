@@ -16,9 +16,9 @@ import {
 const order = async (page: Page) => (await project(page)).tracks.map((t) => t.id);
 
 async function chipCenter(page: Page, trackId: string) {
-  const b = (await page
-    .locator(`[data-testid="track"][data-track-id="${trackId}"] [data-testid="track-chip"]`)
-    .boundingBox())!;
+  const chip = page.locator(`[data-testid="track"][data-track-id="${trackId}"] [data-testid="track-chip"]`);
+  await chip.scrollIntoViewIfNeeded(); // 時間軸在自己的區塊裡捲動
+  const b = (await chip.boundingBox())!;
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 

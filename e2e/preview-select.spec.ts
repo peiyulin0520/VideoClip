@@ -59,18 +59,18 @@ test('點到空白的地方不會取消選取', async ({ page }) => {
   expect(await selectedItemId(page)).toBe(id);
 });
 
-test('在預覽上往上／往下滑是捲頁面，不會選到東西也不會取消選取', async ({ page }) => {
+test('在預覽上往上／往下滑：整頁不捲動，也不會選到東西或取消選取', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await page.evaluate(() => window.scrollTo(0, 0));
   const s = await previewBox(page);
-  // 沒選取時，在滿版影片上滑 → 捲頁面、沒有選取
+  // 沒選取時，在滿版影片上滑 → 沒有選取（編輯畫面是一個螢幕高，整頁不捲動）
   await touchDrag(
     page,
     { x: s.x + s.width / 2, y: s.y + s.height * 0.8 },
     { x: s.x + s.width / 2, y: s.y + s.height * 0.2 },
   );
   expect(await selectedItemId(page)).toBeNull();
-  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(20);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
 test('疊在一起：第一次點選到最上面的、再點一次換下面那層（主軌），再點回最上面；「查看圖層」可以直接選', async ({

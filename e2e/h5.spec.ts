@@ -11,6 +11,7 @@ const order = async (page: Page) =>
 
 /** 長按軌道圖示 600ms 不動（進入多選） */
 async function longPress(page: Page, i: number) {
+  await page.getByTestId('track-chip').nth(i).scrollIntoViewIfNeeded();
   const b = (await page.getByTestId('track-chip').nth(i).boundingBox())!;
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.down();

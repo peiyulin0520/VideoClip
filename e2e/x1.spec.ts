@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
   closePanel,
+  openCat,
   createProjectWith,
   exportFrame,
   openLayerList,
@@ -35,18 +36,17 @@ test('X1-1 剪輯工具列按鈕叫「關鍵格」；整個頁面看不到「定
   await expect(page.locator('body')).not.toContainText('定位');
 });
 
-test('X1-2 有命名的素材：圖層清單、音訊分頁、分離原音都用命名；分離後改影片名稱不會跟著變', async ({
-  page,
-}) => {
+test('X1-2 有命名的素材：圖層清單、分離原音都用命名；分離後改影片名稱不會跟著變', async ({ page }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm']);
   await nameFirstClip(page, '測試一');
   await openLayerList(page);
   await expect(page.getByTestId('layer-row').first()).toContainText('測試一');
   await expect(page.getByTestId('layer-list')).not.toContainText('.webm');
-  await openTab(page, '音訊');
-  await expect(page.getByTestId('audio-row').first()).toContainText('原音 · 1 測試一');
-  await page.getByRole('button', { name: /分離原音 測試一/ }).tap();
+  await closePanel(page);
+  await clips(page).first().tap();
+  await openCat(page, '音訊');
+  await page.getByTestId('tool-audio.split').tap();
   const items = async () =>
     (await project(page)).tracks.flatMap((t) => t.items) as unknown as { type: string; label?: string }[];
   await expect.poll(async () => (await items()).find((i) => i.type === 'audio')?.label).toBe('測試一 原音');
@@ -211,6 +211,7 @@ for (const w of WIDTHS) {
     await createProjectWith(page, ['solid-red.webm']);
     await closePanel(page);
     await clips(page).first().tap();
+    await expect(page.getByTestId('fb-tools')).toBeVisible(); // 選到影片後功能列自動跳到〔剪輯〕，等它跳完再逐一切換
     const problems: string[] = [];
     const scan = async (where: string) => {
       const r = await page.evaluate(() => {

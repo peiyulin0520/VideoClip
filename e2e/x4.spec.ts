@@ -33,7 +33,6 @@ test('X4 預覽的底＝預覽區整塊：改比例時底、播放列的位置�
   const wrap0 = (await page.locator('.stage-wrap').boundingBox())!;
   expect(Math.abs(b0.width - wrap0.width)).toBeLessThan(1); // 底就是預覽區整塊
   expect(Math.abs(b0.height - wrap0.height)).toBeLessThan(1);
-  const playTop = (await page.getByRole('button', { name: /^(播放|暫停)$/ }).boundingBox())!.y;
   // 9:16 的版面比預覽區窄：左右兩側（版面外面）蓋斜線；「框內是影片輸出範圍」只在剛換比例後出現幾秒
   await expect(page.getByText(/框內是影片輸出範圍/)).toHaveCount(0);
   await expect(page.getByTestId('out-hatch')).toBeVisible();
@@ -50,10 +49,10 @@ test('X4 預覽的底＝預覽區整塊：改比例時底、播放列的位置�
     expect(Math.abs(b.x - b0.x)).toBeLessThan(1);
     expect(Math.abs(b.y - b0.y)).toBeLessThan(1);
     expect(Math.abs(b.width - b0.width)).toBeLessThan(1);
-    expect(Math.abs(b.height - b0.height)).toBeLessThan(1);
-    expect(
-      Math.abs((await page.getByRole('button', { name: /^(播放|暫停)$/ }).boundingBox())!.y - playTop),
-    ).toBeLessThan(1);
+    // 預覽高度跟著專案比例（方形、橫式不留一大片斜線）：寬度、位置不動，播放列貼著預覽下緣
+    expect((await page.getByRole('button', { name: /^(播放|暫停)$/ }).boundingBox())!.y).toBeGreaterThan(
+      b.y + b.height,
+    );
     const f = await frame(page);
     expect(f.width / f.height).toBeCloseTo(ratio, 1);
     // 置中
@@ -113,6 +112,11 @@ test('X4 改比例「保持原樣」：疊加的綠色塊在預覽上的位置�
   };
   await closePanel(page);
   await page.getByTestId('clip').nth(1).tap();
+  const baseMid = async () => {
+    const bb = (await base(page))!;
+    return bb.y + bb.height / 2;
+  };
+  const m0 = await baseMid();
   const b0 = await selbox();
   const tr0 = ((await project(page)).tracks[1]!.items[0] as unknown as { transform: { scale: number } })
     .transform;
@@ -120,8 +124,10 @@ test('X4 改比例「保持原樣」：疊加的綠色塊在預覽上的位置�
   // 保持原樣（預設）→ 4:3：選取框的中心、寬度不變
   await setRatio(page, /4:3/);
   const b1 = await selbox();
+  const m1 = await baseMid();
   expect(Math.abs(b1.x + b1.width / 2 - (b0.x + b0.width / 2))).toBeLessThan(2);
-  expect(Math.abs(b1.y + b1.height / 2 - (b0.y + b0.height / 2))).toBeLessThan(2);
+  // 預覽高度跟著比例變，所以比的是「離預覽中心多遠」
+  expect(Math.abs(b1.y + b1.height / 2 - m1 - (b0.y + b0.height / 2 - m0))).toBeLessThan(2);
   expect(Math.abs(b1.width - b0.width)).toBeLessThan(2);
   const tr1 = ((await project(page)).tracks[1]!.items[0] as unknown as { transform: { scale: number } })
     .transform;

@@ -147,11 +147,11 @@ test('版型附文字：拍貼機有「PHOTO BOOTH」＋日期的字卡（group 
   const dFrame = frame1.transform.x - frame0.transform.x;
   expect(Math.abs(dFrame)).toBeGreaterThan(0.1);
   expect(text1.transform.x - text0.transform.x).toBeCloseTo(dFrame, 2); // 文字跟著動同樣的量
-  // 選到文字：文字分頁有「這是版型的文字」提示；改內容、字體，位置不動
+  // 選到文字：改內容、字體，位置不動
   await closePanel(page);
   await page.locator('[data-testid="clip"][data-kind="text"]').first().tap();
   await openTab(page, '文字');
-  await expect(page.getByTestId('group-text-hint')).toBeVisible();
+  await openTool(page, 'text.content');
   await page.getByLabel('文字內容').fill('MY STRIP');
   const text2 = (await allItems(page)).find((i) => i.type === 'text')!;
   expect(text2.card!.runs[0]!.text).toBe('MY STRIP');

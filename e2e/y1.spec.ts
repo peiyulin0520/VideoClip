@@ -99,8 +99,8 @@ test('Y1 調整大小：按鈕不超出區塊，顯示現在大小，［重置�
   await expect
     .poll(async () => (await frameOf(page)).frameStyle?.box?.w ?? 1, { timeout: 15_000 })
     .toBeLessThan(0.9);
+  await openTool(page, 'layout.size'); // 拉大小時視窗會自動收起來，套用後再打開看
   await expect(page.getByTestId('layout-size-now')).not.toHaveText('100% × 100%');
-  await openTool(page, 'layout.size');
   await page.getByTestId('layout-size-reset').tap();
   await expect(page.getByTestId('layout-size-now')).toHaveText('100% × 100%', { timeout: 15_000 });
   await page.screenshot({ path: `${SHOT}/y1-size-390.png` });

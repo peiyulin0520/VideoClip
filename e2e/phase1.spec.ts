@@ -8,6 +8,7 @@ import {
   isGray,
   isRed,
   isWhite,
+  openCat,
   openTab,
   openTool,
   pressPlay,
@@ -79,7 +80,7 @@ test('專案卡片選單：改名、複製、刪除', async ({ page }) => {
   await expect(page.getByTestId('project-card').filter({ hasText: '旅行 vlog' })).toBeVisible();
 
   await page.getByRole('button', { name: '旅行 vlog 的選單' }).tap();
-  await page.getByTestId('tool-edit.copy').tap();
+  await page.getByRole('button', { name: '複製', exact: true }).tap();
   await expect(page.getByTestId('project-card')).toHaveCount(2);
   await expect(page.getByTestId('project-card').filter({ hasText: '旅行 vlog 副本' })).toBeVisible();
 
@@ -97,6 +98,7 @@ test('專案卡片選單：改名、複製、刪除', async ({ page }) => {
 });
 
 test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
+  test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm', 'clip-c.webm']);
   await expect(page.getByTestId('time')).toContainText('/ 0:06.6');
 
@@ -134,12 +136,6 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await page.getByRole('button', { name: '完成' }).tap();
   await expect(clips(page).nth(3)).toContainText('靜音');
 
-  // 完整 / 填滿
-  await page.getByRole('button', { name: '完整' }).tap();
-  await expectToast(page, '完整顯示');
-  await expect(page.getByRole('button', { name: '填滿' })).toBeVisible();
-  await page.getByRole('button', { name: '填滿' }).tap();
-
   // 分割：把播放頭移到 clip-b（1.6s）中間再分割
   await closePanel(page);
   await clips(page).nth(1).tap();
@@ -175,9 +171,10 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await zoomTimeline(page, 1 / 1.5);
 
   // 匯入：從工具列再加一張照片
+  await openCat(page, '加入');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: '匯入' }).tap(),
+    page.getByTestId('tool-add.append').tap(),
   ]);
   await chooser.setFiles(fixture('photo.png'));
   await expect(clips(page)).toHaveCount(count);

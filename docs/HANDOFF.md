@@ -1,6 +1,6 @@
 # 交接手冊（HANDOFF）
 
-給接手的 AI／工程師。**目前的總規劃與順序看 `docs/plans/2026-11-23-roadmap-ui.md`（2026-11-23 定案；U1–U6 程式都做完了（U6 見 `docs/plans/2026-11-23-u6-function-bar.md`），**下一步把 e2e 改成新行為、給 PR**）。**先讀 `AGENTS.md`（規則）和 `docs/PROGRESS.md`（目前狀態），這份補上「為什麼這樣做」和「程式在哪裡」。
+給接手的 AI／工程師。**目前的總規劃與順序看 `docs/plans/2026-11-23-roadmap-ui.md`（2026-11-23 定案；U1–U6 程式都做完了（U6 見 `docs/plans/2026-11-23-u6-function-bar.md`），**e2e 已改成新行為且全綠，等使用者說再開一個 PR**）。**先讀 `AGENTS.md`（規則）和 `docs/PROGRESS.md`（目前狀態），這份補上「為什麼這樣做」和「程式在哪裡」。
 **接手時可以直接對 ChatGPT 等說：**
 > 請先讀 repo 根目錄的 AGENTS.md，再讀 docs/PROGRESS.md 最上面的「交接快照」和 docs/HANDOFF.md，然後從「下一步」繼續。每做完一步都要照 AGENTS.md 的「紀錄規則」更新紀錄、commit 並 push。
 
@@ -246,3 +246,4 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **視窗內容**：不要再做分段切換列；每個視窗只放一項（`TextTab section`、`EffectTab part`、`LayoutTab part`、`ColorTab part`、`ClipPanel panel`）。小視窗即時生效、✕ 關閉，不加〔套用〕（會大改東西的 Sheet 例外）。
 - **選到東西跳類別**：`Toolbar.tsx` 的 `targetForSelection`；`requestTab`（時間軸特效圓圈等）由 `requestTarget` 對到類別＋視窗（特效看 `fxFocus.role`）。
 - **e2e**：`helpers.ts` 的 `openCat`／`openTool`（用工具 id）、`openTab`（舊名稱對照）；視窗開著會蓋住播放列、時間軸，點之前先 `closePanel`；剪輯／加入／文字／版型…的按鈕只在那個類別的工具列顯示。
+- **U6 補充（e2e 改寫時確認的行為）**：①變淡的按鈕用 class `dim`＋`data-dim`（不是 `aria-disabled`，Playwright 會一直等）；②預覽上開始拖調整（自訂比例、版型大小、格子大小、動態字卡顯示範圍）時，升起的視窗自動收起；③在版型類別點格子／整個版型，功能列留在版型；④選到東西 250 ms 後才跳類別（避免手指放開補送的 click 落在別的按鈕）；⑤預覽高度跟專案比例（方形、橫式比較矮），編輯畫面一個螢幕高、整頁不捲，時間軸自己上下捲（軌道多時下面幾條要捲才看得到）；⑥e2e 的 `undo`／`redo` 會先收視窗、按完再把原本開著的視窗升回來；⑦預覽右上〔圖層〕清單是平的一條，每列有 ▲▼（`<軌名> 往上一層／往下一層`），沒有收合、隱藏、鎖定、更多排序

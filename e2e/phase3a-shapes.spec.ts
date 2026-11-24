@@ -35,7 +35,7 @@ test('圖形庫：4 個分類、每個圖形都點得動、縮圖有畫、對話
   let total = 0;
   for (const c of cats) {
     await page.getByRole('button', { name: `圖形分類 ${c}` }).tap();
-    await openTool(page, 'layout.size');
+    await openTool(page, 'text.box');
     const cells = page.getByTestId('shape-grid').locator('.shape-cell');
     const n = await cells.count();
     expect(n).toBeGreaterThanOrEqual(5);
