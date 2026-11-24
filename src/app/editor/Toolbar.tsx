@@ -36,7 +36,7 @@ function MusicInput() {
   );
 }
 
-type Sel = 'text' | 'audio' | 'frame' | 'media';
+type Sel = 'text' | 'audio' | 'frame' | 'cell' | 'media';
 
 /**
  * 選了東西，功能列自動跳到那個東西的類別（不自動升起視窗，免得蓋住時間軸）：
@@ -46,8 +46,10 @@ type Sel = 'text' | 'audio' | 'frame' | 'media';
 export function targetForSelection(cat: CatId | null, kind: Sel): CatId | null {
   if (kind !== 'audio' && (cat === 'effect' || cat === 'color')) return null;
   if (cat === 'add' && kind !== 'text' && kind !== 'audio') return null;
+  // 在版型類別裡點格子（〔各格〕示意圖、預覽上點格子）：留在版型，免得調到一半功能列跳走
+  if (cat === 'layout' && (kind === 'cell' || kind === 'frame')) return null;
   const to: CatId =
-    kind === 'text' ? 'text' : kind === 'audio' ? 'audio' : kind === 'frame' ? 'layout' : 'edit';
+    kind === 'text' ? 'text' : kind === 'audio' ? 'audio' : kind === 'frame' ? 'layout' : 'edit'; // 版型裡的一格（cell）也是剪輯：分割、裁切、變速都在那裡
   return to === cat ? null : to;
 }
 
@@ -136,7 +138,9 @@ export function BottomBar({
             ? 'audio'
             : isFrameItem(f.item)
               ? 'frame'
-              : 'media';
+              : (f.item as { group?: string }).group
+                ? 'cell'
+                : 'media';
       const to = targetForSelection(catRef.current, kind);
       if (to) return goto(to);
       // 留在原類別：視窗那一項對新選到的東西不能用了就收起來
