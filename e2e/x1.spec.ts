@@ -1,10 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
   openLayerList,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
@@ -13,6 +15,7 @@ import {
 const SHOT = 'docs/screenshots/feedback-12';
 
 async function nameFirstClip(page: Page, name: string) {
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '命名', exact: true }).tap();
@@ -23,6 +26,7 @@ async function nameFirstClip(page: Page, name: string) {
 
 test('X1-1 剪輯工具列按鈕叫「關鍵格」；整個頁面看不到「定位」', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await expect(page.getByTestId('kf-btn')).toContainText('關鍵格');
@@ -99,6 +103,7 @@ test('X1-3 新文字是空的、輸入框有淺灰提示字；預覽有半透明
 test('X1-4 按鈕、選單、輸入框都是圓角，不是膠囊（圓形白名單：圓點、＋、播放鍵）', async ({ page }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   const bad: string[] = [];
   for (const tab of ['剪輯', '疊加', '文字', '圖層', '版型', '特效', '色調', '素材', '音訊'] as const) {
@@ -125,6 +130,7 @@ test('X1-4 按鈕、選單、輸入框都是圓角，不是膠囊（圓形白名
 
 test('X1-6 再點一次目前的類別：升起的視窗收起來；再點又升起來', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '色調');
   await expect(page.getByTestId('color-panel')).toBeVisible();
@@ -140,6 +146,7 @@ test('X1-7/8/9/10 片段範圍視窗：圖示播放鈕、秒數等寬、播放�
 }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByTestId('tool-edit.trim').tap();
@@ -178,9 +185,12 @@ test('X1-7/8/9/10 片段範圍視窗：圖示播放鈕、秒數等寬、播放�
 
 test('X1-12 色調卡片名稱都在一行裡', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '色調');
+  await openTool(page, 'color.look');
   await expect(page.getByTestId('look-card')).toHaveCount(10);
+  await openTool(page, 'color.look');
   const lines = await page.getByTestId('look-card').evaluateAll((els) =>
     els.map((el) => {
       const rg = document.createRange();
@@ -189,6 +199,7 @@ test('X1-12 色調卡片名稱都在一行裡', async ({ page }) => {
     }),
   );
   for (const n of lines) expect(n).toBe(1);
+  await openTool(page, 'color.look');
   await expect(page.getByRole('radio', { name: '色調 高反差' })).toBeVisible();
 });
 
@@ -198,6 +209,7 @@ for (const w of WIDTHS) {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: w, height: 844 });
     await createProjectWith(page, ['solid-red.webm']);
+    await closePanel(page);
     await clips(page).first().tap();
     const problems: string[] = [];
     const scan = async (where: string) => {

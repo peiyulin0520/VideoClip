@@ -314,6 +314,7 @@ test('全部影片靜音：一鍵關掉所有影片的聲音（音樂不受影�
 
 test('沒有影片時不能加背景音樂；音樂檔壞掉會說明原因', async ({ page }) => {
   await createProjectWith(page, ['photo.png']);
+  await closePanel(page);
   await page.getByTestId('clip').first().tap();
   await page.getByTestId('tool-edit.delete').tap();
   await openTab(page, '音訊');

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   finishLayout,
   fixture,
@@ -26,6 +27,7 @@ test('單一素材進場：選「捲簾放下」3 秒 → 開頭看不到、中�
 }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm']); // 紅色 4 秒
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '特效');
   await expect(page.getByTestId('tool-fx.in')).toHaveClass(/active/); // 特效預設在〔進場〕
@@ -58,6 +60,7 @@ test('單一素材可以同時有進場與出場（不同特效）：出場「�
 }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '特效');
   await page.getByRole('radio', { name: '進場 疊化' }).tap();
@@ -86,6 +89,7 @@ test('單一素材可以同時有進場與出場（不同特效）：出場「�
   expect(await css('fx-circle-in', 'color')).toBe('rgb(30, 59, 47)');
   await page.screenshot({ path: `${SHOT}/in-out.png` });
   // 點進場圓圈 → 切到進場、顏色對調
+  await closePanel(page);
   await page.getByTestId('fx-circle-in').tap();
   await expect(page.getByTestId('tool-fx.in')).toHaveClass(/active/); // 特效預設在〔進場〕
   expect(await bg('fx-circle-in')).toBe('rgb(30, 59, 47)');
@@ -95,6 +99,7 @@ test('兩段銜接的圓圈寫類型代表字：米色、選取中橘棕；影�
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm', 'photo.png']);
   await expect(page.getByTestId('tr-circle')).toHaveCount(1);
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await page.getByRole('radio', { name: '轉場 左移' }).tap();
   const c = page.getByTestId('tr-circle');
@@ -208,6 +213,7 @@ test('調整進場時間：預覽在左、拖拉軸在右同一列；只有一�
 }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '特效');
   await page.getByRole('radio', { name: '進場 捲簾放下' }).tap();
@@ -255,6 +261,7 @@ test('調整出場時間：只有一個「起」旗標；起＝長度−特效�
 }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '特效');
   await openTool(page, 'fx.out');
@@ -283,6 +290,7 @@ test('轉場分配：起（A 結尾前幾秒）、迄（B 開頭後幾秒）各�
 }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm', 'solid-green.webm']); // 各 4 秒，接縫在 4 秒
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await page.getByRole('radio', { name: '轉場 疊化' }).tap();
   await page.getByTestId('fx-adjust').tap();
@@ -323,6 +331,7 @@ test('版型：選到版型那一條，到特效分頁選進場、出場（整�
     ((await project(page)).tracks as unknown as Tr[]).find(isFrameTrack)!.items.find((i) => !!i.group)!;
   // 選到整個版型 → 特效分頁
   await showTimeline(page);
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${(await frameItem()).id}"]`).tap();
   await openTab(page, '特效');
   await page.getByRole('radio', { name: '進場 疊化' }).tap();
@@ -371,6 +380,7 @@ test('匯出的單格跟預覽一樣：進場「捲簾放下」在 1.5 秒（一
   test.setTimeout(120_000);
   const { exportFrame } = await import('./helpers');
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '特效');
   await page.getByRole('radio', { name: '進場 捲簾放下' }).tap();
@@ -390,6 +400,7 @@ test('音訊的特效：選到音樂時特效分頁只有淡入（逐漸變大�
   await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fx('music-4s.wav'));
   await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
+  await closePanel(page);
   await page.locator('[data-testid="clip"][data-kind="audio"]').first().tap();
   await openCat(page, '特效');
   for (const id of ['fx.in', 'fx.out', 'fx.seam', 'fx.whole'])

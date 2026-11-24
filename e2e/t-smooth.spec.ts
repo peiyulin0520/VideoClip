@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, pressPlay, samplePreview, seekTo } from './helpers';
+import { closePanel, createProjectWith, pressPlay, samplePreview, seekTo } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-9/t-smooth';
 
 async function setup(page: Page) {
   // 兩支 4 秒的純色影片（都沒修剪：B 入點是 0、A 用到素材最後），接縫在 4 秒；疊化 1 秒＝3.5～4.5 秒
   await createProjectWith(page, ['solid-red.webm', 'solid-green.webm']);
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await page.getByRole('radio', { name: '轉場 疊化' }).tap();
   await page.getByLabel('轉場長度').fill('10');

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { clips, createProjectWith, openTab, showTimeline, undo } from './helpers';
+import { clips, closePanel, createProjectWith, openTab, showTimeline, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g2';
 
@@ -10,6 +10,7 @@ test('片段命名：剪輯分頁「命名」、時間軸顯示「序號 名稱�
   await showTimeline(page);
   await expect(clips(page).first()).toContainText('1 影片');
   await expect(clips(page).nth(1)).toContainText('2 影片');
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '命名', exact: true }).tap();
@@ -30,6 +31,7 @@ test('片段命名：剪輯分頁「命名」、時間軸顯示「序號 名稱�
   await page.reload();
   await showTimeline(page);
   await expect(clips(page).first()).toContainText('1 開場・揮手');
+  await closePanel(page);
   await clips(page).first().tap();
   await page.getByRole('button', { name: '命名', exact: true }).tap();
   await page.getByLabel('片段名稱').fill('');
@@ -52,6 +54,7 @@ test('片段命名：剪輯分頁「命名」、時間軸顯示「序號 名稱�
   await expect(clips(page).nth(1)).toContainText('2 蛋糕前');
 
   // 軌道改名
+  await closePanel(page);
   await page.getByTestId('track-chip').first().tap();
   await page.getByRole('button', { name: '改名', exact: true }).tap();
   await page.getByLabel('軌道名稱').fill('主畫面');

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
+  closePanel,
   createProjectWith,
   exportFrame,
   isGreen,
@@ -110,6 +111,7 @@ test('X4 改比例「保持原樣」：疊加的綠色塊在預覽上的位置�
     await page.evaluate(() => window.scrollTo(0, 0));
     return (await page.getByTestId('selbox').boundingBox())!;
   };
+  await closePanel(page);
   await page.getByTestId('clip').nth(1).tap();
   const b0 = await selbox();
   const tr0 = ((await project(page)).tracks[1]!.items[0] as unknown as { transform: { scale: number } })

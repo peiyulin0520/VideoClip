@@ -84,6 +84,7 @@ test('Y6 各格各影像單獨調色：選到第 2 格調成黑白，第 1 格�
   await page.getByRole('button', { name: '關閉', exact: true }).last().tap();
   expect(await selectedItemId(page)).toBe(c2!.id);
   await openTab(page, '色調');
+  await openTool(page, 'color.look');
   await page.getByRole('radio', { name: '色調 黑白' }).tap();
   const now = await cells(page);
   expect(now[1]!.items[0]!.look?.id).toBe('bw');

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
   finishLayout,
@@ -53,6 +54,7 @@ test('L0 版型是一個片段：放在播放線那一秒、跟主軌影片同�
   // 接縫的圓圈 → 疊化
   await showTimeline(page);
   await expect(page.getByTestId('tr-circle')).toHaveCount(1);
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await page.getByRole('radio', { name: '轉場 疊化' }).tap();
   await page.getByLabel('轉場長度').fill('8'); // 0.8 秒：接縫前後各 0.4 秒
@@ -95,6 +97,7 @@ test('L0 版型不能分割；拖到別列時格子軌跟著、時間也一起',
   await addLayout(page, '上下雙格', ['solid-red.webm', 'solid-green.webm']);
   await showTimeline(page);
   const frameId = (await tracks(page)).find(isFrameTrack)!.items.find((i) => i.group && !i.cell)!.id;
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${frameId}"]`).tap();
   await openTab(page, '剪輯');
   await seekTo(page, 2);
@@ -123,6 +126,7 @@ test('L1 空的格子：刪掉格子素材 → 格子還在（示意圖虛線、
   // 選回整個版型（點時間軸上的版型片段）→ 版型分頁的示意圖：空的格子是虛線
   await showTimeline(page);
   const frameId = (await tracks(page)).find(isFrameTrack)!.items.find((i) => i.group && !i.cell)!.id;
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${frameId}"]`).tap();
   await openTab(page, '版型');
   await openTool(page, 'layout.cells');

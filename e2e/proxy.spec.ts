@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, fixture, pressPlay, project } from './helpers';
+import { closePanel, createProjectWith, fixture, pressPlay, project } from './helpers';
 
 type Asset = { id: string; codec?: string; proxy?: { status: string; width?: number; height?: number } };
 const assets = async (page: Page) => (await project(page)).assets as Asset[];
@@ -82,6 +82,7 @@ test('預覽用輕量影片做不出來：標成 failed、照用原檔、播放�
   await expect(page.getByTestId('clip')).toHaveCount(2, { timeout: 20_000 });
   await expect.poll(async () => (await assets(page))[1]?.proxy?.status, { timeout: 20_000 }).toBe('failed');
   // 預覽用的還是原檔（1920 寬）
+  await closePanel(page);
   await page.getByTestId('clip').nth(1).tap();
   await expect
     .poll(async () =>

@@ -2,15 +2,16 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
+  finishLayout,
   fixture,
   isRed,
   openTab,
   project,
   samplePreview,
   showTimeline,
-  finishLayout,
 } from './helpers';
 
 type Cell = { x: number; y: number; w: number; h: number };
@@ -82,6 +83,7 @@ test('修剪面板：拖旗標時預覽的白線跟著（顯示那一秒）；�
 }) => {
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
   await showTimeline(page);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByTestId('tool-edit.trim').tap();

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
+  closePanel,
   createProjectWith,
   exportFrame,
   finishLayout,
@@ -8,6 +9,7 @@ import {
   isGreen,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo as rawSeekTo,
@@ -109,6 +111,7 @@ test('定格：色調漸變——第二個定格的飽和度 −100，開頭還�
   await page.getByTestId('kf-btn').tap();
   await seekTo(page, 3);
   await openTab(page, '色調'); // 調色在「色調」分頁
+  await openTool(page, 'color.adjust');
   await page.getByLabel('飽和度', { exact: true }).fill('-100');
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(2);
   const kfs = (await overlay(page)).keyframes!;
@@ -160,6 +163,7 @@ test('定格：分割後兩段的定格接得起來；在定格的時間再按�
   await page.getByLabel('X 位置').fill('90');
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(2);
   // 刪除第二個：把播放頭放到那個定格上（點菱形），按 ◆
+  await closePanel(page);
   await page.getByTestId('kf-dot').nth(1).tap();
   await openTab(page, '剪輯');
   await expect(page.getByTestId('kf-btn')).toHaveAttribute('aria-pressed', 'true');

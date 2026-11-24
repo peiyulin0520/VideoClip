@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   expectToast,
   fixture,
@@ -43,6 +44,7 @@ test('兩個專案各匯入 2 個素材：重新整理後都還在，編輯一�
   // 開專案 1，刪掉一個片段，再回首頁
   await page.getByRole('link', { name: '開啟 新專案 1' }).tap();
   await expect(clips(page)).toHaveCount(2);
+  await closePanel(page);
   await clips(page).first().tap();
   await page.getByTestId('tool-edit.delete').tap(); // 後面的往前接上，總長度才會變短
   await expect(clips(page)).toHaveCount(1);
@@ -103,6 +105,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await expectToast(page, '請先點選一個片段');
 
   // 點選片段
+  await closePanel(page);
   await clips(page).first().tap();
   expect(await selectedIndex(page)).toBe(0);
 
@@ -137,6 +140,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await page.getByRole('button', { name: '填滿' }).tap();
 
   // 分割：把播放頭移到 clip-b（1.6s）中間再分割
+  await closePanel(page);
   await clips(page).nth(1).tap();
   const n = await clips(page).count();
   const start = (await clipsStartSeconds(page))[1]!;
@@ -146,12 +150,14 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   // 播放頭在邊緣不能分割
   await seekTo(page, 0);
   await page.waitForTimeout(450);
+  await closePanel(page);
   await clips(page).first().tap();
   await page.getByTestId('tool-edit.split').tap();
   await expectToast(page, '播放頭要在片段中間');
 
   // 刪除 / 復原 / 重做（隔一下再點同一個片段：連點兩下會跳出命名面板）
   await page.waitForTimeout(450);
+  await closePanel(page);
   await clips(page).first().tap();
   const count = await clips(page).count();
   await page.getByTestId('tool-edit.delete').tap();
@@ -194,6 +200,7 @@ async function clipsStartSeconds(page: import('@playwright/test').Page): Promise
 
 test('修剪頭尾：拖把手會改片段長度，素材範圍受限', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await expect(page.getByTestId('trim-end')).toBeVisible();
 
@@ -273,6 +280,7 @@ test('照片素材：預設 3 秒、預覽會顯示、不能變速', async ({ pa
   await expect(page.getByTestId('time')).toContainText('/ 0:03.0');
   // photo.png 正中間是白色圓
   await expect.poll(async () => isWhite(await samplePreview(page, 0.5, 0.5)), { timeout: 8000 }).toBe(true);
+  await closePanel(page);
   await clips(page).first().tap();
   await page.getByTestId('tool-edit.speed').tap();
   await expectToast(page, '照片不能變速');

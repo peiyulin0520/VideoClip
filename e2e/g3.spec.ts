@@ -62,6 +62,7 @@ test('修剪面板：沒有兩側拉霸，上方有小旗標（1起／1迄）；
 }) => {
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
   await showTimeline(page);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByTestId('tool-edit.trim').tap();
@@ -91,6 +92,7 @@ test('修剪面板：再加一段（多段）→ 完成後拆成兩個片段，�
 }) => {
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
   await showTimeline(page);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByTestId('tool-edit.trim').tap();

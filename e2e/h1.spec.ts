@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   finishLayout,
   fixture,
@@ -34,6 +35,7 @@ test('「刪除並補齊」刪掉版型的外框＝整個版型（含各格）�
   await showTimeline(page);
   // 時間軸上的版型代表列（外框）：點它、剪輯 → 刪除並補齊
   const frameId = (await tracks(page)).find(isFrameTrack)!.items[0]!.id;
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${frameId}"]`).tap();
   await openTab(page, '剪輯');
   await page.getByTestId('tool-edit.delete').tap();
@@ -83,6 +85,7 @@ test('音訊工具列沒有「專案裡的聲音」清單：要調哪一個就�
 test('裁切畫面的按鈕字在淺色主題下也看得清楚（跟底色的對比夠）', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('vc-theme', 'warm'));
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByTestId('tool-edit.crop').tap();

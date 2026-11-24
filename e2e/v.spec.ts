@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   addOverlays,
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
   finishLayout,
@@ -34,6 +35,7 @@ test('播放列：播放鍵只有圖示、復原重做在右邊；定格在剪�
   await expect.poll(shadow).toBe(rest);
   await page.screenshot({ path: 'docs/screenshots/feedback-10/playbar.png' });
   // 定格：選到素材、新增定格後，按鈕變主題色（aria-pressed）
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   const kf = page.getByTestId('kf-btn');
@@ -146,6 +148,7 @@ test('版型附文字：拍貼機有「PHOTO BOOTH」＋日期的字卡（group 
   expect(Math.abs(dFrame)).toBeGreaterThan(0.1);
   expect(text1.transform.x - text0.transform.x).toBeCloseTo(dFrame, 2); // 文字跟著動同樣的量
   // 選到文字：文字分頁有「這是版型的文字」提示；改內容、字體，位置不動
+  await closePanel(page);
   await page.locator('[data-testid="clip"][data-kind="text"]').first().tap();
   await openTab(page, '文字');
   await expect(page.getByTestId('group-text-hint')).toBeVisible();
@@ -154,6 +157,7 @@ test('版型附文字：拍貼機有「PHOTO BOOTH」＋日期的字卡（group 
   expect(text2.card!.runs[0]!.text).toBe('MY STRIP');
   expect(text2.transform.x).toBeCloseTo(text1.transform.x, 5);
   // 刪除整個版型：文字也一起不見
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '版型');
   await page.getByTestId('tool-layout.remove').tap();
@@ -190,11 +194,13 @@ test('看原色（色調視窗標題列）：沒調色時按鈕不能用；調�
 }) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '色調');
   const peek = page.getByTestId('grade-peek');
   await peek.tap();
   await expect(peek).toHaveAttribute('aria-pressed', 'false');
+  await openTool(page, 'color.look');
   await page.getByRole('radio', { name: '色調 黑白' }).tap();
   await peek.tap();
   await expect(peek).toHaveAttribute('aria-pressed', 'true');

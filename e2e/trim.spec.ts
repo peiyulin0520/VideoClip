@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, project, samplePreview, seekTo, undo } from './helpers';
+import { clips, closePanel, createProjectWith, project, samplePreview, seekTo, undo } from './helpers';
 
 type Clip = { id: string; start: number; duration: number; trimIn: number };
 const main = async (page: Page) => (await project(page)).tracks[0]!.items as unknown as Clip[];
@@ -19,6 +19,7 @@ test('影像軌左把手往右拉：尾巴不動、前面留空位（黑畫面�
   page,
 }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']); // 2 秒 + 1.6 秒
+  await closePanel(page);
   await clips(page).first().tap();
   const before = await main(page);
   expect(before.map((c) => c.start)).toEqual([0, 2]);
@@ -43,6 +44,7 @@ test('影像軌左把手往右拉：尾巴不動、前面留空位（黑畫面�
 
   // 左把手往左拉回來：吃掉空白、素材起點還原
   await seekTo(page, 1); // 片段開頭對到播放頭（0 秒貼左之後，往右捲太多左把手會被軌道圖示蓋住）
+  await closePanel(page);
   await clips(page).first().tap();
   await drag(page, 'trim-start', -60);
   m = await main(page);
@@ -61,6 +63,7 @@ test('影像軌左把手往右拉：尾巴不動、前面留空位（黑畫面�
 
 test('補齊空位：開場留白的虛線框裡有 ←，點一下就補齊，後面往前接上；一步復原', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await expect(page.getByTestId('gap')).toHaveCount(0);
   await drag(page, 'trim-start', 60);
@@ -80,6 +83,7 @@ test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖�
   page,
 }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await page.getByTestId('tool-edit.trim').tap();
   const info = page.getByTestId('trim-info');
@@ -122,6 +126,7 @@ test('修剪面板：整段素材攤開、上方小旗標標起點終點；拖�
 
 test('照片沒有修剪面板（提示用時間軸把手）；疊加影片的修剪面板不會壓到後面的物件', async ({ page }) => {
   await createProjectWith(page, ['photo.png']);
+  await closePanel(page);
   await clips(page).first().tap();
   await page.getByTestId('tool-edit.trim').tap();
   await expect(page.getByTestId('trim-strip')).toHaveCount(0);

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, legacyBox, openTab, openTool, project, touchDrag } from './helpers';
+import { closePanel, createProjectWith, legacyBox, openTab, openTool, project, touchDrag } from './helpers';
 
 const SHOT = 'docs/screenshots/fix-feedback-2';
 
@@ -55,6 +55,7 @@ test('文字顏色：基本色、展開 32 色、每一格都點得動、最近�
   await page.waitForTimeout(1200);
   await page.reload();
   await expect(page.locator('[data-testid="clip"][data-kind="text"]')).toHaveCount(1, { timeout: 20_000 });
+  await closePanel(page);
   await page.locator('[data-testid="clip"][data-kind="text"]').tap();
   await openTab(page, '文字');
   await expect(page.getByLabel('最近用過的顏色').getByRole('button')).toHaveCount(8);

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  closePanel,
   createProjectWith,
   finishLayout,
   fixture,
@@ -88,6 +89,7 @@ test('X6 一格多素材：列尾 ＋ 加色塊、加照片；格子編號；空
   // 刪掉色塊 → 4–6 是空檔：預設「停格」停在紅色最後一格
   await showTimeline(page);
   const colorItem = (await cells(page))[0]!.items.find((i) => i.start > 3.9 && i.start < 4.1)!;
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${colorItem.id}"]`).tap();
   await openTab(page, '剪輯');
   await page.getByTestId('tool-edit.delete').first().tap();
@@ -153,6 +155,7 @@ test('X6 移至格子：剪輯分頁［移至格子］把素材搬到別格，�
   const [c1, c2] = await cells(page);
   const it = c1!.items[0]!;
   await showTimeline(page);
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${it.id}"]`).tap();
   await expect(page.getByTestId('clip-area')).toBeVisible();
   await expect(page.getByTestId('preview-cell-no')).toHaveText(['1', '2']);

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  closePanel,
   createProjectWith,
   fixture,
   isRed,
@@ -91,6 +92,7 @@ test('L3 版型尾端「加入」→ 文字：進版型自己的文字軌（不�
   // 一般「字卡」類沒有（版型文字不佔一般類別）
   await expect(page.getByTestId('cat-head').filter({ hasText: '字卡' })).toHaveCount(0);
   // 點展開裡的文字片段：文字分頁看得到它
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${text.id}"]`).tap();
   await openTab(page, '文字');
   await expect(page.getByLabel('文字內容')).toBeVisible();

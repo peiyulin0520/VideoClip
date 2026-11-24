@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addOverlays, createProjectWith, openTab, openTool, project } from './helpers';
+import { addOverlays, closePanel, createProjectWith, openTab, openTool, project } from './helpers';
 
 type Inspect = {
   ext: string;
@@ -91,6 +91,7 @@ test('匯出的聲音：有聲音的影片匯出有音軌且量得到音量；�
   expect(loud.warnings.filter((w) => /沒有聲音/.test(w))).toHaveLength(0);
 
   // 音量 0
+  await closePanel(page);
   await page.getByTestId('clip').first().tap();
   await openTab(page, '剪輯');
   await openTool(page, 'audio.volume');
@@ -199,6 +200,7 @@ test('沒有內容時匯出鈕按下去會說要先匯入；專案資料不會�
   await page.getByTestId('new-project-files').setInputFiles([]);
   // 空專案：從首頁建立一個空專案的路徑不一定有，這裡改用匯入後刪掉片段
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await page.getByTestId('clip').first().tap();
   await openTab(page, '剪輯');
   await page.getByTestId('tool-edit.delete').tap();

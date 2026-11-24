@@ -1,10 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   undo,
@@ -18,6 +20,7 @@ const isGray = (c: number[] | null) =>
   !!c && Math.abs(c[0]! - c[1]!) < 25 && Math.abs(c[1]! - c[2]!) < 25 && c[0]! > 20;
 
 async function openColor(page: Page) {
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '色調');
   await expect(page.getByTestId('color-panel')).toBeVisible();
@@ -30,6 +33,7 @@ test('調色面板：色調組合 10 張卡片（原圖＋9 種）、卡片是�
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm']);
   await openColor(page);
+  await openTool(page, 'color.look');
   await expect(page.getByTestId('look-card')).toHaveCount(10);
   const pix = (look: string) =>
     page
@@ -52,6 +56,7 @@ test('選「黑白」→ 預覽變灰、look 寫進專案；強度 0 回到原�
   await createProjectWith(page, ['solid-red.webm']);
   await openColor(page);
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(true);
+  await openTool(page, 'color.look');
   await page.getByRole('radio', { name: '色調 黑白' }).tap();
   expect((await items(page))[0]!.look).toEqual({ id: 'bw', amount: 1 });
   await expect.poll(async () => isGray(await samplePreview(page, 0.5, 0.5))).toBe(true);
@@ -73,15 +78,19 @@ test('調整滑桿疊在色調組合之上；曝光預覽與單格輸出一樣�
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm']);
   await openColor(page);
+  await openTool(page, 'color.look');
   await page.getByRole('radio', { name: '色調 黑白' }).tap();
   await expect.poll(async () => isGray(await samplePreview(page, 0.5, 0.5))).toBe(true);
   // 手動：飽和度 +100（預設 −100 → 手動 +100 相加＝0，回到原色）
+  await openTool(page, 'color.adjust');
   await page.getByLabel('飽和度', { exact: true }).fill('100');
   expect((await items(page))[0]!.adjust!.saturation).toBeCloseTo(1, 2);
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(true);
+  await openTool(page, 'color.adjust');
   await page.getByLabel('飽和度', { exact: true }).fill('0');
   await expect.poll(async () => isGray(await samplePreview(page, 0.5, 0.5))).toBe(true);
   // 曝光 −50：變暗；預覽與單格輸出同一點接近
+  await openTool(page, 'color.adjust');
   await page.getByLabel('曝光', { exact: true }).fill('-50');
   const prev = await samplePreview(page, 0.5, 0.5);
   const out = await exportFrame(page, 0.5, [[0.5, 0.5]]);
@@ -95,7 +104,7 @@ test('調整滑桿疊在色調組合之上；曝光預覽與單格輸出一樣�
   await expect(page.getByTestId('peek-tag')).toHaveCount(0);
   await expect.poll(async () => isGray(await samplePreview(page, 0.5, 0.5))).toBe(true);
   // 全部歸零：look、adjust 都沒了、回到紅色
-  await page.getByTestId('grade-reset').tap();
+  await page.getByTestId('tool-color.reset').tap();
   const it = (await items(page))[0]!;
   expect(it.look).toBeUndefined();
   expect(it.adjust).toBeUndefined();
@@ -106,9 +115,11 @@ test('套用到全部同類：兩個影片都套上同一組；一步復原；�
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm', 'solid-green.webm']);
   await openColor(page);
+  await openTool(page, 'color.look');
   await page.getByRole('radio', { name: '色調 復古' }).tap();
+  await openTool(page, 'color.adjust');
   await page.getByLabel('曝光', { exact: true }).fill('20');
-  await page.getByTestId('grade-all').tap();
+  await page.getByTestId('tool-color.all').tap();
   const all = await items(page);
   expect(all.every((i) => i.look?.id === 'vintage')).toBe(true);
   expect(all.every((i) => (i.adjust?.exposure ?? 0) > 0.15)).toBe(true);
@@ -127,12 +138,15 @@ test('字卡也能調色：色調分頁選字卡 → 選黑白，look 寫進字�
   await page.getByTestId('tool-text.add').tap();
   await openTab(page, '色調');
   await expect(page.getByTestId('color-panel')).toBeVisible();
+  await openTool(page, 'color.look');
   await page.getByRole('radio', { name: '色調 黑白' }).tap();
   const text = (await items(page)).find((i) => i.type === 'text')!;
   expect(text.look).toEqual({ id: 'bw', amount: 1 });
   // 在色調分頁點影片：留在色調分頁
+  await closePanel(page);
   await clips(page).first().tap();
   await page.waitForTimeout(600);
-  await expect(page.getByRole('toolbar', { name: '色調', exact: true })).toBeVisible(); // 功能列還在色調
+  await expect(page.getByRole('toolbar', { name: '色調', exact: true })).toBeVisible(); // 功能列還在色調（不會跳到剪輯）
+  await openTool(page, 'color.look');
   await expect(page.getByTestId('color-panel')).toBeVisible();
 });

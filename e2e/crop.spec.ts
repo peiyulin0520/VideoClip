@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
+  closePanel,
   createProjectWith,
   isGreen,
   isRed,
@@ -216,6 +217,7 @@ test('裁切模式的進出：沒選東西會提示；❌ 關閉不套用；選�
   await expect(page.locator('.toast').filter({ hasText: '先點一個' })).toBeVisible();
   await expect(page.getByTestId('crop-layer')).toHaveCount(0);
 
+  await closePanel(page);
   await page.getByTestId('clip').first().tap(); // 選主軌片段：主軌也能裁切
   await page.getByTestId('tool-edit.crop').tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();

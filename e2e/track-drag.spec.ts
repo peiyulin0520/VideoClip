@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
+  closePanel,
   createProjectWith,
   isBlue,
   isGreen,
@@ -48,6 +49,7 @@ test('軌道圖示按住上下拖＝換圖層順序（觸控）；點一下仍�
 
   // 點一下（沒有拖）：開軌道選單
   await showTimeline(page);
+  await closePanel(page);
   await page.getByTestId('track-chip').first().tap();
   await expect(page.getByRole('button', { name: /隱藏這條軌道|顯示這條軌道/ })).toBeVisible();
   await page.touchscreen.tap(5, 5);

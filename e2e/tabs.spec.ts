@@ -44,6 +44,7 @@ test('七個類別都在、390 寬點得到每一個；每一個有該有的內�
 
 test('剪輯工具列只留跟剪輯影片有關的；沒有前後移；移除版型在版型、全部靜音在音訊', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   for (const n of ['分割', '刪除', '複製', '修剪', '變速', '裁切', '外觀', '關鍵格', '命名'])
@@ -83,6 +84,7 @@ test('選了東西功能列自動跳：字卡→文字、音樂→音訊、從�
   await expectTab(page, '剪輯');
   // 點時間軸上的字卡 → 切到文字（先捲到看得到時間軸：黏在上面的分頁列會蓋住字卡）
   await showTimeline(page);
+  await closePanel(page);
   await page.locator('[data-testid="clip"][data-kind="text"]').first().tap();
   await expectTab(page, '文字');
   // 加音樂（在音訊分頁）→ 留在音訊；再點影片 → 剪輯；再點音樂 → 音訊
@@ -94,6 +96,7 @@ test('選了東西功能列自動跳：字卡→文字、音樂→音訊、從�
   await video.tap();
   await expectTab(page, '剪輯');
   await showTimeline(page);
+  await closePanel(page);
   await page.locator('[data-testid="clip"][data-kind="audio"]').first().tap();
   await expectTab(page, '音訊');
   // 疊加分頁加素材：自動選取新的，但分頁不變

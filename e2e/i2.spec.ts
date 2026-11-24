@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  closePanel,
   createProjectWith,
   isGreen,
   isRed,
@@ -34,6 +35,7 @@ test('轉場播放：接縫前後一路播過去，每個取樣點都有畫面�
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm', 'solid-green.webm']);
   await showTimeline(page);
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await page.getByRole('radio', { name: '轉場 疊化' }).tap();
   await page.getByLabel('轉場長度').fill('10');

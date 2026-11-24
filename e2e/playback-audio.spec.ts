@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createProjectWith, openTab, openTool, pressPlay, project } from './helpers';
+import { closePanel, createProjectWith, openTab, openTool, pressPlay, project } from './helpers';
 
 type Hook = {
   stats: () => { fps: number; renderMs: number };
@@ -56,6 +56,7 @@ test('影片聲音：播放時有聲音輸出；音量 0 就沒有；有 Audio S
 
   // 音量 0：播放時沒有聲音
   await page.getByRole('button', { name: '播放' }).waitFor();
+  await closePanel(page);
   await page.getByTestId('clip').first().tap();
   await openTab(page, '剪輯');
   await openTool(page, 'audio.volume');

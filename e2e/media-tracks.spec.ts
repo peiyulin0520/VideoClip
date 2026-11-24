@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   addOverlays,
   clips,
+  closePanel,
   createProjectWith,
   fixture,
   openLayerList,
@@ -79,6 +80,7 @@ test('刪除只刪這一段、留空位；空位裡的 ← 讓後面的往前接
   const starts = async () => (await tracks(page))[0]!.items.map((i) => Math.round(i.start * 10) / 10);
   expect(await starts()).toEqual([0, 2, 3.6]);
 
+  await closePanel(page);
   await clips(page).first().tap();
   await page.getByTestId('tool-edit.delete').tap();
   expect(await starts()).toEqual([2, 3.6]); // 後面的沒動，前面是空位
@@ -86,6 +88,7 @@ test('刪除只刪這一段、留空位；空位裡的 ← 讓後面的往前接
   await undo(page);
   expect(await starts()).toEqual([0, 2, 3.6]);
 
+  await closePanel(page);
   await clips(page).first().tap();
   await page.getByTestId('tool-edit.delete').tap();
   await page.getByTestId('gap').tap(); // 空位裡的 ←：後面的往前接上

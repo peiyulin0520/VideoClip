@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
   isGreen,
@@ -34,6 +35,7 @@ test('時間軸兩個緊接的片段中間有小圓圈（沒轉場是「＋」�
   await setup(page);
   await expect(page.getByTestId('tr-circle')).toHaveCount(1);
   await expect(page.getByTestId('tr-circle')).toHaveText('＋');
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await expect(page.getByTestId('tool-fx.seam')).toHaveClass(/active/); // 功能列跳到特效的〔轉場〕視窗
   await expect(page.getByTestId('effect-panel')).toBeVisible();
@@ -51,6 +53,7 @@ test('轉場畫面：疊化＝接縫是紅綠混色、閃黑＝全黑、閃白�
 }) => {
   test.setTimeout(120_000);
   await setup(page);
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await page.getByRole('radio', { name: '轉場 疊化' }).tap();
   await page.getByLabel('轉場長度').fill('8'); // 0.8 秒：4 秒的接縫前後各 0.4 秒
@@ -97,6 +100,7 @@ test('轉場畫面：疊化＝接縫是紅綠混色、閃黑＝全黑、閃白�
 
 test('轉場選單：分類、卡片上有 A→B 示意小動畫（不同時間畫面不同）、選到的粗外框', async ({ page }) => {
   await setup(page);
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await expect(page.getByRole('tab', { name: '相機動作' })).toBeVisible();
   await expect(page.getByRole('tab', { name: '故障' })).toBeVisible();
@@ -121,6 +125,7 @@ test('套用到這一軌全部銜接處；分割後轉場只留在前半；刪�
   await createProjectWith(page, ['solid-red.webm', 'solid-green.webm', 'solid-blue.webm']);
   await showTimeline(page);
   await expect(page.getByTestId('tr-circle')).toHaveCount(2);
+  await closePanel(page);
   await page.getByTestId('tr-circle').first().tap();
   await page.getByRole('radio', { name: '轉場 閃黑' }).tap();
   await page.getByRole('button', { name: '全部套用（這一軌所有銜接處）' }).tap();
@@ -144,6 +149,7 @@ test('匯出的轉場跟預覽一樣：左移、捲簾放下在接縫時的單�
 }) => {
   test.setTimeout(90_000);
   await setup(page);
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await page.getByRole('radio', { name: '轉場 左移' }).tap();
   await page.getByLabel('轉場長度').fill('8');

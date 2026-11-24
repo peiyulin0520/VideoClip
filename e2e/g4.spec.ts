@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   finishLayout,
   fixture,
@@ -198,6 +199,7 @@ test('整段效果：捲動——不同時間整組的位置不同（開頭在�
   await page.screenshot({ path: `${SHOT}/drift.png` });
   // 整段效果在特效分頁：選到整個版型（時間軸上的版型片段）→ 整段選「無」
   await showTimeline(page);
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${frame.id}"]`).tap();
   await openTab(page, '特效');
   await openTool(page, 'fx.whole');

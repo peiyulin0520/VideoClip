@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  closePanel,
   createProjectWith,
   finishLayout,
   fixture,
@@ -118,6 +119,7 @@ test('Y5 整段效果：任何影像都能用「捲動」——開頭在畫面�
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
   await showTimeline(page);
+  await closePanel(page);
   await page.locator('[data-testid="clip"]').first().tap();
   await openTab(page, '特效');
   await openTool(page, 'fx.whole');
