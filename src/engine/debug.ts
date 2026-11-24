@@ -10,6 +10,8 @@ import { lastImportErrors } from './importMedia';
 import { renderText, canvasFamily } from './textRender';
 import { kineticById, KINETIC, schemeOf } from './kinetic';
 import { paintKinetic } from './kinetic/render';
+import { holdTime } from './kinetic/hold';
+import { splitWords } from './kinetic/core';
 import type { Player } from './player';
 
 let editorRenders = 0;
@@ -116,6 +118,81 @@ export function installDebugHook(player: Player) {
           series.push(ink / (W * H));
         }
         return [{ id: def.id, cycle, series }];
+      }),
+    /**
+     * 測試用：每一式用給的文字（一段字串，照字卡的規則拆詞）算「停在最後」那一刻，畫兩張只差最後一個字的圖：
+     * 兩張不一樣＝最後一個字有被畫出來。回傳停點、一輪長度、最後一個字有沒有畫出來、停點的墨量與最後一輪裡的最大墨量。
+     */
+    kineticHoldCheck: (text: string) =>
+      KINETIC.map((def) => {
+        const words = splitWords(text);
+        const total = def.len(words);
+        const hold = holdTime(def, words);
+        const full = def.area === 'full';
+        const W = full ? 180 : 320;
+        const H = full ? 320 : 180;
+        const sch = schemeOf(def);
+        const mk = (ws: string[]) => ({
+          words: ws,
+          fg: sch.fg,
+          paper: sch.bg,
+          hi: sch.hi,
+          hifg: sch.hifg,
+          bg: sch.bg,
+          family: canvasFamily(''),
+        });
+        const swapLast = words.map((w, i) => {
+          if (i !== words.length - 1) return w;
+          const cs = Array.from(w);
+          cs[cs.length - 1] = '丑';
+          return cs.join('');
+        });
+        const draw = (ws: string[], t: number) => {
+          const c = document.createElement('canvas');
+          c.width = W;
+          c.height = H;
+          paintKinetic(c, def, mk(ws), Math.floor(t * 60 + 1e-6) / 60, def.fade ?? 'none');
+          return c.getContext('2d')!.getImageData(0, 0, W, H).data;
+        };
+        const diff = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
+          let n = 0;
+          for (let j = 0; j < a.length; j += 4)
+            if (
+              Math.abs(a[j]! - b[j]!) + Math.abs(a[j + 1]! - b[j + 1]!) + Math.abs(a[j + 2]! - b[j + 2]!) >
+              60
+            )
+              n++;
+          return n;
+        };
+        const bg = parseInt(sch.bg.slice(1), 16);
+        const ink = (d: Uint8ClampedArray) => {
+          let n = 0;
+          for (let j = 0; j < d.length; j += 4)
+            if (
+              Math.abs(d[j]! - ((bg >> 16) & 255)) +
+                Math.abs(d[j + 1]! - ((bg >> 8) & 255)) +
+                Math.abs(d[j + 2]! - (bg & 255)) >
+              90
+            )
+              n++;
+          return n / (W * H);
+        };
+        const lastDiff = diff(draw(words, hold), draw(swapLast, hold));
+        // 最後一個詞的每個字：換掉那一個字、畫面有沒有變（沒變＝那個字停點時沒畫出來）
+        const base = draw(words, hold);
+        const lastWord = Array.from(words[words.length - 1]!);
+        const perChar = lastWord.map((_, k) => {
+          const cs = lastWord.slice();
+          cs[k] = '丑';
+          return diff(base, draw([...words.slice(0, -1), cs.join('')], hold));
+        });
+        // 最後一輪（最後一個詞）裡的最大墨量；一直在跑的式子（total＝null）沒有一輪
+        let maxInk = 0;
+        if (total !== null) {
+          const last = def.len([words[words.length - 1]!])!;
+          for (let t = total - last; t <= total; t += 1 / 30) maxInk = Math.max(maxInk, ink(draw(words, t)));
+        }
+        return { id: def.id, hold, total, lastDiff, perChar, inkAtHold: ink(draw(words, hold)), maxInk };
       }),
     kineticList: () => KINETIC.map((f) => ({ id: f.id, zh: f.zh, group: f.group, poster: f.poster })),
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),

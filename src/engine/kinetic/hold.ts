@@ -62,6 +62,7 @@ export const HOLD_F: Record<string, number> = {
  * 一直在跑的那幾式（跑馬燈、環繞…沒有一輪的長度）沒有「最後」：跑到代表畫面（poster，卡片縮圖那一格，字讀得最清楚）就停。
  */
 export function holdTime(def: KineticDef, words: string[]): number {
+  if (def.hold) return def.hold(words);
   const total = def.len(words);
   const last = def.len([words[words.length - 1]!]);
   if (total === null || last === null) return def.poster;

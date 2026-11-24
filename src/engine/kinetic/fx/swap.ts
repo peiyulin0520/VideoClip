@@ -62,6 +62,8 @@ export const FX_SWAP: KineticDef[] = [
     words: ['即將抵達', '開往花蓮', '請勿奔跑'],
     poster: 2.6,
     len: (w) => 3.2 * w.length,
+    // 最後一個詞每一格牌都翻定了（第 i 格 0.35 + i×0.28 秒翻定）
+    hold: (w) => 3.2 * (w.length - 1) + 0.35 + (clamp(maxChars(w), 1, 7) - 1) * 0.28 + 0.3,
     draw(s, t) {
       const { g } = s;
       const n = clamp(maxChars(s.words), 1, 7);
@@ -111,7 +113,10 @@ export const FX_SWAP: KineticDef[] = [
     scheme: 'cobalt',
     words: ['春日限定', '夏夜特映', '秋季新番', '冬眠計畫'],
     poster: 1,
-    len: (w) => 1.5 + 0.5 + (clamp(maxChars(w), 1, 7) - 1) * 0.1 + 0.1,
+    // 每個詞一輪（翻到下一個詞）：總長是詞數 × 一輪
+    len: (w) => (1.5 + 0.5 + (clamp(maxChars(w), 1, 7) - 1) * 0.1 + 0.1) * w.length,
+    // 最後一個詞停著、還沒開始翻（1.5 秒才開始翻）
+    hold: (w) => (1.5 + 0.5 + (clamp(maxChars(w), 1, 7) - 1) * 0.1 + 0.1) * (w.length - 1) + 1.2,
     draw(s, t) {
       const { g } = s;
       const n = clamp(maxChars(s.words), 1, 7);
@@ -218,7 +223,13 @@ export const FX_SWAP: KineticDef[] = [
     scheme: 'verm',
     words: ['好運到', '大滿貫', '再一次'],
     poster: 3,
-    len: (w) => 1.0 + (clamp(maxChars(w), 1, 6) - 1) * 0.5 + 1.3,
+    // 每個詞一輪：每一欄依序停下來（最後一欄 1 + (n−1)×0.5 秒停），再閃一下
+    len: (w) => (1.0 + (clamp(maxChars(w), 1, 6) - 1) * 0.5 + 1.3) * w.length,
+    hold: (w) =>
+      (1.0 + (clamp(maxChars(w), 1, 6) - 1) * 0.5 + 1.3) * (w.length - 1) +
+      1.0 +
+      (clamp(maxChars(w), 1, 6) - 1) * 0.5 +
+      0.9,
     draw(s, t) {
       const { g } = s;
       const n = clamp(maxChars(s.words), 1, 6);

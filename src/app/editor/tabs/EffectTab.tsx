@@ -25,6 +25,7 @@ import {
 } from '../../../store/actions';
 import { KINETIC, KINETIC_GROUPS, kineticById, resolveBg, schemeOf } from '../../../engine/kinetic';
 import { kineticFrame } from '../../../engine/kinetic/hit';
+import { holdTime } from '../../../engine/kinetic/hold';
 import type { KineticDef, KineticGroup } from '../../../engine/kinetic/core';
 import { kineticWords } from '../../../engine/kinetic/render';
 import { TEXT_FXS } from '../../../engine/textFx';
@@ -360,6 +361,11 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
               </button>
             ))}
           </div>
+          {k.end === 'hold' && (
+            <div className="slider-label" data-testid="kn-hold-at">
+              停在 {(holdTime(def, words) / speed).toFixed(1)} 秒
+            </div>
+          )}
         </>
       </div>
     </div>

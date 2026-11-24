@@ -191,6 +191,8 @@ export const FX_HR: KineticDef[] = [
     words: ['你在看我', '我在看你'],
     poster: 2.4,
     len: (w) => 4.4 * w.length,
+    // 字還沒被換掉（0.65 秒起才開始換）
+    hold: (w) => 4.4 * (w.length - 1) + 0.5,
     draw(s, t) {
       const { W, H } = s;
       const D = 4.4;
@@ -273,6 +275,20 @@ export const FX_HR: KineticDef[] = [
     area: 'full',
     hit: [0, 0.3, 1, 0.4],
     len: (w) => 5 * w.length,
+    // 光圈剛好掃到字正中間的那一刻（光圈的 x 是時間的函式，在最後一個詞那一輪裡找最靠中間的）
+    hold: (w) => {
+      const a = 5 * (w.length - 1);
+      let best = a + 1;
+      let bestD = Infinity;
+      for (let t = a + 0.5; t <= a + 4.5; t += 0.02) {
+        const d = Math.abs(36 * Math.sin(t * 1.1) + 5 * Math.sin(t * 3.7));
+        if (d < bestD) {
+          bestD = d;
+          best = t;
+        }
+      }
+      return best;
+    },
     draw(s, t) {
       const { g, W, H, cqmin } = s;
       const D = 5;
