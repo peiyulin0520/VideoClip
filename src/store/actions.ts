@@ -969,7 +969,7 @@ export function applyLayoutShape(
   const H = p.height;
   const oldBox = fr.item.frameStyle?.box ?? { w: 1, h: 1 };
   const newBox = style.box ?? { w: 1, h: 1 };
-  const b = buildIn(defOf(style), W, H, style.box, style.line, style.cells);
+  const b = buildIn(defOf(style), W, H, style.box, style.line, style.cells, style.gap);
   const rs = b.panels.length ? b.panels : b.windows;
   const l = Math.min(...rs.map((r) => r.x));
   const tp = Math.min(...rs.map((r) => r.y));

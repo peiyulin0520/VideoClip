@@ -45,6 +45,7 @@ export function LayoutDiagram({
         style.box,
         style.line,
         style.cells,
+        style.gap,
       );
   }, [style, W, H]);
 

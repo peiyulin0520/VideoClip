@@ -226,6 +226,33 @@ describe('格子之間的框線粗細', () => {
   });
 });
 
+describe('分隔線粗細（只動格子之間，不動外框邊距）', () => {
+  const b0 = gridDef(1, 2).build(1000, 1000);
+  const gapOf = (b: typeof b0) => b.windows[1]!.x - (b.windows[0]!.x + b.windows[0]!.w);
+  const margin = (b: typeof b0) => b.windows[0]!.x - b.panels[0]!.x;
+  it('只給分隔線 3 倍：空隙變 3 倍、外框邊距不變；給 0＝貼在一起但邊距還在', () => {
+    const t = applyLineScale(b0, 1, 3);
+    expect(gapOf(t)).toBeCloseTo(gapOf(b0) * 3, 3);
+    expect(margin(t)).toBeCloseTo(margin(b0), 3);
+    const z = applyLineScale(b0, 1, 0);
+    expect(gapOf(z)).toBeCloseTo(0, 3);
+    expect(margin(z)).toBeCloseTo(margin(b0), 3);
+  });
+  it('整體 2 倍、分隔線單獨設 1 倍：邊距 2 倍、分隔線不變；沒給分隔線＝跟整體一樣', () => {
+    const t = applyLineScale(b0, 2, 1);
+    expect(margin(t)).toBeCloseTo(margin(b0) * 2, 3);
+    expect(gapOf(t)).toBeCloseTo(gapOf(b0), 3);
+    expect(gapOf(applyLineScale(b0, 2))).toBeCloseTo(gapOf(b0) * 2, 3);
+  });
+  it('buildIn 傳 gap；上限 3 倍', () => {
+    expect(gapOf(buildIn(gridDef(1, 2), 1000, 1000, undefined, 1, undefined, 2))).toBeCloseTo(
+      gapOf(b0) * 2,
+      3,
+    );
+    expect(gapOf(applyLineScale(b0, 1, 99))).toBeCloseTo(gapOf(b0) * LINE_MAX, 3);
+  });
+});
+
 describe('自訂每一格的範圍（拖格子大小）', () => {
   it('buildIn 有 cells 且格數對＝格子照 cells（比例 × 畫面）、外框底板不動；格數不對就忽略', () => {
     const d = gridDef(1, 2);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { GRID_MAX, LINE_MAX, buildIn, defOf, hasFrameLine } from '../../../engine/layouts';
+import { GRID_MAX, LINE_MAX, buildIn, cellGap, defOf, hasFrameLine } from '../../../engine/layouts';
 import { Slider } from '../../../ui/Slider';
 import type { Project, VideoItem } from '../../../model/types';
 import { useUI } from '../../../store/uiStore';
@@ -84,6 +84,16 @@ function FrameBlock({ project, group, frame }: { project: Project; group: string
       ) && (
         <LineSlider key={`${frame.frameStyle.line ?? 1}`} group={group} line={frame.frameStyle.line ?? 1} />
       )}
+      {cellGap(
+        buildIn(defOf(frame.frameStyle), project.width, project.height, frame.frameStyle.box).windows,
+      ) !== undefined && (
+        <LineSlider
+          key={`gap-${frame.frameStyle.gap ?? frame.frameStyle.line ?? 1}`}
+          group={group}
+          line={frame.frameStyle.gap ?? frame.frameStyle.line ?? 1}
+          only="gap"
+        />
+      )}
     </div>
   );
 }
@@ -141,13 +151,13 @@ function PlayControls({ frame }: { frame: VideoItem }) {
 }
 
 /** 格子之間框線的粗細：0%（沒有框線）～300%；停下來 0.4 秒才重畫外框（每次重畫都是一張新的外框圖） */
-function LineSlider({ group, line }: { group: string; line: number }) {
+function LineSlider({ group, line, only }: { group: string; line: number; only?: 'gap' }) {
   const [v, setV] = useState(Math.round(line * 100));
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   return (
     <Slider
-      label="格子框線粗細"
+      label={only === 'gap' ? '分隔線粗細' : '格子框線粗細'}
       value={v}
       min={0}
       max={LINE_MAX * 100}
@@ -156,7 +166,15 @@ function LineSlider({ group, line }: { group: string; line: number }) {
       onChange={(n) => {
         setV(n);
         window.clearTimeout(timer.current);
-        timer.current = window.setTimeout(() => void reshapeLayout(group, { line: n / 100 }), 400);
+        timer.current = window.setTimeout(
+          () =>
+            void reshapeLayout(
+              group,
+              // 整體粗細：分隔線跟著一起變（清掉單獨設的分隔線粗細）；分隔線粗細：只動格子之間
+              only === 'gap' ? { gap: n / 100 } : { line: n / 100, gap: undefined },
+            ),
+          400,
+        );
       }}
     />
   );
@@ -224,6 +242,7 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
                 style.box,
                 style.line,
                 style.cells,
+                style.gap,
               );
               useUI.setState({
                 cellEdit: {
