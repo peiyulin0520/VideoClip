@@ -8,12 +8,14 @@ import { Editor } from './pages/Editor';
 import { Home } from './pages/Home';
 import { Settings } from './pages/Settings';
 import { Welcome } from './Welcome';
+import { useAppHeight } from './useAppHeight';
 import { Placeholder } from './pages/Placeholder';
 
 // HashRouter：GitHub Pages 是子路徑（/VideoClip/），用 #/ 路由才不會 404。
 export function App() {
   const loaded = useApp((s) => s.loaded);
   const onboarded = useApp((s) => s.state.onboarded);
+  useAppHeight();
   useEffect(() => {
     void useApp.getState().init();
     void initFonts();

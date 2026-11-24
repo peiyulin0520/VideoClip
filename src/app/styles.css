@@ -487,7 +487,7 @@ button {
   --proj-aspect: 0.5625; /* 專案版面寬 ÷ 高（Editor 依專案設定） */
   display: flex;
   flex-direction: column;
-  height: 100svh;
+  height: var(--app-h, 100svh);
   overflow: hidden;
 }
 .ed-top {
@@ -528,8 +528,8 @@ button {
      用 svh：Safari 網址列伸縮時不會抖 */
   --stage-cap: min(
     calc(100vw * 16 / 9),
-    calc(100svh - var(--top-h) - var(--playbar-h) - var(--tabbar-h) - 96px),
-    calc(100svh * 0.54)
+    calc(var(--app-h, 100svh) - var(--top-h) - var(--playbar-h) - var(--tabbar-h) - 96px),
+    calc(var(--app-h, 100svh) * 0.54)
   );
   height: max(180px, min(var(--stage-cap), calc(100vw / var(--proj-aspect) * 1.12)));
   display: flex;
@@ -980,6 +980,10 @@ button {
   padding: 10px 16px calc(12px + var(--safe-bottom));
   background: var(--panel);
 }
+/* 升起的視窗下面就是功能列（功能列自己已經留了 Home 橫條的位置），視窗內容底下不要再留一次 */
+.ps-body .panel {
+  padding-bottom: 8px;
+}
 .panel-head {
   display: flex;
   justify-content: space-between;
@@ -1062,7 +1066,7 @@ button {
   z-index: 30;
   display: flex;
   flex-direction: column;
-  max-height: min(56svh, calc(100svh - var(--top-h) - 160px));
+  max-height: min(calc(var(--app-h, 100svh) * 0.56), calc(var(--app-h, 100svh) - var(--top-h) - 160px));
   background: var(--panel);
   border-top: 1px solid var(--line);
   border-radius: 14px 14px 0 0;
@@ -1130,6 +1134,8 @@ button {
 }
 .fb-row .tool {
   height: auto;
+  /* 跟第一層的類別同一個字級 */
+  font-size: var(--fs-note);
 }
 .bottombar .toolbar {
   padding-bottom: 6px;
@@ -3518,7 +3524,7 @@ button:not(:disabled):active,
   left: 0;
   right: 0;
   z-index: 60;
-  height: 100svh;
+  height: var(--app-h, 100svh);
   display: flex;
   flex-direction: column;
   gap: 6px;
