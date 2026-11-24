@@ -1,6 +1,6 @@
 # 交接手冊（HANDOFF）
 
-給接手的 AI／工程師。**目前的總規劃與順序看 `docs/plans/2026-11-23-roadmap-ui.md`（2026-11-23 定案；U1–U5 已做完，**下一步 U6 功能列每一項一顆按鈕：`docs/plans/2026-11-23-u6-function-bar.md`**，做完才修 e2e、給 PR）。**先讀 `AGENTS.md`（規則）和 `docs/PROGRESS.md`（目前狀態），這份補上「為什麼這樣做」和「程式在哪裡」。
+給接手的 AI／工程師。**目前的總規劃與順序看 `docs/plans/2026-11-23-roadmap-ui.md`（2026-11-23 定案；U1–U6 程式都做完了（U6 見 `docs/plans/2026-11-23-u6-function-bar.md`），**下一步把 e2e 改成新行為、給 PR**）。**先讀 `AGENTS.md`（規則）和 `docs/PROGRESS.md`（目前狀態），這份補上「為什麼這樣做」和「程式在哪裡」。
 **接手時可以直接對 ChatGPT 等說：**
 > 請先讀 repo 根目錄的 AGENTS.md，再讀 docs/PROGRESS.md 最上面的「交接快照」和 docs/HANDOFF.md，然後從「下一步」繼續。每做完一步都要照 AGENTS.md 的「紀錄規則」更新紀錄、commit 並 push。
 
@@ -240,3 +240,9 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **鎖定／全螢幕**：`useUI.previewLock`／`previewFull`（`Preview` 卸載時重設）；鎖定在 `Preview.onPointerDown` 最前面擋；全螢幕進度條 `ProgressBar.tsx`。
 - **字級**：類別按鈕用 `--fs-note`，其餘仍是 `--fs-body`；不要在新元件寫死 px。
 - **沒有說明小字**：使用者偏好（網頁式、簡潔）；空狀態一句提示可以，教學文字不要。
+
+## U6 功能列每一項一顆按鈕（2026-11-24）新增的東西（給下一位）
+- **工具表**：`src/app/editor/tools.tsx` 的 `TOOLS`（類別 → 按鈕清單）是功能列的唯一來源：加／改按鈕只動這張表。每顆有 `id`（e2e 用 `data-testid="tool-<id>"`）、`zone`（換區畫細線）、`kind`（popup 升起視窗／action 直接執行／toggle 切換）、`enabled`＋`need`（不能用時變淡、點了 toast）、`guard`（能用但不適合的提示）、`badge`（圖示那格顯示目前的值）、`popup`（視窗內容；`bare` 表示它自己就是 Sheet）、`custom`（自己畫按鈕：關鍵格 `KeyframeButton`、看原色 `GradePeekButton`）。
+- **視窗內容**：不要再做分段切換列；每個視窗只放一項（`TextTab section`、`EffectTab part`、`LayoutTab part`、`ColorTab part`、`ClipPanel panel`）。小視窗即時生效、✕ 關閉，不加〔套用〕（會大改東西的 Sheet 例外）。
+- **選到東西跳類別**：`Toolbar.tsx` 的 `targetForSelection`；`requestTab`（時間軸特效圓圈等）由 `requestTarget` 對到類別＋視窗（特效看 `fxFocus.role`）。
+- **e2e**：`helpers.ts` 的 `openCat`／`openTool`（用工具 id）、`openTab`（舊名稱對照）；視窗開著會蓋住播放列、時間軸，點之前先 `closePanel`；剪輯／加入／文字／版型…的按鈕只在那個類別的工具列顯示。
