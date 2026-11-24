@@ -59,11 +59,11 @@ export const HOLD_F: Record<string, number> = {
 
 /**
  * 這一式停在最後畫面的時間（秒，字卡自己的時間 × 速度之後）：最後一個詞那一輪裡「字完整呈現」的那一刻。
- * 一直在跑的那幾式（沒有一輪的長度）回傳 null：沒有「最後」。
+ * 一直在跑的那幾式（跑馬燈、環繞…沒有一輪的長度）沒有「最後」：跑到代表畫面（poster，卡片縮圖那一格，字讀得最清楚）就停。
  */
-export function holdTime(def: KineticDef, words: string[]): number | null {
+export function holdTime(def: KineticDef, words: string[]): number {
   const total = def.len(words);
   const last = def.len([words[words.length - 1]!]);
-  if (total === null || last === null) return null;
+  if (total === null || last === null) return def.poster;
   return Math.max(0, total - last) + (HOLD_F[def.id] ?? 0.5) * last;
 }

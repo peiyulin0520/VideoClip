@@ -210,7 +210,6 @@ export function LayoutPicker() {
               確定，加在 {formatTime(time)}
             </button>
           </div>
-          <p className="hint">拖播放線選秒數；加好後在播放軸展開版型，各格按 ＋ 放素材。</p>
         </div>
       )}
     </>

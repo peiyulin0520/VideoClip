@@ -269,14 +269,14 @@ describe('動態字卡：副標、停在最後畫面', () => {
     // 沒有副標可改的式子沒有 sub
     expect(kineticById('cube')!.sub).toBeUndefined();
   });
-  it('holdTime：最後一個詞那一輪裡字完整呈現的那一刻；一直在跑的式子（跑馬燈）沒有', async () => {
+  it('holdTime：最後一個詞那一輪裡字完整呈現的那一刻；一直在跑的式子（跑馬燈）停在代表畫面', async () => {
     const { holdTime, HOLD_F } = await import('./hold');
     const vpop = kineticById('vpop')!; // 每個詞 2.2 秒
     expect(holdTime(vpop, ['a', 'b', 'c'])).toBeCloseTo(4.4 + HOLD_F.vpop! * 2.2, 6);
     expect(holdTime(vpop, ['a'])).toBeCloseTo(HOLD_F.vpop! * 2.2, 6);
     const emph = kineticById('emph')!; // 兩個詞一組、一組 2.8 秒
     expect(holdTime(emph, ['a', 'b', 'c', 'd'])).toBeCloseTo(2.8 + HOLD_F.emph! * 2.8, 6);
-    expect(holdTime(kineticById('crawl')!, ['a'])).toBeNull();
+    expect(holdTime(kineticById('crawl')!, ['a'])).toBe(kineticById('crawl')!.poster); // 一直在跑的：停在代表畫面
     // 每一式（一輪有長度的）都有停點、在最後一輪裡面
     for (const f of KINETIC) {
       const w = f.words;

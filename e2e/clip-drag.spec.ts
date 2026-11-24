@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addOverlays, createProjectWith, openTab, project, showTimeline } from './helpers';
+import { addOverlays, createProjectWith, openTab, project, showTimeline, undo } from './helpers';
 
 // 2026-11-12 使用者：「直接在拖拉軸長按拖移各種素材到不同圖層及不同位置……影像只能放影像、音效只能放音效、字卡只能放字卡」
 
@@ -8,16 +8,22 @@ type Tr = { id: string; kind: string; items: { id: string; start: number; durati
 const tracks = async (page: Page) => (await project(page)).tracks as unknown as Tr[];
 
 async function rowCenter(page: Page, trackId: string) {
-  const b = (await page.locator(`[data-testid="track"][data-track-id="${trackId}"]`).boundingBox())!;
+  const row = page.locator(`[data-testid="track"][data-track-id="${trackId}"]`);
+  await row.scrollIntoViewIfNeeded(); // 時間軸在自己的區塊裡捲動（軌道多就看不到下面幾條）
+  const b = (await row.boundingBox())!;
   return b.y + b.height / 2;
 }
 /** 軌道上緣往下 offset px（軌道變矮之後，放置區把列推下來的位置離按下去的點不到 12px，所以點靠上緣一點） */
 async function rowTop(page: Page, trackId: string, offset: number) {
-  const b = (await page.locator(`[data-testid="track"][data-track-id="${trackId}"]`).boundingBox())!;
+  const row = page.locator(`[data-testid="track"][data-track-id="${trackId}"]`);
+  await row.scrollIntoViewIfNeeded();
+  const b = (await row.boundingBox())!;
   return b.y + offset;
 }
 async function clipCenter(page: Page, itemId: string) {
-  const b = (await page.locator(`[data-testid="clip"][data-item-id="${itemId}"]`).boundingBox())!;
+  const clip = page.locator(`[data-testid="clip"][data-item-id="${itemId}"]`);
+  await clip.scrollIntoViewIfNeeded();
+  const b = (await clip.boundingBox())!;
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 /** 長按 → 移到 (x, y) → （可先檢查）→ 放開 */
@@ -55,7 +61,7 @@ test('長按影像片段拖到另一條影像軌、時間往右：換軌道、�
   const moved = after[1]!.items.find((i) => i.id === clipA)!;
   expect(moved.start).toBeGreaterThan(4.5); // 影像 2 的綠色 0–4 秒，所以放在後面的空位
 
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const undone = await tracks(page);
   expect(undone[0]!.items.map((i) => i.id)).toEqual([clipA]);
   expect(undone[0]!.items[0]!.start).toBe(0);
@@ -64,7 +70,7 @@ test('長按影像片段拖到另一條影像軌、時間往右：換軌道、�
 test('影像片段拖到字卡軌：變灰、放開彈回原位並提示「只能放在…的軌道上」', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   const [media, text] = await tracks(page);
   const clipA = media!.items[0]!.id;
   await showTimeline(page);

@@ -1,38 +1,12 @@
-import { addText } from '../../../store/actions';
-import { useUI } from '../../../store/uiStore';
-import { AddToGroupToggle } from '../AddToGroupToggle';
-import { TextPanel } from '../TextPanel';
+import { TextPanel, type TextSection } from '../TextPanel';
 import type { Found } from './shared';
 
-export function TextTab({ found }: { found: Found }) {
-  const player = useUI((s) => s.player);
+/** 文字工具列每一項的視窗：只畫那一段（內容、版面、字塊、描邊陰影、裝飾）。 */
+export function TextTab({ found, section }: { found: Found; section: TextSection }) {
   const item = found?.item.type === 'text' ? found.item : null;
-  const add = () => addText(player?.time ?? 0);
   return (
     <div className="panel text-panel">
-      <AddToGroupToggle what="新增的文字" />
-      {item ? (
-        <>
-          <>
-            {item.group && (
-              <p className="hint" data-testid="group-text-hint">
-                這是版型的文字：內容、字體都可以改，位置、大小、進出場跟著整個版型。
-              </p>
-            )}
-            <TextPanel item={item} onAdd={add} onAddShape={() => addText(player?.time ?? 0, true)} />
-          </>
-        </>
-      ) : (
-        <>
-          <button className="btn primary done" onClick={add}>
-            ＋ 新增文字（放在目前這一秒）
-          </button>
-          <button className="btn done" onClick={() => addText(player?.time ?? 0, true)}>
-            ＋ 新增圖形（星形、對話框、雲朵…）
-          </button>
-          <p className="hint">新增或點選一個文字後，可以在這裡改內容、字體、字塊和描邊。</p>
-        </>
-      )}
+      {item ? <TextPanel item={item} only={section} /> : <p className="hint">先點選一段文字</p>}
     </div>
   );
 }

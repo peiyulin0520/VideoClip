@@ -1,5 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, fixture, openTab, project, showTimeline } from './helpers';
+import {
+  clips,
+  closePanel,
+  createProjectWith,
+  fixture,
+  openCat,
+  openTab,
+  openTool,
+  project,
+  showTimeline,
+  undo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g3';
 type It = {
@@ -51,9 +62,10 @@ test('修剪面板：沒有兩側拉霸，上方有小旗標（1起／1迄）；
 }) => {
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
   await showTimeline(page);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
+  await page.getByTestId('tool-edit.trim').tap();
   await expect(page.getByTestId('range-flag-start-0')).toBeVisible();
   await expect(page.getByTestId('range-flag-end-0')).toBeVisible();
   await expect(page.getByTestId('range-flag-start-0')).toContainText('1起');
@@ -80,9 +92,10 @@ test('修剪面板：再加一段（多段）→ 完成後拆成兩個片段，�
 }) => {
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
   await showTimeline(page);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
+  await page.getByTestId('tool-edit.trim').tap();
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
   await drag(page, 'range-flag-end-0', -strip.width * 0.75); // 留 [0, 1]
   await clickStrip(page, 0.5); // 白線移到 2 秒
@@ -100,31 +113,33 @@ test('修剪面板：再加一段（多段）→ 完成後拆成兩個片段，�
   expect(items[1]!.trimIn).toBeCloseTo(2, 1);
   expect(items[1]!.duration).toBeCloseTo(1, 1);
   await expect(page.locator('.toast').filter({ hasText: '已拆成 2 段' })).toBeVisible();
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await tracks(page))[0]!.items).toHaveLength(1);
 });
 
-test('音訊分頁：列出專案裡所有聲音（影片原音＋背景音樂）；關掉某一個；分離原音後匯出仍然有聲音', async ({
-  page,
-}) => {
+test('音訊工具列：影片原音的音量關掉再打開；分離原音後匯出仍然有聲音', async ({ page }) => {
   test.setTimeout(150_000);
   await createProjectWith(page, ['clip-a.webm']); // 有聲音（440Hz）2 秒
-  await openTab(page, '音訊');
+  await openCat(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
   await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
-  const rows = page.getByTestId('audio-row');
-  await expect(rows).toHaveCount(2);
+  const video = page.locator('[data-testid="clip"][data-kind="video"]').first();
+  const music = page.locator('[data-testid="clip"][data-kind="audio"]').first();
+  await closePanel(page);
   await page.screenshot({ path: `${SHOT}/audio-tab.png` });
 
   // 關掉影片原音 → volume 0；再打開
-  await page.getByRole('switch', { name: /保留聲音 影片/ }).tap();
+  await video.tap();
+  await expect(page.getByRole('toolbar', { name: '剪輯' })).toBeVisible(); // 選到影片：功能列自動跳到〔剪輯〕，等它跳完
+  await openCat(page, '音訊');
+  await openTool(page, 'audio.volume');
+  await page.getByRole('button', { name: '關閉聲音' }).tap();
   expect((await tracks(page))[0]!.items[0]!.volume).toBe(0);
-  await page.getByRole('switch', { name: /保留聲音 影片/ }).tap();
+  await page.getByRole('button', { name: '音量 100%' }).tap();
   expect((await tracks(page))[0]!.items[0]!.volume).toBeGreaterThan(0);
 
-  // 音樂關掉：匯出只剩影片原音（前 2 秒有 440Hz，之後沒有）
   // 分離原音：音樂軌多一段（指向同一個影片素材）、影片靜音；匯出聲音還在
-  await page.getByRole('button', { name: /分離原音 影片/ }).tap();
+  await openTool(page, 'audio.split');
   await expect(page.locator('.toast').filter({ hasText: '原音已分離' })).toBeVisible();
   const tr = await tracks(page);
   expect(tr[0]!.items[0]!.volume).toBe(0);
@@ -135,7 +150,10 @@ test('音訊分頁：列出專案裡所有聲音（影片原音＋背景音樂�
   expect(audio).toHaveLength(1);
   expect(audio[0]!.duration).toBeCloseTo(tr[0]!.items[0]!.duration, 2);
   // 把背景音樂也關掉，只量分離出來的原音
-  await page.getByRole('switch', { name: /保留聲音 ♪ music-4s/ }).tap();
+  await closePanel(page);
+  await music.tap();
+  await openTool(page, 'audio.volume');
+  await page.getByRole('button', { name: '關閉聲音' }).tap();
   const out = await inspect(page);
   expect(out.hasAudio).toBe(true);
   expect(Math.max(...out.audioPeaks.slice(0, 2))).toBeGreaterThan(0.05);

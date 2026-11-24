@@ -1,9 +1,22 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, exportFrame, openTab, project, samplePreview, seekTo } from './helpers';
+import {
+  clips,
+  closePanel,
+  openCat,
+  createProjectWith,
+  exportFrame,
+  openLayerList,
+  openTab,
+  openTool,
+  project,
+  samplePreview,
+  seekTo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
 
 async function nameFirstClip(page: Page, name: string) {
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   await page.getByRole('button', { name: '命名', exact: true }).tap();
@@ -12,27 +25,28 @@ async function nameFirstClip(page: Page, name: string) {
   await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
 }
 
-test('X1-1 播放列按鈕叫「定格」；整個頁面看不到「定位」', async ({ page }) => {
+test('X1-1 剪輯工具列按鈕叫「關鍵格」；整個頁面看不到「定位」', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
-  await expect(page.getByTestId('kf-btn')).toContainText('定格');
+  await closePanel(page);
   await clips(page).first().tap();
+  await openTab(page, '剪輯');
+  await expect(page.getByTestId('kf-btn')).toContainText('關鍵格');
   await openTab(page, '圖層');
-  await expect(page.getByTestId('kf-panel')).toContainText('定格細部調整');
+  await expect(page.getByTestId('kf-panel')).toContainText('關鍵格細部調整');
   await expect(page.locator('body')).not.toContainText('定位');
 });
 
-test('X1-2 有命名的素材：圖層清單、音訊分頁、分離原音都用命名；分離後改影片名稱不會跟著變', async ({
-  page,
-}) => {
+test('X1-2 有命名的素材：圖層清單、分離原音都用命名；分離後改影片名稱不會跟著變', async ({ page }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm']);
   await nameFirstClip(page, '測試一');
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await expect(page.getByTestId('layer-row').first()).toContainText('測試一');
   await expect(page.getByTestId('layer-list')).not.toContainText('.webm');
-  await openTab(page, '音訊');
-  await expect(page.getByTestId('audio-row').first()).toContainText('原音 · 1 測試一');
-  await page.getByRole('button', { name: /分離原音 測試一/ }).tap();
+  await closePanel(page);
+  await clips(page).first().tap();
+  await openCat(page, '音訊');
+  await page.getByTestId('tool-audio.split').tap();
   const items = async () =>
     (await project(page)).tracks.flatMap((t) => t.items) as unknown as { type: string; label?: string }[];
   await expect.poll(async () => (await items()).find((i) => i.type === 'audio')?.label).toBe('測試一 原音');
@@ -46,10 +60,7 @@ test('X1-3 新文字是空的、輸入框有淺灰提示字；預覽有半透明
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   const input = page.getByLabel('文字內容');
   await expect(input).toHaveValue('');
   await expect(input).toHaveAttribute('placeholder', '點兩下編輯文字');
@@ -92,6 +103,7 @@ test('X1-3 新文字是空的、輸入框有淺灰提示字；預覽有半透明
 test('X1-4 按鈕、選單、輸入框都是圓角，不是膠囊（圓形白名單：圓點、＋、播放鍵）', async ({ page }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   const bad: string[] = [];
   for (const tab of ['剪輯', '疊加', '文字', '圖層', '版型', '特效', '色調', '素材', '音訊'] as const) {
@@ -116,12 +128,16 @@ test('X1-4 按鈕、選單、輸入框都是圓角，不是膠囊（圓形白名
   expect(bad).toEqual([]);
 });
 
-test('X1-6 再點一次目前的分頁，面板不會收合', async ({ page }) => {
+test('X1-6 再點一次〔色調組合〕：升起的視窗收起來；再點又升起來', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
-  await openTab(page, '色調');
+  await closePanel(page);
   await clips(page).first().tap();
+  await openTab(page, '色調');
   await expect(page.getByTestId('color-panel')).toBeVisible();
-  await page.locator('.tabs').getByRole('tab', { name: '色調', exact: true }).tap();
+  const tab = page.getByTestId('tool-color.look');
+  await tab.tap();
+  await expect(page.getByTestId('color-panel')).toHaveCount(0);
+  await tab.tap();
   await expect(page.getByTestId('color-panel')).toBeVisible();
 });
 
@@ -130,9 +146,10 @@ test('X1-7/8/9/10 片段範圍視窗：圖示播放鈕、秒數等寬、播放�
 }) => {
   test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
+  await page.getByTestId('tool-edit.trim').tap();
   const play = page.getByTestId('rm-play');
   await expect(play.locator('svg')).toHaveCount(1);
   expect(((await play.innerText()) ?? '').trim()).toBe('');
@@ -168,9 +185,12 @@ test('X1-7/8/9/10 片段範圍視窗：圖示播放鈕、秒數等寬、播放�
 
 test('X1-12 色調卡片名稱都在一行裡', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '色調');
+  await openTool(page, 'color.look');
   await expect(page.getByTestId('look-card')).toHaveCount(10);
+  await openTool(page, 'color.look');
   const lines = await page.getByTestId('look-card').evaluateAll((els) =>
     els.map((el) => {
       const rg = document.createRange();
@@ -179,6 +199,7 @@ test('X1-12 色調卡片名稱都在一行裡', async ({ page }) => {
     }),
   );
   for (const n of lines) expect(n).toBe(1);
+  await openTool(page, 'color.look');
   await expect(page.getByRole('radio', { name: '色調 高反差' })).toBeVisible();
 });
 
@@ -188,7 +209,9 @@ for (const w of WIDTHS) {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: w, height: 844 });
     await createProjectWith(page, ['solid-red.webm']);
+    await closePanel(page);
     await clips(page).first().tap();
+    await expect(page.getByTestId('fb-tools')).toBeVisible(); // 選到影片後功能列自動跳到〔剪輯〕，等它跳完再逐一切換
     const problems: string[] = [];
     const scan = async (where: string) => {
       const r = await page.evaluate(() => {
@@ -239,11 +262,15 @@ for (const w of WIDTHS) {
             if (h.scrollWidth > h.clientWidth + 1 && !inScrollRow) out.push(`字被截 ${label}`);
           }
         }
-        const tabs = document.querySelector('.tabs') as HTMLElement;
-        if (tabs.scrollWidth > tabs.clientWidth + 1)
+        const tabs = document.querySelector('.tabs') as HTMLElement | null;
+        if (tabs && tabs.scrollWidth > tabs.clientWidth + 1)
           out.push(`分頁列放不下 ${tabs.scrollWidth}>${tabs.clientWidth}`);
-        // 字級統一：分頁、按鈕、chip、卡片名稱同一個大小
-        const tabFs = parseFloat(getComputedStyle(document.querySelector('.tab')!).fontSize);
+        // 字級統一：按鈕、chip、卡片名稱同一個大小（＝內文字級 --fs-body）
+        const probe = document.createElement('i');
+        probe.style.fontSize = 'var(--fs-body)';
+        document.body.appendChild(probe);
+        const tabFs = parseFloat(getComputedStyle(probe).fontSize);
+        probe.remove();
         for (const el of Array.from(
           document.querySelectorAll(
             '.bottombar .btn, .bottombar .chip, .bottombar .chip3, .bottombar .look-card span',
@@ -265,14 +292,16 @@ for (const w of WIDTHS) {
       await openTab(page, tab);
       await scan(tab);
     }
+    // 第一層的類別字級（--fs-note）是內文的 0.86 倍
+    await page
+      .getByTestId('fb-back')
+      .tap()
+      .catch(() => undefined);
     const fs = await page.evaluate(() => ({
-      btn: parseFloat(
-        getComputedStyle(document.querySelector('.bottombar .btn, .bottombar .chip, .tab')!).fontSize,
-      ),
       tab: parseFloat(getComputedStyle(document.querySelector('.tab')!).fontSize),
     }));
-    if (w === 320) expect(fs.tab).toBeCloseTo(12, 0);
-    if (w >= 390) expect(fs.tab).toBeCloseTo(14, 0);
+    if (w === 320) expect(fs.tab).toBeCloseTo(12 * 0.86, 0);
+    if (w >= 390) expect(fs.tab).toBeCloseTo(14 * 0.86, 0);
     expect(problems).toEqual([]);
   });
 }

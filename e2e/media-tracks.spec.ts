@@ -1,5 +1,16 @@
 import { expect, test } from '@playwright/test';
-import { addOverlays, clips, createProjectWith, fixture, openTab, project, showTimeline } from './helpers';
+import {
+  addOverlays,
+  clips,
+  closePanel,
+  createProjectWith,
+  fixture,
+  openLayerList,
+  openTab,
+  project,
+  showTimeline,
+  undo,
+} from './helpers';
 
 // 2026-11-12：主軌與疊加合併成「影像軌」；影像／特效／字卡／音訊分區；刪除並補齊；舊專案（v1）自動轉換
 
@@ -18,7 +29,7 @@ test('舊專案（v1：主軌＋疊加，字卡在疊加下面）打開後自動
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
   await addOverlays(page, ['solid-green.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   const before = await tracks(page);
   expect(before.map((t) => t.kind)).toEqual(['media', 'media', 'text']);
   const startsBefore = before.flatMap((t) => t.items.map((i) => i.start));
@@ -64,22 +75,27 @@ test('舊專案（v1：主軌＋疊加，字卡在疊加下面）打開後自動
   await expect(page.locator('.toast').filter({ hasText: '圖層順序已經調整' })).toBeVisible();
 });
 
-test('刪除只刪這一段、留空位；刪除並補齊讓後面的往前接；都是一步復原', async ({ page }) => {
+test('刪除只刪這一段、留空位；空位裡的 ← 讓後面的往前接；都是一步復原', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm', 'clip-c.webm']); // 2 + 1.6 + 3 秒
   const starts = async () => (await tracks(page))[0]!.items.map((i) => Math.round(i.start * 10) / 10);
   expect(await starts()).toEqual([0, 2, 3.6]);
 
+  await closePanel(page);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   expect(await starts()).toEqual([2, 3.6]); // 後面的沒動，前面是空位
   await expect(page.getByTestId('gap')).toHaveCount(1); // 開場留白的虛線框
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect(await starts()).toEqual([0, 2, 3.6]);
 
+  await closePanel(page);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '刪除並補齊', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
+  await page.getByTestId('gap').tap(); // 空位裡的 ←：後面的往前接上
   expect(await starts()).toEqual([0, 1.6]);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page); // 補齊空白是一步：復原回到「刪除後、還有空位」
+  expect(await starts()).toEqual([2, 3.6]);
+  await undo(page);
   expect(await starts()).toEqual([0, 2, 3.6]);
 });
 
@@ -91,7 +107,7 @@ test('軌道預設順序：新增字卡、音樂、影像後是 影像 → 字�
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
   await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await addOverlays(page, ['solid-green.webm']); // 最後加的影像軌：仍在字卡下面
   await addOverlays(page, ['solid-blue.webm']);
   expect((await tracks(page)).map((t) => t.kind)).toEqual(['media', 'media', 'media', 'text', 'audio']);
@@ -104,7 +120,7 @@ test('軌道預設順序：新增字卡、音樂、影像後是 影像 → 字�
   expect(kinds).toEqual(['text', 'media', 'media', 'media', 'audio']);
 
   // 圖層分頁（X9）：最上面那條影像軌往上一層＝換到字卡上面（跨類別）；再往上一層＝已經最上面
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await page.getByRole('button', { name: '影像 3 往上一層' }).tap();
   expect((await tracks(page)).map((t) => t.kind)).toEqual(['media', 'media', 'text', 'media', 'audio']);
   await page.getByRole('button', { name: '影像 3 往上一層' }).tap();
@@ -127,7 +143,7 @@ test('每一條影像軌地位一樣：最下面那條也能往上換、能放�
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
   const [base, over] = await tracks(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   // 原本的「主軌」（影像 1）也有往上一層
   await page.getByRole('button', { name: '影像 1 往上一層' }).tap();
   const swapped = await tracks(page);

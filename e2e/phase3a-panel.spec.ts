@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { countColor, createProjectWith, legacyBox, openTab, project } from './helpers';
+import { countColor, createProjectWith, legacyBox, openTab, openTool, project } from './helpers';
 
 const SHOT = 'docs/screenshots/phase3a';
 
@@ -33,12 +33,19 @@ const setRange = (page: Page, label: string, v: number) =>
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, v);
 
-const section = (page: Page, name: string) => page.getByRole('tab', { name, exact: true }).tap();
+const SECTION_TOOL: Record<string, string> = {
+  文字: 'text.content',
+  版面: 'text.layout',
+  字塊: 'text.box',
+  描邊陰影: 'text.stroke',
+  裝飾: 'text.deco',
+};
+const section = (page: Page, name: string) => openTool(page, SECTION_TOOL[name]!);
 
 test('字卡面板：文字／版面／字塊／描邊陰影，每個按鈕都有反應', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('字卡測試');
 
   // ---- 文字：粗體、斜體 ----

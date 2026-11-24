@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, fixture, isRed, project, samplePreview, type RGBA } from './helpers';
+import { clips, closePanel, fixture, isRed, project, samplePreview, type RGBA } from './helpers';
 
 // 模擬 iPhone 匯入大影片時的各種失敗（沙盒沒有 iPhone，用 Chromium 把對應的瀏覽器功能弄壞）。
 // 錯誤訊息用 WebKit 的原文：The operation failed for an unknown transient reason (e.g. out of memory).
@@ -63,8 +63,9 @@ test('OPFS 和 IndexedDB 都寫不進去 → 先放記憶體：照樣能剪、�
   await expect.poll(async () => isRed((await samplePreview(page, 0.5, 0.5)) as RGBA | null)).toBe(true);
   expect((await project(page)).assets[0]!.unsaved).toBe(true);
   // 還能繼續剪：分割
+  await closePanel(page);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '複製', exact: true }).tap();
+  await page.getByTestId('tool-edit.copy').tap();
   await expect(clips(page)).toHaveCount(2);
 });
 

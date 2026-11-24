@@ -1,10 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  closePanel,
   createProjectWith,
   finishLayout,
   fixture,
   isRed,
+  openCat,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
@@ -35,16 +38,13 @@ async function twoCells(page: Page) {
   await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]);
 }
 
-test('Y5 特效分頁：「作用在」是分段式切換（進場、出場、轉場、整段），「效果」在有標題的區塊；沒有另外的版型動畫區', async ({
-  page,
-}) => {
+test('Y5 特效工具列：進場、出場、轉場、整段各一顆按鈕，沒有另外的版型動畫區', async ({ page }) => {
   test.setTimeout(120_000);
   await twoCells(page);
-  await openTab(page, '特效');
-  const where = page.getByTestId('fx-where');
-  await expect(where.getByRole('tab')).toHaveText([/進場/, /出場/, /轉場/, /整段/]);
-  await expect(where.locator('.seg')).toHaveCount(1);
-  await expect(page.getByTestId('fx-effects').locator('.zone-title')).toHaveText('效果');
+  await openCat(page, '特效');
+  const row = page.getByRole('toolbar', { name: '特效', exact: true });
+  for (const name of ['進場', '出場', '轉場', '整段'])
+    await expect(row.getByRole('button', { name })).toBeVisible();
   await expect(page.getByTestId('layout-motion')).toHaveCount(0);
   await page.screenshot({ path: `${SHOT}/y5-effect-tab-390.png` });
 });
@@ -55,7 +55,7 @@ test('Y5 版型裡的素材可以有自己的進場特效（選到格子素材�
   test.setTimeout(150_000);
   await twoCells(page); // 選到第 1 格
   await openTab(page, '特效');
-  await expect(page.getByTestId('fx-where')).toBeVisible(); // 以前格子素材看到的是「請到版型分頁」
+  await expect(page.getByTestId('tool-fx.in')).not.toHaveClass(/dim/); // 以前格子素材看到的是「請到版型分頁」
   await page.getByRole('radio', { name: '進場 疊化' }).tap();
   const cell = (await cells(page))[0]!.items[0]!;
   expect(cell.inEffect?.kind).toBe('dissolve');
@@ -119,9 +119,10 @@ test('Y5 整段效果：任何影像都能用「捲動」——開頭在畫面�
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
   await showTimeline(page);
+  await closePanel(page);
   await page.locator('[data-testid="clip"]').first().tap();
   await openTab(page, '特效');
-  await page.getByTestId('fx-part-whole').tap();
+  await openTool(page, 'fx.whole');
   await page.getByRole('radio', { name: '整段 捲動' }).tap();
   expect((await tracks(page)).flatMap((t) => t.items)[0]!.motion).toBe('drift');
   await seekTo(page, 0.1);
@@ -132,6 +133,7 @@ test('Y5 整段效果：任何影像都能用「捲動」——開頭在畫面�
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(false); // 已經捲出去
   await showTimeline(page);
   await expect(page.getByTestId('fx-circle-whole')).toHaveText('捲');
+  await openTool(page, 'fx.whole');
   await page.getByRole('radio', { name: '整段 無' }).tap();
   expect((await tracks(page)).flatMap((t) => t.items)[0]!.motion).toBeUndefined();
 });

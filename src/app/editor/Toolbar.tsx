@@ -1,31 +1,82 @@
-import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, X } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { isFrameItem } from '../../engine/layoutTracks';
 import { findItem } from '../../engine/timeline';
 import { cancelCrop } from '../../store/cropStore';
 import { useProjectStore } from '../../store/projectStore';
-import { useUI } from '../../store/uiStore';
-import { AssetsTab } from './tabs/AssetsTab';
-import { AudioTab } from './tabs/AudioTab';
-import { EditTab } from './tabs/EditTab';
-import { LayersTab } from './tabs/LayersTab';
-import { LayoutTab } from './tabs/LayoutTab';
-import { EffectTab } from './tabs/EffectTab';
-import { OverlayTab } from './tabs/OverlayTab';
-import { TABS, type Panel, type Tab } from './tabs/shared';
-import { ColorTab } from './tabs/ColorTab';
-import { TextTab } from './tabs/TextTab';
+import { toast, useUI } from '../../store/uiStore';
+import { importMusicFiles } from './musicImport';
+import { CATS, ToolButton, type CatId } from './tabs/shared';
+import { TOOLS, toolById, type ToolDef, type ToolEnv } from './tools';
 
-export type { Tab } from './tabs/shared';
+/** 背景音樂的檔案選擇器（隱藏的 input；〔背景音樂〕按鈕呼叫 pickMusicFile 打開它） */
+let pickMusicFile: () => void = () => undefined;
+function MusicInput() {
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    pickMusicFile = () => input.current?.click();
+    return () => {
+      pickMusicFile = () => undefined;
+    };
+  }, []);
+  return (
+    <input
+      ref={input}
+      type="file"
+      accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac,.caf"
+      multiple
+      hidden
+      data-testid="music-input"
+      onChange={(e) => {
+        const files = Array.from(e.target.files ?? []);
+        e.target.value = '';
+        void importMusicFiles(files);
+      }}
+    />
+  );
+}
+
+type Sel = 'text' | 'audio' | 'frame' | 'cell' | 'media';
 
 /**
- * 選了東西自動切到對應的分頁：字卡→文字、音樂→音訊；影片／照片從文字或音訊分頁選到時→剪輯。
- * 其他分頁（疊加、素材、版型、圖層）保持原樣：在那裡加東西時會自動選取新的，不應該被帶走。
+ * 選了東西，功能列自動跳到那個東西的類別（不自動升起視窗，免得蓋住時間軸）：
+ * 字卡→文字、音樂→音訊、整個版型→版型、其他（影片、照片、貼圖、版型裡的一格）→剪輯。
+ * 例外：正在特效、色調、加入時點別的素材，留在原類別（方便一個一個套用；加東西時會自動選取新的，不該被帶走）。
  */
-export function tabForSelection(current: Tab, kind: 'text' | 'audio' | 'media'): Tab {
-  // 色調分頁：選別的影片、照片、貼圖、字卡都留在色調分頁（音樂沒有色調，才切走）
-  if (current === 'color' && kind !== 'audio') return current;
-  if (kind === 'text') return 'text';
-  if (kind === 'audio') return 'audio';
-  return current === 'text' || current === 'audio' ? 'edit' : current;
+export function targetForSelection(cat: CatId | null, kind: Sel): CatId | null {
+  if (kind !== 'audio' && (cat === 'effect' || cat === 'color')) return null;
+  if (cat === 'add' && kind !== 'text' && kind !== 'audio') return null;
+  // 在版型類別裡點格子（〔各格〕示意圖、預覽上點格子）：留在版型，免得調到一半功能列跳走
+  if (cat === 'layout' && (kind === 'cell' || kind === 'frame')) return null;
+  const to: CatId =
+    kind === 'text' ? 'text' : kind === 'audio' ? 'audio' : kind === 'frame' ? 'layout' : 'edit'; // 版型裡的一格（cell）也是剪輯：分割、裁切、變速都在那裡
+  return to === cat ? null : to;
+}
+
+/** 別處（時間軸的特效圓圈、色調…）要求切到某個類別與視窗 */
+function requestTarget(tab: string): { cat: CatId; popup: string | null } | null {
+  switch (tab) {
+    case 'edit':
+      return { cat: 'edit', popup: null };
+    case 'effect': {
+      const f = useUI.getState().fxFocus;
+      const popup =
+        f?.role === 'out'
+          ? 'fx.out'
+          : f?.role === 'seam'
+            ? 'fx.seam'
+            : f?.role === 'whole'
+              ? 'fx.whole'
+              : f?.role === 'style'
+                ? 'fx.textfx'
+                : 'fx.in';
+      return { cat: 'effect', popup };
+    }
+    case 'color':
+      return { cat: 'color', popup: 'color.look' };
+    default:
+      return null;
+  }
 }
 
 export function BottomBar({
@@ -37,98 +88,185 @@ export function BottomBar({
 }) {
   const project = useProjectStore((s) => s.project)!;
   const selectedId = useProjectStore((s) => s.selectedId);
-  const [tab, setTab] = useState<Tab>('edit');
-  const [panel, setPanel] = useState<Panel>(null);
-
+  // 第一層：選了哪個類別（null＝只看到 7 個類別）；第三層：升起的視窗（工具 id；null＝收起，可以直接拖播放軸）
+  const [cat, setCat] = useState<CatId | null>(null);
+  const [popup, setPopup] = useState<string | null>(null);
   const found = findItem(project, selectedId);
   const barRef = useRef<HTMLDivElement>(null);
 
-  // 選取的東西換了：自動切到對應的分頁。
-  // 晚一點才切：手指放開後瀏覽器還會補送一個 click；如果馬上換分頁、版面跟著變，那個 click 會落在別的按鈕上
-  const tabRef = useRef(tab);
+  const catRef = useRef(cat);
   useEffect(() => {
-    tabRef.current = tab;
-  }, [tab]);
+    catRef.current = cat;
+  }, [cat]);
+  const goto = (c: CatId | null, p: string | null = null) => {
+    catRef.current = c;
+    setCat(c);
+    setPopup(p);
+    cancelCrop();
+  };
+
+  const env: ToolEnv = {
+    project,
+    found,
+    onImportMain,
+    onImportOverlay,
+    pickMusic: pickMusicFile,
+    openPopup: (id) => setPopup(id),
+    closePopup: () => {
+      setPopup(null);
+      cancelCrop();
+    },
+  };
+
+  // 選取的東西換了：自動跳到對應的類別；開著的視窗對新選到的東西不適用就收起來。
+  // 晚一點才處理：手指放開後瀏覽器還會補送一個 click；如果馬上換版面，那個 click 會落在別的按鈕上
   useEffect(() => {
-    if (!selectedId) return;
-    const tabAtSelect = tabRef.current;
+    const catAtSelect = catRef.current;
     const timer = setTimeout(() => {
-      if (tabRef.current !== tabAtSelect) return; // 這段時間使用者自己切了分頁：不要再把人帶走
       const st = useProjectStore.getState();
       const f = st.project && findItem(st.project, st.selectedId);
-      if (!f || st.selectedId !== selectedId) return;
-      const kind = f.item.type === 'text' ? 'text' : f.item.type === 'audio' ? 'audio' : 'media';
-      const next = tabForSelection(tabRef.current, kind);
-      if (next === tabRef.current) return;
-      tabRef.current = next;
-      setTab(next);
-      setPanel(null);
-      cancelCrop();
+      if (!f || st.selectedId !== selectedId) {
+        // 取消選取：視窗要選到東西才有內容的，收起來
+        setPopup((p) => (p && toolById(p)?.enabled ? null : p));
+        return;
+      }
+      if (catRef.current !== catAtSelect) return; // 這段時間使用者自己切了：不要再把人帶走
+      const kind: Sel =
+        f.item.type === 'text'
+          ? 'text'
+          : f.item.type === 'audio'
+            ? 'audio'
+            : isFrameItem(f.item)
+              ? 'frame'
+              : (f.item as { group?: string }).group
+                ? 'cell'
+                : 'media';
+      const to = targetForSelection(catRef.current, kind);
+      if (to) return goto(to);
+      // 留在原類別：視窗那一項對新選到的東西不能用了就收起來
+      const tool = popup ? toolById(popup) : undefined;
+      const e2: ToolEnv = { ...env, project: st.project!, found: f };
+      if (tool?.enabled && !tool.enabled(e2)) setPopup(null);
     }, 250);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  // 其他地方要求切分頁（點時間軸的轉場小圓圈 → 特效）
+  // 預覽上正在拖調整（自訂比例、版型大小、格子大小、動態字卡顯示範圍）：把升起的視窗收起來，免得蓋住下面的把手
+  const editing = useUI((s) => !!(s.frameEdit || s.layoutEdit || s.cellEdit || s.kineticEdit));
+  useEffect(() => {
+    if (!editing) return;
+    const t = setTimeout(() => setPopup(null), 0);
+    return () => clearTimeout(t);
+  }, [editing]);
+
+  // 其他地方要求切類別（點時間軸的特效圓圈 → 特效；色調 → 色調視窗…）
   const requestTab = useUI((s) => s.requestTab);
   useEffect(() => {
     if (!requestTab) return;
-    const want = TABS.find((x) => x.id === requestTab)?.id;
     useUI.setState({ requestTab: null });
-    if (!want) return;
-    setTimeout(() => {
-      tabRef.current = want;
-      setTab(want);
-      setPanel(null);
-      cancelCrop();
-    }, 250);
+    const to = requestTarget(requestTab);
+    if (to) setTimeout(() => goto(to.cat, to.popup), 250);
   }, [requestTab]);
 
-  // 點目前的分頁＝收合/展開下面的面板（讓出空間給預覽畫面）
-  const switchTab = (t: Tab) => {
-    setPanel(null);
-    cancelCrop(); // 離開剪輯分頁就結束裁切模式（不套用）
-    // 再點一次目前的分頁：什麼都不做（面板不收合）
-    if (t !== tab) setTab(t);
-    // 分頁列黏在頂端時（已經往下捲過），切分頁後停在分頁列的位置，不要停在新面板的一半
-    const el = barRef.current;
-    if (el) {
-      const stickTop = parseFloat(getComputedStyle(el).getPropertyValue('--top-h')) || 52;
-      if (el.getBoundingClientRect().top <= stickTop + 1)
-        requestAnimationFrame(() => window.scrollTo({ top: el.offsetTop - stickTop }));
+  const press = (t: ToolDef) => {
+    if (t.enabled && !t.enabled(env)) return toast(t.need ?? '先點一個片段');
+    const g = t.guard?.(env);
+    if (g) return toast(g);
+    if (t.kind === 'popup') {
+      cancelCrop();
+      setPopup((p) => (p === t.id ? null : t.id));
+      return;
     }
+    setPopup(null);
+    t.run?.(env);
   };
 
-  // 分頁列放不下（窄螢幕）可以左右滑；選中的分頁自動捲進畫面
+  // 目前選中的類別捲進畫面（窄螢幕第一層可以左右滑）
   useEffect(() => {
     barRef.current
       ?.querySelector<HTMLElement>('.tab.active')
       ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-  }, [tab]);
+  }, [cat]);
+
+  const tool = popup ? toolById(popup) : undefined;
+  const list = cat ? TOOLS[cat] : [];
+  const catLabel = CATS.find((c) => c.id === cat)?.label ?? '';
+  const body = tool?.popup?.(env);
 
   return (
     <div className="bottombar" ref={barRef}>
-      <div className="tabs" role="tablist">
-        {TABS.map((t) => (
+      <MusicInput />
+      {tool && body && tool.bare && body}
+      {tool && body && !tool.bare && (
+        <div className="panel-sheet" data-testid="panel-sheet" role="region" aria-label={`${tool.label}面板`}>
+          <div className="ps-head">
+            <b>{tool.label}</b>
+            <button
+              className="sheet-close"
+              aria-label="收起面板"
+              data-testid="panel-close"
+              onClick={env.closePopup}
+            >
+              <X size={20} aria-hidden="true" />
+            </button>
+          </div>
+          <div className="ps-body">{body}</div>
+        </div>
+      )}
+      {cat ? (
+        <div className="fb-row" data-testid="fb-tools">
           <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`tab${tab === t.id ? ' active' : ''}`}
-            onClick={() => switchTab(t.id)}
+            className="fb-back"
+            aria-label="返回"
+            data-testid="fb-back"
+            onClick={() => goto(null, null)}
           >
-            {t.label}
+            <ArrowLeft size={20} aria-hidden="true" />
           </button>
-        ))}
-      </div>
-      {tab === 'edit' && <EditTab panel={panel} setPanel={setPanel} onImport={onImportMain} found={found} />}
-      {tab === 'overlay' && <OverlayTab onImportOverlay={onImportOverlay} />}
-      {tab === 'text' && <TextTab found={found} />}
-      {tab === 'layers' && <LayersTab />}
-      {tab === 'layout' && <LayoutTab found={found} />}
-      {tab === 'effect' && <EffectTab found={found} />}
-      {tab === 'color' && <ColorTab found={found} />}
-      {tab === 'assets' && <AssetsTab />}
-      {tab === 'audio' && <AudioTab found={found} panel={panel} setPanel={setPanel} />}
+          <div className="toolbar" role="toolbar" aria-label={catLabel}>
+            {list.map((t, i) => {
+              const sep = i > 0 && list[i - 1]!.zone !== t.zone;
+              const dim = !!t.enabled && !t.enabled(env);
+              return (
+                <Fragment key={t.id}>
+                  {sep && <span className="zone-sep tool-sep" aria-hidden="true" />}
+                  {t.custom ? (
+                    t.custom()
+                  ) : (
+                    <ToolButton
+                      icon={t.icon}
+                      label={t.label}
+                      testId={`tool-${t.id}`}
+                      active={t.kind === 'popup' ? popup === t.id : undefined}
+                      fill={t.kind === 'toggle' ? !!t.on?.(env) : undefined}
+                      dim={dim}
+                      danger={t.danger}
+                      badge={dim ? null : t.badge?.(env)}
+                      onClick={() => press(t)}
+                    />
+                  )}
+                </Fragment>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="tabs" role="tablist">
+          {CATS.map((c) => (
+            <button
+              key={c.id}
+              role="tab"
+              aria-selected={false}
+              className="tab"
+              onClick={() => goto(c.id, null)}
+            >
+              <c.icon size={20} aria-hidden="true" />
+              <span>{c.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -2,12 +2,13 @@ import { expect, test } from '@playwright/test';
 import {
   addOverlays,
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
   isRed,
+  previewBox,
   project,
   selectedItemId,
-  previewBox,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/fix-safe-zone';
@@ -19,7 +20,7 @@ test('安全區參考線：預設不顯示；開關有文字；打開後常駐�
   await page.screenshot({ path: `${SHOT}/after-default.png` });
 
   const toggle = page.getByRole('button', { name: '安全區參考線' });
-  await expect(toggle).toContainText('安全區');
+  await expect(toggle).toBeVisible(); // 只剩小圖示（U3），沒有文字
   const b = (await toggle.boundingBox())!;
   expect(b.width).toBeGreaterThanOrEqual(44);
   expect(b.height).toBeGreaterThanOrEqual(44);
@@ -91,6 +92,7 @@ test('主軌：匯入後不自動選取；預覽上點一下就選到（細框�
   expect(after.x).toBeGreaterThan(before.x);
 
   // 從時間軸選主軌片段 → 細框、沒有 ✕、有縮放鈕
+  await closePanel(page);
   await clips(page).first().tap();
   await expect(page.getByTestId('selbox')).toBeVisible();
   await expect(page.getByRole('button', { name: '刪除圖層' })).toHaveCount(0);

@@ -1,6 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
-import { countColor, createProjectWith, legacyBox, openTab, project, regionHash } from './helpers';
+import {
+  countColor,
+  createProjectWith,
+  legacyBox,
+  openTab,
+  openTool,
+  project,
+  regionHash,
+  undo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/fix-feedback-2';
 
@@ -18,12 +27,9 @@ const setRange = (page: Page, label: string, v: number) =>
 async function startWithShape(page: Page, cat: string, shapeLabel: string) {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('吃飯');
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   if (cat !== '基本') await page.getByRole('button', { name: `圖形分類 ${cat}` }).tap();
   await page.getByRole('radio', { name: shapeLabel, exact: true }).tap();
   await legacyBox(page);
@@ -60,7 +66,7 @@ test('雲朵：凹槽深度／圓滑／凸起數量可調，預覽跟著變，�
     .toBeGreaterThan(30);
 
   // 復原：回到上一個調整值
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await boxOf(page)).adj).not.toMatchObject({ count: 12 });
 
   // 還原預設／換圖形：調整值清掉

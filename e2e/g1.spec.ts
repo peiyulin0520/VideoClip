@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { countColor, createProjectWith, fixture, openTab, project } from './helpers';
+import { countColor, createProjectWith, fixture, openTab, openTool, project, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g1';
 type Run = { text: string; color: string; opacity?: number; weight: string };
@@ -18,7 +18,7 @@ const setRange = (page: Page, label: string, v: number) =>
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, String(val));
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, v);
-const addTextBtn = (page: Page) => page.getByRole('button', { name: /新增文字/ }).first();
+const addTextBtn = (page: Page) => page.getByTestId('tool-text.add');
 
 test('文字透明度：滑桿讓字變淡（描邊不會從字裡透出來）；套用樣式到所有文字；新增文字沿用上一次的樣式', async ({
   page,
@@ -49,7 +49,7 @@ test('文字透明度：滑桿讓字變淡（描邊不會從字裡透出來）�
   const first = (await cards(page)).find((c) => c.card.runs[0]!.text === '甲甲甲')!;
   expect(first.card.runs[0]!.weight).toBe('normal');
   expect(first.card.runs[0]!.opacity ?? 1).toBe(1);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const undone = (await cards(page)).find((c) => c.card.runs[0]!.text === '甲甲甲')!;
   expect(undone.card.runs[0]!.opacity).toBeCloseTo(0.3);
 });
@@ -58,7 +58,7 @@ test('字塊預設透明底＋棕色框線；形狀縮圖是線框；獨立圖�
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await addTextBtn(page).tap();
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   await page.getByRole('radio', { name: '方形' }).tap();
   const box = (await cards(page))[0]!.card.box!;
   expect(box.fillOn).toBe(false);
@@ -90,7 +90,7 @@ test('字塊預設透明底＋棕色框線；形狀縮圖是線框；獨立圖�
   await expect.poll(async () => (await cards(page))[0]!.card.box!.fillOn).not.toBe(false);
 
   // 獨立圖形：透明底＋棕色框線
-  await page.getByRole('button', { name: '＋ 另外新增一個獨立圖形' }).tap();
+  await page.getByTestId('tool-text.shape').tap();
   const shape = (await cards(page)).find(
     (c) => c.card.runs[0]!.text === '' && !(c as { placeholder?: boolean }).placeholder,
   )!;
@@ -98,21 +98,15 @@ test('字塊預設透明底＋棕色框線；形狀縮圖是線框；獨立圖�
   expect(shape.card.box!.stroke?.color.toLowerCase()).toBe('#8b5a44');
 });
 
-test('三層選單長得不一樣：底部分頁、區塊分段控制、分類小膠囊（選中的背景色各不同、區塊不用強調色）', async ({
-  page,
-}) => {
+test('分類小膠囊：選中的背景色跟主題強調色不同（強調色留給按下去的主要動作）', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await addTextBtn(page).tap();
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
-  const bg = (sel: string) =>
-    page
-      .locator(sel)
-      .first()
-      .evaluate((el) => getComputedStyle(el).backgroundColor);
-  const l1 = await bg('.tab.active');
-  const l2 = await bg('.seg.on');
-  const l3 = await bg('.chip3.on');
+  await openTool(page, 'text.box');
+  const l3 = await page
+    .locator('.chip3.on')
+    .first()
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
   const accent = await page.evaluate(() => {
     const el = document.createElement('i');
     el.style.background = 'var(--accent)';
@@ -121,15 +115,7 @@ test('三層選單長得不一樣：底部分頁、區塊分段控制、分類�
     el.remove();
     return c;
   });
-  expect(l2).not.toBe(accent);
-  expect(l2).not.toBe(l3);
   expect(l3).not.toBe(accent);
-  void l1;
-  // 「＋」新增是圓形按鈕，不是跟區塊同樣的膠囊
-  const r = await page
-    .getByRole('button', { name: '新增文字', exact: true })
-    .evaluate((el) => getComputedStyle(el).borderRadius);
-  expect(r).toBe('50%');
   await page.screenshot({ path: `${SHOT}/three-levels.png` });
 });
 

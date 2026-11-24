@@ -478,17 +478,21 @@ button {
 }
 
 /* ---------- 編輯器 ---------- */
-/* 編輯器是一般可往下捲的頁面：最上面是預覽（大小永遠不變），往下滑是時間軸、分頁、各項設定。
-   頂列與分頁列捲動時黏在上面。見 docs/plans/2026-11-11-preview-first-layout.md */
+/* 編輯器剛好一個螢幕高、整頁不捲動：由上到下 頂列、預覽、播放列、時間軸（吃剩下的高度，裡面上下滑）、功能列（最下面）。
+   見 docs/plans/2026-11-23-roadmap-ui.md §1 */
 .editor {
   --top-h: calc(52px + var(--safe-top));
   --playbar-h: 58px;
-  min-height: 100svh;
-  padding-bottom: calc(24px + var(--safe-bottom));
+  --tabbar-h: 58px;
+  --proj-aspect: 0.5625; /* 專案版面寬 ÷ 高（Editor 依專案設定） */
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  overflow: hidden;
 }
 .ed-top {
-  position: sticky;
-  top: 0;
+  position: relative;
+  flex: none;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -518,12 +522,16 @@ button {
 }
 .stage-wrap {
   position: relative;
-  /* 預覽的底＝預覽區整塊（不管專案比例；版面在裡面等比放到最大）：預覽和下面的播放列、時間軸位置才不會跳。
-     高度適中（約螢幕的 54%，使用者參考 VideoClip_2）：預覽不會過大，往下就是播放列、時間軸、功能列，不用滑很遠。用 svh：Safari 網址列伸縮時不會抖 */
-  height: max(
-    300px,
-    min(calc(100vw * 16 / 9), calc(100svh - var(--top-h) - var(--playbar-h)), calc(100svh * 0.54))
+  flex: none;
+  /* 預覽的底＝預覽區整塊（不管專案比例；版面在裡面等比放到最大）。
+     高度依專案比例：直式約螢幕 54%；方形、橫式寬度撐滿，高度只要版面再多一圈邊，剩下的高度都給時間軸。
+     用 svh：Safari 網址列伸縮時不會抖 */
+  --stage-cap: min(
+    calc(100vw * 16 / 9),
+    calc(100svh - var(--top-h) - var(--playbar-h) - var(--tabbar-h) - 96px),
+    calc(100svh * 0.54)
   );
+  height: max(180px, min(var(--stage-cap), calc(100vw / var(--proj-aspect) * 1.12)));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -779,6 +787,7 @@ button {
   transform: translate(-50%, -50%);
 }
 .playbar {
+  flex: none;
   height: var(--playbar-h);
   display: flex;
   align-items: center;
@@ -792,16 +801,15 @@ button {
 }
 .timeline {
   position: relative;
-  flex: none;
-  height: 112px;
-  min-height: 112px;
+  flex: 1 1 0;
+  min-height: 0;
   background: var(--timeline);
   border-top: 1px solid var(--line);
 }
 .tl-scroll {
   height: 100%;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: auto;
   touch-action: pan-x pan-y;
   scrollbar-width: none;
 }
@@ -1029,38 +1037,102 @@ button {
 }
 
 .bottombar {
+  position: relative;
+  flex: none;
   background: var(--panel);
 }
 .tabs {
-  position: sticky;
-  top: var(--top-h);
-  z-index: 15;
-  background: var(--panel);
   display: flex;
-  overflow-x: auto; /* 7 個分頁：窄螢幕放不下時可以左右滑 */
+  height: var(--tabbar-h);
+  overflow-x: auto; /* 分頁放不下時可以左右滑 */
   scrollbar-width: none;
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  padding-bottom: var(--safe-bottom);
+  box-sizing: content-box;
 }
 .tabs::-webkit-scrollbar {
   display: none;
 }
+/* 分頁的內容（面板）：點分頁才從功能列上面升起，裡面可以上下滑；收起來後就能直接拖播放軸看效果 */
+.panel-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 1px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  max-height: min(56svh, calc(100svh - var(--top-h) - 160px));
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.28);
+}
+.ps-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 4px 0 14px;
+  font-size: var(--fs-body);
+}
+.ps-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 8px;
+}
 .tab {
   flex: 1 1 0;
-  min-width: 0;
+  min-width: 44px;
   min-height: 44px;
-  padding: 0 0.2em;
-  font-size: var(--fs-body);
+  padding: 0 0.1em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: var(--fs-note);
   white-space: nowrap;
   color: var(--muted);
   background: transparent;
   border-radius: 0;
 }
 .tab.active {
-  color: var(--fg);
+  color: var(--accent);
   border-bottom: 2px solid var(--accent);
 }
+/* 第二層：返回 ＋ 這個類別的工具（左右滑） */
+.fb-row {
+  display: flex;
+  align-items: stretch;
+  height: var(--tabbar-h);
+  padding-bottom: var(--safe-bottom);
+  box-sizing: content-box;
+  border-top: 1px solid var(--line);
+}
+.fb-back {
+  flex: none;
+  width: 44px;
+  background: transparent;
+  color: var(--muted);
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+}
+.fb-row .toolbar,
+.bottombar .fb-row .toolbar {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 4px;
+  align-items: stretch;
+}
+.fb-row .tool {
+  height: auto;
+}
 .bottombar .toolbar {
-  padding-bottom: calc(6px + var(--safe-bottom));
+  padding-bottom: 6px;
 }
 .hint {
   margin: 6px 0;
@@ -1559,6 +1631,11 @@ button {
 .editor.preview-full .timeline,
 .editor.preview-full .bottombar {
   display: none;
+}
+.editor.preview-full .stage-wrap {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
 }
 
 /* 顏色選擇器 */
@@ -4532,4 +4609,148 @@ button:not(:disabled):active,
 }
 .ka-frame .crop-h {
   z-index: 1;
+}
+
+/* 色調視窗標題列的「看原色」 */
+.ps-peek {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  min-height: 36px;
+  margin: 0 4px 0 auto;
+  padding: 0 0.8em;
+  font-size: var(--fs-note);
+  white-space: nowrap;
+}
+.ps-peek.on {
+  color: #fff;
+  background: var(--accent);
+}
+/* 預覽右上角：圖層、鎖定、全螢幕 靠右排成一列；安全區只剩小圖示 */
+.preview-tools {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+}
+.preview-tools > button {
+  position: static;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+}
+.safe-toggle {
+  padding: 0;
+  width: 44px;
+  justify-content: center;
+}
+.out-label {
+  transition: opacity 0.4s;
+}
+
+/* 全螢幕預覽：播放列上方的細進度條 */
+.progress-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 14px;
+  touch-action: none;
+  background: var(--panel);
+}
+.pg-track {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+}
+.pg-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* ---- 功能列工具按鈕：圖示那一格換成「目前的值」；現在不能用的變淡 ---- */
+.tool-ico {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+}
+.tool.dim {
+  opacity: 0.4;
+}
+.tool.danger {
+  color: #ff6b6b;
+}
+.badge-char {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-style: normal;
+  font-size: var(--fs-note);
+  line-height: 1;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 50%;
+}
+.badge-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--fg) 45%, transparent);
+}
+.badge-text {
+  font-style: normal;
+  font-size: var(--fs-note);
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.badge-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border: 1.5px solid var(--panel);
+  border-radius: 50%;
+}
+
+/* 預覽〔圖層〕清單：每一列右邊有往上／往下一層 */
+.peek li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.peek li .peek-row {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.peek-move {
+  display: flex;
+  flex: none;
+}
+.badge-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--fg) 45%, transparent);
+}
+.badge-cells {
+  color: var(--accent);
+  overflow: visible;
 }

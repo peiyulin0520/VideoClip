@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, legacyBox, openTab, project, touchDrag } from './helpers';
+import { closePanel, createProjectWith, legacyBox, openTab, openTool, project, touchDrag } from './helpers';
 
 const SHOT = 'docs/screenshots/fix-feedback-2';
 
@@ -9,16 +9,19 @@ type Card = {
   decorations?: { kind: string; color: string }[];
 };
 const card = async (page: Page) => (await project(page)).tracks[1]!.items[0]!.card as unknown as Card;
-const section = (page: Page, name: string) =>
-  page.getByRole('tablist', { name: '字卡設定' }).getByRole('tab', { name, exact: true }).tap();
+const SECTION_TOOL: Record<string, string> = {
+  文字: 'text.content',
+  版面: 'text.layout',
+  字塊: 'text.box',
+  描邊陰影: 'text.stroke',
+  裝飾: 'text.deco',
+};
+const section = (page: Page, name: string) => openTool(page, SECTION_TOOL[name]!);
 
 async function newText(page: Page) {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
 }
 
 test('文字顏色：基本色、展開 32 色、每一格都點得動、最近用過、重新整理後最近用過還在', async ({ page }) => {
@@ -52,6 +55,7 @@ test('文字顏色：基本色、展開 32 色、每一格都點得動、最近�
   await page.waitForTimeout(1200);
   await page.reload();
   await expect(page.locator('[data-testid="clip"][data-kind="text"]')).toHaveCount(1, { timeout: 20_000 });
+  await closePanel(page);
   await page.locator('[data-testid="clip"][data-kind="text"]').tap();
   await openTab(page, '文字');
   await expect(page.getByLabel('最近用過的顏色').getByRole('button')).toHaveCount(8);

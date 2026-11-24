@@ -148,15 +148,77 @@ export const exportFrame = async (page: Page, t: number, pts: [number, number][]
     [t, pts] as const,
   );
 
-/** 切到底部分頁 */
-export async function openTab(
-  page: Page,
-  name: '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '色調' | '素材' | '音訊',
-) {
-  const tab = page.locator('.tabs').getByRole('tab', { name, exact: true }); // 只找底部分頁列（文字面板裡也有叫「文字」的小分頁）
-  // 已經在這個分頁就不用再點（再點也不會收合）
-  if ((await tab.getAttribute('aria-selected')) === 'true') return;
-  await tab.tap();
+/** 功能列的類別（第一層）；工具 id 的前綴對到類別 */
+const CAT_OF: Record<string, string> = {
+  edit: '剪輯',
+  add: '加入',
+  text: '文字',
+  layout: '版型',
+  fx: '特效',
+  color: '色調',
+  audio: '音訊',
+};
+
+/** 切到某個類別的工具列（第二層）；已經在那裡就不動（按返回再點類別） */
+export async function openCat(page: Page, cat: string) {
+  const row = page.getByRole('toolbar', { name: cat, exact: true });
+  if (await row.isVisible()) return;
+  // 剛選了東西時功能列會在 250 ms 後自動跳類別：點到一半版面被換掉就重來
+  for (let i = 0; i < 4; i++) {
+    try {
+      const back = page.getByTestId('fb-back');
+      if (await back.isVisible()) await back.tap({ timeout: 3000 });
+      await page
+        .locator('.tabs')
+        .getByRole('tab', { name: cat, exact: true })
+        .tap({ timeout: i === 3 ? 30_000 : 3000 });
+      break;
+    } catch (e) {
+      if (i === 3) throw e;
+      if (await row.isVisible()) return;
+    }
+  }
+  await expect(row).toBeVisible();
+}
+
+/**
+ * 功能列：切到工具所在的類別，再點那顆工具（升起它的視窗，或執行它）。
+ * 視窗那一項已經開著（按鈕是強調色）就不再點，免得又收起來。
+ */
+export async function openTool(page: Page, toolId: string) {
+  await openCat(page, CAT_OF[toolId.split('.')[0]!]!);
+  const btn = page.getByTestId(`tool-${toolId}`);
+  if ((await btn.getAttribute('class'))?.includes('active')) return;
+  await btn.tap();
+}
+
+type TabName = '剪輯' | '疊加' | '文字' | '圖層' | '版型' | '特效' | '色調' | '素材' | '音訊';
+/** 舊的分頁名稱 → 新的功能列（類別，或類別加預設要升起的視窗） */
+export async function openTab(page: Page, name: TabName) {
+  switch (name) {
+    case '剪輯':
+      return openCat(page, '剪輯');
+    case '疊加':
+      return openCat(page, '加入');
+    case '素材':
+      return openTool(page, 'add.sticker');
+    case '圖層':
+      return openTool(page, 'edit.look');
+    case '版型':
+      return openTool(page, 'layout.add');
+    case '特效':
+      return openTool(page, 'fx.in'); // 舊「特效」分頁預設就在進場
+    case '色調':
+      return openTool(page, 'color.look');
+    case '音訊':
+      return openCat(page, '音訊');
+    case '文字': {
+      await openCat(page, '文字');
+      // 選到文字時升起〔內容〕；沒選到文字就只停在文字工具列
+      const content = page.getByTestId('tool-text.content');
+      if (!(await content.getAttribute('class'))?.includes('dim')) await openTool(page, 'text.content');
+    }
+  }
 }
 
 /** 疊加分頁 →「加入影片或照片」→ 選檔案 */
@@ -165,7 +227,7 @@ export async function addOverlays(page: Page, files: string[]) {
   const before = await page.getByTestId('clip').count();
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: /加入影片或照片/ }).tap(),
+    page.getByTestId('tool-add.overlay').tap(),
   ]);
   await chooser.setFiles(files.map(fixture));
   // 匯入是非同步的（讀檔、縮圖），等到時間軸上多出這幾個物件
@@ -232,8 +294,76 @@ export async function touchDrag(page: Page, from: { x: number; y: number }, to: 
   await cdp.detach();
 }
 
+/** 開預覽右上角的〔圖層〕清單（這一秒的圖層，可以往上／往下換順序） */
+export async function openLayerList(page: Page) {
+  await closePanel(page);
+  if (!(await page.getByTestId('layer-peek').isVisible()))
+    await page.getByRole('button', { name: '查看圖層' }).tap();
+  await expect(page.getByTestId('layer-peek')).toBeVisible();
+}
+
+/** 收起升起的視窗（它會蓋住播放列和時間軸；要點復原、播放、時間軸上的片段前先收起來） */
+export async function closePanel(page: Page) {
+  const close = page.getByTestId('panel-close');
+  if (await close.isVisible()) {
+    await close.tap();
+    await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
+  }
+}
+/** 目前升起視窗的那顆工具（按鈕是強調色）；沒有就回傳 null */
+async function activePopupTool(page: Page): Promise<string | null> {
+  const t = page.locator('.fb-row .tool.active');
+  return (await t.count()) ? await t.first().getAttribute('data-testid') : null;
+}
+/** 復原／重做：視窗會蓋住播放列，先收起來按完再把原本開著的視窗升回來（測試接著還要用它） */
+async function stepHistory(page: Page, name: '復原' | '重做') {
+  const tool = await activePopupTool(page);
+  await closePanel(page);
+  await page.getByRole('button', { name }).tap();
+  if (tool) await page.getByTestId(tool).tap();
+}
+export async function undo(page: Page) {
+  await stepHistory(page, '復原');
+}
+export async function redo(page: Page) {
+  await stepHistory(page, '重做');
+}
+
+/** 雙指縮放時間軸（用真的 touch 事件；factor＞1＝放大、＜1＝縮小） */
+export async function zoomTimeline(page: Page, factor: number) {
+  await page.getByTestId('timeline-scroll').evaluate((el, f) => {
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const touch = (id: number, x: number) =>
+      new Touch({ identifier: id, target: el, clientX: x, clientY: cy });
+    const fire = (type: string, d: number) => {
+      const touches = [touch(1, cx - d), touch(2, cx + d)];
+      el.dispatchEvent(
+        new TouchEvent(type, {
+          touches,
+          targetTouches: touches,
+          changedTouches: touches,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    };
+    fire('touchstart', 50);
+    fire('touchmove', 50 * f);
+    el.dispatchEvent(new TouchEvent('touchend', { bubbles: true }));
+  }, factor);
+}
+
+/** 按播放（視窗開著會蓋住播放列，先收起來） */
+export async function pressPlay(page: Page) {
+  await closePanel(page);
+  await page.getByRole('button', { name: '播放', exact: true }).tap();
+}
+
 /** 把整頁捲到看得到時間軸（不會動到時間軸的水平捲動／播放頭） */
 export async function showTimeline(page: Page) {
+  await closePanel(page);
   await page.locator('.timeline').evaluate((el) => {
     const r = el.getBoundingClientRect();
     if (r.top < 60 || r.bottom > window.innerHeight) window.scrollBy(0, r.top - window.innerHeight / 3);
@@ -242,6 +372,7 @@ export async function showTimeline(page: Page) {
 
 /** 取消選取：點時間軸某一軌的空白處（預覽上點空白處不會取消選取了） */
 export async function deselect(page: Page) {
+  await closePanel(page);
   const track = page.locator('[data-testid="track"]').first();
   const tb = (await track.boundingBox())!;
   const view = (await page.getByTestId('timeline-scroll').boundingBox())!;
@@ -278,14 +409,14 @@ export async function finishLayout(page: Page, files: string[], opts: { motion?:
   await page.getByTestId('layout-confirm').tap();
   // 選項區收起來＝新版型已經加好、而且選到它了（不然讀到的是上一個版型的示意圖）
   await expect(page.getByTestId('layout-options')).toHaveCount(0, { timeout: 30_000 });
+  await openTool(page, 'layout.cells'); // 新版型選到了：升起〔各格〕視窗（示意圖）
   const cells = page.getByTestId('ld-cell');
   await expect(cells.first()).toBeVisible({ timeout: 30_000 });
   const n = await cells.count();
   if (opts.motion) {
-    await openTab(page, '特效');
-    await page.getByTestId('fx-part-whole').tap();
+    await openTool(page, 'fx.whole');
     await page.getByRole('radio', { name: `整段 ${opts.motion}` }).tap();
-    await openTab(page, '版型');
+    await openTool(page, 'layout.cells');
   }
   for (let i = 0; i < n; i++) {
     await cells.nth(i).tap();

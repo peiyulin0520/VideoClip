@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   createProjectWith,
+  finishLayout,
   fixture,
+  isFrameTrack,
   isGreen,
   isRed,
   openTab,
@@ -9,8 +11,7 @@ import {
   project,
   samplePreview,
   selectedItemId,
-  isFrameTrack,
-  finishLayout,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-5/layout';
@@ -103,9 +104,9 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
 
   // 移除版型：外框與所有格子一起拿掉；一步復原
   await openTab(page, '版型');
-  await page.getByRole('button', { name: '移除版型' }).tap();
+  await page.getByTestId('tool-layout.remove').tap();
   expect((await tracks(page)).length).toBe(1);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await tracks(page)).length).toBe(6); // 主軌 + 4 格 + 外框
 });
 
@@ -173,7 +174,7 @@ test('版型的格子可以用裁切調整露出的範圍：預設鎖定格子�
   // 剛加好版型時，第 1 格已經被選取（時間軸上各格藏起來，由「版型」分頁選格子）
   await expect.poll(() => selectedItemId(page)).toBe(it.id);
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await expect(page.getByTestId('crop-layer')).toBeVisible();
   await expect(page.getByRole('radio', { name: '格子比例' })).toHaveAttribute('aria-checked', 'true');
   // 鎖定比例後拖保留區域的角（縮小），再按套用裁切

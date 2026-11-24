@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, project, seekTo as rawSeekTo, showTimeline } from './helpers';
+import { closePanel, createProjectWith, project, seekTo as rawSeekTo, showTimeline } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
 type Tr = {
@@ -20,6 +20,7 @@ const items = async (page: Page) =>
 async function setup(page: Page) {
   await createProjectWith(page, ['clip-a.webm', 'clip-c.webm']);
   await showTimeline(page);
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap(); // 接縫的小圓圈：切到特效分頁、選到後一段
   await page.getByRole('radio', { name: '轉場 疊化' }).tap();
   await page.getByLabel('轉場長度').fill('20');

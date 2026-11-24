@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { clips, countColor, createProjectWith, openTab, previewBox, project, fixture } from './helpers';
+import {
+  clips,
+  countColor,
+  createProjectWith,
+  fixture,
+  openTab,
+  previewBox,
+  project,
+  redo,
+  undo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/phase3a';
 
@@ -58,12 +68,12 @@ test('貼圖：分類、縮圖有載入、點一下加到這一秒（變成照�
   expect(tf.y).toBeLessThan(0.4);
 
   // 加貼圖是一步復原：復原兩次（拖移、加入）→ 貼圖和素材都不見；重做回來
-  await page.getByRole('button', { name: '復原' }).tap();
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
+  await undo(page);
   await expect(clips(page)).toHaveCount(1);
   expect((await project(page)).assets).toHaveLength(1);
-  await page.getByRole('button', { name: '重做' }).tap();
-  await page.getByRole('button', { name: '重做' }).tap();
+  await redo(page);
+  await redo(page);
   await expect(clips(page)).toHaveCount(2);
 
   // 重新整理後還在（存在這台裝置）
@@ -86,7 +96,6 @@ test('我的貼圖：上傳自己的圖存在這支手機，換一個專案也�
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '素材');
   await page.getByRole('tablist', { name: '貼圖分類' }).getByRole('tab', { name: '我的貼圖' }).tap();
-  await expect(page.getByText('所有專案都能用')).toBeVisible();
   await page.getByTestId('my-sticker-input').setInputFiles(fixture('photo.png'));
   const grid = page.getByTestId('my-sticker-grid');
   await expect(grid.locator('.sticker-cell')).toHaveCount(1);

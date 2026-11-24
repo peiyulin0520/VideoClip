@@ -1,11 +1,10 @@
-import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { GRID_MAX, LINE_MAX, buildIn, defOf, hasFrameLine } from '../../../engine/layouts';
 import { Slider } from '../../../ui/Slider';
 import type { Project, VideoItem } from '../../../model/types';
 import { useUI } from '../../../store/uiStore';
 import { ConfirmSheet } from '../../../ui/Sheet';
-import { arrangeGroup, editItem, removeGroup, setGapMode } from '../../../store/actions';
+import { arrangeGroup, editItem, setGapMode } from '../../../store/actions';
 import { FrameStyleControls } from '../FrameStyleControls';
 import { reshapeLayout, restyleFrame } from '../frameRestyle';
 import { useProjectStore } from '../../../store/projectStore';
@@ -34,19 +33,13 @@ function FrameStyleEditor({ group, color, opacity }: { group: string; color: str
   );
 }
 
-/** 一個版型自己才有的設定：示意圖（點格子改那一格）、外框顏色與透明度。特效、動畫、轉場在「特效」分頁；長度在播放軸 */
-function GroupPanel({ project, group }: { project: Project; group: string }) {
+/** 各格：版型示意圖，點一格選到那一格並開「這一格」視窗（換素材、調那一格的大小） */
+function CellsBlock({ project, group }: { project: Project; group: string }) {
   const selectedId = useProjectStore((s) => s.selectedId);
   const select = useProjectStore((s) => s.select);
   const [cell, setCell] = useState<{ id: string; index: number } | null>(null);
-  const frame = frameOfGroup(project.tracks, group)?.item;
-  if (!frame) return null;
   return (
-    <div className="panel group-panel" data-testid="group-panel">
-      <div className="panel-head">
-        <span>整個版型 · {frame.label}</span>
-      </div>
-      <p className="hint">點示意圖的格子可以改那一格。進出場、轉場在「特效」分頁；長度在播放軸。</p>
+    <>
       <LayoutDiagram
         project={project}
         group={group}
@@ -57,42 +50,40 @@ function GroupPanel({ project, group }: { project: Project; group: string }) {
           setCell({ id, index: i });
         }}
       />
-      <PlayControls frame={frame} />
       {cell && <CellSheet key={cell.id} trackId={cell.id} index={cell.index} onClose={() => setCell(null)} />}
-      {frame.frameStyle && (
-        <div className="zone-soft" data-testid="layout-frame">
-          <div className="zone-title">外框</div>
-          <FrameStyleEditor
-            key={frame.frameStyle.opacity}
-            group={group}
-            color={frame.frameStyle.color}
-            opacity={frame.frameStyle.opacity}
-          />
-          {frame.outline && (
-            <button
-              className="btn"
-              data-testid="frame-outline-off"
-              onClick={() =>
-                editItem(frame.id, (x) => {
-                  delete x.outline;
-                })
-              }
-            >
-              拿掉外圍描邊
-            </button>
-          )}
-          {hasFrameLine(
-            buildIn(defOf(frame.frameStyle), project.width, project.height, frame.frameStyle.box),
-          ) && (
-            <LineSlider
-              key={`${frame.frameStyle.line ?? 1}`}
-              group={group}
-              line={frame.frameStyle.line ?? 1}
-            />
-          )}
-        </div>
+    </>
+  );
+}
+
+/** 外框：顏色、透明度、拿掉外圍描邊、格子框線粗細 */
+function FrameBlock({ project, group, frame }: { project: Project; group: string; frame: VideoItem }) {
+  if (!frame.frameStyle) return null;
+  return (
+    <div data-testid="layout-frame">
+      <FrameStyleEditor
+        key={frame.frameStyle.opacity}
+        group={group}
+        color={frame.frameStyle.color}
+        opacity={frame.frameStyle.opacity}
+      />
+      {frame.outline && (
+        <button
+          className="btn"
+          data-testid="frame-outline-off"
+          onClick={() =>
+            editItem(frame.id, (x) => {
+              delete x.outline;
+            })
+          }
+        >
+          拿掉外圍描邊
+        </button>
       )}
-      {frame.frameStyle && <ShapeControls project={project} group={group} frame={frame} />}
+      {hasFrameLine(
+        buildIn(defOf(frame.frameStyle), project.width, project.height, frame.frameStyle.box),
+      ) && (
+        <LineSlider key={`${frame.frameStyle.line ?? 1}`} group={group} line={frame.frameStyle.line ?? 1} />
+      )}
     </div>
   );
 }
@@ -104,7 +95,6 @@ function PlayControls({ frame }: { frame: VideoItem }) {
   const gap = frame.gapMode ?? 'fill';
   return (
     <div className="zone-soft" data-testid="layout-play">
-      <div className="zone-title">播放</div>
       <div className="slider-label">播放方式</div>
       <div className="chips" role="radiogroup" aria-label="播放方式">
         {(
@@ -189,7 +179,6 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
   const full = box.w >= 0.999 && box.h >= 0.999;
   return (
     <div className="zone-soft" data-testid="layout-shape">
-      <div className="zone-title">大小與格數</div>
       <div className="size-group">
         <div className="size-label">
           <span>整個版型</span>
@@ -304,41 +293,31 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
   );
 }
 
-/** 版型分頁：多格版型（拍貼機、膠卷、拍立得…），之後的模板也放這裡 */
-export function LayoutTab({ found }: { found: Found }) {
+export type LayoutPart = 'add' | 'frame' | 'size' | 'cells' | 'play';
+
+/** 版型工具列每一項的視窗：〔版型〕挑版型加進專案；〔外框〕〔大小〕〔各格〕〔播放方式〕調選到的版型 */
+export function LayoutTab({ found, part }: { found: Found; part: LayoutPart }) {
   const project = useProjectStore((s) => s.project)!;
+  if (part === 'add')
+    return (
+      <div className="panel">
+        <LayoutPicker />
+      </div>
+    );
   const group = found && found.item.type !== 'audio' ? found.item.group : undefined;
-  // 選到版型時，「新增版型」收合成一顆鈕；展開只對當下這個版型有效（選到別的版型又收起來）
-  const [addingFor, setAddingFor] = useState<string | undefined>(undefined);
-  const adding = !!group && addingFor === group;
+  const frame = group ? frameOfGroup(project.tracks, group)?.item : undefined;
+  if (!group || !frame)
+    return (
+      <div className="panel group-panel" data-testid="group-panel">
+        <p className="hint">先點選一個版型</p>
+      </div>
+    );
   return (
-    <>
-      {group && (
-        <section className="this-layout" data-testid="zone-this-layout" aria-label="這個版型">
-          <div className="this-layout-head">
-            <b>這個版型</b>
-            <button className="btn danger this-layout-remove" onClick={() => removeGroup(group)}>
-              <Trash2 size={16} /> 移除版型
-            </button>
-          </div>
-          <GroupPanel project={project} group={group} />
-        </section>
-      )}
-      {group && <hr className="zone-line" aria-hidden="true" />}
-      {group && !adding ? (
-        <div className="zone-soft new-layout" data-testid="zone-new-layout">
-          <button className="btn" data-testid="layout-add-more" onClick={() => setAddingFor(group)}>
-            ＋ 再新增一個版型
-          </button>
-        </div>
-      ) : (
-        <div
-          className={`panel${group ? ' new-layout' : ''}`}
-          data-testid={group ? 'zone-new-layout' : undefined}
-        >
-          <LayoutPicker />
-        </div>
-      )}
-    </>
+    <div className="panel group-panel" data-testid="group-panel">
+      {part === 'cells' && <CellsBlock project={project} group={group} />}
+      {part === 'play' && <PlayControls frame={frame} />}
+      {part === 'frame' && <FrameBlock project={project} group={group} frame={frame} />}
+      {part === 'size' && frame.frameStyle && <ShapeControls project={project} group={group} frame={frame} />}
+    </div>
   );
 }

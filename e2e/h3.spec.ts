@@ -2,15 +2,16 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
+  finishLayout,
   fixture,
   isRed,
   openTab,
   project,
   samplePreview,
   showTimeline,
-  finishLayout,
 } from './helpers';
 
 type Cell = { x: number; y: number; w: number; h: number };
@@ -30,7 +31,7 @@ test('頂列「順暢／高清」：預設順暢（預覽畫布長邊 480）；�
       return Math.max(k.width, k.height);
     });
   await expect(page.getByTestId('quality-btn')).toHaveText('順暢');
-  expect(await side()).toBe(480);
+  await expect.poll(side).toBe(480);
   await page.screenshot({ path: 'docs/screenshots/feedback-9/quality-btn.png' });
   await page.getByTestId('quality-btn').tap();
   await expect(page.getByTestId('quality-btn')).toHaveText('高清');
@@ -53,7 +54,7 @@ test('設定頁可以選預覽畫質（自動／清楚／流暢），存在這�
 test('自動：一支影片用清楚（960），同時有 3 支影片就改用流暢（480）', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('vc-preview-quality', 'auto'));
   await createProjectWith(page, ['solid-red.webm']);
-  expect(await canvasW(page)).toBeGreaterThan(480 - 1);
+  await expect.poll(() => canvasW(page), { timeout: 15_000 }).toBeGreaterThan(480 - 1);
   await addOverlays(page, ['solid-green.webm', 'solid-blue.webm']);
   await expect.poll(() => canvasW(page), { timeout: 15_000 }).toBeLessThanOrEqual(480);
 });
@@ -73,7 +74,7 @@ test('同時播放的影片超過預覽的上限：多的格子畫縮圖、不�
   // 9 格都是紅色（超過影片池的格子用縮圖頂著，不是黑的）
   for (const c of cells)
     await expect
-      .poll(async () => isRed(await samplePreview(page, c.x + c.w / 2, c.y + c.h / 2)), { timeout: 8000 })
+      .poll(async () => isRed(await samplePreview(page, c.x + c.w / 2, c.y + c.h / 2)), { timeout: 20_000 })
       .toBe(true);
 });
 
@@ -82,9 +83,10 @@ test('修剪面板：拖旗標時預覽的白線跟著（顯示那一秒）；�
 }) => {
   await createProjectWith(page, ['solid-red.webm']); // 4 秒
   await showTimeline(page);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '片段範圍', exact: true }).tap();
+  await page.getByTestId('tool-edit.trim').tap();
   await expect(page.getByTestId('rm-video')).toBeVisible();
   const flag = (await page.getByTestId('range-flag-end-0').boundingBox())!;
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;

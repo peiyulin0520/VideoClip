@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  closePanel,
   createProjectWith,
   fixture,
   isRed,
@@ -91,6 +92,7 @@ test('L3 版型尾端「加入」→ 文字：進版型自己的文字軌（不�
   // 一般「字卡」類沒有（版型文字不佔一般類別）
   await expect(page.getByTestId('cat-head').filter({ hasText: '字卡' })).toHaveCount(0);
   // 點展開裡的文字片段：文字分頁看得到它
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${text.id}"]`).tap();
   await openTab(page, '文字');
   await expect(page.getByLabel('文字內容')).toBeVisible();
@@ -108,13 +110,13 @@ test('L4 選到版型時，文字分頁新增文字／素材分頁加貼圖都�
   const frameGroup = async () =>
     (await tracks(page)).flatMap((t) => t.items).find((i) => i.group && !i.cell && i.type !== 'text')!.group;
 
-  // 文字分頁：有「加到版型裡」切換、預設開；新增文字 → 版型的文字成員軌
+  // 文字工具列：選到版型時有〔加進版型〕切換、預設開；新增文字 → 版型的文字成員軌
   await openTab(page, '文字');
-  await expect(page.getByRole('switch', { name: /新增的文字加到版型/ })).toHaveAttribute(
-    'aria-checked',
+  await expect(page.getByRole('button', { name: /新增的文字加到版型/ })).toHaveAttribute(
+    'aria-pressed',
     'true',
   );
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   const ms = await members();
   expect(ms.filter((t) => t.kind === 'text')).toHaveLength(1);
   expect(ms[0]!.items[0]!.group).toBe(await frameGroup());
@@ -149,8 +151,8 @@ test('L4 選到版型時，文字分頁新增文字／素材分頁加貼圖都�
 
   // 關掉切換：新增的文字就在一般的字卡軌道
   await openTab(page, '文字');
-  await page.getByRole('switch', { name: /新增的文字加到版型/ }).tap();
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByRole('button', { name: /新增的文字加到版型/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   const plain = (await tracks(page)).filter((t) => t.kind === 'text' && !t.groupRole);
   expect(plain).toHaveLength(1);
   expect(plain[0]!.items[0]!.group).toBeUndefined();

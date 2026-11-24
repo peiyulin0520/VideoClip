@@ -8,13 +8,19 @@ import {
   isBlue,
   isGreen,
   isRed,
+  openLayerList,
+  showTimeline,
   openTab,
+  openTool,
+  pinch,
+  previewBox,
   project,
+  redo,
   samplePreview,
   selectedItemId,
   type RGBA,
-  previewBox,
-  pinch,
+  undo,
+  zoomTimeline,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/phase2';
@@ -30,7 +36,7 @@ test('同一秒疊 3 支影片＋1 個字卡：換圖層順序後預覽正確，
 
   // 加一個文字
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await expect(clips(page)).toHaveCount(4);
   await expect(page.getByTestId('track')).toHaveCount(4);
   await page.getByLabel('文字內容').fill('疊圖測試');
@@ -45,7 +51,7 @@ test('同一秒疊 3 支影片＋1 個字卡：換圖層順序後預覽正確，
   await page.screenshot({ path: `${SHOT}/layers-blue-on-top.png` });
 
   // 圖層分頁：列出這一秒的 4 個圖層（最上面的在最上面）
-  await openTab(page, '圖層');
+  await openLayerList(page);
   const rows = page.getByTestId('layer-row');
   await expect(rows).toHaveCount(4);
   await expect(rows.nth(0)).toContainText('文字');
@@ -64,9 +70,12 @@ test('同一秒疊 3 支影片＋1 個字卡：換圖層順序後預覽正確，
   await expect.poll(async () => isBlue(await samplePreview(page, ...IN))).toBe(true);
 
   // 隱藏藍色那條軌道 → 看到綠色
-  await page.getByRole('button', { name: '影像 3 隱藏' }).tap();
+  await showTimeline(page);
+  await page.getByRole('button', { name: /影像 3 軌道設定/ }).tap();
+  await page.getByRole('button', { name: /隱藏這條軌道/ }).tap();
   await expect.poll(async () => isGreen(await samplePreview(page, ...IN))).toBe(true);
-  await page.getByRole('button', { name: '影像 3 顯示' }).tap();
+  await page.getByRole('button', { name: /影像 3 軌道設定/ }).tap();
+  await page.getByRole('button', { name: /顯示這條軌道/ }).tap();
   await expect.poll(async () => isBlue(await samplePreview(page, ...IN))).toBe(true);
 
   // 單格匯出（輸出解析度 1080×1920）和預覽在同樣幾個點的顏色一致
@@ -108,11 +117,11 @@ test('預覽上的選取框：只有框線（沒有圓點）、拖移、雙指�
   expect(Math.abs(tf1.rotation - 90)).toBeLessThan(0.01); // 88° 吸附到 90°
   await page.screenshot({ path: `${SHOT}/selection-box-scaled.png` });
   // 一次雙指手勢＝一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const tfu = (await project(page)).tracks[1]!.items[0]!.transform;
   expect(tfu.scale).toBeCloseTo(0.5);
   expect(tfu.rotation).toBe(0);
-  await page.getByRole('button', { name: '重做' }).tap();
+  await redo(page);
 
   // 拖框內 → 移動位置
   const st2 = await previewBox(page);
@@ -126,13 +135,13 @@ test('預覽上的選取框：只有框線（沒有圓點）、拖移、雙指�
   expect(tf2.y).toBeGreaterThan(0.5);
 
   // 一次拖曳 = 一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   const tf3 = (await project(page)).tracks[1]!.items[0]!.transform;
   expect(tf3.x).toBeCloseTo(tf1.x, 1);
 
   // 刪除：用剪輯分頁的刪除鈕（預覽上不放 ✕）
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   await expect(clips(page)).toHaveCount(1);
   await expect(page.getByTestId('selbox')).toHaveCount(0);
 });
@@ -156,8 +165,9 @@ test('點預覽畫面會選到最上面那個物件；鎖定的軌道不會被�
   expect(await selectedItemId(page)).toBe(mainId);
 
   // 鎖定藍色那條軌道 → 點中間會選到綠
-  await openTab(page, '圖層');
-  await page.getByRole('button', { name: '影像 3 鎖定' }).tap();
+  await showTimeline(page);
+  await page.getByRole('button', { name: /影像 3 軌道設定/ }).tap();
+  await page.getByRole('button', { name: /鎖定（不能選取/ }).tap();
   await click(0.5, 0.5);
   expect(await selectedItemId(page)).toBe(track1Id);
 });
@@ -165,9 +175,8 @@ test('點預覽畫面會選到最上面那個物件；鎖定的軌道不會被�
 test('疊加素材：長按拖曳移動時間、修剪、軌道選單', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
-  // 縮小時間軸兩次（60 → 26.7 px/秒），4 秒的素材才完整落在手機螢幕內
-  await page.getByRole('button', { name: '縮小時間軸' }).tap();
-  await page.getByRole('button', { name: '縮小時間軸' }).tap();
+  // 雙指縮小時間軸（60 → 26.7 px/秒），4 秒的素材才完整落在手機螢幕內
+  await zoomTimeline(page, 1 / 2.25);
   const PPS = 60 / 2.25;
   const overlay = page.locator('[data-testid="clip"][data-kind="video"]').nth(0); // 疊加軌在主軌上面，DOM 順序在前
   const id = (await project(page)).tracks[1]!.items[0]!.id;
@@ -268,7 +277,7 @@ test('圖層屬性：透明度、混合模式、圓角、外框、裁切', async
   // 留下來的那一半在畫面上的位置不變（x≈0.6 還是綠）
   await expect(page.getByLabel('裁切左')).toHaveCount(0); // 圖層分頁沒有裁切滑桿了
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const hl = (await page.getByTestId('crop-h-l').boundingBox())!;
   await page.mouse.move(hl.x + hl.width / 2, hl.y + hl.height / 2);
@@ -292,7 +301,7 @@ test('圖層屬性：透明度、混合模式、圓角、外框、裁切', async
 test('文字：新增、改內容與顏色、在預覽上可拖移，也能分割', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('哈囉\n第二行');
   await page.getByRole('button', { name: '文字顏色 #111111' }).tap();
   const p = await project(page);
@@ -309,18 +318,22 @@ test('文字：新增、改內容與顏色、在預覽上可拖移，也能分�
   // 分割：把播放頭移到文字中間（1.5 秒）再按分割
   await page.getByTestId('timeline-scroll').evaluate((el) => void (el.scrollLeft = 90));
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '分割', exact: true }).tap();
+  await page.getByTestId('tool-edit.split').tap();
   await expect(clips(page)).toHaveCount(3);
 });
 
-test('底部分頁：再點目前的分頁面板不會收合，預覽大小永遠不變（使用者：預覽不能被擠小）', async ({ page }) => {
+test('功能列：升起視窗、按 ✕ 收起來，預覽大小永遠不變（使用者：預覽不能被擠小）', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
-  await openTab(page, '文字');
   const stage = page.getByTestId('stage');
-  const h1 = (await stage.boundingBox())!.height;
-  const w1 = (await stage.boundingBox())!.width;
-  await page.getByRole('tab', { name: '文字' }).tap(); // 再點一次：面板不會收合
-  await expect(page.getByRole('button', { name: /新增文字/ })).toBeVisible();
-  expect((await stage.boundingBox())!.height).toBeCloseTo(h1, 0);
-  expect((await stage.boundingBox())!.width).toBeCloseTo(w1, 0);
+  const h0 = (await stage.boundingBox())!.height;
+  const w0 = (await stage.boundingBox())!.width;
+  await page.getByTestId('clip').first().tap();
+  await openTab(page, '色調');
+  await openTool(page, 'color.look');
+  await expect(page.getByTestId('panel-sheet')).toBeVisible();
+  expect((await stage.boundingBox())!.height).toBeCloseTo(h0, 0);
+  expect((await stage.boundingBox())!.width).toBeCloseTo(w0, 0);
+  await page.getByTestId('panel-close').tap(); // ✕ 收起
+  await expect(page.getByTestId('panel-sheet')).toHaveCount(0);
+  expect((await stage.boundingBox())!.height).toBeCloseTo(h0, 0);
 });

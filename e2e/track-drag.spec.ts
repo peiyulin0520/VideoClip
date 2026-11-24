@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
+  closePanel,
   createProjectWith,
   isBlue,
   isGreen,
@@ -9,14 +10,15 @@ import {
   samplePreview,
   showTimeline,
   touchDrag,
+  undo,
 } from './helpers';
 
 const order = async (page: Page) => (await project(page)).tracks.map((t) => t.id);
 
 async function chipCenter(page: Page, trackId: string) {
-  const b = (await page
-    .locator(`[data-testid="track"][data-track-id="${trackId}"] [data-testid="track-chip"]`)
-    .boundingBox())!;
+  const chip = page.locator(`[data-testid="track"][data-track-id="${trackId}"] [data-testid="track-chip"]`);
+  await chip.scrollIntoViewIfNeeded(); // 時間軸在自己的區塊裡捲動
+  const b = (await chip.boundingBox())!;
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 
@@ -42,11 +44,12 @@ test('軌道圖示按住上下拖＝換圖層順序（觸控）；點一下仍�
   await page.screenshot({ path: 'docs/screenshots/feedback-5/track-drag-after.png' });
 
   // 一步復原
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await order(page)).join(',')).toBe([main, green, blue].join(','));
 
   // 點一下（沒有拖）：開軌道選單
   await showTimeline(page);
+  await closePanel(page);
   await page.getByTestId('track-chip').first().tap();
   await expect(page.getByRole('button', { name: /隱藏這條軌道|顯示這條軌道/ })).toBeVisible();
   await page.touchscreen.tap(5, 5);
@@ -59,7 +62,7 @@ test('軌道圖示：往下拖超過最底、往上拖超過字卡，都夾在�
   await addOverlays(page, ['solid-green.webm']);
   await addOverlays(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await showTimeline(page);
   const [red, green, blue, text] = await order(page); // 陣列由下到上：影像 ×3、字卡
   // 綠（中間那條影像軌）往下拖很遠：最多到影像區最底（紅的下面），不會掉到音訊或別處

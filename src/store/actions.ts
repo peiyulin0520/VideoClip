@@ -351,7 +351,7 @@ export function toggleKeyframe(id: string): 'added' | 'removed' | null {
   const idx = keyframeIndexAt(target, local);
   const t = useUI.getState().player?.time ?? 0;
   if (t < target.start || t > target.start + target.duration + 1e-6) {
-    toast('播放頭要在這個素材的時間範圍裡才能打定格');
+    toast('播放頭要在這個素材的時間範圍裡才能打關鍵格');
     return null;
   }
   editItem(target.id, (it) => {

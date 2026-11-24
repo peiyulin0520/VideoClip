@@ -124,11 +124,6 @@ export function MyStickers() {
           e.target.value = '';
         }}
       />
-      {items && items.length === 0 && (
-        <p className="hint">
-          把自己的圖片（建議去背的 PNG）存在這裡，所有專案都能用，不用每次重新匯入。只存在這台手機。
-        </p>
-      )}
       <div className="sticker-grid" data-testid="my-sticker-grid">
         {(items ?? []).map((r) => (
           <div key={r.id} className="sticker-wrap">

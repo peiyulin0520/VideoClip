@@ -6,14 +6,12 @@ import {
   MIN_TRANSITION,
   TRANSITION_CATS,
   TRANSITIONS,
-  transitionName,
   transitionSpan,
   TYPEWRITER_CODE,
   type TransitionCat,
 } from '../../../engine/transitions';
-import type { EffectKind, Item, KineticFade, TextFxKind, TextItem, VideoItem } from '../../../model/types';
+import type { EffectKind, Item, KineticFade, TextFxKind, TextItem } from '../../../model/types';
 import {
-  editItem,
   setItemMotion,
   setItemEffect,
   patchKinetic,
@@ -40,76 +38,34 @@ import { TransitionAudioBlock } from '../TransitionAudio';
 import { TransitionCard } from '../TransitionCards';
 import type { Found } from './shared';
 
-type Part = 'in' | 'out' | 'seam' | 'style' | 'whole';
+export type FxPart = 'in' | 'out' | 'seam' | 'whole' | 'textfx' | 'kinetic';
 type CatKey = TransitionCat | '文字';
 
-/** 特效分頁：依選到的素材類別，列出這一類能用的特效——進場、出場（只在素材自己的開頭／結尾）、跟前一段的轉場 */
-export function EffectTab({ found }: { found: Found }) {
+/** 特效工具列每一項的視窗：進場、出場、轉場、整段、文字特效、動態字卡（各自一項，沒有分段切換列） */
+export function EffectTab({ found, part }: { found: Found; part: FxPart }) {
   useProjectStore((s) => s.project); // 專案變了要重畫
-  const fxFocus = useUI((s) => s.fxFocus);
   const [cat, setCat] = useState<CatKey | null>(null);
   // 任何素材都能在這裡設特效：版型外框＝整個版型；格子裡的素材、版型裡的文字貼圖＝各自的
   const item: Item | null = found ? found.item : null;
   const track = item ? found!.track : null;
-  const part: Part = item && fxFocus?.id === item.id ? fxFocus.role : 'in';
-  const setPart = (role: Part) => item && useUI.setState({ fxFocus: { id: item.id, role } });
-
   return (
     <div className="panel effect-panel" data-testid="effect-panel">
-      <div className="fx-legend" aria-hidden="true">
-        <span className="lg seam">雙影片銜接</span>
-        <span className="lg single">單影片進出場</span>
-      </div>
       {!item || !track ? (
-        <p className="hint">
-          先在時間軸點一個素材（進場、出場、整段），或點兩個素材中間的小圓圈（轉場），再選特效。整個版型：點版型那一條；版型裡的素材：點那個素材。
-        </p>
-      ) : item.type === 'audio' ? (
-        <AudioFx item={item as VideoItem} />
+        <p className="hint">先點選一個素材</p>
       ) : (
-        <>
-          <div className="fx-where" data-testid="fx-where">
-            <div className="zone-title">作用在</div>
-            <div className="seg" role="tablist" aria-label="特效位置">
-              {(
-                [
-                  ['in', '進場'],
-                  ['out', '出場'],
-                  ['seam', '轉場'],
-                  ['whole', '整段'],
-                  ...(item.type === 'text' ? [['style', '文字特效'] as const] : []),
-                ] as (readonly [Part, string])[]
-              ).map(([k, name]) => (
-                <button
-                  key={k}
-                  role="tab"
-                  aria-selected={part === k}
-                  data-testid={`fx-part-${k}`}
-                  className={`seg-btn${part === k ? ' on' : ''}`}
-                  onClick={() => setPart(k)}
-                >
-                  {name}
-                  {k === 'in' && item.inEffect ? ` ·${transitionName(item.inEffect.kind)}` : ''}
-                  {k === 'out' && item.outEffect ? ` ·${transitionName(item.outEffect.kind)}` : ''}
-                  {k === 'seam' && item.transitionIn ? ` ·${transitionName(item.transitionIn.kind)}` : ''}
-                  {k === 'whole' && item.motion ? ` ·${item.motion === 'drift' ? '捲動' : '滑入滑出'}` : ''}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="zone-soft" data-testid="fx-effects">
-            <div className="zone-title">效果</div>
-            {part === 'seam' ? (
-              <SeamBlock item={item} track={track} cat={cat} setCat={setCat} />
-            ) : part === 'whole' ? (
-              <WholeBlock item={item} />
-            ) : part === 'style' && item.type === 'text' ? (
-              <StyleBlock item={item} />
-            ) : part === 'style' ? null : (
-              <SingleBlock item={item} role={part} cat={cat} setCat={setCat} />
-            )}
-          </div>
-        </>
+        <div data-testid="fx-effects">
+          {part === 'seam' ? (
+            <SeamBlock item={item} track={track} cat={cat} setCat={setCat} />
+          ) : part === 'whole' ? (
+            <WholeBlock item={item} />
+          ) : part === 'textfx' || part === 'kinetic' ? (
+            item.type === 'text' ? (
+              <StyleBlock item={item} mode={part === 'textfx' ? 'basic' : 'kinetic'} />
+            ) : null
+          ) : (
+            <SingleBlock item={item} role={part} cat={cat} setCat={setCat} />
+          )}
+        </div>
       )}
     </div>
   );
@@ -147,13 +103,13 @@ function WholeBlock({ item }: { item: Item }) {
 }
 
 /** 字卡的文字特效：整段字一直在動。［基本］是舊的 4 種；其他組是動態字卡 64 式（照原版分組），選一種或「無」 */
-function StyleBlock({ item }: { item: Item }) {
+function StyleBlock({ item, mode }: { item: Item; mode: 'basic' | 'kinetic' }) {
   const textFx = item.type === 'text' ? item.textFx?.kind : undefined;
   const kin = item.type === 'text' ? item.kinetic : undefined;
   const kdef = kin ? kineticById(kin.id) : undefined;
   const groups = KINETIC_GROUPS.filter((g) => KINETIC.some((f) => f.group === g.id));
-  const [pickedGroup, setGroup] = useState<KineticGroup | 'basic' | null>(null);
-  const grp: KineticGroup | 'basic' = pickedGroup ?? kdef?.group ?? 'basic';
+  const [pickedGroup, setGroup] = useState<KineticGroup | null>(null);
+  const grp: KineticGroup = pickedGroup ?? kdef?.group ?? groups[0]!.id;
   const focus = () => useUI.setState({ fxFocus: { id: item.id, role: 'style' } });
   const pickBasic = (k: TextFxKind | null) => {
     setTextFx(item.id, k);
@@ -166,32 +122,40 @@ function StyleBlock({ item }: { item: Item }) {
   const run = item.type === 'text' ? item.card.runs[0] : undefined;
   const words = item.type === 'text' && kdef ? kineticWords(item, kdef.words) : [];
   const cardWords = (def: KineticDef) => (item.type === 'text' ? kineticWords(item, def.words) : def.words);
-  const none = !textFx && !kin;
+  // 基本文字特效（4 種）與動態字卡（64 式）各一個視窗；「無」只清掉這一個視窗管的那一種
+  const none = mode === 'basic' ? !textFx : !kin;
   return (
     <>
-      <div className="seg" role="tablist" aria-label="文字特效分組" data-testid="kn-groups">
-        {([['basic', '基本'], ...groups.map((g) => [g.id, g.name] as const)] as const).map(([id, name]) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={grp === id}
-            data-testid={`kn-group-${id}`}
-            className={`seg-btn${grp === id ? ' on' : ''}`}
-            onClick={() => setGroup(id)}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-      <div className="tr-grid" role="radiogroup" aria-label="文字特效" data-testid="tr-grid">
+      {mode === 'kinetic' && (
+        <div className="seg" role="tablist" aria-label="動態字卡分組" data-testid="kn-groups">
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              role="tab"
+              aria-selected={grp === g.id}
+              data-testid={`kn-group-${g.id}`}
+              className={`seg-btn${grp === g.id ? ' on' : ''}`}
+              onClick={() => setGroup(g.id)}
+            >
+              {g.name}
+            </button>
+          ))}
+        </div>
+      )}
+      <div
+        className="tr-grid"
+        role="radiogroup"
+        aria-label={mode === 'basic' ? '文字特效' : '動態字卡'}
+        data-testid="tr-grid"
+      >
         <button
           role="radio"
           aria-checked={none}
-          aria-label="文字特效 無"
+          aria-label={mode === 'basic' ? '文字特效 無' : '動態字卡 無'}
           className={`tr-card${none ? ' on' : ''}`}
           onClick={() => {
-            setTextFx(item.id, null);
-            setKinetic(item.id, null);
+            if (mode === 'basic') setTextFx(item.id, null);
+            else setKinetic(item.id, null);
             focus();
           }}
         >
@@ -200,7 +164,7 @@ function StyleBlock({ item }: { item: Item }) {
           </span>
           <span className="tr-name">無</span>
         </button>
-        {grp === 'basic'
+        {mode === 'basic'
           ? TEXT_FXS.map((f) => (
               <button
                 key={f.id}
@@ -227,7 +191,9 @@ function StyleBlock({ item }: { item: Item }) {
               />
             ))}
       </div>
-      {kin && kdef && item.type === 'text' && <KineticSettings item={item} def={kdef} words={words} />}
+      {mode === 'kinetic' && kin && kdef && item.type === 'text' && (
+        <KineticSettings item={item} def={kdef} words={words} />
+      )}
     </>
   );
 }
@@ -372,31 +338,29 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
           ))}
         </div>
         {len !== null && <div className="slider-label">一輪 {(len / speed).toFixed(1)} 秒</div>}
-        {len !== null && (
-          <>
-            <div className="slider-label">字卡比一輪長時</div>
-            <div className="chips" role="radiogroup" aria-label="字卡比一輪長時">
-              {(
-                [
-                  ['loop', '重複播放'],
-                  ['hold', '停在最後畫面'],
-                ] as const
-              ).map(([id, name]) => (
-                <button
-                  key={id}
-                  role="radio"
-                  aria-checked={(k.end ?? 'loop') === id}
-                  aria-label={name}
-                  data-testid={`kn-end-${id}`}
-                  className={`chip${(k.end ?? 'loop') === id ? ' active' : ''}`}
-                  onClick={() => patchKinetic(item.id, { end: id === 'loop' ? undefined : id })}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+        <>
+          <div className="slider-label">字卡比一輪長時</div>
+          <div className="chips" role="radiogroup" aria-label="字卡比一輪長時">
+            {(
+              [
+                ['loop', '重複播放'],
+                ['hold', '停在最後畫面'],
+              ] as const
+            ).map(([id, name]) => (
+              <button
+                key={id}
+                role="radio"
+                aria-checked={(k.end ?? 'loop') === id}
+                aria-label={name}
+                data-testid={`kn-end-${id}`}
+                className={`chip${(k.end ?? 'loop') === id ? ' active' : ''}`}
+                onClick={() => patchKinetic(item.id, { end: id === 'loop' ? undefined : id })}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </>
       </div>
     </div>
   );
@@ -515,11 +479,6 @@ function SingleBlock({
           }}
         />
       )}
-      <p className="hint">
-        {role === 'in'
-          ? '進場：這個素材從開頭開始出現（素材當 B）。影片照常播，不會等特效做完。'
-          : '出場：特效在素材結尾結束，素材慢慢離開（素材當 A）。'}
-      </p>
     </>
   );
 }
@@ -617,50 +576,6 @@ function SeamBlock({
           {spanNow && <TransitionAudioBlock item={item} prev={spanNow.prev} />}
         </>
       )}
-    </>
-  );
-}
-
-/** 音訊沒有畫面特效：只有「幾秒內慢慢變大聲（淡入）／慢慢變小聲（淡出）」 */
-function AudioFx({ item }: { item: VideoItem }) {
-  const max = Math.max(Math.min(10, Math.round((item.duration / 2) * 10) / 10), 0.1);
-  return (
-    <>
-      <p className="hint">音訊的特效：開頭慢慢變大聲、結尾慢慢變小聲。</p>
-      <Slider
-        label="淡入（逐漸變大聲）"
-        value={item.fadeIn ?? 0}
-        min={0}
-        max={max}
-        step={0.1}
-        format={(v) => `${v.toFixed(1)} 秒`}
-        onChange={(v) =>
-          editItem(
-            item.id,
-            (it) => {
-              if (it.type === 'audio') it.fadeIn = v;
-            },
-            { coalesce: `fi:${item.id}` },
-          )
-        }
-      />
-      <Slider
-        label="淡出（逐漸變小聲）"
-        value={item.fadeOut ?? 0}
-        min={0}
-        max={max}
-        step={0.1}
-        format={(v) => `${v.toFixed(1)} 秒`}
-        onChange={(v) =>
-          editItem(
-            item.id,
-            (it) => {
-              if (it.type === 'audio') it.fadeOut = v;
-            },
-            { coalesce: `fo:${item.id}` },
-          )
-        }
-      />
     </>
   );
 }

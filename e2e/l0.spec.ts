@@ -1,18 +1,21 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
+  finishLayout,
   fixture,
   isFrameTrack,
   isGreen,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
   showTimeline,
-  finishLayout,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
@@ -51,6 +54,7 @@ test('L0 版型是一個片段：放在播放線那一秒、跟主軌影片同�
   // 接縫的圓圈 → 疊化
   await showTimeline(page);
   await expect(page.getByTestId('tr-circle')).toHaveCount(1);
+  await closePanel(page);
   await page.getByTestId('tr-circle').tap();
   await page.getByRole('radio', { name: '轉場 疊化' }).tap();
   await page.getByLabel('轉場長度').fill('8'); // 0.8 秒：接縫前後各 0.4 秒
@@ -93,10 +97,11 @@ test('L0 版型不能分割；拖到別列時格子軌跟著、時間也一起',
   await addLayout(page, '上下雙格', ['solid-red.webm', 'solid-green.webm']);
   await showTimeline(page);
   const frameId = (await tracks(page)).find(isFrameTrack)!.items.find((i) => i.group && !i.cell)!.id;
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${frameId}"]`).tap();
   await openTab(page, '剪輯');
   await seekTo(page, 2);
-  await page.getByRole('button', { name: '分割', exact: true }).tap();
+  await page.getByTestId('tool-edit.split').tap();
   await expect(page.locator('.toast').filter({ hasText: '版型不能分割' })).toBeVisible();
   expect((await tracks(page)).flatMap((t) => t.items).filter((i) => i.group && !i.cell)).toHaveLength(1);
   expect(clips(page)).toBeTruthy();
@@ -106,12 +111,14 @@ test('L1 空的格子：刪掉格子素材 → 格子還在（示意圖虛線、
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '上下雙格', ['solid-red.webm', 'solid-green.webm']);
+  await openTool(page, 'layout.cells');
   await expect(page.getByTestId('ld-cell')).toHaveCount(2);
   // 刪掉第 2 格的素材
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').nth(1).tap();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   const cellTracks = (await tracks(page)).filter((t) => t.groupRole === 'cell');
   expect(cellTracks).toHaveLength(2); // 格子軌都還在
   expect(cellTracks.filter((t) => t.items.length === 0)).toHaveLength(1);
@@ -119,14 +126,17 @@ test('L1 空的格子：刪掉格子素材 → 格子還在（示意圖虛線、
   // 選回整個版型（點時間軸上的版型片段）→ 版型分頁的示意圖：空的格子是虛線
   await showTimeline(page);
   const frameId = (await tracks(page)).find(isFrameTrack)!.items.find((i) => i.group && !i.cell)!.id;
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${frameId}"]`).tap();
   await openTab(page, '版型');
+  await openTool(page, 'layout.cells');
   await expect(page.getByTestId('ld-cell').nth(1)).toHaveClass(/empty/);
   // 匯出提醒
   await page.getByRole('button', { name: '匯出影片' }).tap();
   await expect(page.getByTestId('export-empty-cells-note')).toContainText('1 格');
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
   // 點空的格子 → 選素材放進去
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').nth(1).tap();
   await expect(page.getByTestId('cell-sheet-empty')).toBeVisible();
   await page.screenshot({ path: `${SHOT}/cell-empty.png` });
@@ -167,8 +177,9 @@ test('L2 版型分頁只挑版型：沒有特效／動畫／長度；按鈕寫�
   expect(frame.duration).toBe(5);
   // 特效分頁選到整個版型：跟一般素材同一套（進場、出場、轉場、整段），沒有另外的版型動畫區
   await openTab(page, '特效');
-  await expect(page.getByTestId('fx-where')).toBeVisible();
+  for (const id of ['fx.in', 'fx.out', 'fx.seam', 'fx.whole'])
+    await expect(page.getByTestId(`tool-${id}`)).not.toHaveClass(/dim/); // 整個版型跟一般素材同一套
   await expect(page.getByTestId('layout-motion')).toHaveCount(0);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await tracks(page)).filter((t) => t.groupRole === 'cell')).toHaveLength(0);
 });

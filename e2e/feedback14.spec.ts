@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
+  closePanel,
   createProjectWith,
   finishLayout,
   fixture,
@@ -9,8 +10,11 @@ import {
   isRed,
   isWhite,
   openTab,
+  openTool,
   project,
+  regionHash,
   samplePreview,
+  seekTo,
   selectFrame,
 } from './helpers';
 
@@ -41,6 +45,7 @@ test('回報14 拖邊調整整體大小套用後：舊的外框圖不能留在�
   await layoutSetup(page);
   // 套用前：版型占滿畫面，左邊緣是外框（白）
   await expect.poll(async () => isWhite(await samplePreview(page, 0.03, 0.5))).toBe(true);
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-resize').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   const h = (await page.getByTestId('layout-h-r').boundingBox())!;
@@ -67,7 +72,9 @@ test('回報14 拖各格大小套用後：舊的分隔線不能還留著', async
   await layoutSetup(page);
   const before = (await tracks(page)).filter((t) => t.groupRole === 'cell').map((t) => t.cell!);
   const gapY = (before[0]!.y + before[0]!.h + before[1]!.y) / 2; // 兩格之間原本的線
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-cell-resize').scrollIntoViewIfNeeded();
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-cell-resize').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   const hd = (await page.getByTestId('lc-handle-h').boundingBox())!;
@@ -90,12 +97,15 @@ test('回報14 拖各格大小套用後：舊的分隔線不能還留著', async
 test('回報14 版型分頁：「整個版型」與「各格」的按鈕分成兩組、中間有空隙；寬 × 高有標題', async ({ page }) => {
   test.setTimeout(120_000);
   await layoutSetup(page);
+  await openTool(page, 'layout.size');
   const a = (await page.getByTestId('layout-resize').boundingBox())!;
+  await openTool(page, 'layout.size');
   const b = (await page.getByTestId('layout-cell-resize').boundingBox())!;
   expect(b.y - (a.y + a.height)).toBeGreaterThanOrEqual(10);
   await expect(page.getByTestId('layout-size-now')).toHaveText('100% × 100%');
   for (const w of [320, 390]) {
     await page.setViewportSize({ width: w, height: 844 });
+    await openTool(page, 'layout.size');
     const z = (await page.getByTestId('layout-shape').boundingBox())!;
     for (const id of ['layout-resize', 'layout-size-reset', 'layout-cell-resize', 'layout-cell-reset']) {
       const r = (await page.getByTestId(id).boundingBox())!;
@@ -108,6 +118,7 @@ test('回報14 版型分頁：「整個版型」與「各格」的按鈕分成�
 test('回報14 調整版型大小：「寬 × 高、套用」那一排不蓋住任何把手', async ({ page }) => {
   test.setTimeout(120_000);
   await layoutSetup(page);
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-resize').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   const card = (await page.locator('.lr-card').boundingBox())!;
@@ -123,18 +134,22 @@ test('回報14 調整版型大小：「寬 × 高、套用」那一排不蓋住�
   await page.screenshot({ path: `${SHOT}/layout-resize-card-390.png` });
 });
 
-test('回報14 特效分頁：選了特效之後，「文字特效」那一格的字也不被切掉', async ({ page }) => {
+test('回報14 特效工具列：選了特效之後，〔文字特效〕〔動態字卡〕按鈕的字不被切掉', async ({ page }) => {
   test.setTimeout(120_000);
   await addKinetic(page);
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-flow').tap();
+  await openTool(page, 'fx.kinetic');
   await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
+  await closePanel(page);
   for (const w of [320, 390]) {
     await page.setViewportSize({ width: w, height: 844 });
-    const t = await page.getByTestId('fx-part-style').evaluate((el) => [el.scrollWidth, el.clientWidth]);
-    expect(t[0], `@${w}`).toBeLessThanOrEqual(t[1]! + 1);
-    const seg = (await page.getByTestId('fx-where').boundingBox())!;
-    const b = (await page.getByTestId('fx-part-style').boundingBox())!;
-    expect(b.x + b.width, `@${w}`).toBeLessThanOrEqual(seg.x + seg.width + 0.5);
+    for (const id of ['fx.textfx', 'fx.kinetic']) {
+      const t = await page
+        .getByTestId(`tool-${id}`)
+        .evaluate((el) => [el.scrollWidth, el.clientWidth, el.querySelector('span:last-child')!.scrollWidth]);
+      expect(t[0], `@${w} ${id}`).toBeLessThanOrEqual(t[1]! + 1);
+    }
   }
   await page.screenshot({ path: `${SHOT}/effect-part-tab-390.png` });
 });
@@ -157,7 +172,7 @@ test('回報14 裁切：筆刷、橡皮擦時沒有粉紅框線（直接看結�
   await addOverlays(page, ['solid-green.webm']);
   await openTab(page, '剪輯');
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
-  await page.getByRole('button', { name: '裁切' }).tap();
+  await page.getByTestId('tool-edit.crop').tap();
   await page.getByTestId('crop-tool-lasso').tap();
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;
@@ -193,13 +208,10 @@ test('回報14 裁切：筆刷、橡皮擦時沒有粉紅框線（直接看結�
 async function addKinetic(page: Page) {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
-  await page
-    .getByRole('button', { name: /新增文字/ })
-    .first()
-    .tap();
+  await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('蔡氏家族聚餐');
   await openTab(page, '特效');
-  await page.getByTestId('fx-part-style').tap();
+  await openTool(page, 'fx.kinetic');
 }
 const textItem = async (page: Page) =>
   (await tracks(page)).flatMap((t) => t.items).find((i) => i.type === 'text')!;
@@ -207,23 +219,31 @@ const textItem = async (page: Page) =>
 test('回報14 副標：有副標的特效多一個副標輸入框，打了就存進字卡；沒有副標的特效沒有', async ({ page }) => {
   test.setTimeout(150_000);
   await addKinetic(page);
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-flow').tap();
+  await openTool(page, 'fx.kinetic');
   await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
   await expect(page.getByTestId('kn-sub-input')).toBeVisible();
   await page.getByTestId('kn-sub-input').fill('家族大團圓');
   await expect.poll(async () => (await textItem(page)).kinetic?.sub).toBe('家族大團圓');
   await page.getByTestId('kn-sub-input').fill('');
   await expect.poll(async () => (await textItem(page)).kinetic?.sub).toBeUndefined();
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-sp').tap();
+  await openTool(page, 'fx.kinetic');
   await page.locator('[data-testid="kn-card"][data-kn-id="cube"]').tap();
   await expect(page.getByTestId('kn-sub-input')).toHaveCount(0);
   await page.screenshot({ path: `${SHOT}/kinetic-sub-390.png` });
 });
 
-test('回報14 字卡比一輪長時：重複播放／停在最後畫面（一直在跑的特效沒有這個選項）', async ({ page }) => {
+test('回報14 字卡比一輪長時：重複播放／停在最後畫面（每一式都有，一直在跑的停在代表畫面）', async ({
+  page,
+}) => {
   test.setTimeout(150_000);
   await addKinetic(page);
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-in').tap();
+  await openTool(page, 'fx.kinetic');
   await page.locator('[data-testid="kn-card"][data-kn-id="burst"]').tap();
   await expect(page.getByTestId('kn-end-loop')).toBeVisible();
   await expect(page.getByTestId('kn-end-loop')).toHaveAttribute('aria-checked', 'true');
@@ -231,8 +251,38 @@ test('回報14 字卡比一輪長時：重複播放／停在最後畫面（一�
   await expect.poll(async () => (await textItem(page)).kinetic?.end).toBe('hold');
   await page.getByTestId('kn-end-loop').tap();
   await expect.poll(async () => (await textItem(page)).kinetic?.end).toBeUndefined();
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-flow').tap();
+  await openTool(page, 'fx.kinetic');
   await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
-  await expect(page.getByTestId('kn-end-hold')).toHaveCount(0);
+  await expect(page.getByTestId('kn-end-hold')).toBeVisible();
   await page.screenshot({ path: `${SHOT}/kinetic-end-390.png` });
+});
+
+test('回報14 停在最後畫面：選了之後過了停點畫面不再動；重複播放照舊一直動（含一直在跑的巨字橫移）', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await addKinetic(page);
+  await openTool(page, 'fx.kinetic');
+  await page.getByTestId('kn-group-flow').tap();
+  await openTool(page, 'fx.kinetic');
+  await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
+  const it = await textItem(page);
+  const dur = ((await project(page)).tracks as unknown as { items: { id: string; duration: number }[] }[])
+    .flatMap((t) => t.items)
+    .find((i) => i.id === it.id)!.duration;
+  expect(dur).toBeGreaterThan(2.8);
+  const full: [number, number, number, number] = [0, 0, 1, 1];
+  const at = async (t: number) => {
+    await seekTo(page, t);
+    await page.waitForTimeout(400);
+    return regionHash(page, full);
+  };
+  // 重複播放：一直在動
+  expect(await at(1.9)).not.toBe(await at(2.8));
+  // 停在最後畫面：停點（巨字橫移＝代表畫面 1.5 秒）之後不再動
+  await page.getByTestId('kn-end-hold').tap();
+  expect(await at(1.9)).toBe(await at(2.8));
+  expect(await at(0.5)).not.toBe(await at(1.9)); // 停點之前照樣在動
 });

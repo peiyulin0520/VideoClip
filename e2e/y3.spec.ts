@@ -1,5 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, finishLayout, fixture, isRed, openTab, samplePreview } from './helpers';
+import {
+  createProjectWith,
+  finishLayout,
+  fixture,
+  isRed,
+  openTab,
+  pressPlay,
+  samplePreview,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-13';
 
@@ -24,7 +32,7 @@ test('Y3 預覽：不播放時每一格有編號；播放時所有編輯框（�
   await expect(page.getByTestId('selbox')).toBeVisible();
   await page.screenshot({ path: `${SHOT}/y3-cell-numbers-390.png` });
 
-  await page.getByRole('button', { name: '播放', exact: true }).tap();
+  await pressPlay(page);
   await expect(page.getByTestId('clip-area')).toHaveCount(0);
   await expect(page.getByTestId('selbox')).toHaveCount(0);
   await expect(page.getByTestId('preview-cell-no')).toHaveCount(0);

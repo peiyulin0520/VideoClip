@@ -15,7 +15,8 @@ import { ShapeThumb } from './ShapeThumb';
 import { FontSelect } from '../fonts/FontSelect';
 
 const SECTIONS = ['文字', '版面', '字塊', '描邊陰影', '裝飾'] as const;
-type Section = (typeof SECTIONS)[number];
+export type TextSection = (typeof SECTIONS)[number];
+type Section = TextSection;
 const SIDES = [
   ['top', '上'],
   ['bottom', '下'],
@@ -39,13 +40,15 @@ export const DEFAULT_BOX: CardBox = {
 export function TextPanel({
   item,
   onAdd,
-  onAddShape,
+  only,
 }: {
   item: TextItem;
-  onAdd: () => void;
-  onAddShape: () => void;
+  onAdd?: () => void;
+  /** 只畫這一段、不畫分段切換列（功能列每一項一顆按鈕，各自升起自己的視窗） */
+  only?: TextSection;
 }) {
-  const [section, setSection] = useState<Section>('文字');
+  const [picked, setSection] = useState<Section>('文字');
+  const section = only ?? picked;
   const [linked, setLinked] = useState(false);
   const [cat, setCat] = useState<(typeof SHAPE_CATS)[number]>('基本');
   const card = item.card;
@@ -68,12 +71,16 @@ export function TextPanel({
 
   return (
     <>
-      <div className="seg-row sticky-tabs">
-        <Segmented options={SECTIONS} value={section} onChange={setSection} label="字卡設定" />
-        <button className="add-circle" aria-label="新增文字" onClick={onAdd}>
-          ＋
-        </button>
-      </div>
+      {!only && (
+        <div className="seg-row sticky-tabs">
+          <Segmented options={SECTIONS} value={section} onChange={setSection} label="字卡設定" />
+          {onAdd && (
+            <button className="add-circle" aria-label="新增另一段文字" onClick={onAdd}>
+              ＋
+            </button>
+          )}
+        </div>
+      )}
 
       {section === '文字' && (
         <>
@@ -275,11 +282,6 @@ export function TextPanel({
                 </button>
               );
             })}
-          </div>
-          <div className="chips">
-            <button className="chip sm" onClick={onAddShape}>
-              ＋ 另外新增一個獨立圖形
-            </button>
           </div>
           {box ? (
             <>
@@ -491,9 +493,7 @@ export function TextPanel({
                 onChange={(v) => edit((c) => void (c.box!.nudgeY = v), 'nudge')}
               />
             </>
-          ) : (
-            <p className="hint">選一個形狀，文字後面就會有色塊。內距上下左右可以分開調。</p>
-          )}
+          ) : null}
         </>
       )}
 
@@ -564,7 +564,6 @@ export function TextPanel({
 
       {section === '裝飾' && (
         <>
-          <p className="hint">點一個風格加到字上（可以疊好幾個），再點一次就拿掉。</p>
           <div className="deco-grid" data-testid="deco-grid">
             {DECORATION_KINDS.map((k) => {
               const on = !!card.decorations?.some((d) => d.kind === k.kind);

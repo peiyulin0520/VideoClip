@@ -1,17 +1,20 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
+  closePanel,
   createProjectWith,
   exportFrame,
+  finishLayout,
+  isFrameTrack,
   isGreen,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo as rawSeekTo,
-  isFrameTrack,
-  finishLayout,
   selectFrame,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-9/i7';
@@ -57,10 +60,13 @@ test('定格：開頭按「◇ 定格」→ 換時間用 X 位置滑桿（自動
 }) => {
   test.setTimeout(120_000);
   await setup(page);
+  await openTab(page, '剪輯');
   await expect(page.getByTestId('kf-btn')).toBeEnabled();
   await seekTo(page, 0.02);
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(1);
+  await openTab(page, '剪輯');
   await expect(page.getByTestId('kf-btn')).toHaveAttribute('aria-pressed', 'true');
   expect((await overlay(page)).keyframes![0]!.x).toBeCloseTo(0.5, 2);
 
@@ -101,9 +107,11 @@ test('定格：色調漸變——第二個定格的飽和度 −100，開頭還�
   test.setTimeout(120_000);
   await setup(page);
   await seekTo(page, 0.02);
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await seekTo(page, 3);
   await openTab(page, '色調'); // 調色在「色調」分頁
+  await openTool(page, 'color.adjust');
   await page.getByLabel('飽和度', { exact: true }).fill('-100');
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(2);
   const kfs = (await overlay(page)).keyframes!;
@@ -127,6 +135,7 @@ test('定格：預覽上拖物件（有定格時換時間拖，自動多一個�
   test.setTimeout(120_000);
   await setup(page);
   await seekTo(page, 0.02);
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await seekTo(page, 2);
   await openTab(page, '圖層');
@@ -139,7 +148,7 @@ test('定格：預覽上拖物件（有定格時換時間拖，自動多一個�
   expect(o.keyframes).toBeUndefined();
   expect(o.transform.y).toBeCloseTo(0.8, 1);
   await expect(page.getByTestId('kf-dot')).toHaveCount(0);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await overlay(page)).keyframes?.length).toBe(2);
 });
 
@@ -147,14 +156,18 @@ test('定格：分割後兩段的定格接得起來；在定格的時間再按�
   test.setTimeout(120_000);
   await setup(page);
   await seekTo(page, 0.02);
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await seekTo(page, 3);
   await openTab(page, '圖層');
   await page.getByLabel('X 位置').fill('90');
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(2);
   // 刪除第二個：把播放頭放到那個定格上（點菱形），按 ◆
+  await closePanel(page);
   await page.getByTestId('kf-dot').nth(1).tap();
+  await openTab(page, '剪輯');
   await expect(page.getByTestId('kf-btn')).toHaveAttribute('aria-pressed', 'true');
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(1);
 });
@@ -173,6 +186,7 @@ test('版型：定格打在外框＝整組一起動（各格不用單獨打）�
     (await tracks()).filter((t) => t.groupRole === 'cell').map((t) => t.items[0]!.transform.x);
   const before = await cellsX();
   await seekTo(page, 0.02);
+  await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await expect.poll(async () => (await tracks()).find(isFrameTrack)!.items[0]!.keyframes?.length).toBe(1);
   await seekTo(page, 2);

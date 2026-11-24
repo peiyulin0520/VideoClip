@@ -1,4 +1,4 @@
-import { ChevronLeft, Pause, Play, Redo2, Share, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronLeft, Pause, Play, Redo2, Share, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { countEditorRender } from '../../engine/debug';
@@ -22,11 +22,10 @@ import { setProjectAspect } from '../../store/actions';
 import { Sheet } from '../../ui/Sheet';
 import { CropEditor } from '../editor/CropEditor';
 import { ExportSheet } from '../editor/ExportSheet';
-import { GradePeekButton } from '../editor/GradePeekButton';
-import { KeyframeButton } from '../editor/KeyframeButton';
 import { PlaybarButton } from '../editor/PlaybarButton';
 import { Preview } from '../editor/Preview';
-import { Timeline, MAX_PPS, MIN_PPS } from '../editor/Timeline';
+import { ProgressBar } from '../editor/ProgressBar';
+import { Timeline } from '../editor/Timeline';
 import { BottomBar } from '../editor/Toolbar';
 
 export function Editor() {
@@ -214,7 +213,10 @@ function EditorBody() {
   const empty = project.tracks.every((t) => t.items.length === 0);
 
   return (
-    <main className={`editor${previewFull ? ' preview-full' : ''}`}>
+    <main
+      className={`editor${previewFull ? ' preview-full' : ''}`}
+      style={{ ['--proj-aspect' as string]: String(project.width / project.height) }}
+    >
       <header className="ed-top">
         <div className="btn-zone grow" data-testid="zone-nav">
           <Link className="icon-btn" to="/" aria-label="回首頁">
@@ -258,29 +260,6 @@ function EditorBody() {
           </button>
         </div>
         <span className="zone-sep" aria-hidden="true" />
-        <div className="btn-zone" data-testid="zone-history">
-          <button
-            className="icon-btn"
-            aria-label="復原"
-            aria-disabled={!canUndo}
-            onClick={() => {
-              if (!useProjectStore.getState().undo()) toast('沒有可復原的動作');
-            }}
-          >
-            <Undo2 size={22} />
-          </button>
-          <button
-            className="icon-btn"
-            aria-label="重做"
-            aria-disabled={!canRedo}
-            onClick={() => {
-              if (!useProjectStore.getState().redo()) toast('沒有可重做的動作');
-            }}
-          >
-            <Redo2 size={22} />
-          </button>
-        </div>
-        <span className="zone-sep" aria-hidden="true" />
         <div className="btn-zone" data-testid="zone-export">
           <button
             className="icon-btn export-btn"
@@ -303,6 +282,8 @@ function EditorBody() {
         emptyAction={empty ? () => pick('main') : undefined}
       />
 
+      {previewFull && <ProgressBar total={total} />}
+
       <div className="playbar">
         <div className="btn-zone" data-testid="zone-play">
           <PlaybarButton
@@ -318,24 +299,27 @@ function EditorBody() {
         </div>
         <span className="spacer" />
         <span className="zone-sep" aria-hidden="true" />
-        <div className="btn-zone" data-testid="zone-fx">
-          <KeyframeButton />
-          <GradePeekButton />
-        </div>
-        <span className="zone-sep" aria-hidden="true" />
-        <div className="btn-zone" data-testid="zone-zoom">
-          <PlaybarButton
-            icon={ZoomOut}
-            label="縮小"
-            ariaLabel="縮小時間軸"
-            onClick={() => setPps(Math.max(pps / 1.5, MIN_PPS))}
-          />
-          <PlaybarButton
-            icon={ZoomIn}
-            label="放大"
-            ariaLabel="放大時間軸"
-            onClick={() => setPps(Math.min(pps * 1.5, MAX_PPS))}
-          />
+        <div className="btn-zone" data-testid="zone-history">
+          <button
+            className="icon-btn"
+            aria-label="復原"
+            aria-disabled={!canUndo}
+            onClick={() => {
+              if (!useProjectStore.getState().undo()) toast('沒有可復原的動作');
+            }}
+          >
+            <Undo2 size={22} />
+          </button>
+          <button
+            className="icon-btn"
+            aria-label="重做"
+            aria-disabled={!canRedo}
+            onClick={() => {
+              if (!useProjectStore.getState().redo()) toast('沒有可重做的動作');
+            }}
+          >
+            <Redo2 size={22} />
+          </button>
         </div>
       </div>
 
@@ -356,9 +340,6 @@ function EditorBody() {
       <CropEditor />
 
       <Sheet open={ratioOpen} title="畫面比例" onClose={() => setRatioOpen(false)}>
-        <p className="hint">
-          預覽的底不會變，框內是影片輸出的範圍，框外（斜線）不會輸出。按「套用」才會改；按 ✕ 關閉就不改。
-        </p>
         <div className="chips" role="radiogroup" aria-label="選擇畫面比例">
           <button
             role="radio"
@@ -411,11 +392,6 @@ function EditorBody() {
             影片填滿畫面
           </button>
         </div>
-        <p className="hint">
-          {ratioFill
-            ? '位置、大小照新畫面的比例重新算，主要影片會填滿。'
-            : '每個東西在預覽上的位置、大小不變，超出框的部分留在斜線區。'}
-        </p>
         <div className="sheet-row">
           <button
             className="btn primary grow"

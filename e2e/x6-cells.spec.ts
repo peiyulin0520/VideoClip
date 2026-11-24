@@ -1,17 +1,20 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  closePanel,
   createProjectWith,
   finishLayout,
   fixture,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
   selectFrame,
-  trimClipEnd,
   showTimeline,
+  trimClipEnd,
   type RGBA,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
@@ -86,9 +89,10 @@ test('X6 一格多素材：列尾 ＋ 加色塊、加照片；格子編號；空
   // 刪掉色塊 → 4–6 是空檔：預設「停格」停在紅色最後一格
   await showTimeline(page);
   const colorItem = (await cells(page))[0]!.items.find((i) => i.start > 3.9 && i.start < 4.1)!;
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${colorItem.id}"]`).tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '刪除', exact: true }).first().tap();
+  await page.getByTestId('tool-edit.delete').first().tap();
   expect(await row(page, 0)).toEqual([
     [0, 4],
     [6, 4],
@@ -99,8 +103,10 @@ test('X6 一格多素材：列尾 ＋ 加色塊、加照片；格子編號；空
   // 空檔改成「透明」→ 不再畫紅色（要先選到整個版型，版型分頁才有它的設定）
   await selectFrame(page);
   await openTab(page, '版型');
+  await openTool(page, 'layout.play');
   await page.getByRole('radio', { name: '空檔 透明' }).tap();
   await expect.poll(async () => isRed(await samplePreview(page, cx, cy))).toBe(false);
+  await openTool(page, 'layout.play');
   await page.getByRole('radio', { name: '空檔 停格' }).tap();
   await expect.poll(async () => isRed(await samplePreview(page, cx, cy))).toBe(true);
 });
@@ -110,6 +116,7 @@ test('X6 同步／依序：排好各格素材、版型長度跟著；依序時�
   await twoCellLayout(page);
   await addColorTo(page, 1); // 第 1 格 0–4 紅、4–6 黃
   await openTab(page, '版型');
+  await openTool(page, 'layout.play');
   await page.getByRole('radio', { name: '播放方式 依序' }).tap();
   // 依序：第 1 格 0–4、4–6；第 2 格接在後面 6–10；版型 10 秒
   expect(await row(page, 0)).toEqual([
@@ -129,37 +136,33 @@ test('X6 同步／依序：排好各格素材、版型長度跟著；依序時�
   expect((await row(page, 1))[0]![0]).toBeGreaterThan(6.7);
   expect((await frame(page)).duration).toBeGreaterThan(10.7);
   if (await page.getByRole('dialog').count()) await page.getByTestId('sheet-close').tap();
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect(await row(page, 1)).toEqual([[6, 4]]);
 
   // 切回同步：第 2 格回到版型開頭
+  await openTool(page, 'layout.play');
   await page.getByRole('radio', { name: '播放方式 同步' }).tap();
   expect(await row(page, 1)).toEqual([[0, 4]]);
   expect((await frame(page)).duration).toBeCloseTo(6, 1);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await frame(page)).layoutPlay).toBe('seq');
   expect(await row(page, 1)).toEqual([[6, 4]]);
 });
 
-test('X6 移至格子：剪輯分頁［移至格子］把素材搬到別格，畫面換成新格子；預覽框出那一格', async ({ page }) => {
+test('X6 選到格子裡的素材：預覽框出那一格、標出每一格的格號；剪輯工具列不再有〔移至格子〕', async ({
+  page,
+}) => {
   test.setTimeout(180_000);
   await twoCellLayout(page);
-  const [c1, c2] = await cells(page);
+  const [c1] = await cells(page);
   const it = c1!.items[0]!;
   await showTimeline(page);
+  await closePanel(page);
   await page.locator(`[data-testid="clip"][data-item-id="${it.id}"]`).tap();
   await expect(page.getByTestId('clip-area')).toBeVisible();
   await expect(page.getByTestId('preview-cell-no')).toHaveText(['1', '2']);
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '移至格子' }).tap();
-  await page.getByRole('button', { name: '移至第 2 格' }).tap();
-  const after = await cells(page);
-  expect(after[0]!.items).toHaveLength(0);
-  expect(after[1]!.items).toHaveLength(2);
-  const moved = after[1]!.items.find((i) => i.id === it.id)!;
-  expect(moved.cell!.y).toBeCloseTo(c2!.items[0]!.cell!.y, 3);
-  // 兩個素材同時間在第 2 格：後來搬的找空位 → 接在後面
-  expect(moved.start).toBeGreaterThanOrEqual(c2!.items[0]!.start + c2!.items[0]!.duration - 1e-6);
+  await expect(page.getByRole('button', { name: '移至格子' })).toHaveCount(0);
 });
 
 test('X6 這一格視窗：素材清單、加色塊、改色塊顏色與文字（套用）、刪除一段（文字一起刪）', async ({
@@ -168,6 +171,7 @@ test('X6 這一格視窗：素材清單、加色塊、改色塊顏色與文字�
   test.setTimeout(180_000);
   await twoCellLayout(page);
   await openTab(page, '版型');
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').first().tap();
   const dlg = page.getByRole('dialog', { name: '第 1 格' });
   await expect(dlg.getByTestId('cell-items').locator('li')).toHaveCount(1);

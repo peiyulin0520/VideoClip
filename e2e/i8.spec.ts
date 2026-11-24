@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { clips, createProjectWith, project, seekTo } from './helpers';
+import { clips, createProjectWith, pressPlay, project, seekTo } from './helpers';
 
 test('長影片（90 秒）：時間軸縮圖一路鋪滿到結尾（1 分鐘之後不是空白），而且後半段是藍色的縮圖', async ({
   page,
@@ -121,7 +121,7 @@ test('縮圖補不到的備用：播放到哪裡就把那一格補上（其他�
   );
   expect((await videoAsset(page)).thumbs).toHaveLength(1); // 只有紅色那一張
   await seekTo(page, 60); // 第 60 秒（藍色）
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await expect.poll(async () => (await videoAsset(page)).thumbs.length, { timeout: 20_000 }).toBe(45);
   const a = await videoAsset(page);
   expect((await rgbOf(page, a.thumbs[30]!))[2]!).toBeGreaterThan(180); // 第 60 秒那一格是藍色

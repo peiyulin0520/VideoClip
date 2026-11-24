@@ -5,10 +5,12 @@ import {
   exportFrame,
   isGreen,
   isRed,
+  openLayerList,
   openTab,
   project,
   samplePreview,
   showTimeline,
+  undo,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
@@ -25,7 +27,7 @@ async function sandwichProject(page: Page) {
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   // 預設：影像（紅）、影像（綠）、字卡 → 字卡在最上面
   expect(await kinds(page)).toBe('media,media,text');
 }
@@ -35,7 +37,7 @@ test('X9 夾心：圖層分頁把文字往下一層＝夾在兩個影像中間�
 }) => {
   test.setTimeout(120_000);
   await sandwichProject(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   expect(await listKinds(page)).toBe('text,media,media');
   const nos = await page.getByTestId('layer-no').allTextContents();
   expect(nos).toEqual(['第 3 層', '第 2 層', '第 1 層']);
@@ -67,7 +69,7 @@ test('X9 夾心：圖層分頁把文字往下一層＝夾在兩個影像中間�
   ).toHaveCount(0);
   await page.screenshot({ path: `${SHOT}/x9-timeline-mixed-390.png` });
 
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect(await kinds(page)).toBe('media,media,text');
 });
 
@@ -75,7 +77,7 @@ test('X9 播放軸換順序只在同一類、跨過夾在中間的別類，不�
   test.setTimeout(120_000);
   await sandwichProject(page);
   const [red, green, text] = await tracks(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await textRow(page)
     .getByRole('button', { name: /往下一層/ })
     .tap(); // [紅, 文字, 綠]
@@ -86,48 +88,54 @@ test('X9 播放軸換順序只在同一類、跨過夾在中間的別類，不�
   await page.locator('.menu-item', { hasText: '往上一層' }).tap();
   expect((await tracks(page)).map((t) => t.id)).toEqual([text!.id, green!.id, red!.id]);
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(true);
-  // 文字軌在播放軸上只有一條字卡：往上一層＝提示到圖層分頁調整
+  // 文字軌在播放軸上只有一條字卡：往上一層＝提示到預覽〔圖層〕清單調整
   await page.locator(`[data-testid="track"][data-track-id="${text!.id}"] [data-testid="track-chip"]`).tap();
   await page.locator('.menu-item', { hasText: '往上一層' }).tap();
-  await expect(page.locator('.toast').filter({ hasText: '到「圖層」分頁調整' })).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: '預覽右上角的〔圖層〕' })).toBeVisible();
 });
 
-test('X9 圖層分頁「更多排序」：移到最下層／最上層；已穿插的小標點了切到圖層分頁', async ({ page }) => {
+test('X9 〔圖層〕清單：文字往下一層再往上一層回到最上面；到頂再往上有提示；已穿插的小標點了有提示', async ({
+  page,
+}) => {
   test.setTimeout(120_000);
   await sandwichProject(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await textRow(page)
-    .getByRole('button', { name: /更多排序/ })
+    .getByRole('button', { name: /往下一層/ })
     .tap();
-  await page.getByRole('button', { name: /移到最下層/ }).tap();
+  expect(await kinds(page)).toBe('media,text,media');
+  await textRow(page)
+    .getByRole('button', { name: /往下一層/ })
+    .tap();
   expect(await kinds(page)).toBe('text,media,media');
   expect(await listKinds(page)).toBe('media,media,text');
   await textRow(page)
-    .getByRole('button', { name: /更多排序/ })
+    .getByRole('button', { name: /往上一層/ })
     .tap();
-  await page.getByRole('button', { name: /移到最上層/ }).tap();
-  expect(await kinds(page)).toBe('media,media,text');
-  // 最上面再移到最上層 → 提示
   await textRow(page)
-    .getByRole('button', { name: /更多排序/ })
+    .getByRole('button', { name: /往上一層/ })
     .tap();
-  await page.getByRole('button', { name: /移到最上層/ }).tap();
+  expect(await kinds(page)).toBe('media,media,text');
+  // 最上面再往上一層 → 提示
+  await textRow(page)
+    .getByRole('button', { name: /往上一層/ })
+    .tap();
   await expect(page.locator('.toast').filter({ hasText: '已經是最上面的圖層' })).toBeVisible();
 
-  // 夾心之後到播放軸，點「已穿插」→ 切到圖層分頁
+  // 夾心之後到播放軸，點「已穿插」→ 提示怎麼看完整順序
   await textRow(page)
     .getByRole('button', { name: /往下一層/ })
     .tap();
   await openTab(page, '剪輯');
   await showTimeline(page);
   await page.locator('[data-testid="cat-head"][data-kind="media"]').getByTestId('cat-mixed').tap();
-  await expect(page.getByTestId('layer-list')).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: '預覽右上角的〔圖層〕' })).toBeVisible();
 });
 
-test('X9 圖層分頁 320 寬：每一列的按鈕不換行、不橫向捲動', async ({ page }) => {
+test('X9 〔圖層〕清單 320 寬：每一列的按鈕不換行、不橫向捲動', async ({ page }) => {
   test.setTimeout(120_000);
   await sandwichProject(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await page.setViewportSize({ width: 320, height: 844 });
   await page.waitForTimeout(200);
   const bad = await page.evaluate(() => {
@@ -137,7 +145,7 @@ test('X9 圖層分頁 320 寬：每一列的按鈕不換行、不橫向捲動', 
         const r = b.getBoundingClientRect();
         if (r.right > window.innerWidth + 0.5) out.push(`${b.getAttribute('aria-label')} 超出螢幕`);
       }
-      const btns = Array.from(row.querySelectorAll('.layer-btns button')).map(
+      const btns = Array.from(row.querySelectorAll('.peek-move button')).map(
         (b) => b.getBoundingClientRect().top,
       );
       if (Math.max(...btns) - Math.min(...btns) > 2) out.push('按鈕換行');
@@ -169,7 +177,7 @@ test('X9 版型是一整塊：圖層分頁把外面的影像往下一層＝一�
   // 版型文字（成員軌）緊貼在外框那一列的上面；綠色的影像軌在最上面
   expect(before).toEqual(['media', 'cell', 'cell', 'cell', 'media', 'member', 'media']);
   const greenId = ((await project(page)).tracks as unknown as G[])[6]!.id;
-  await openTab(page, '圖層');
+  await openLayerList(page);
   const green = page.locator('[data-testid="layer-row"]').first();
   await green.getByRole('button', { name: /往下一層/ }).tap();
   const tr = (await project(page)).tracks as unknown as G[];

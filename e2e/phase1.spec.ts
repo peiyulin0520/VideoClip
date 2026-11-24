@@ -1,18 +1,26 @@
 import { expect, test } from '@playwright/test';
 import {
   clips,
+  closePanel,
   createProjectWith,
   expectToast,
   fixture,
   isGray,
   isRed,
   isWhite,
+  openCat,
+  openTab,
+  openTool,
+  pressPlay,
   project,
+  redo,
   samplePreview,
   seekTo,
   selectedIndex,
-  timeText,
   showTimeline,
+  timeText,
+  undo,
+  zoomTimeline,
 } from './helpers';
 
 const SHOT = 'docs/screenshots/phase1';
@@ -37,8 +45,10 @@ test('兩個專案各匯入 2 個素材：重新整理後都還在，編輯一�
   // 開專案 1，刪掉一個片段，再回首頁
   await page.getByRole('link', { name: '開啟 新專案 1' }).tap();
   await expect(clips(page)).toHaveCount(2);
+  await closePanel(page);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '刪除並補齊', exact: true }).tap(); // 後面的往前接上，總長度才會變短
+  await page.getByTestId('tool-edit.delete').tap(); // 刪掉留空位
+  await page.getByTestId('gap').tap(); // 空位裡的 ←：後面的往前接上，總長度才會變短
   await expect(clips(page)).toHaveCount(1);
   await page.getByRole('link', { name: '回首頁' }).tap();
   // 首頁是從資料庫讀的：封面角落的長度變成剩下那段（clip-b 1.6 秒）＝ 離開編輯器時已立即存檔
@@ -55,7 +65,7 @@ test('兩個專案各匯入 2 個素材：重新整理後都還在，編輯一�
   // 重新整理後素材檔還在、能播放
   await page.reload();
   await expect(clips(page)).toHaveCount(1);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await expect.poll(async () => timeText(page), { timeout: 5000 }).not.toMatch(/^0:00\.0/);
 });
 
@@ -70,7 +80,7 @@ test('專案卡片選單：改名、複製、刪除', async ({ page }) => {
   await expect(page.getByTestId('project-card').filter({ hasText: '旅行 vlog' })).toBeVisible();
 
   await page.getByRole('button', { name: '旅行 vlog 的選單' }).tap();
-  await page.getByRole('button', { name: '複製' }).tap();
+  await page.getByRole('button', { name: '複製', exact: true }).tap();
   await expect(page.getByTestId('project-card')).toHaveCount(2);
   await expect(page.getByTestId('project-card').filter({ hasText: '旅行 vlog 副本' })).toBeVisible();
 
@@ -88,26 +98,29 @@ test('專案卡片選單：改名、複製、刪除', async ({ page }) => {
 });
 
 test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
+  test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm', 'clip-c.webm']);
   await expect(page.getByTestId('time')).toContainText('/ 0:06.6');
 
   // 沒選片段時，需要選取的按鈕會提示
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
-  await expectToast(page, '請先點選一個片段');
+  await openTab(page, '剪輯');
+  await page.getByTestId('tool-edit.delete').tap();
+  await expectToast(page, '先點一個片段'); // 刪除按鈕變淡，點了提示要先選
 
   // 點選片段
+  await closePanel(page);
   await clips(page).first().tap();
   expect(await selectedIndex(page)).toBe(0);
 
   // 複製：複製品放在原片段後面最近的空位（後面被占住就接在最後）；自由擺放，其他片段不動
-  await page.getByRole('button', { name: '複製' }).tap();
+  await page.getByTestId('tool-edit.copy').tap();
   await expect(clips(page)).toHaveCount(4);
   expect(await selectedIndex(page)).toBe(3);
   expect((await project(page)).tracks[0]!.items.map((i) => i.start).slice(0, 3)).toEqual([0, 2, 3.6]);
 
   // 變速：2 倍速 → 這個 2 秒的片段變 1 秒
   const totalBefore = await timeText(page);
-  await page.getByRole('button', { name: '變速' }).tap();
+  await page.getByTestId('tool-edit.speed').tap();
   await expect(page.getByTestId('speed-value')).toHaveText('1x');
   await page.getByRole('button', { name: '2x', exact: true }).tap();
   await expect(page.getByTestId('speed-value')).toHaveText('2x');
@@ -117,53 +130,51 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   await expect(clips(page).nth(3)).toContainText('2x');
 
   // 音量：靜音
-  await page.getByRole('button', { name: '音量' }).tap();
+  await openTool(page, 'audio.volume');
   await page.getByRole('button', { name: '關閉聲音', exact: true }).tap();
   await expect(page.getByTestId('volume-value')).toHaveText('0%');
   await page.getByRole('button', { name: '完成' }).tap();
   await expect(clips(page).nth(3)).toContainText('靜音');
 
-  // 完整 / 填滿
-  await page.getByRole('button', { name: '完整' }).tap();
-  await expectToast(page, '完整顯示');
-  await expect(page.getByRole('button', { name: '填滿' })).toBeVisible();
-  await page.getByRole('button', { name: '填滿' }).tap();
-
   // 分割：把播放頭移到 clip-b（1.6s）中間再分割
+  await closePanel(page);
   await clips(page).nth(1).tap();
   const n = await clips(page).count();
   const start = (await clipsStartSeconds(page))[1]!;
   await seekTo(page, start + 0.8);
-  await page.getByRole('button', { name: '分割' }).tap();
+  await page.getByTestId('tool-edit.split').tap();
   await expect(clips(page)).toHaveCount(n + 1);
   // 播放頭在邊緣不能分割
   await seekTo(page, 0);
   await page.waitForTimeout(450);
+  await closePanel(page);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '分割' }).tap();
+  await page.getByTestId('tool-edit.split').tap();
   await expectToast(page, '播放頭要在片段中間');
 
   // 刪除 / 復原 / 重做（隔一下再點同一個片段：連點兩下會跳出命名面板）
   await page.waitForTimeout(450);
+  await closePanel(page);
   await clips(page).first().tap();
   const count = await clips(page).count();
-  await page.getByRole('button', { name: '刪除', exact: true }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   await expect(clips(page)).toHaveCount(count - 1);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   await expect(clips(page)).toHaveCount(count);
-  await page.getByRole('button', { name: '重做' }).tap();
+  await redo(page);
   await expect(clips(page)).toHaveCount(count - 1);
 
   // 縮放時間軸
   const w0 = (await clips(page).first().boundingBox())!.width;
-  await page.getByRole('button', { name: '放大時間軸' }).tap();
+  await zoomTimeline(page, 1.5);
   await expect.poll(async () => (await clips(page).first().boundingBox())!.width).toBeGreaterThan(w0 * 1.3);
-  await page.getByRole('button', { name: '縮小時間軸' }).tap();
+  await zoomTimeline(page, 1 / 1.5);
 
   // 匯入：從工具列再加一張照片
+  await openCat(page, '加入');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: '匯入' }).tap(),
+    page.getByTestId('tool-add.append').tap(),
   ]);
   await chooser.setFiles(fixture('photo.png'));
   await expect(clips(page)).toHaveCount(count);
@@ -187,6 +198,7 @@ async function clipsStartSeconds(page: import('@playwright/test').Page): Promise
 
 test('修剪頭尾：拖把手會改片段長度，素材範圍受限', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await expect(page.getByTestId('trim-end')).toBeVisible();
 
@@ -214,7 +226,7 @@ test('修剪頭尾：拖把手會改片段長度，素材範圍受限', async ({
   // 一次拖曳 = 一步復原
   await drag('trim-end', -60);
   await expect(clips(page).first()).toContainText('1.0s');
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   await expect(clips(page).first()).toContainText('2.0s');
 });
 
@@ -251,7 +263,7 @@ test('播放：時間前進、影片真的在解碼、跨片段會無縫換到�
 
   // 從第 1.5 秒開始播，會跨過 2.0 秒進入第 2 支
   await seekTo(page, 1.5);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await expect(page.getByRole('button', { name: '暫停' })).toBeVisible();
   await expect.poll(async () => isGray(await samplePreview(page, 0.1, 0.5)), { timeout: 6000 }).toBe(true);
   await page.screenshot({ path: `${SHOT}/playing-second-clip.png` });
@@ -266,11 +278,12 @@ test('照片素材：預設 3 秒、預覽會顯示、不能變速', async ({ pa
   await expect(page.getByTestId('time')).toContainText('/ 0:03.0');
   // photo.png 正中間是白色圓
   await expect.poll(async () => isWhite(await samplePreview(page, 0.5, 0.5)), { timeout: 8000 }).toBe(true);
+  await closePanel(page);
   await clips(page).first().tap();
-  await page.getByRole('button', { name: '變速' }).tap();
+  await page.getByTestId('tool-edit.speed').tap();
   await expectToast(page, '照片不能變速');
-  await page.getByRole('button', { name: '音量' }).tap();
-  await expectToast(page, '照片沒有聲音');
+  await openTool(page, 'audio.volume');
+  await expectToast(page, '先點一個影片或音樂'); // 照片沒有聲音：音量按鈕變淡
 });
 
 test('不支援的檔案會提示，不會壞掉', async ({ page }) => {

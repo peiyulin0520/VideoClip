@@ -10,7 +10,6 @@ export function AssetsTab() {
         <span>貼圖</span>
       </div>
       <StickerPicker />
-      <p className="hint">畫畫功能之後會加在這裡。</p>
     </div>
   );
 }

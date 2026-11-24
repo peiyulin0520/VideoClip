@@ -3,10 +3,10 @@ import { useEffect } from 'react';
 import { itemHasGrade } from '../../engine/grade';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
-import { PlaybarButton } from './PlaybarButton';
+import { ToolButton } from './tabs/shared';
 
 /**
- * 播放列的 👁：按一下看原色（整個專案暫時不套調色）、再按一下回到色調。
+ * 色調工具列的〔看原色〕：按一下看原色（整個專案暫時不套調色）、再按一下回到色調。
  * 不改專案資料、不進復原紀錄；離開編輯器自動關掉。專案裡沒有任何調色時按鈕變淡。
  */
 export function GradePeekButton() {
@@ -21,14 +21,23 @@ export function GradePeekButton() {
   useEffect(() => {
     if (peek && !any) useUI.setState({ gradePeek: false });
   }, [peek, any]);
-  useEffect(() => () => useUI.setState({ gradePeek: false }), []);
+  // 離開色調工具列（按鈕卸載）：回到有色調的畫面
+  useEffect(
+    () => () => {
+      useUI.setState({ gradePeek: false });
+      useUI.getState().player?.setGradeBypass(null);
+    },
+    [],
+  );
   return (
-    <PlaybarButton
+    <ToolButton
       icon={on ? EyeOff : Eye}
-      label={on ? '原色' : '色調'}
+      label="看原色"
       ariaLabel={on ? '回到套用色調的畫面' : '看原色（不套色調）'}
       testId="grade-peek"
-      on={on}
+      active={on}
+      fill={on}
+      dim={!any}
       onClick={() => {
         if (!any) return toast('這個專案還沒有調色調');
         useUI.setState({ gradePeek: !peek });

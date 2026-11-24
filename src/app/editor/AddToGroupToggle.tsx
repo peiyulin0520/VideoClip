@@ -1,3 +1,5 @@
+import { Group } from 'lucide-react';
+import { ToolButton } from './tabs/shared';
 import { useProjectStore } from '../../store/projectStore';
 import { useUI } from '../../store/uiStore';
 import { findItem } from '../../engine/timeline';
@@ -29,11 +31,31 @@ export function AddToGroupToggle({ what }: { what: string }) {
         {on ? '✓ ' : ''}
         {what}加到版型「{frame.item.label ?? '版型'}」裡
       </button>
-      <p className="hint">
-        {on
-          ? '放在版型的任何位置（可以疊在外框上），時間只能在版型範圍內，跟著整個版型動。'
-          : '不加進版型：照一般方式加在專案裡。'}
-      </p>
     </div>
+  );
+}
+
+/**
+ * 工具列上的〔加進版型〕開關：選到版型（或版型裡的東西）時才出現，跟〔新增〕放在一起——
+ * 新增的文字、音樂要不要加進這個版型。開著＝強調色。
+ */
+export function GroupToggleButton({ what }: { what: string }) {
+  const project = useProjectStore((s) => s.project);
+  const selectedId = useProjectStore((s) => s.selectedId);
+  const off = useUI((s) => s.addToGroupOff);
+  const f = project && selectedId ? findItem(project, selectedId) : null;
+  const g = f?.item.group;
+  const frame = project && g ? frameOfGroup(project.tracks, g) : null;
+  if (!g || !frame) return null;
+  const on = !off;
+  return (
+    <ToolButton
+      icon={Group}
+      label="加進版型"
+      ariaLabel={`${what}加到版型「${frame.item.label ?? '版型'}」裡`}
+      fill={on}
+      active={on}
+      onClick={() => useUI.setState({ addToGroupOff: on })}
+    />
   );
 }

@@ -1,5 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, finishLayout, fixture, openTab, selectFrame, showTimeline } from './helpers';
+import {
+  closePanel,
+  createProjectWith,
+  finishLayout,
+  fixture,
+  openTab,
+  selectFrame,
+  showTimeline,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-13';
 
@@ -11,20 +19,17 @@ async function layout(page: Page) {
   await showTimeline(page);
 }
 
-test('Y4 新專案播放軸不留白：高度剛好是內容；收合分類後也跟著縮', async ({ page }) => {
+test('Y4 播放軸填滿播放列到功能列之間，下面不留白；收合分類後也一樣', async ({ page }) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['clip-a.webm']);
-  await showTimeline(page);
-  const h = async () => ({
-    box: (await page.locator('.timeline').boundingBox())!.height,
-    content: (await page.locator('.tl-content').boundingBox())!.height,
-  });
-  const a = await h();
-  expect(a.box).toBeLessThanOrEqual(a.content + 2);
+  const gap = async () => {
+    const tl = (await page.locator('.timeline').boundingBox())!;
+    const bar = (await page.locator('.bottombar').boundingBox())!;
+    return Math.abs(tl.y + tl.height - bar.y);
+  };
+  expect(await gap()).toBeLessThanOrEqual(2);
   await page.getByTestId('cat-toggle').first().tap(); // 收合「影像」
-  const b = await h();
-  expect(b.box).toBeLessThanOrEqual(b.content + 2);
-  expect(b.box).toBeLessThan(a.box);
+  expect(await gap()).toBeLessThanOrEqual(2);
 });
 
 test('Y4 標題列往右捲也留在左邊：分類標題、版型標題、版型裡的分類標題', async ({ page }) => {
@@ -57,7 +62,8 @@ test('Y4 版型的進出場特效：版型標題旁有代表字圓圈（點了�
   await page.getByRole('radio', { name: '進場 疊化' }).tap();
   await expect(page.getByTestId('group-fx-in')).toHaveText('溶');
   await expect(page.getByTestId('group-fx-out')).toHaveCount(0);
-  await page.getByTestId('group-fx-in').tap();
+  await closePanel(page);
+  await page.getByTestId('group-fx-in').tap(); // 時間軸版型標題旁的圓圈：跳到特效〔進場〕
   await expect(page.getByRole('radio', { name: '進場 疊化' })).toBeVisible();
   // 選取中的片段：有主題色外框＋白色內框
   const sel = page.locator('[data-testid="clip"].selected').first();

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createProjectWith, openTab, project } from './helpers';
+import { closePanel, createProjectWith, openTab, openTool, pressPlay, project } from './helpers';
 
 type Hook = {
   stats: () => { fps: number; renderMs: number };
@@ -17,7 +17,7 @@ async function waitHook(page: import('@playwright/test').Page) {
 test('播放順暢：播放中編輯器不會每一格都重畫，畫面更新率夠', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-c.webm']); // 2 秒 + 3 秒
   await waitHook(page);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await expect(page.getByRole('button', { name: '暫停' })).toBeVisible();
   const before = await hook(page, (h) => h.editorRenders());
   await page.waitForTimeout(2500);
@@ -41,7 +41,7 @@ test('影片聲音：播放時有聲音輸出；音量 0 就沒有；有 Audio S
   });
   await createProjectWith(page, ['clip-c.webm']); // 3 秒，660Hz
   await waitHook(page);
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await expect(page.getByRole('button', { name: '暫停' })).toBeVisible();
   const type = await page.evaluate(
     () => (navigator as unknown as { audioSession: { type: string } }).audioSession.type,
@@ -56,12 +56,13 @@ test('影片聲音：播放時有聲音輸出；音量 0 就沒有；有 Audio S
 
   // 音量 0：播放時沒有聲音
   await page.getByRole('button', { name: '播放' }).waitFor();
+  await closePanel(page);
   await page.getByTestId('clip').first().tap();
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '音量' }).tap();
+  await openTool(page, 'audio.volume');
   await page.getByRole('slider', { name: '音量' }).fill('0');
   expect((await project(page)).tracks[0]!.items[0]!).toMatchObject({ volume: 0 });
-  await page.getByRole('button', { name: '播放' }).tap();
+  await pressPlay(page);
   await page.waitForTimeout(800);
   const peak = await page.evaluate(async () => {
     const h = (window as unknown as { __videoclip: { audio: () => { level: number | null } } }).__videoclip;

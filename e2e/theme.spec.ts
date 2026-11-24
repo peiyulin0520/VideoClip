@@ -102,7 +102,7 @@ test('首頁在每個主題下也看得到專案卡片與「新增專案」', as
 test('清新／溫暖：時間軸上字卡與音樂片段的字看得清楚（深底配淺字）', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增文字/ }).tap();
+  await page.getByTestId('tool-text.add').tap();
   await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
   await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });

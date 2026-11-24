@@ -2,46 +2,48 @@ import { expect, test } from '@playwright/test';
 import {
   addOverlays,
   clips,
+  closePanel,
   createProjectWith,
   exportFrame,
+  finishLayout,
   fixture,
   openTab,
+  openTool,
   project,
   seekTo,
-  finishLayout,
   selectFrame,
+  undo,
 } from './helpers';
 
-test('播放列：播放鍵只有圖示；定格、縮小、放大是圖示加中文；按住時有顏色回饋；定格開著時是主題色', async ({
+test('播放列：播放鍵只有圖示、復原重做在右邊；定格在剪輯工具列；按住時有顏色回饋；定格開著時是主題色', async ({
   page,
 }) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm']);
   const play = page.getByRole('button', { name: '播放', exact: true });
   expect(((await play.innerText()) ?? '').trim()).toBe('');
-  await expect(page.getByRole('button', { name: '縮小時間軸' })).toContainText('縮小');
-  await expect(page.getByRole('button', { name: '放大時間軸' })).toContainText('放大');
-  await expect(page.getByTestId('kf-btn')).toContainText('定格');
+  await expect(page.getByRole('button', { name: '縮小時間軸' })).toHaveCount(0); // 縮放改成雙指
   // 按住：底色疊一層主題色（box-shadow 跟沒按時不同）
-  const zoom = page.getByRole('button', { name: '放大時間軸' });
-  const shadow = () => zoom.evaluate((el) => getComputedStyle(el).boxShadow);
+  const undoBtn = page.getByRole('button', { name: '復原' });
+  const shadow = () => undoBtn.evaluate((el) => getComputedStyle(el).boxShadow);
   const rest = await shadow();
-  const b = (await zoom.boundingBox())!;
+  const b = (await undoBtn.boundingBox())!;
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.down();
   await expect.poll(shadow).not.toBe(rest);
   await page.mouse.up();
   await expect.poll(shadow).toBe(rest);
   await page.screenshot({ path: 'docs/screenshots/feedback-10/playbar.png' });
-  // 定格：選到素材、新增定格後，按鈕變主題色底（aria-pressed）
+  // 定格：選到素材、新增定格後，按鈕變主題色（aria-pressed）
+  await closePanel(page);
   await clips(page).first().tap();
+  await openTab(page, '剪輯');
   const kf = page.getByTestId('kf-btn');
-  const bg = () => kf.evaluate((el) => getComputedStyle(el).backgroundColor);
-  const off = await bg();
+  await expect(kf).toContainText('關鍵格');
   await seekTo(page, 0.5);
   await kf.tap();
   await expect(kf).toHaveAttribute('aria-pressed', 'true');
-  expect(await bg()).not.toBe(off);
+  await expect(kf).toHaveClass(/active/);
 });
 
 test('時間軸：最下面的影像軌跟其他軌一樣高；直式影片縮圖格最窄 18px 左右；片段名稱一行', async ({ page }) => {
@@ -94,6 +96,7 @@ async function makeBooth(
     await page.getByLabel('外框透明度').fill(String(Math.round(opts.opacity * 100)));
   await finishLayout(page, [fixture('solid-green.webm')]);
   await selectFrame(page); // 版型層：整個版型
+  await openTool(page, 'layout.frame');
   await expect(page.getByTestId('group-panel')).toBeVisible();
 }
 
@@ -122,7 +125,7 @@ test('版型外框自由選顏色＋透明度：黑色 50% → 外框是半透�
   const after = (await allItems(page)).find((i) => i.frameStyle)!;
   expect(after.assetId).not.toBe(oldAsset);
   expect(after.frameStyle!.opacity).toBe(0.5);
-  await page.getByRole('button', { name: '復原' }).tap();
+  await undo(page);
   expect((await allItems(page)).find((i) => i.frameStyle)!.frameStyle!.color).toBe('#141414');
 });
 
@@ -144,18 +147,20 @@ test('版型附文字：拍貼機有「PHOTO BOOTH」＋日期的字卡（group 
   const dFrame = frame1.transform.x - frame0.transform.x;
   expect(Math.abs(dFrame)).toBeGreaterThan(0.1);
   expect(text1.transform.x - text0.transform.x).toBeCloseTo(dFrame, 2); // 文字跟著動同樣的量
-  // 選到文字：文字分頁有「這是版型的文字」提示；改內容、字體，位置不動
+  // 選到文字：改內容、字體，位置不動
+  await closePanel(page);
   await page.locator('[data-testid="clip"][data-kind="text"]').first().tap();
   await openTab(page, '文字');
-  await expect(page.getByTestId('group-text-hint')).toBeVisible();
+  await openTool(page, 'text.content');
   await page.getByLabel('文字內容').fill('MY STRIP');
   const text2 = (await allItems(page)).find((i) => i.type === 'text')!;
   expect(text2.card!.runs[0]!.text).toBe('MY STRIP');
   expect(text2.transform.x).toBeCloseTo(text1.transform.x, 5);
   // 刪除整個版型：文字也一起不見
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '版型');
-  await page.getByRole('button', { name: '移除版型' }).tap();
+  await page.getByTestId('tool-layout.remove').tap();
   expect((await allItems(page)).filter((i) => i.type === 'text')).toHaveLength(0);
 });
 
@@ -169,38 +174,33 @@ test('版型可以選「不附版型文字」', async ({ page }) => {
   expect((await allItems(page)).filter((i) => i.type === 'text')).toHaveLength(0);
 });
 
-test('播放列：播放鍵與時間在最左；定格、色調(👁)、縮小、放大靠在最右、彼此間距 ≤ 8px', async ({ page }) => {
+test('播放列：播放鍵與時間在最左；復原、重做靠在最右、彼此間距 ≤ 8px', async ({ page }) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm']);
   const box = async (loc: ReturnType<typeof page.getByRole>) => (await loc.boundingBox())!;
   const play = await box(page.getByRole('button', { name: '播放', exact: true }));
-  const kf = await box(page.getByTestId('kf-btn'));
-  const peek = await box(page.getByTestId('grade-peek'));
-  const out = await box(page.getByRole('button', { name: '縮小時間軸' }));
-  const inn = await box(page.getByRole('button', { name: '放大時間軸' }));
+  const undoB = await box(page.getByRole('button', { name: '復原' }));
+  const redoB = await box(page.getByRole('button', { name: '重做' }));
   expect(play.x).toBeLessThan(20);
-  expect(kf.x).toBeGreaterThan(play.x + 100);
-  // 同一區的鈕靠很近；不同區（定格／色調 ｜ 縮小／放大）中間多一條細線
-  for (const [a, b, max] of [
-    [kf, peek, 8],
-    [peek, out, 12],
-    [out, inn, 8],
-  ] as const) {
-    expect(b.x - (a.x + a.width)).toBeLessThanOrEqual(max);
-    expect(b.x - (a.x + a.width)).toBeGreaterThanOrEqual(0);
-  }
+  expect(undoB.x).toBeGreaterThan(play.x + 100);
+  expect(redoB.x - (undoB.x + undoB.width)).toBeLessThanOrEqual(8);
+  expect(redoB.x - (undoB.x + undoB.width)).toBeGreaterThanOrEqual(0);
   const vw = page.viewportSize()!.width;
-  expect(vw - (inn.x + inn.width)).toBeLessThanOrEqual(12);
+  expect(vw - (redoB.x + redoB.width)).toBeLessThanOrEqual(12);
 });
 
-test('👁 看原色：沒調色時按鈕不能用；調色後按一下變原色（紅）、再按回灰；匯出時自動關', async ({ page }) => {
+test('看原色（色調視窗標題列）：沒調色時按鈕不能用；調色後按一下變原色、再按回灰；匯出時自動關', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   await createProjectWith(page, ['solid-red.webm']);
+  await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '色調');
   const peek = page.getByTestId('grade-peek');
   await peek.tap();
   await expect(peek).toHaveAttribute('aria-pressed', 'false');
+  await openTool(page, 'color.look');
   await page.getByRole('radio', { name: '色調 黑白' }).tap();
   await peek.tap();
   await expect(peek).toHaveAttribute('aria-pressed', 'true');

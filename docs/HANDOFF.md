@@ -1,6 +1,6 @@
 # 交接手冊（HANDOFF）
 
-給接手的 AI／工程師。先讀 `AGENTS.md`（規則）和 `docs/PROGRESS.md`（目前狀態），這份補上「為什麼這樣做」和「程式在哪裡」。
+給接手的 AI／工程師。**目前的總規劃與順序看 `docs/plans/2026-11-23-roadmap-ui.md`（2026-11-23 定案；U1–U6 程式都做完了（U6 見 `docs/plans/2026-11-23-u6-function-bar.md`），**e2e 已改成新行為且全綠，等使用者說再開一個 PR**）。**先讀 `AGENTS.md`（規則）和 `docs/PROGRESS.md`（目前狀態），這份補上「為什麼這樣做」和「程式在哪裡」。
 **接手時可以直接對 ChatGPT 等說：**
 > 請先讀 repo 根目錄的 AGENTS.md，再讀 docs/PROGRESS.md 最上面的「交接快照」和 docs/HANDOFF.md，然後從「下一步」繼續。每做完一步都要照 AGENTS.md 的「紀錄規則」更新紀錄、commit 並 push。
 
@@ -217,7 +217,7 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **版型成員（v2，L3）**：版型裡的文字／貼圖／音效在 `groupRole:'member'` 的軌道（`memberTracksOf`），貼圖、音效物件要標 `member:true`（不然 `isFrameItem` 會把有 group 沒 cell 的影像當外框）。加進版型用 `addGroupMember`（自動夾進版型時間範圍，不要自己 push）；拖移、修剪都要過 `clampToGroup`／`groupSpan`。播放軸展開狀態在 `useGroupOpen`；`Timeline.tsx` 的 `layout` 會在展開的版型那一列後面插入標題列與成員／格子列（`rows[].sub`），這些列不參與換圖層順序的拖移
 - **版型分頁（v2，L2）**：只有「挑版型→確定，加在播放線」與選到版型時的示意圖／外框顏色。進出場、動畫、轉場、長度都不在這裡（特效分頁、時間軸尾端）。e2e 加版型用 `helpers.finishLayout`（確定→逐格放素材），拉長縮短版型用 `trimClipEnd`
 - **版型的軌道（v2，L0＋L1）**：外框＝一般影像軌上的片段（`isFrameItem`：有 group、沒有 cell；`frameOfGroup(tracks, group)` 找它），格子＝`groupRole:'cell'` 的隱藏軌（`track.cell` 記位置，可以是空的）；格子軌永遠貼在外框那一列正下方——`projectStore.apply` 每次都跑 `normalizeGroupTracks`，不要自己排。版型參加轉場時整組用外框的 look（`scene.ts` 的 `groupTransitions`／`deferred`）。不要再用 `groupRole === 'frame'`（只剩舊資料，載入會轉掉）。e2e 找外框軌用 `isFrameTrack`（helpers）
-- **動態字卡（文字特效 64 式，2026-11-16）**：計畫 `docs/plans/2026-11-16-kinetic-text.md`，原版參考 `docs/reference/claude-animated-text/`（MIT，授權檔在 `src/engine/kinetic/LICENSE-claude-animated-text.txt`）。每一式是 `KineticDef`（`draw(stage, t)` 畫到 canvas 2D，單位照原版 cqmin／cqw／cqh 換成像素，亂數用固定種子）；加新一式＝在 `fx/<組>.ts` 加一筆、`KINETIC` 就會出現在介面（64 式已全部完成：in／flow／swap／em／sp／mv／tv／hr 各 8）。`KineticDef.hi`＝這一式自己的預設強調色（用 `schemeOf(def)` 取配色）。副標 `kinetic.sub`（`KineticDef.sub` 有值的式子才有，Stage.sub）、`kinetic.end`＝loop／hold（`hold.ts` 的 `HOLD_F` 是每一式一輪裡「字完整呈現」的比例，`holdTime()` 算出最後一個詞那一輪的停點；渲染時 `tt=min(tt,hold)`）。compositor 的 `frameCanvas` 重畫前一定要先清（外框圖有透明區）。效能：`KINETIC_BENCH=1 npx playwright test e2e/kinetic-bench.spec.ts` 量每一式畫一張的時間；跟原版比對：`KINETIC_COMPARE=1 …kinetic-compare.spec.ts`＋`scripts/kinetic-compare.py`。`TextItem.kinetic` 跟 `textFx` 二選一；動態字卡畫在「框」大小的圖上（框外看不到）：框＝`kinetic.size`（沒有＝那一式的預設框 `area`：wide／full／lyrics，`engine/kinetic/hit.ts`），中心＝字卡位置，`measureTextItem` 回傳框的大小；每一式的單位 cqmin／cqw／cqh 以框為準；`fade` 邊緣淡出、`wrapLines` 換行工具在 `core.ts`；顏色（字色＝字卡文字段顏色、`accent`、`bg` 色碼）都用選色器。調整範圍：`uiStore.kineticEdit`＋`KineticAreaEdit`。`SceneLayer.dynamic`＝同一張畫布每格重畫，compositor 不重建貼圖。
+- **動態字卡（文字特效 64 式，2026-11-16）**：計畫 `docs/plans/2026-11-16-kinetic-text.md`，原版參考 `docs/reference/claude-animated-text/`（MIT，授權檔在 `src/engine/kinetic/LICENSE-claude-animated-text.txt`）。每一式是 `KineticDef`（`draw(stage, t)` 畫到 canvas 2D，單位照原版 cqmin／cqw／cqh 換成像素，亂數用固定種子）；加新一式＝在 `fx/<組>.ts` 加一筆、`KINETIC` 就會出現在介面（64 式已全部完成：in／flow／swap／em／sp／mv／tv／hr 各 8）。`KineticDef.hi`＝這一式自己的預設強調色（用 `schemeOf(def)` 取配色）。副標 `kinetic.sub`（`KineticDef.sub` 有值的式子才有，Stage.sub）、`kinetic.end`＝loop／hold（`hold.ts` 的 `HOLD_F` 是每一式一輪裡「字完整呈現」的比例，`holdTime()` 算出最後一個詞那一輪的停點，一直在跑的式子停在 poster；渲染時 `tt=min(tt,hold)`）。compositor 的 `frameCanvas` 重畫前一定要先清（外框圖有透明區）。效能：`KINETIC_BENCH=1 npx playwright test e2e/kinetic-bench.spec.ts` 量每一式畫一張的時間；跟原版比對：`KINETIC_COMPARE=1 …kinetic-compare.spec.ts`＋`scripts/kinetic-compare.py`。`TextItem.kinetic` 跟 `textFx` 二選一；動態字卡畫在「框」大小的圖上（框外看不到）：框＝`kinetic.size`（沒有＝那一式的預設框 `area`：wide／full／lyrics，`engine/kinetic/hit.ts`），中心＝字卡位置，`measureTextItem` 回傳框的大小；每一式的單位 cqmin／cqw／cqh 以框為準；`fade` 邊緣淡出、`wrapLines` 換行工具在 `core.ts`；顏色（字色＝字卡文字段顏色、`accent`、`bg` 色碼）都用選色器。調整範圍：`uiStore.kineticEdit`＋`KineticAreaEdit`。`SceneLayer.dynamic`＝同一張畫布每格重畫，compositor 不重建貼圖。
 - **素材遺失（Y11，2026-11-16）**：`findMissing`（`assetUrls.ts`）回傳找不到檔案的素材並記在 `lost`（`isAssetMissing`）；`Editor.tsx` 載入時把沒人用的從 `project.assets` 拿掉並 `saveProject`，只提醒有在用的；時間軸 clip 對 `isAssetMissing` 的素材蓋 `.clip-lost`。
 - **拖格子大小（Y9，2026-11-16）**：`frameStyle.cells`（每格佔畫面的比例，照格號順序）覆蓋 `buildIn` 算出來的格子範圍（格數對才用），外框底板不動。`LayoutCellResize` 用 `uiStore.cellEdit` 存草稿，`dividersOf`／`moveDivider` 是純函式（有單元測試）；套用走 `reshapeLayout(group, { cells })`，其他 `reshapeLayout` 呼叫（改格數、大小、框線）會清掉 `cells`。
 - **一格多列（Y8，2026-11-16）**：格子軌有 `cellNo`（第幾格）；同一格的幾條軌＝`cellsOf`／`rowsOfCell`，陣列順序＝上下。所有「第幾格」都要用 `cellNoOf`／`cellsOf`，不要再用 `cellTracksOf().indexOf`。`ensureCellNos` 在每次 `apply` 補舊資料。空檔：停格只有「有素材的最上面那列」、色塊只有最下面那列，而且整格沒有列在播才畫。動作：`addCellRow`、`removeCellRow`、`setCellNo`、`swapCellRows`。
@@ -231,3 +231,19 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **彈出視窗「套用／儲存」規則（使用者規定）**：設定型視窗（畫面比例、字體、專案名稱、更換封面、改名、命名、選色…）一律在視窗裡放一顆寫著「套用」或「儲存」的主題色按鈕；視窗裡先改的是草稿（state），按了才寫進專案，**視窗不會自動關**（跳 toast「已套用／已儲存」）；按 ❌／點背景關閉＝只放棄「最後一次套用之後」的改動，已套用的保留。例外（套用後一定要關）：自訂比例、裁切編輯器、片段範圍、版型挑素材。新增這類視窗要照做（例：`FontSelect` 的 `draft`、Editor 的 `ratioDraft`）。選單、確認刪除、匯出不在此列
 - **feedback-12 X2 視窗**：所有彈出視窗都用 `ui/Sheet`（標題列有 ❌ `data-testid=sheet-close`、**不要再加底部「取消」**；❌＝不存）；視窗內的修改要嘛是視窗內暫存、按套用才寫入，要嘛像轉場聲音視窗那樣自己在 ❌／取消時還原
 
+
+## U1–U5 介面重整（2026-11-23）新增的東西（給下一位）
+- **版面**：`.editor` 是 `100svh` 直向 flex（頂列／預覽／〔全螢幕時的進度條〕／播放列／時間軸／功能列），整頁不捲；時間軸 `flex:1`、裡面上下滑；預覽高度由 `--proj-aspect` 決定（直式約 54% 高，橫式、方形較矮）。
+- **功能列**：`Toolbar.tsx` `BottomBar`。狀態 `cat`（第一層類別或 null）、`tool`（升起的視窗或 null）、`panel`（變速／音量／範圍）。類別與視窗的定義在 `tabs/shared.tsx`（`CATS`、`SINGLE_TOOL`、`TOOL_TITLE`、`targetOfTab`）。只有一個工具的類別（版型、特效、色調、音訊）點了直接升起視窗；剪輯、加入、文字進第二層工具列（`.fb-row`，`fb-back` 返回）。**新增功能時**：加一個工具＝在對應類別的工具列放 `ToolButton`、需要視窗就加一個 `ToolId` 與 `TOOL_TITLE`。
+- **自動跳**：`targetForSelection`（選到東西只換類別、不自動升起視窗）；`requestTab`（別處呼叫，如時間軸轉場圓圈→特效）經 `targetOfTab` 對應。刻意晚 250ms 才跳（手指放開後瀏覽器補送的 click 會落在新版面的別的按鈕上）。
+- **視窗會蓋住播放列和時間軸**（使用者決定維持，2026-11-23）：e2e 點播放、復原、時間軸片段前先 `closePanel`；`helpers.ts` 有 `undo/redo/pressPlay/zoomTimeline`。
+- **鎖定／全螢幕**：`useUI.previewLock`／`previewFull`（`Preview` 卸載時重設）；鎖定在 `Preview.onPointerDown` 最前面擋；全螢幕進度條 `ProgressBar.tsx`。
+- **字級**：類別按鈕用 `--fs-note`，其餘仍是 `--fs-body`；不要在新元件寫死 px。
+- **沒有說明小字**：使用者偏好（網頁式、簡潔）；空狀態一句提示可以，教學文字不要。
+
+## U6 功能列每一項一顆按鈕（2026-11-24）新增的東西（給下一位）
+- **工具表**：`src/app/editor/tools.tsx` 的 `TOOLS`（類別 → 按鈕清單）是功能列的唯一來源：加／改按鈕只動這張表。每顆有 `id`（e2e 用 `data-testid="tool-<id>"`）、`zone`（換區畫細線）、`kind`（popup 升起視窗／action 直接執行／toggle 切換）、`enabled`＋`need`（不能用時變淡、點了 toast）、`guard`（能用但不適合的提示）、`badge`（圖示那格顯示目前的值）、`popup`（視窗內容；`bare` 表示它自己就是 Sheet）、`custom`（自己畫按鈕：關鍵格 `KeyframeButton`、看原色 `GradePeekButton`）。
+- **視窗內容**：不要再做分段切換列；每個視窗只放一項（`TextTab section`、`EffectTab part`、`LayoutTab part`、`ColorTab part`、`ClipPanel panel`）。小視窗即時生效、✕ 關閉，不加〔套用〕（會大改東西的 Sheet 例外）。
+- **選到東西跳類別**：`Toolbar.tsx` 的 `targetForSelection`；`requestTab`（時間軸特效圓圈等）由 `requestTarget` 對到類別＋視窗（特效看 `fxFocus.role`）。
+- **e2e**：`helpers.ts` 的 `openCat`／`openTool`（用工具 id）、`openTab`（舊名稱對照）；視窗開著會蓋住播放列、時間軸，點之前先 `closePanel`；剪輯／加入／文字／版型…的按鈕只在那個類別的工具列顯示。
+- **U6 補充（e2e 改寫時確認的行為）**：①變淡的按鈕用 class `dim`＋`data-dim`（不是 `aria-disabled`，Playwright 會一直等）；②預覽上開始拖調整（自訂比例、版型大小、格子大小、動態字卡顯示範圍）時，升起的視窗自動收起；③在版型類別點格子／整個版型，功能列留在版型；④選到東西 250 ms 後才跳類別（避免手指放開補送的 click 落在別的按鈕）；⑤預覽高度跟專案比例（方形、橫式比較矮），編輯畫面一個螢幕高、整頁不捲，時間軸自己上下捲（軌道多時下面幾條要捲才看得到）；⑥e2e 的 `undo`／`redo` 會先收視窗、按完再把原本開著的視窗升回來；⑦預覽右上〔圖層〕清單是平的一條，每列有 ▲▼（`<軌名> 往上一層／往下一層`），沒有收合、隱藏、鎖定、更多排序
