@@ -127,7 +127,7 @@ test('K0.5 顯示範圍：預設是畫面中間一條 16:9；調整範圍（拖�
   // 巨字橫移：預設整個畫面、左右淡出（框的左右邊緣是透明的，影片的藍色透出來）
   await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-flow').tap();
-  await openTool(page, 'fx.textfx');
+  await openTool(page, 'fx.kinetic');
   await page.getByRole('radio', { name: '文字特效 巨字橫移' }).tap();
   await expect(page.getByRole('radio', { name: '邊緣淡出 左右' })).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('radio', { name: '邊緣淡出 無' }).tap();
