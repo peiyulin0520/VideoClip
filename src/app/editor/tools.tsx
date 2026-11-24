@@ -1,5 +1,4 @@
 import {
-  Blend,
   Copy,
   Crop as CropIcon,
   Eye,
@@ -15,7 +14,7 @@ import {
   Grid2x2,
   LayoutGrid,
   Maximize2,
-  MoveHorizontal,
+  SquareSplitHorizontal,
   Music,
   Palette,
   Pencil,
@@ -62,6 +61,7 @@ import { startCrop } from '../../store/cropStore';
 import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { PromptSheet } from '../../ui/PromptSheet';
+import { ShadowFrameIcon, TransitionIcon } from './toolIcons';
 import { GradePeekButton } from './GradePeekButton';
 import { KeyframeButton } from './KeyframeButton';
 import { MuteSheet } from './MuteSheet';
@@ -229,7 +229,7 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
     {
       id: 'edit.split',
       label: '分割',
-      icon: Scissors,
+      icon: SquareSplitHorizontal,
       zone: 'time',
       kind: 'action',
       run: splitNow,
@@ -263,7 +263,7 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
     {
       id: 'edit.trim',
       label: '修剪',
-      icon: MoveHorizontal,
+      icon: Scissors,
       zone: 'time',
       kind: 'popup',
       enabled: (e) => {
@@ -448,7 +448,7 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
     {
       id: 'text.stroke',
       label: '描邊陰影',
-      icon: Blend,
+      icon: ShadowFrameIcon,
       zone: 'adjust',
       kind: 'popup',
       enabled: isText,
@@ -595,7 +595,7 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
     {
       id: 'fx.seam',
       label: '轉場',
-      icon: Blend,
+      icon: TransitionIcon,
       zone: 'adjust',
       kind: 'popup',
       enabled: notAudio,
@@ -791,7 +791,7 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
     {
       id: 'audio.trim',
       label: '修剪',
-      icon: MoveHorizontal,
+      icon: Scissors,
       zone: 'adjust',
       kind: 'popup',
       enabled: hasSound,
