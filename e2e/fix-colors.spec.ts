@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, legacyBox, openTab, project, touchDrag } from './helpers';
+import { createProjectWith, legacyBox, openTab, openTool, project, touchDrag } from './helpers';
 
 const SHOT = 'docs/screenshots/fix-feedback-2';
 
@@ -9,8 +9,14 @@ type Card = {
   decorations?: { kind: string; color: string }[];
 };
 const card = async (page: Page) => (await project(page)).tracks[1]!.items[0]!.card as unknown as Card;
-const section = (page: Page, name: string) =>
-  page.getByRole('tablist', { name: '字卡設定' }).getByRole('tab', { name, exact: true }).tap();
+const SECTION_TOOL: Record<string, string> = {
+  文字: 'text.content',
+  版面: 'text.layout',
+  字塊: 'text.box',
+  描邊陰影: 'text.stroke',
+  裝飾: 'text.deco',
+};
+const section = (page: Page, name: string) => openTool(page, SECTION_TOOL[name]!);
 
 async function newText(page: Page) {
   await createProjectWith(page, ['solid-blue.webm']);

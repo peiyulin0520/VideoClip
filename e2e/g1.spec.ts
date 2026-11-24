@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { countColor, createProjectWith, fixture, openTab, project, undo } from './helpers';
+import { countColor, createProjectWith, fixture, openTab, openTool, project, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-7/g1';
 type Run = { text: string; color: string; opacity?: number; weight: string };
@@ -58,7 +58,7 @@ test('字塊預設透明底＋棕色框線；形狀縮圖是線框；獨立圖�
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await addTextBtn(page).tap();
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   await page.getByRole('radio', { name: '方形' }).tap();
   const box = (await cards(page))[0]!.card.box!;
   expect(box.fillOn).toBe(false);
@@ -104,7 +104,7 @@ test('三層選單長得不一樣：底部分頁、區塊分段控制、分類�
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await addTextBtn(page).tap();
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   const bg = (sel: string) =>
     page
       .locator(sel)

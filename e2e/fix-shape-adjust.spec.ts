@@ -1,6 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
-import { countColor, createProjectWith, legacyBox, openTab, project, regionHash, undo } from './helpers';
+import {
+  countColor,
+  createProjectWith,
+  legacyBox,
+  openTab,
+  openTool,
+  project,
+  regionHash,
+  undo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/fix-feedback-2';
 
@@ -20,7 +29,7 @@ async function startWithShape(page: Page, cat: string, shapeLabel: string) {
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('吃飯');
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   if (cat !== '基本') await page.getByRole('button', { name: `圖形分類 ${cat}` }).tap();
   await page.getByRole('radio', { name: shapeLabel, exact: true }).tap();
   await legacyBox(page);

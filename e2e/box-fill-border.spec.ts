@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { countColor, createProjectWith, legacyBox, openTab, project } from './helpers';
+import { countColor, createProjectWith, legacyBox, openTab, openTool, project } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-5';
 type Box = {
@@ -29,7 +29,7 @@ test('字塊：填滿與框線分開，各自有顏色與透明度；可以不�
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('框線測試');
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   await page.getByRole('radio', { name: '方形' }).tap();
   await legacyBox(page);
   await page.getByRole('button', { name: '字塊顏色 #ffd23f' }).tap();
@@ -94,7 +94,7 @@ test('框線不再被填滿的透明度牽動；填滿透明度可以到 0%', as
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('點兩下編輯文字'); // 新文字一開始是空的提示狀態；打字後才是實心字
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   await page.getByRole('radio', { name: '方形' }).tap();
   await legacyBox(page);
   await page.getByRole('button', { name: '字塊顏色 #ffd23f' }).tap();

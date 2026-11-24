@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
-import { countColor, createProjectWith, openTab, project, undo } from './helpers';
+import { countColor, createProjectWith, openTab, openTool, project, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/phase3a';
 
@@ -23,7 +23,7 @@ test('裝飾面板：縮圖都有畫出來、點選加／拿掉、改顏色與�
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('尾端有圈圈');
-  await page.getByRole('tab', { name: '裝飾', exact: true }).tap();
+  await openTool(page, 'text.deco');
 
   // 13 種風格，每格的縮圖真的有畫東西（不是空白）
   const cells = page.getByTestId('deco-grid').locator('.deco-cell');
@@ -171,7 +171,7 @@ test('裝飾的「與文字距離」「大小」滑桿：資料與預覽都會�
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('吃飯');
-  await page.getByRole('tab', { name: '裝飾', exact: true }).tap();
+  await openTool(page, 'text.deco');
   await page.getByRole('button', { name: '裝飾 波浪底線' }).tap();
   // 波浪線粗細 25%、預設距離：線不會碰到字（用字下方到線上緣之間有藍色背景像素）
   await setRange(page, '波浪底線粗細', 25);
@@ -210,7 +210,7 @@ test('裝飾的長度、透明度、放大後的範圍：底線可以縮短、�
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('今天吃很多飯');
-  await page.getByRole('tab', { name: '裝飾', exact: true }).tap();
+  await openTool(page, 'text.deco');
   await page.getByRole('button', { name: '裝飾 虛線' }).tap();
   const d = async () =>
     (await decos(page))[0] as {

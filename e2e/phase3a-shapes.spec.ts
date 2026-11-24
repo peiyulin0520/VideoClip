@@ -1,6 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
-import { clips, countColor, createProjectWith, legacyBox, openTab, project, setSwitch } from './helpers';
+import {
+  clips,
+  countColor,
+  createProjectWith,
+  legacyBox,
+  openTab,
+  openTool,
+  project,
+  setSwitch,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/phase3a';
 
@@ -20,7 +29,7 @@ test('圖形庫：4 個分類、每個圖形都點得動、縮圖有畫、對話
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('哈囉你好');
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
 
   const cats = ['基本', '對話框', '星形', '標籤箭頭'];
   let total = 0;
@@ -88,10 +97,10 @@ test('獨立圖形：新增、用內距調大小、時間軸顯示「圖形」�
   expect((await cardOf()).box.shape).toBe('star5');
   // 預設透明底＋棕色框線；打開填滿才有黃色星星
   expect((await cardOf()).box).toMatchObject({ fillOn: false });
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   await setSwitch(page, '填滿', true);
   await expect.poll(() => countColor(page, [255, 210, 63], 30, [0.2, 0.3, 0.8, 0.7])).toBeGreaterThan(300);
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   await page.getByRole('button', { name: '圖形分類 基本' }).tap();
   await page.getByRole('radio', { name: '愛心' }).tap();
   await setRange(page, '內距 上', 150);
@@ -110,7 +119,7 @@ test('驗收截圖：每個圖形裡放「文字」的總覽', async ({ page }) 
   // 用 UI 取得全部 id：逐一展開分類讀 data-shape
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
-  await page.getByRole('tab', { name: '字塊', exact: true }).tap();
+  await openTool(page, 'text.box');
   const all: string[] = [];
   for (const c of ['基本', '對話框', '星形', '標籤箭頭']) {
     await page.getByRole('button', { name: `圖形分類 ${c}` }).tap();

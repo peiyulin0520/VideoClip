@@ -7,6 +7,7 @@ import {
   createProjectWith,
   deselect,
   openTab,
+  openTool,
   pinch,
   previewBox,
   project,
@@ -53,7 +54,7 @@ test('整頁不捲動；視窗裡面可以上下滑、最後的控制項點得�
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
-  await page.getByRole('tablist', { name: '字卡設定' }).getByRole('tab', { name: '裝飾', exact: true }).tap();
+  await openTool(page, 'text.deco');
   for (const k of ['尾端圈圈', '波浪底線', '愛心'])
     await page.getByRole('button', { name: `裝飾 ${k}` }).tap();
   // 整頁剛好一個螢幕高，不能捲
@@ -185,7 +186,7 @@ test('不用手勢也能調：圖層分頁與文字「版面」的整體大小�
       input.dispatchEvent(new Event('input', { bubbles: true }));
     }, v);
   // 文字面板「版面」
-  await page.getByRole('tablist', { name: '字卡設定' }).getByRole('tab', { name: '版面', exact: true }).tap();
+  await openTool(page, 'text.layout');
   await setRange('整體大小', 150);
   await setRange('整體大小', 180);
   await setRange('旋轉', -30);
