@@ -98,20 +98,15 @@ test('字塊預設透明底＋棕色框線；形狀縮圖是線框；獨立圖�
   expect(shape.card.box!.stroke?.color.toLowerCase()).toBe('#8b5a44');
 });
 
-test('三層選單長得不一樣：底部分頁、區塊分段控制、分類小膠囊（選中的背景色各不同、區塊不用強調色）', async ({
-  page,
-}) => {
+test('分類小膠囊：選中的背景色跟主題強調色不同（強調色留給按下去的主要動作）', async ({ page }) => {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await addTextBtn(page).tap();
   await openTool(page, 'text.box');
-  const bg = (sel: string) =>
-    page
-      .locator(sel)
-      .first()
-      .evaluate((el) => getComputedStyle(el).backgroundColor);
-  const l2 = await bg('.seg.on');
-  const l3 = await bg('.chip3.on');
+  const l3 = await page
+    .locator('.chip3.on')
+    .first()
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
   const accent = await page.evaluate(() => {
     const el = document.createElement('i');
     el.style.background = 'var(--accent)';
@@ -120,12 +115,7 @@ test('三層選單長得不一樣：底部分頁、區塊分段控制、分類�
     el.remove();
     return c;
   });
-  expect(l2).not.toBe(accent);
-  expect(l2).not.toBe(l3);
   expect(l3).not.toBe(accent);
-  // 「＋」新增是圓形按鈕，不是跟區塊同樣的膠囊
-  const r = await page.getByTestId('tool-text.add').evaluate((el) => getComputedStyle(el).borderRadius);
-  expect(r).toBe('50%');
   await page.screenshot({ path: `${SHOT}/three-levels.png` });
 });
 

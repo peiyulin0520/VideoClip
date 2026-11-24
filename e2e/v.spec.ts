@@ -7,6 +7,7 @@ import {
   finishLayout,
   fixture,
   openTab,
+  openTool,
   project,
   seekTo,
   selectFrame,
@@ -93,6 +94,7 @@ async function makeBooth(
     await page.getByLabel('外框透明度').fill(String(Math.round(opts.opacity * 100)));
   await finishLayout(page, [fixture('solid-green.webm')]);
   await selectFrame(page); // 版型層：整個版型
+  await openTool(page, 'layout.frame');
   await expect(page.getByTestId('group-panel')).toBeVisible();
 }
 
