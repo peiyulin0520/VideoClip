@@ -5,6 +5,7 @@ import {
   fixture,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
@@ -121,7 +122,7 @@ test('Y5 整段效果：任何影像都能用「捲動」——開頭在畫面�
   await showTimeline(page);
   await page.locator('[data-testid="clip"]').first().tap();
   await openTab(page, '特效');
-  await page.getByTestId('fx-part-whole').tap();
+  await openTool(page, 'fx.whole');
   await page.getByRole('radio', { name: '整段 捲動' }).tap();
   expect((await tracks(page)).flatMap((t) => t.items)[0]!.motion).toBe('drift');
   await seekTo(page, 0.1);

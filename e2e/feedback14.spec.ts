@@ -9,6 +9,7 @@ import {
   isRed,
   isWhite,
   openTab,
+  openTool,
   project,
   regionHash,
   samplePreview,
@@ -198,7 +199,7 @@ async function addKinetic(page: Page) {
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('蔡氏家族聚餐');
   await openTab(page, '特效');
-  await page.getByTestId('fx-part-style').tap();
+  await openTool(page, 'fx.kinetic');
 }
 const textItem = async (page: Page) =>
   (await tracks(page)).flatMap((t) => t.items).find((i) => i.type === 'text')!;

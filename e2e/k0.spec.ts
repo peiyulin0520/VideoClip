@@ -4,6 +4,7 @@ import {
   createProjectWith,
   exportFrame,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
@@ -29,7 +30,7 @@ async function addText(page: Page, text: string) {
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill(text);
   await openTab(page, '特效');
-  await page.getByTestId('fx-part-style').tap();
+  await openTool(page, 'fx.kinetic');
 }
 
 test('K0 動態字卡：特效分頁分組（基本／登場／流動）、選「爆出」→ 寫進字卡、舞台歸中、時間軸有標記與色帶', async ({

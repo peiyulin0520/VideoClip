@@ -7,6 +7,7 @@ import {
   isFrameTrack,
   isRed,
   openTab,
+  openTool,
   pinch,
   previewBox,
   project,
@@ -197,7 +198,7 @@ test('整段效果：捲動——不同時間整組的位置不同（開頭在�
   await showTimeline(page);
   await page.locator(`[data-testid="clip"][data-item-id="${frame.id}"]`).tap();
   await openTab(page, '特效');
-  await page.getByTestId('fx-part-whole').tap();
+  await openTool(page, 'fx.whole');
   await page.getByRole('radio', { name: '整段 無' }).tap();
   const frame2 = (await tracks(page)).find(isFrameTrack)!.items[0]!;
   expect(frame2.motion).toBeUndefined();

@@ -195,7 +195,7 @@ export async function openTab(page: Page, name: TabName) {
     case '版型':
       return openTool(page, 'layout.add');
     case '特效':
-      return openCat(page, '特效');
+      return openTool(page, 'fx.in'); // 舊「特效」分頁預設就在進場
     case '色調':
       return openTool(page, 'color.look');
     case '音訊':

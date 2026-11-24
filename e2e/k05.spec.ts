@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, openTab, project, samplePreview, seekTo } from './helpers';
+import { createProjectWith, openTab, openTool, project, samplePreview, seekTo } from './helpers';
 
 const SHOT = 'docs/screenshots/kinetic';
 type Kin = {
@@ -28,7 +28,7 @@ async function setup(page: Page, kid: string, group = 'in') {
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('開場');
   await openTab(page, '特效');
-  await page.getByTestId('fx-part-style').tap();
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId(`kn-group-${group}`).tap();
   await page.getByRole('radio', { name: `文字特效 ${kid}` }).tap();
 }

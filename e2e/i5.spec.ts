@@ -2,14 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
   createProjectWith,
+  finishLayout,
   fixture,
+  isFrameTrack,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
-  isFrameTrack,
-  finishLayout,
   showTimeline,
 } from './helpers';
 
@@ -66,7 +67,7 @@ test('單一素材可以同時有進場與出場（不同特效）：出場「�
   await clips(page).first().tap();
   await openTab(page, '特效');
   await page.getByRole('radio', { name: '進場 疊化' }).tap();
-  await page.getByTestId('fx-part-out').tap();
+  await openTool(page, 'fx.out');
   await page.getByRole('radio', { name: '出場 左移' }).tap();
   await page.getByLabel('出場幾秒').fill('20'); // 2.0 秒：從 2 秒開始
   const it = await first(page);
@@ -105,7 +106,7 @@ test('兩段銜接的圓圈寫類型代表字：米色、選取中橘棕；影�
   const c = page.getByTestId('tr-circle');
   await expect(c).toHaveText('左');
   expect(await c.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(184, 85, 58)'); // 選取中＝橘棕
-  await page.getByTestId('fx-part-in').tap(); // 切到進場：接縫的圓圈變成沒選取的米色
+  await openTool(page, 'fx.in'); // 切到進場：接縫的圓圈變成沒選取的米色
   expect(await c.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(234, 219, 200)');
 });
 
@@ -142,9 +143,9 @@ test('字卡：文字也能用 32 種特效；「打字」進場一個字一個�
   await page.screenshot({ path: `${SHOT}/typewriter.png` });
 
   // 出場：從後面往前刪——最後剩下的字比一半少
-  await page.getByTestId('fx-part-in').tap();
+  await openTool(page, 'fx.in');
   await page.getByRole('radio', { name: '進場 無' }).tap();
-  await page.getByTestId('fx-part-out').tap();
+  await openTool(page, 'fx.out');
   await page.getByRole('radio', { name: '出場 打字' }).tap();
   await page.getByLabel('出場幾秒').fill(String(Math.round(d * 10)));
   await seekTo(page, 0.02);
@@ -165,7 +166,7 @@ test('字卡文字特效：閃爍（亮光掃過，不同時間亮的地方不�
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('閃爍的字');
   await openTab(page, '特效');
-  await page.getByTestId('fx-part-style').tap();
+  await openTool(page, 'fx.kinetic');
   await page.getByRole('radio', { name: '文字特效 閃爍' }).tap();
   const it = () =>
     (project(page) as Promise<{ tracks: { items: { type: string; textFx?: { kind: string } }[] }[] }>).then(
@@ -262,7 +263,7 @@ test('調整出場時間：只有一個「起」旗標；起＝長度−特效�
   await createProjectWith(page, ['solid-red.webm']);
   await clips(page).first().tap();
   await openTab(page, '特效');
-  await page.getByTestId('fx-part-out').tap();
+  await openTool(page, 'fx.out');
   await page.getByRole('radio', { name: '出場 左移' }).tap();
   const before = (await first(page)).outEffect!.duration;
   await page.getByTestId('fx-adjust').tap();
@@ -331,13 +332,13 @@ test('版型：選到版型那一條，到特效分頁選進場、出場（整�
   await page.locator(`[data-testid="clip"][data-item-id="${(await frameItem()).id}"]`).tap();
   await openTab(page, '特效');
   await page.getByRole('radio', { name: '進場 疊化' }).tap();
-  await page.getByTestId('fx-part-out').tap();
+  await openTool(page, 'fx.out');
   await page.getByRole('radio', { name: '出場 左移' }).tap();
   const f = await frameItem();
   expect(f.inEffect).toMatchObject({ kind: 'dissolve' });
   expect(f.outEffect).toMatchObject({ kind: 'moveL' });
   // 換成右移
-  await page.getByTestId('fx-part-in').tap();
+  await openTool(page, 'fx.in');
   await page.getByRole('radio', { name: '進場 右移' }).tap();
   expect((await frameItem()).inEffect).toMatchObject({ kind: 'moveR' });
   // 時間軸：外框那一條的開頭／結尾有代表字
