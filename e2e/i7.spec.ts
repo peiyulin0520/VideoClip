@@ -58,11 +58,13 @@ test('定格：開頭按「◇ 定格」→ 換時間用 X 位置滑桿（自動
 }) => {
   test.setTimeout(120_000);
   await setup(page);
+  await openTab(page, '剪輯');
   await expect(page.getByTestId('kf-btn')).toBeEnabled();
   await seekTo(page, 0.02);
   await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(1);
+  await openTab(page, '剪輯');
   await expect(page.getByTestId('kf-btn')).toHaveAttribute('aria-pressed', 'true');
   expect((await overlay(page)).keyframes![0]!.x).toBeCloseTo(0.5, 2);
 
@@ -159,6 +161,7 @@ test('定格：分割後兩段的定格接得起來；在定格的時間再按�
   await expect.poll(async () => (await overlay(page)).keyframes?.length).toBe(2);
   // 刪除第二個：把播放頭放到那個定格上（點菱形），按 ◆
   await page.getByTestId('kf-dot').nth(1).tap();
+  await openTab(page, '剪輯');
   await expect(page.getByTestId('kf-btn')).toHaveAttribute('aria-pressed', 'true');
   await openTab(page, '剪輯');
   await page.getByTestId('kf-btn').tap();

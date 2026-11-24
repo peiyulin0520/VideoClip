@@ -37,7 +37,7 @@ test('播放列：播放鍵只有圖示、復原重做在右邊；定格在剪�
   await clips(page).first().tap();
   await openTab(page, '剪輯');
   const kf = page.getByTestId('kf-btn');
-  await expect(kf).toContainText('定格');
+  await expect(kf).toContainText('關鍵格');
   await seekTo(page, 0.5);
   await kf.tap();
   await expect(kf).toHaveAttribute('aria-pressed', 'true');
@@ -156,7 +156,7 @@ test('版型附文字：拍貼機有「PHOTO BOOTH」＋日期的字卡（group 
   // 刪除整個版型：文字也一起不見
   await clips(page).first().tap();
   await openTab(page, '版型');
-  await page.getByRole('button', { name: '移除版型' }).tap();
+  await page.getByTestId('tool-layout.remove').tap();
   expect((await allItems(page)).filter((i) => i.type === 'text')).toHaveLength(0);
 });
 

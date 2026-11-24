@@ -25,9 +25,9 @@ test('X1-1 播放列按鈕叫「定格」；整個頁面看不到「定位」', 
   await createProjectWith(page, ['solid-red.webm']);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
-  await expect(page.getByTestId('kf-btn')).toContainText('定格');
+  await expect(page.getByTestId('kf-btn')).toContainText('關鍵格');
   await openTab(page, '圖層');
-  await expect(page.getByTestId('kf-panel')).toContainText('定格細部調整');
+  await expect(page.getByTestId('kf-panel')).toContainText('關鍵格細部調整');
   await expect(page.locator('body')).not.toContainText('定位');
 });
 

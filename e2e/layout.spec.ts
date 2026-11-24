@@ -104,7 +104,7 @@ test('版型：拍貼機直條——4 格、外框、各格輪流放紅綠；外
 
   // 移除版型：外框與所有格子一起拿掉；一步復原
   await openTab(page, '版型');
-  await page.getByRole('button', { name: '移除版型' }).tap();
+  await page.getByTestId('tool-layout.remove').tap();
   expect((await tracks(page)).length).toBe(1);
   await undo(page);
   expect((await tracks(page)).length).toBe(6); // 主軌 + 4 格 + 外框

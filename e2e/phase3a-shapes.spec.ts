@@ -107,7 +107,7 @@ test('獨立圖形：新增、用內距調大小、時間軸顯示「圖形」�
   await expect.poll(async () => (await cardOf()).box.shape).toBe('heart');
   await page.screenshot({ path: `${SHOT}/standalone-heart.png` });
   // 在字塊分頁再加第二個獨立圖形
-  await page.getByRole('button', { name: /另外新增一個獨立圖形/ }).tap();
+  await page.getByTestId('tool-text.shape').tap();
   await expect(clips(page)).toHaveCount(3);
 });
 

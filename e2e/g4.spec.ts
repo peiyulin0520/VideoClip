@@ -108,11 +108,9 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   const tr = await tracks(page);
   const frame = tr.find(isFrameTrack)!.items[0]!;
   // 版型分頁列出每一格；點「選第 2 格」選到那一格
-  await openTab(page, '版型');
+  await openTool(page, 'layout.cells');
   await expect(page.getByTestId('group-panel')).toBeVisible();
-  await openTool(page, 'layout.cells');
   await expect(page.getByTestId('ld-cell')).toHaveCount(3);
-  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').nth(1).tap(); // 點示意圖的第 2 格：選到那一格＋開「這一格」視窗
   await expect(page.getByRole('dialog', { name: '第 2 格' })).toBeVisible();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
@@ -128,7 +126,7 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   await openTab(page, '版型');
 
   // 刪掉外框＝整個版型拿掉（復原回來）
-  await page.getByRole('button', { name: '移除版型' }).tap();
+  await page.getByTestId('tool-layout.remove').tap();
   expect((await tracks(page)).length).toBe(1);
   await undo(page);
   expect((await tracks(page)).length).toBe(5);

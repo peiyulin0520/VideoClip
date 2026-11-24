@@ -96,7 +96,6 @@ test('我的貼圖：上傳自己的圖存在這支手機，換一個專案也�
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '素材');
   await page.getByRole('tablist', { name: '貼圖分類' }).getByRole('tab', { name: '我的貼圖' }).tap();
-  await expect(page.getByText('所有專案都能用')).toBeVisible();
   await page.getByTestId('my-sticker-input').setInputFiles(fixture('photo.png'));
   const grid = page.getByTestId('my-sticker-grid');
   await expect(grid.locator('.sticker-cell')).toHaveCount(1);
