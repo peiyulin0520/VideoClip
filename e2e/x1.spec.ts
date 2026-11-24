@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, exportFrame, openTab, project, samplePreview, seekTo } from './helpers';
+import {
+  clips,
+  createProjectWith,
+  exportFrame,
+  openLayerList,
+  openTab,
+  project,
+  samplePreview,
+  seekTo,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
 
@@ -28,7 +37,7 @@ test('X1-2 有命名的素材：圖層清單、音訊分頁、分離原音都用
   test.setTimeout(120_000);
   await createProjectWith(page, ['clip-a.webm']);
   await nameFirstClip(page, '測試一');
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await expect(page.getByTestId('layer-row').first()).toContainText('測試一');
   await expect(page.getByTestId('layer-list')).not.toContainText('.webm');
   await openTab(page, '音訊');

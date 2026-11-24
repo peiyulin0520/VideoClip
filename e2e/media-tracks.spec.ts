@@ -4,6 +4,7 @@ import {
   clips,
   createProjectWith,
   fixture,
+  openLayerList,
   openTab,
   project,
   showTimeline,
@@ -113,7 +114,7 @@ test('軌道預設順序：新增字卡、音樂、影像後是 影像 → 字�
   expect(kinds).toEqual(['text', 'media', 'media', 'media', 'audio']);
 
   // 圖層分頁（X9）：最上面那條影像軌往上一層＝換到字卡上面（跨類別）；再往上一層＝已經最上面
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await page.getByRole('button', { name: '影像 3 往上一層' }).tap();
   expect((await tracks(page)).map((t) => t.kind)).toEqual(['media', 'media', 'text', 'media', 'audio']);
   await page.getByRole('button', { name: '影像 3 往上一層' }).tap();
@@ -136,7 +137,7 @@ test('每一條影像軌地位一樣：最下面那條也能往上換、能放�
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
   const [base, over] = await tracks(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   // 原本的「主軌」（影像 1）也有往上一層
   await page.getByRole('button', { name: '影像 1 往上一層' }).tap();
   const swapped = await tracks(page);

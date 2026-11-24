@@ -7,6 +7,13 @@ import { moveTrackPast, swapCellRows } from '../../store/actions';
 import { toast } from '../../store/uiStore';
 import { useProjectStore } from '../../store/projectStore';
 
+const KIND_TAG: Record<Track['kind'], string> = {
+  media: '影像',
+  sticker: '貼圖',
+  text: '字卡',
+  audio: '音訊',
+};
+
 /** 一個物件在清單裡的名字（使用者命名的優先） */
 export function itemName(item: Item): string {
   return itemTitle(item);
@@ -72,15 +79,21 @@ export function LayerPeek({
         </button>
       </div>
       {layers.length === 0 && <p className="hint">這一秒畫面上沒有東西</p>}
-      <ul>
-        {layers.map(({ item, track }) => {
+      <ul data-testid="layer-list">
+        {layers.map(({ item, track }, idx) => {
           const asset =
             item.type === 'text'
               ? null
               : project.assets.find((a) => a.id === (item as { assetId: string }).assetId);
           const thumb = asset?.thumbs?.[0];
           return (
-            <li key={item.id}>
+            <li
+              key={item.id}
+              data-testid="layer-row"
+              data-item-id={item.id}
+              data-kind={track.kind}
+              data-layer-no={layers.length - idx}
+            >
               <button
                 className={`peek-row${item.id === selectedId ? ' on' : ''}`}
                 disabled={track.locked}
@@ -95,7 +108,12 @@ export function LayerPeek({
                   {!thumb && (item.type === 'text' ? 'Aa' : '')}
                 </span>
                 <span className="peek-name">{itemName(item)}</span>
-                <span className="peek-track">{track.name}</span>
+                <span className="peek-track">
+                  <span className="layer-kind" data-testid="layer-kind">
+                    {KIND_TAG[track.kind]}
+                  </span>{' '}
+                  <span data-testid="layer-no">第 {layers.length - idx} 層</span> · {track.name}
+                </span>
                 {track.locked && <Lock size={14} aria-label="已鎖住" />}
               </button>
               {!track.locked && (

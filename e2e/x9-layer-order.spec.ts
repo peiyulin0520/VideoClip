@@ -5,6 +5,7 @@ import {
   exportFrame,
   isGreen,
   isRed,
+  openLayerList,
   openTab,
   project,
   samplePreview,
@@ -36,7 +37,7 @@ test('X9 夾心：圖層分頁把文字往下一層＝夾在兩個影像中間�
 }) => {
   test.setTimeout(120_000);
   await sandwichProject(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   expect(await listKinds(page)).toBe('text,media,media');
   const nos = await page.getByTestId('layer-no').allTextContents();
   expect(nos).toEqual(['第 3 層', '第 2 層', '第 1 層']);
@@ -76,7 +77,7 @@ test('X9 播放軸換順序只在同一類、跨過夾在中間的別類，不�
   test.setTimeout(120_000);
   await sandwichProject(page);
   const [red, green, text] = await tracks(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await textRow(page)
     .getByRole('button', { name: /往下一層/ })
     .tap(); // [紅, 文字, 綠]
@@ -96,7 +97,7 @@ test('X9 播放軸換順序只在同一類、跨過夾在中間的別類，不�
 test('X9 圖層分頁「更多排序」：移到最下層／最上層；已穿插的小標點了切到圖層分頁', async ({ page }) => {
   test.setTimeout(120_000);
   await sandwichProject(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await textRow(page)
     .getByRole('button', { name: /更多排序/ })
     .tap();
@@ -128,7 +129,7 @@ test('X9 圖層分頁「更多排序」：移到最下層／最上層；已穿�
 test('X9 圖層分頁 320 寬：每一列的按鈕不換行、不橫向捲動', async ({ page }) => {
   test.setTimeout(120_000);
   await sandwichProject(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await page.setViewportSize({ width: 320, height: 844 });
   await page.waitForTimeout(200);
   const bad = await page.evaluate(() => {
@@ -170,7 +171,7 @@ test('X9 版型是一整塊：圖層分頁把外面的影像往下一層＝一�
   // 版型文字（成員軌）緊貼在外框那一列的上面；綠色的影像軌在最上面
   expect(before).toEqual(['media', 'cell', 'cell', 'cell', 'media', 'member', 'media']);
   const greenId = ((await project(page)).tracks as unknown as G[])[6]!.id;
-  await openTab(page, '圖層');
+  await openLayerList(page);
   const green = page.locator('[data-testid="layer-row"]').first();
   await green.getByRole('button', { name: /往下一層/ }).tap();
   const tr = (await project(page)).tracks as unknown as G[];

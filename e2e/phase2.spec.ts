@@ -8,6 +8,8 @@ import {
   isBlue,
   isGreen,
   isRed,
+  openLayerList,
+  showTimeline,
   openTab,
   pinch,
   previewBox,
@@ -48,7 +50,7 @@ test('同一秒疊 3 支影片＋1 個字卡：換圖層順序後預覽正確，
   await page.screenshot({ path: `${SHOT}/layers-blue-on-top.png` });
 
   // 圖層分頁：列出這一秒的 4 個圖層（最上面的在最上面）
-  await openTab(page, '圖層');
+  await openLayerList(page);
   const rows = page.getByTestId('layer-row');
   await expect(rows).toHaveCount(4);
   await expect(rows.nth(0)).toContainText('文字');
@@ -159,8 +161,9 @@ test('點預覽畫面會選到最上面那個物件；鎖定的軌道不會被�
   expect(await selectedItemId(page)).toBe(mainId);
 
   // 鎖定藍色那條軌道 → 點中間會選到綠
-  await openTab(page, '圖層');
-  await page.getByRole('button', { name: '影像 3 鎖定' }).tap();
+  await showTimeline(page);
+  await page.getByRole('button', { name: /影像 3 軌道設定/ }).tap();
+  await page.getByRole('button', { name: /鎖定（不能選取/ }).tap();
   await click(0.5, 0.5);
   expect(await selectedItemId(page)).toBe(track1Id);
 });

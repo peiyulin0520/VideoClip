@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, expectToast, finishLayout, fixture, openTab } from './helpers';
+import { createProjectWith, expectToast, finishLayout, fixture, openLayerList, openTab } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-13';
 
@@ -15,7 +15,7 @@ test('Y7 圖層分頁：版型預設收合成一列（顯示第幾層到第幾�
 }) => {
   test.setTimeout(120_000);
   await twoCells(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   const group = page.getByTestId('layer-group');
   await expect(group).toHaveCount(1);
   await expect(group).toHaveAttribute('data-open', 'false');
@@ -42,7 +42,7 @@ test('Y7 版型裡的格子列也有上下鈕（只有一層時提示）；每�
 }) => {
   test.setTimeout(120_000);
   await twoCells(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await page
     .getByTestId('layer-group')
     .getByRole('button', { name: /^展開版型/ })

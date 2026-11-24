@@ -282,6 +282,14 @@ export async function touchDrag(page: Page, from: { x: number; y: number }, to: 
   await cdp.detach();
 }
 
+/** 開預覽右上角的〔圖層〕清單（這一秒的圖層，可以往上／往下換順序） */
+export async function openLayerList(page: Page) {
+  await closePanel(page);
+  if (!(await page.getByTestId('layer-peek').isVisible()))
+    await page.getByRole('button', { name: '查看圖層' }).tap();
+  await expect(page.getByTestId('layer-peek')).toBeVisible();
+}
+
 /** 收起升起的視窗（它會蓋住播放列和時間軸；要點復原、播放、時間軸上的片段前先收起來） */
 export async function closePanel(page: Page) {
   const close = page.getByTestId('panel-close');

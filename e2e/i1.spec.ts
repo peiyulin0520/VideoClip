@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { addOverlays, createProjectWith, openTab, seekTo, showTimeline } from './helpers';
+import { addOverlays, createProjectWith, openLayerList, openTab, seekTo, showTimeline } from './helpers';
 
 test('圖層分頁跟著播放頭：從沒有素材的空白移到有素材的時間，清單馬上出現圖層', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await addOverlays(page, ['solid-green.webm']);
   await showTimeline(page);
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await expect(page.getByTestId('layer-list').locator('li')).toHaveCount(2);
   // 播放頭移到結尾之後的空白（總長 4 秒，捲到最右邊）
   await seekTo(page, 3.99);

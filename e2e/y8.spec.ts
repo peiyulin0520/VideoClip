@@ -5,6 +5,7 @@ import {
   fixture,
   isBlue,
   isRed,
+  openLayerList,
   openTab,
   project,
   samplePreview,
@@ -72,7 +73,7 @@ test('Y8 同一格再加一列：兩列疊在同一格、編號一樣；上面�
 
   // 圖層分頁：把藍色那列往下一層 → 紅色在上面
   const blueId = (await cellTracks(page))[1]!.items[0]!.id;
-  await openTab(page, '圖層');
+  await openLayerList(page);
   await page
     .getByTestId('layer-group')
     .getByRole('button', { name: /^展開版型/ })
