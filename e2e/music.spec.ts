@@ -1,5 +1,17 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, fixture, openTab, pressPlay, project, seekTo, undo } from './helpers';
+import {
+  clips,
+  closePanel,
+  createProjectWith,
+  fixture,
+  openCat,
+  openTab,
+  openTool,
+  pressPlay,
+  project,
+  seekTo,
+  undo,
+} from './helpers';
 
 type Item = {
   id: string;
@@ -82,31 +94,37 @@ test('音樂比影片長：放在影片結束前會被切在影片結束；放�
   // 沒有影片時不能加
 });
 
-test('選到音樂：只有音樂用得到的工具；音量 0–200%、淡入淡出、關閉聲音；全部一步復原', async ({ page }) => {
+test('選到音樂：音訊工具列有音量、淡入淡出、修剪；音量 0–200%、淡入淡出、關閉聲音；全部一步復原', async ({
+  page,
+}) => {
   await createProjectWith(page, ['solid-red.webm']);
   await addMusic(page);
   await musicClip(page).tap();
-  await openTab(page, '音訊');
-  const tools = page.getByRole('toolbar', { name: '音樂工具' });
-  await expect(tools).toBeVisible();
-  for (const n of ['分割', '刪除', '複製', '片段範圍', '音量'])
-    await expect(tools.getByRole('button', { name: n })).toBeVisible();
-  for (const n of ['變速', '裁切', '填滿', '完整'])
-    await expect(tools.getByRole('button', { name: n })).toHaveCount(0);
+  await openCat(page, '音訊');
+  for (const id of ['audio.volume', 'audio.fade', 'audio.trim', 'audio.mute'])
+    await expect(page.getByTestId(`tool-${id}`)).not.toHaveClass(/dim/);
+  // 剪輯工具列裡只有音樂用得到的能用：變速、裁切變淡（點了提示）
+  await openCat(page, '剪輯');
+  await expect(page.getByTestId('tool-edit.split')).toBeVisible();
+  await expect(page.getByTestId('tool-edit.delete')).not.toHaveClass(/dim/);
 
-  await tools.getByRole('button', { name: '音量' }).tap();
+  await openTool(page, 'audio.volume');
   const vol = page.getByRole('slider', { name: '音量' });
   expect(await vol.evaluate((el) => (el as HTMLInputElement).max)).toBe('2');
   await page.getByRole('button', { name: '音量 200%' }).tap();
   expect((await audioTrack(page))!.items[0]!.volume).toBe(2);
   await expect(page.getByTestId('volume-value')).toHaveText('200%');
+  await expect(page.getByTestId('tool-audio.volume')).toContainText('200%'); // 按鈕上顯示目前的值
   await page.getByRole('button', { name: '音量 50%' }).tap();
   expect((await audioTrack(page))!.items[0]!.volume).toBe(0.5);
   await page.getByRole('button', { name: '關閉聲音' }).tap();
   expect((await audioTrack(page))!.items[0]!.volume).toBe(0);
+  await closePanel(page);
   await expect(musicClip(page)).toContainText('靜音');
+  await openTool(page, 'audio.volume');
   await page.getByRole('button', { name: '音量 100%' }).tap();
 
+  await openTool(page, 'audio.fade');
   const setRange = (label: string, v: number) =>
     page.getByRole('slider', { name: label, exact: true }).evaluate((el, val) => {
       const i = el as HTMLInputElement;
@@ -136,9 +154,9 @@ test('音樂可以分割、複製、刪除；修剪面板顯示波形；音樂�
   await createProjectWith(page, ['solid-red.webm']);
   await addMusic(page);
   await musicClip(page).tap();
-  await openTab(page, '音訊');
+  await openCat(page, '剪輯');
   await seekTo(page, 2);
-  await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '分割' }).tap();
+  await page.getByTestId('tool-edit.split').tap();
   let items = (await audioTrack(page))!.items;
   expect(items).toHaveLength(2);
   expect(items[0]!.duration).toBeCloseTo(2, 1);
@@ -146,7 +164,7 @@ test('音樂可以分割、複製、刪除；修剪面板顯示波形；音樂�
   expect(items[1]!.trimIn).toBeCloseTo(2, 1);
 
   // 修剪面板：有波形，可以改留下的區段
-  await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '片段範圍' }).tap();
+  await openTool(page, 'audio.trim');
   await expect(page.getByTestId('trim-strip').getByTestId('wave')).toBeVisible();
   await page.waitForTimeout(500); // 等面板滑上來
   const assetSec = ((await project(page)).assets as unknown as { kind: string; duration: number }[]).find(
@@ -165,11 +183,12 @@ test('音樂可以分割、複製、刪除；修剪面板顯示波形；音樂�
   expect(items.find((x) => x.trimIn > 1)!.duration).toBeCloseTo(1, 1);
 
   // 複製
-  await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '複製' }).tap();
+  await openCat(page, '剪輯');
+  await page.getByTestId('tool-edit.copy').tap();
   expect((await audioTrack(page))!.items.length).toBe(3);
 
   // 刪除
-  await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '刪除' }).tap();
+  await page.getByTestId('tool-edit.delete').tap();
   expect((await audioTrack(page))!.items.length).toBe(2);
 
   // 軌道選單：有靜音、沒有往上／往下一層、有刪除
@@ -237,7 +256,7 @@ test('匯出會混進背景音樂：放在對的時間；音量、淡入淡出�
   // 淡入 2 秒：第 0 秒（響的那半秒音量最多 25%）比第 2 秒小很多
   await musicClip(page).tap();
   await openTab(page, '音訊');
-  await page.getByRole('toolbar', { name: '音樂工具' }).getByRole('button', { name: '音量' }).tap();
+  await openTool(page, 'audio.fade');
   await page.getByRole('slider', { name: '淡入', exact: true }).evaluate((el) => {
     const i = el as HTMLInputElement;
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(i, '2');
@@ -253,6 +272,7 @@ test('匯出會混進背景音樂：放在對的時間；音量、淡入淡出�
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(i, '0');
     i.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  await openTool(page, 'audio.volume');
   await page.getByRole('button', { name: '音量 50%' }).tap();
   const half = await inspect(page, {});
   expect(Math.max(...half.audioPeaks.slice(0, 4))).toBeLessThan(
@@ -271,17 +291,18 @@ test('匯出會混進背景音樂：放在對的時間；音量、淡入淡出�
 test('全部影片靜音：一鍵關掉所有影片的聲音（音樂不受影響），再按恢復；一步復原', async ({ page }) => {
   test.setTimeout(150_000);
   await createProjectWith(page, ['clip-a.webm']); // 有聲音（440Hz）
-  await openTab(page, '音訊'); // 「全部影片靜音」在音訊分頁
-  const mute = page.getByRole('button', { name: '全部影片靜音' });
+  await openCat(page, '音訊'); // 〔全部靜音〕在音訊工具列
+  const mute = page.getByTestId('tool-audio.allmute');
   await expect(mute).toBeVisible();
   const before = await inspect(page, {});
   expect(before.hasAudio).toBe(true);
   await mute.tap();
-  await expect(page.getByRole('button', { name: '恢復影片聲音' })).toBeVisible();
+  await expect(mute).toHaveAttribute('aria-pressed', 'true');
   const muted = await inspect(page, {});
   expect(muted.hasAudio).toBe(false);
   expect(((await project(page)).tracks[0] as unknown as { muted?: boolean }).muted).toBe(true);
-  await page.getByRole('button', { name: '恢復影片聲音' }).tap();
+  await mute.tap();
+  await expect(mute).toHaveAttribute('aria-pressed', 'false');
   expect((await inspect(page, {})).hasAudio).toBe(true);
   // 全部靜音時加音樂：音樂還是有聲音
   await mute.tap();

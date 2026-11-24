@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, fixture, openTab, project } from './helpers';
+import { createProjectWith, fixture, openTab, openTool, project } from './helpers';
 
 type It = {
   id: string;
@@ -50,8 +50,9 @@ test('靜音標記：兩組保留的聲音（0–1、2–3 秒）→ 片段不�
   await createProjectWith(page, ['solid-red.webm']); // 4 秒，沒聲音
   await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
-  await expect(page.getByTestId('audio-mute')).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId('audio-mute').tap();
+  await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
+  await page.locator('[data-testid="clip"][data-kind="audio"]').first().tap();
+  await openTool(page, 'audio.mute');
   await page.waitForTimeout(500); // 等面板滑上來
   await expect(page.getByTestId('rm-cursor')).toBeVisible();
   await expect(page.getByTestId('range-add')).toContainText('在白線位置新增一組起迄標記');
@@ -93,8 +94,9 @@ test('標記軸：白線在已選範圍裡不能新增；取消不改任何東�
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
-  await expect(page.getByTestId('audio-mute')).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId('audio-mute').tap();
+  await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
+  await page.locator('[data-testid="clip"][data-kind="audio"]').first().tap();
+  await openTool(page, 'audio.mute');
   await page.waitForTimeout(500);
   await clickStrip(page, 0.5); // 白線在 [0,4] 裡
   await page.getByTestId('range-add').tap();
@@ -111,9 +113,9 @@ test('進階：切到「標記要靜音的聲音」→ 在 1–2 秒標一段靜
   await createProjectWith(page, ['solid-red.webm']); // 4 秒，沒聲音
   await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
-  await expect(page.getByTestId('audio-mute')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('audio-mute')).toContainText('進階');
-  await page.getByTestId('audio-mute').tap();
+  await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
+  await page.locator('[data-testid="clip"][data-kind="audio"]').first().tap();
+  await openTool(page, 'audio.mute');
   await page.waitForTimeout(500);
   await expect(page.getByTestId('audio-mode-keep')).toHaveAttribute('aria-checked', 'true'); // 預設：標記要保留的
   await page.getByTestId('audio-mode-silence').tap();

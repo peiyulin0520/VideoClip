@@ -6,6 +6,7 @@ import {
   fixture,
   isFrameTrack,
   isRed,
+  openCat,
   openTab,
   openTool,
   project,
@@ -395,11 +396,13 @@ test('音訊的特效：選到音樂時特效分頁只有淡入（逐漸變大�
   await createProjectWith(page, ['solid-red.webm']);
   await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fx('music-4s.wav'));
-  await expect(page.getByTestId('audio-mute')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
   await page.locator('[data-testid="clip"][data-kind="audio"]').first().tap();
-  await openTab(page, '特效');
-  await expect(page.getByTestId('fx-part-in')).toHaveCount(0); // 沒有畫面特效
-  await page.getByLabel('淡入（逐漸變大聲）').fill('1.5');
+  await openCat(page, '特效');
+  for (const id of ['fx.in', 'fx.out', 'fx.seam', 'fx.whole'])
+    await expect(page.getByTestId(`tool-${id}`)).toHaveClass(/dim/); // 音樂沒有畫面特效，按鈕變淡
+  await openTool(page, 'audio.fade');
+  await page.getByLabel('淡入').fill('1.5');
   await page.getByLabel('淡出（逐漸變小聲）').fill('0.5');
   const a = (
     (await project(page)).tracks as unknown as {

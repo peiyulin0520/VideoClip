@@ -2,15 +2,16 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   clips,
   createProjectWith,
+  finishLayout,
   fixture,
+  isFrameTrack,
+  openCat,
   openTab,
   pinch,
   previewBox,
   project,
-  showTimeline,
-  isFrameTrack,
-  finishLayout,
   selectFrame,
+  showTimeline,
 } from './helpers';
 
 type Tf = { x: number; y: number; scale: number; rotation: number; opacity: number };
@@ -66,14 +67,16 @@ test('圖層分頁「位置、大小、旋轉歸位」＝整個版型歸位；�
   }
 });
 
-test('音訊分頁每一列左邊是那支影片的首圖（縮圖），不再只有「影片」兩個字', async ({ page }) => {
+test('音訊工具列沒有「專案裡的聲音」清單：要調哪一個就在時間軸點它，工具列有對應的按鈕', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm']);
-  await openTab(page, '音訊');
-  const thumb = page.getByTestId('audio-thumb').first();
-  await expect(thumb).toBeVisible();
-  const bg = await thumb.evaluate((el) => getComputedStyle(el).backgroundImage);
-  expect(bg).toContain('url(');
-  await expect(page.getByTestId('audio-row').first()).toContainText('1 影片');
+  await openCat(page, '音訊');
+  await expect(page.getByTestId('audio-list')).toHaveCount(0);
+  for (const id of ['audio.music', 'audio.split', 'audio.volume', 'audio.fade', 'audio.trim', 'audio.mute'])
+    await expect(page.getByTestId(`tool-${id}`)).toBeVisible();
+  // 沒選到影片：調整的按鈕變淡，點了有提示
+  await expect(page.getByTestId('tool-audio.volume')).toHaveClass(/dim/);
+  await page.getByTestId('tool-audio.volume').tap();
+  await expect(page.locator('.toast').filter({ hasText: '先點一個影片或音樂' })).toBeVisible();
   await page.screenshot({ path: 'docs/screenshots/feedback-8/audio-thumb.png' });
 });
 

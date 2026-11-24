@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, fixture, undo } from './helpers';
+import { clips, createProjectWith, fixture, openTool, undo } from './helpers';
 
 const SHOT = 'docs/screenshots/fix-safe-zone';
 
@@ -37,12 +37,14 @@ async function newEmptyProject(page: Page, chip?: RegExp) {
 }
 
 async function importMain(page: Page, file: string) {
+  // 空專案：預覽中央的大〔匯入〕鈕；之後：加入工具列的〔接續〕
+  const empty = page.locator('.empty-import');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page
-      .getByRole('button', { name: /匯入影片或照片|匯入/ })
-      .first()
-      .tap(),
+    (async () => {
+      if (await empty.isVisible()) await empty.tap();
+      else await openTool(page, 'add.append');
+    })(),
   ]);
   await chooser.setFiles(fixture(file));
 }

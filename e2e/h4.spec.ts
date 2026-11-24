@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, fixture, openTab, project } from './helpers';
+import { createProjectWith, fixture, openTab, openTool, project } from './helpers';
 
 type It = { id: string; type: string; start: number; duration: number; trimIn: number };
 type Tr = { kind: string; items: It[] };
@@ -39,8 +39,9 @@ test('音訊修剪：音訊列的「修剪」→ 上方旗標＋波形；留 [0,
   await createProjectWith(page, ['solid-red.webm']); // 4 秒，沒聲音
   await openTab(page, '音訊');
   await page.getByTestId('music-input').setInputFiles(fixture('music-4s.wav'));
-  await expect(page.getByTestId('audio-trim')).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId('audio-trim').tap();
+  await expect(page.locator('[data-testid="clip"][data-kind="audio"]')).toHaveCount(1, { timeout: 20_000 });
+  await page.locator('[data-testid="clip"][data-kind="audio"]').first().tap();
+  await openTool(page, 'audio.trim');
   await expect(page.getByTestId('trim-strip').getByTestId('wave')).toBeVisible();
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
   await drag(page, 'range-flag-end-0', -strip.width * 0.75); // 留 [0,1]

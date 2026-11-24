@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clips, createProjectWith, openTab, project, showTimeline } from './helpers';
+import { clips, createProjectWith, openTab, openTool, project, showTimeline } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-12';
 
@@ -40,8 +40,7 @@ test('每種彈出視窗右上角都有 ❌（關閉），底部沒有「取消�
   await page.getByTestId('tool-edit.trim').tap();
   await check('剪取片段');
   // 進階：聲音範圍
-  await openTab(page, '音訊');
-  await page.getByTestId('audio-mute').first().tap();
+  await openTool(page, 'audio.mute');
   await check('進階：聲音範圍');
 });
 
