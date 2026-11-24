@@ -128,13 +128,13 @@ test('X1-4 按鈕、選單、輸入框都是圓角，不是膠囊（圓形白名
   expect(bad).toEqual([]);
 });
 
-test('X1-6 再點一次目前的類別：升起的視窗收起來；再點又升起來', async ({ page }) => {
+test('X1-6 再點一次〔色調組合〕：升起的視窗收起來；再點又升起來', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await closePanel(page);
   await clips(page).first().tap();
   await openTab(page, '色調');
   await expect(page.getByTestId('color-panel')).toBeVisible();
-  const tab = page.locator('.tabs').getByRole('tab', { name: '色調', exact: true });
+  const tab = page.getByTestId('tool-color.look');
   await tab.tap();
   await expect(page.getByTestId('color-panel')).toHaveCount(0);
   await tab.tap();

@@ -46,7 +46,8 @@ test('兩個專案各匯入 2 個素材：重新整理後都還在，編輯一�
   await expect(clips(page)).toHaveCount(2);
   await closePanel(page);
   await clips(page).first().tap();
-  await page.getByTestId('tool-edit.delete').tap(); // 後面的往前接上，總長度才會變短
+  await page.getByTestId('tool-edit.delete').tap(); // 刪掉留空位
+  await page.getByTestId('gap').tap(); // 空位裡的 ←：後面的往前接上，總長度才會變短
   await expect(clips(page)).toHaveCount(1);
   await page.getByRole('link', { name: '回首頁' }).tap();
   // 首頁是從資料庫讀的：封面角落的長度變成剩下那段（clip-b 1.6 秒）＝ 離開編輯器時已立即存檔
@@ -88,7 +89,7 @@ test('專案卡片選單：改名、複製、刪除', async ({ page }) => {
   await page.getByRole('link', { name: '回首頁' }).tap();
 
   await page.getByRole('button', { name: '旅行 vlog 的選單' }).tap();
-  await page.getByTestId('tool-edit.delete').tap();
+  await page.getByRole('button', { name: '刪除', exact: true }).tap();
   await page.getByRole('dialog').getByRole('button', { name: '刪除', exact: true }).tap();
   await expect(page.getByTestId('project-card')).toHaveCount(1);
   await page.reload();
@@ -102,7 +103,7 @@ test('編輯器工具列：每個按鈕都有反應', async ({ page }) => {
   // 沒選片段時，需要選取的按鈕會提示
   await openTab(page, '剪輯');
   await page.getByTestId('tool-edit.delete').tap();
-  await expectToast(page, '請先點選一個片段');
+  await expectToast(page, '先點一個片段'); // 刪除按鈕變淡，點了提示要先選
 
   // 點選片段
   await closePanel(page);
