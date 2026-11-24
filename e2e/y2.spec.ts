@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { createProjectWith, finishLayout, fixture, openTab, selectFrame, showTimeline } from './helpers';
+import {
+  createProjectWith,
+  finishLayout,
+  fixture,
+  openTab,
+  openTool,
+  selectFrame,
+  showTimeline,
+} from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-13';
 
@@ -13,6 +21,7 @@ test('Y2 選色器：點的顏色移到「最近用過」第一格、整個選�
   await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]);
   await selectFrame(page);
   await openTab(page, '版型');
+  await openTool(page, 'layout.frame');
   const picker = page.getByTestId('layout-frame').getByTestId('color-picker');
   await picker.getByRole('button', { name: '外框顏色 更多顏色' }).tap();
   // 點兩個不是常用的顏色（粉嫩第一個、莫蘭迪第一個）和一個常用色

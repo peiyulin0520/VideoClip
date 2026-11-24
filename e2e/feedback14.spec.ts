@@ -44,6 +44,7 @@ test('回報14 拖邊調整整體大小套用後：舊的外框圖不能留在�
   await layoutSetup(page);
   // 套用前：版型占滿畫面，左邊緣是外框（白）
   await expect.poll(async () => isWhite(await samplePreview(page, 0.03, 0.5))).toBe(true);
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-resize').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   const h = (await page.getByTestId('layout-h-r').boundingBox())!;
@@ -70,7 +71,9 @@ test('回報14 拖各格大小套用後：舊的分隔線不能還留著', async
   await layoutSetup(page);
   const before = (await tracks(page)).filter((t) => t.groupRole === 'cell').map((t) => t.cell!);
   const gapY = (before[0]!.y + before[0]!.h + before[1]!.y) / 2; // 兩格之間原本的線
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-cell-resize').scrollIntoViewIfNeeded();
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-cell-resize').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   const hd = (await page.getByTestId('lc-handle-h').boundingBox())!;
@@ -93,12 +96,15 @@ test('回報14 拖各格大小套用後：舊的分隔線不能還留著', async
 test('回報14 版型分頁：「整個版型」與「各格」的按鈕分成兩組、中間有空隙；寬 × 高有標題', async ({ page }) => {
   test.setTimeout(120_000);
   await layoutSetup(page);
+  await openTool(page, 'layout.size');
   const a = (await page.getByTestId('layout-resize').boundingBox())!;
+  await openTool(page, 'layout.size');
   const b = (await page.getByTestId('layout-cell-resize').boundingBox())!;
   expect(b.y - (a.y + a.height)).toBeGreaterThanOrEqual(10);
   await expect(page.getByTestId('layout-size-now')).toHaveText('100% × 100%');
   for (const w of [320, 390]) {
     await page.setViewportSize({ width: w, height: 844 });
+    await openTool(page, 'layout.size');
     const z = (await page.getByTestId('layout-shape').boundingBox())!;
     for (const id of ['layout-resize', 'layout-size-reset', 'layout-cell-resize', 'layout-cell-reset']) {
       const r = (await page.getByTestId(id).boundingBox())!;
@@ -111,6 +117,7 @@ test('回報14 版型分頁：「整個版型」與「各格」的按鈕分成�
 test('回報14 調整版型大小：「寬 × 高、套用」那一排不蓋住任何把手', async ({ page }) => {
   test.setTimeout(120_000);
   await layoutSetup(page);
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-resize').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   const card = (await page.locator('.lr-card').boundingBox())!;

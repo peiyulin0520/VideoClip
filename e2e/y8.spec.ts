@@ -7,6 +7,7 @@ import {
   isRed,
   openLayerList,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
@@ -120,10 +121,12 @@ test('Y9 預覽上拖格子大小：拖兩格之間的線，一格變大、另�
   await twoCells(page);
   await selectFrame(page);
   await openTab(page, '版型');
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-cell-resize').scrollIntoViewIfNeeded();
   const before = await cellTracks(page);
   const h0 = before[0]!.cell!.h;
   const h1 = before[1]!.cell!.h;
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-cell-resize').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(page.getByTestId('lc-cell')).toHaveCount(2);

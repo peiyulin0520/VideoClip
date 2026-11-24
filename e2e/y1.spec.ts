@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createProjectWith, finishLayout, fixture, openTab, project, selectFrame } from './helpers';
+import { createProjectWith, finishLayout, fixture, openTab, openTool, project, selectFrame } from './helpers';
 
 const SHOT = 'docs/screenshots/feedback-13';
 type It = {
@@ -34,8 +34,10 @@ test('Y1 版型分頁：播放、外框、大小與格數各自一個有標題�
     await expect(zone).toBeVisible();
     await expect(zone.locator('.zone-title')).toHaveCount(1);
   }
+  await openTool(page, 'layout.frame');
   await expect(page.getByTestId('layout-frame').locator('.zone-title')).toHaveText('外框');
   // 外框顏色、透明度、框線粗細都在「外框」區塊裡
+  await openTool(page, 'layout.frame');
   const frame = page.getByTestId('layout-frame');
   await expect(frame.getByLabel('格子框線粗細')).toBeVisible();
   await expect(frame.getByRole('radio', { name: '外框 白' })).toBeVisible();
@@ -64,8 +66,10 @@ test('Y1 外框顏色（含選色器的顏色）都會換；框線粗細連外�
 test('Y1 調整大小：按鈕不超出區塊，顯示現在大小，［重置大小］回 100%', async ({ page }) => {
   test.setTimeout(150_000);
   await setup(page);
+  await openTool(page, 'layout.size');
   const shape = page.getByTestId('layout-shape');
   await expect(page.getByTestId('layout-size-now')).toHaveText('100% × 100%');
+  await openTool(page, 'layout.size');
   await expect(page.getByTestId('layout-size-reset')).toBeDisabled();
   for (const w of [320, 390]) {
     await page.setViewportSize({ width: w, height: 844 });
@@ -77,6 +81,7 @@ test('Y1 調整大小：按鈕不超出區塊，顯示現在大小，［重置�
   }
   await page.setViewportSize({ width: 390, height: 844 });
   // 預覽上把右邊拉窄、套用 → 顯示新的大小、重置可按；按重置回到 100%
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-resize').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   const h = (await page.getByTestId('layout-h-r').boundingBox())!;
@@ -91,6 +96,7 @@ test('Y1 調整大小：按鈕不超出區塊，顯示現在大小，［重置�
     .poll(async () => (await frameOf(page)).frameStyle?.box?.w ?? 1, { timeout: 15_000 })
     .toBeLessThan(0.9);
   await expect(page.getByTestId('layout-size-now')).not.toHaveText('100% × 100%');
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-size-reset').tap();
   await expect(page.getByTestId('layout-size-now')).toHaveText('100% × 100%', { timeout: 15_000 });
   await page.screenshot({ path: `${SHOT}/y1-size-390.png` });
@@ -106,5 +112,6 @@ test('Y1 圖層分頁：選到版型外框時沒有「外框顏色／粗細」�
   await expect(page.getByLabel(/^外框顏色 #/)).toHaveCount(0);
   await expect(page.getByText('外框粗細', { exact: true })).toHaveCount(0);
   await openTab(page, '版型');
+  await openTool(page, 'layout.frame');
   await expect(page.getByTestId('frame-outline-off')).toHaveCount(0);
 });

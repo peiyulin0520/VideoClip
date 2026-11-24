@@ -7,6 +7,7 @@ import {
   isGreen,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
@@ -56,6 +57,7 @@ test('Y6 格子裡的影像不預先裁切（整張蓋滿格子，畫面被格�
 test('Y6 這一格視窗：選哪一段就換哪一段的素材（標題「換第 N 段的素材」）', async ({ page }) => {
   test.setTimeout(150_000);
   await twoCells(page);
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').first().tap();
   await page.getByRole('button', { name: '＋ 加素材' }).tap();
   await page.getByTestId('cell-add-file').setInputFiles(fixture('solid-green.webm'));
@@ -77,6 +79,7 @@ test('Y6 各格各影像單獨調色：選到第 2 格調成黑白，第 1 格�
   test.setTimeout(150_000);
   await twoCells(page);
   const [c1, c2] = (await cells(page)).map((t) => t.items[0]!);
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').nth(1).tap();
   await page.getByRole('button', { name: '關閉', exact: true }).last().tap();
   expect(await selectedItemId(page)).toBe(c2!.id);

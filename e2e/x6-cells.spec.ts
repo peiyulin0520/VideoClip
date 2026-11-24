@@ -5,6 +5,7 @@ import {
   fixture,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
@@ -100,8 +101,10 @@ test('X6 一格多素材：列尾 ＋ 加色塊、加照片；格子編號；空
   // 空檔改成「透明」→ 不再畫紅色（要先選到整個版型，版型分頁才有它的設定）
   await selectFrame(page);
   await openTab(page, '版型');
+  await openTool(page, 'layout.play');
   await page.getByRole('radio', { name: '空檔 透明' }).tap();
   await expect.poll(async () => isRed(await samplePreview(page, cx, cy))).toBe(false);
+  await openTool(page, 'layout.play');
   await page.getByRole('radio', { name: '空檔 停格' }).tap();
   await expect.poll(async () => isRed(await samplePreview(page, cx, cy))).toBe(true);
 });
@@ -111,6 +114,7 @@ test('X6 同步／依序：排好各格素材、版型長度跟著；依序時�
   await twoCellLayout(page);
   await addColorTo(page, 1); // 第 1 格 0–4 紅、4–6 黃
   await openTab(page, '版型');
+  await openTool(page, 'layout.play');
   await page.getByRole('radio', { name: '播放方式 依序' }).tap();
   // 依序：第 1 格 0–4、4–6；第 2 格接在後面 6–10；版型 10 秒
   expect(await row(page, 0)).toEqual([
@@ -134,6 +138,7 @@ test('X6 同步／依序：排好各格素材、版型長度跟著；依序時�
   expect(await row(page, 1)).toEqual([[6, 4]]);
 
   // 切回同步：第 2 格回到版型開頭
+  await openTool(page, 'layout.play');
   await page.getByRole('radio', { name: '播放方式 同步' }).tap();
   expect(await row(page, 1)).toEqual([[0, 4]]);
   expect((await frame(page)).duration).toBeCloseTo(6, 1);
@@ -169,6 +174,7 @@ test('X6 這一格視窗：素材清單、加色塊、改色塊顏色與文字�
   test.setTimeout(180_000);
   await twoCellLayout(page);
   await openTab(page, '版型');
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').first().tap();
   const dlg = page.getByRole('dialog', { name: '第 1 格' });
   await expect(dlg.getByTestId('cell-items').locator('li')).toHaveCount(1);

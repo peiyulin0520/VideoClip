@@ -110,7 +110,9 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   // 版型分頁列出每一格；點「選第 2 格」選到那一格
   await openTab(page, '版型');
   await expect(page.getByTestId('group-panel')).toBeVisible();
+  await openTool(page, 'layout.cells');
   await expect(page.getByTestId('ld-cell')).toHaveCount(3);
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').nth(1).tap(); // 點示意圖的第 2 格：選到那一格＋開「這一格」視窗
   await expect(page.getByRole('dialog', { name: '第 2 格' })).toBeVisible();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
@@ -137,6 +139,7 @@ test('版型：素材比版型短，剩下的秒數顯示色塊——反黑，�
   await createProjectWith(page, ['solid-blue.webm']); // 4 秒
   await addLayout(page, '上下雙格', ['clip-a.webm', 'solid-red.webm']); // clip-a 2 秒；紅 4 秒 → 版型 4 秒
   await openTab(page, '版型');
+  await openTool(page, 'layout.play');
   await page.getByRole('radio', { name: '空檔 色塊' }).tap(); // 這幾個測試要的是「空檔畫色塊」那一套
   const tr = await tracks(page);
   const cell0 = tr.filter((t) => t.groupRole === 'cell')[0]!;
@@ -161,6 +164,7 @@ test('版型：素材比版型短，剩下的秒數顯示色塊——反黑，�
   await page.screenshot({ path: `${SHOT}/fill-black.png` });
   // 改成反白
   await openTab(page, '版型');
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').first().tap();
   await page.getByTestId('cell-mode-blank').tap();
   await page.getByRole('button', { name: '空白畫面顏色 #ffffff' }).tap();

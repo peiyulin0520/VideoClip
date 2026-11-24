@@ -9,6 +9,7 @@ import {
   isGreen,
   isRed,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
@@ -107,8 +108,10 @@ test('L1 空的格子：刪掉格子素材 → 格子還在（示意圖虛線、
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await addLayout(page, '上下雙格', ['solid-red.webm', 'solid-green.webm']);
+  await openTool(page, 'layout.cells');
   await expect(page.getByTestId('ld-cell')).toHaveCount(2);
   // 刪掉第 2 格的素材
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').nth(1).tap();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
   await openTab(page, '剪輯');
@@ -122,12 +125,14 @@ test('L1 空的格子：刪掉格子素材 → 格子還在（示意圖虛線、
   const frameId = (await tracks(page)).find(isFrameTrack)!.items.find((i) => i.group && !i.cell)!.id;
   await page.locator(`[data-testid="clip"][data-item-id="${frameId}"]`).tap();
   await openTab(page, '版型');
+  await openTool(page, 'layout.cells');
   await expect(page.getByTestId('ld-cell').nth(1)).toHaveClass(/empty/);
   // 匯出提醒
   await page.getByRole('button', { name: '匯出影片' }).tap();
   await expect(page.getByTestId('export-empty-cells-note')).toContainText('1 格');
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
   // 點空的格子 → 選素材放進去
+  await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').nth(1).tap();
   await expect(page.getByTestId('cell-sheet-empty')).toBeVisible();
   await page.screenshot({ path: `${SHOT}/cell-empty.png` });
