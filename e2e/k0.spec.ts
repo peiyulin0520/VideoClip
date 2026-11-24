@@ -33,13 +33,12 @@ async function addText(page: Page, text: string) {
   await openTool(page, 'fx.kinetic');
 }
 
-test('K0 動態字卡：特效分頁分組（基本／登場／流動）、選「爆出」→ 寫進字卡、舞台歸中、時間軸有標記與色帶', async ({
+test('K0 動態字卡：動態字卡視窗分組（登場／流動…）、選「爆出」→ 寫進字卡、舞台歸中、時間軸有標記與色帶', async ({
   page,
 }) => {
   test.setTimeout(150_000);
   await addText(page, '開場 登場');
   await expect(page.getByTestId('kn-groups').getByRole('tab')).toHaveText([
-    '基本',
     '登場',
     '流動',
     '切換',

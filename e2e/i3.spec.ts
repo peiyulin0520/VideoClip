@@ -104,7 +104,7 @@ test('貼圖自成一類：貼圖放在貼圖軌（影像軌之上、字卡之�
   await openTab(page, '疊加');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: /加入影片或照片/ }).tap(),
+    page.getByTestId('tool-add.overlay').tap(),
   ]);
   await chooser.setFiles(fixture('photo.png'));
   await expect(page.locator('[data-testid="clip"][data-kind="image"]')).toHaveCount(2, { timeout: 20_000 });

@@ -152,6 +152,14 @@ export function BottomBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
+  // 預覽上正在拖調整（自訂比例、版型大小、格子大小、動態字卡顯示範圍）：把升起的視窗收起來，免得蓋住下面的把手
+  const editing = useUI((s) => !!(s.frameEdit || s.layoutEdit || s.cellEdit || s.kineticEdit));
+  useEffect(() => {
+    if (!editing) return;
+    const t = setTimeout(() => setPopup(null), 0);
+    return () => clearTimeout(t);
+  }, [editing]);
+
   // 其他地方要求切類別（點時間軸的特效圓圈 → 特效；色調 → 色調視窗…）
   const requestTab = useUI((s) => s.requestTab);
   useEffect(() => {

@@ -69,9 +69,12 @@ test('同一秒疊 3 支影片＋1 個字卡：換圖層順序後預覽正確，
   await expect.poll(async () => isBlue(await samplePreview(page, ...IN))).toBe(true);
 
   // 隱藏藍色那條軌道 → 看到綠色
-  await page.getByRole('button', { name: '影像 3 隱藏' }).tap();
+  await showTimeline(page);
+  await page.getByRole('button', { name: /影像 3 軌道設定/ }).tap();
+  await page.getByRole('button', { name: /隱藏這條軌道/ }).tap();
   await expect.poll(async () => isGreen(await samplePreview(page, ...IN))).toBe(true);
-  await page.getByRole('button', { name: '影像 3 顯示' }).tap();
+  await page.getByRole('button', { name: /影像 3 軌道設定/ }).tap();
+  await page.getByRole('button', { name: /顯示這條軌道/ }).tap();
   await expect.poll(async () => isBlue(await samplePreview(page, ...IN))).toBe(true);
 
   // 單格匯出（輸出解析度 1080×1920）和預覽在同樣幾個點的顏色一致
