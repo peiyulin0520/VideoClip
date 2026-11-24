@@ -45,7 +45,7 @@ async function twoCells(page: Page) {
   await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]);
 }
 
-test('Y8 同一格再加一列：兩列疊在同一格、編號一樣；上面那列蓋住下面那列；圖層分頁可以上下換', async ({
+test('Y8 同一格再加一列：兩列疊在同一格、編號一樣；上面那列蓋住下面那列；預覽〔圖層〕清單可以上下換', async ({
   page,
 }) => {
   test.setTimeout(180_000);
@@ -75,10 +75,6 @@ test('Y8 同一格再加一列：兩列疊在同一格、編號一樣；上面�
   // 圖層分頁：把藍色那列往下一層 → 紅色在上面
   const blueId = (await cellTracks(page))[1]!.items[0]!.id;
   await openLayerList(page);
-  await page
-    .getByTestId('layer-group')
-    .getByRole('button', { name: /^展開版型/ })
-    .tap();
   await page
     .locator(`[data-testid="layer-row"][data-item-id="${blueId}"]`)
     .getByRole('button', { name: /往下一層/ })
@@ -149,6 +145,7 @@ test('Y9 預覽上拖格子大小：拖兩格之間的線，一格變大、另�
   // 重置
   await selectFrame(page);
   await openTab(page, '版型');
+  await openTool(page, 'layout.size');
   await page.getByTestId('layout-cell-reset').tap();
   await expect.poll(async () => (await cellTracks(page))[0]!.cell!.h, { timeout: 20_000 }).toBeCloseTo(h0, 3);
 });
