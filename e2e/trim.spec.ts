@@ -59,17 +59,16 @@ test('影像軌左把手往右拉：尾巴不動、前面留空位（黑畫面�
   expect((await main(page))[0]!.duration).toBeCloseTo(2, 1);
 });
 
-test('補齊空位：開場留白的虛線框點一下選取、再點一下補齊，後面往前接上；一步復原', async ({ page }) => {
+test('補齊空位：開場留白的虛線框裡有 ←，點一下就補齊，後面往前接上；一步復原', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm']);
   await clips(page).first().tap();
   await expect(page.getByTestId('gap')).toHaveCount(0);
   await drag(page, 'trim-start', 60);
   await expect(page.getByTestId('gap')).toHaveCount(1);
   const gap = page.getByTestId('gap');
-  await gap.tap(); // 第一下：選取，出現「補齊」
-  await expect(gap).toHaveText('補齊');
+  await expect(gap).toHaveAttribute('aria-label', /往前補齊空白/);
   expect((await main(page)).map((c) => c.start)).toEqual([1, 2]); // 還沒動
-  await gap.tap(); // 第二下：真的補齊
+  await gap.tap(); // 點一下就補齊（←）
   const m = await main(page);
   expect(m.map((c) => c.start)).toEqual([0, 1]);
   await expect(page.getByTestId('gap')).toHaveCount(0);

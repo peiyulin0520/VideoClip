@@ -74,7 +74,7 @@ test('舊專案（v1：主軌＋疊加，字卡在疊加下面）打開後自動
   await expect(page.locator('.toast').filter({ hasText: '圖層順序已經調整' })).toBeVisible();
 });
 
-test('刪除只刪這一段、留空位；刪除並補齊讓後面的往前接；都是一步復原', async ({ page }) => {
+test('刪除只刪這一段、留空位；空位裡的 ← 讓後面的往前接；都是一步復原', async ({ page }) => {
   await createProjectWith(page, ['clip-a.webm', 'clip-b.webm', 'clip-c.webm']); // 2 + 1.6 + 3 秒
   const starts = async () => (await tracks(page))[0]!.items.map((i) => Math.round(i.start * 10) / 10);
   expect(await starts()).toEqual([0, 2, 3.6]);
@@ -88,6 +88,7 @@ test('刪除只刪這一段、留空位；刪除並補齊讓後面的往前接�
 
   await clips(page).first().tap();
   await page.getByTestId('tool-edit.delete').tap();
+  await page.getByTestId('gap').tap(); // 空位裡的 ←：後面的往前接上
   expect(await starts()).toEqual([0, 1.6]);
   await undo(page);
   expect(await starts()).toEqual([0, 2, 3.6]);
