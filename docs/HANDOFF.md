@@ -247,3 +247,10 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **選到東西跳類別**：`Toolbar.tsx` 的 `targetForSelection`；`requestTab`（時間軸特效圓圈等）由 `requestTarget` 對到類別＋視窗（特效看 `fxFocus.role`）。
 - **e2e**：`helpers.ts` 的 `openCat`／`openTool`（用工具 id）、`openTab`（舊名稱對照）；視窗開著會蓋住播放列、時間軸，點之前先 `closePanel`；剪輯／加入／文字／版型…的按鈕只在那個類別的工具列顯示。
 - **U6 補充（e2e 改寫時確認的行為）**：①變淡的按鈕用 class `dim`＋`data-dim`（不是 `aria-disabled`，Playwright 會一直等）；②預覽上開始拖調整（自訂比例、版型大小、格子大小、動態字卡顯示範圍）時，升起的視窗自動收起；③在版型類別點格子／整個版型，功能列留在版型；④選到東西 250 ms 後才跳類別（避免手指放開補送的 click 落在別的按鈕）；⑤預覽高度跟專案比例（方形、橫式比較矮），編輯畫面一個螢幕高、整頁不捲，時間軸自己上下捲（軌道多時下面幾條要捲才看得到）；⑥e2e 的 `undo`／`redo` 會先收視窗、按完再把原本開著的視窗升回來；⑦預覽右上〔圖層〕清單是平的一條，每列有 ▲▼（`<軌名> 往上一層／往下一層`），沒有收合、隱藏、鎖定、更多排序
+
+## feedback-15 第 1 批（2026-11-24）新增的東西（給下一位）
+- **動態字卡停點**：`KineticDef.hold?(words)`（`engine/kinetic/core.ts`）；沒給就用 `hold.ts` 的 `HOLD_F` 比例。時間常數跟字數有關的式子一定要自己給 `hold`。新增或改動式子後跑 `e2e/kinetic-hold.spec.ts`（64 式 × 7 組文字，用 `__videoclip.kineticHoldCheck(text)`：停點那格畫兩次、只差一個字，畫面不同＝那個字有畫出來；一直在跑的式子與跳錶不檢查）。
+- **版型框線**：`frameStyle.line`（整體：外框邊距＋分隔線）、`frameStyle.gap`（只有分隔線；沒設＝跟 `line` 一樣）；`applyLineScale(b, scale, gapScale?)`、`buildIn/paintFrame/renderFramePng` 最後多一個 `gap` 參數；`reshapeLayout(group, { line, gap })`（調整體粗細要一起傳 `gap: undefined`）。
+- **刪軌道**：`removeTrack` 依 `groupRole` 分：member＝只刪那條、cell＝`clearCellTrack`、frame＝整個版型。
+- **畫面高度**：`useAppHeight`（只在加到主畫面時把 `window.innerHeight` 寫進 `--app-h`）；`.editor`、`--stage-cap`、`.panel-sheet`、`.crop-editor` 都用 `var(--app-h, 100svh)`。升起的視窗裡 `.panel` 不留 `--safe-bottom`。
+- **測試技巧**：沙盒 `--safe-bottom` 是 0；要驗 iPhone 的 Home 橫條空白，在 `addInitScript` 裡塞 `:root{--safe-bottom:34px !important}`（見 `e2e/z4-space.spec.ts`）。

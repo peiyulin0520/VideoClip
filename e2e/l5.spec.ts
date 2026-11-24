@@ -216,8 +216,9 @@ test('L7 格子框線粗細：滑桿 0%＝格子貼在一起、300%＝框線變�
   await openTab(page, '版型');
   const gap = async () => {
     const cs = (await tracks(page)).filter((t) => t.groupRole === 'cell');
-    const a = cs[0]!.items[0]!.cell!;
-    const b = cs[1]!.items[0]!.cell!;
+    const a = cs[0]?.items[0]?.cell;
+    const b = cs[1]?.items[0]?.cell;
+    if (!a || !b) return Number.NaN; // 外框重畫、格子換位置的那一瞬間還沒有資料：下一輪再量
     return b.x - (a.x + a.w);
   };
   const g1 = await gap();

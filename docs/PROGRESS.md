@@ -6,9 +6,9 @@
 - **日期**：2026-11-24
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
-- **測試**：1145 個單元測試、339 個 e2e（iPhone 13 尺寸、Chromium；336 過、3 個照原本就跳過）、lint（含 prettier）、build 全過
+- **測試**：1151 個單元測試、約 343 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #20（U1–U6）已開、等使用者合併。**接著照 `docs/plans/2026-11-24-feedback-15.md` 做（Sonnet）**：第 1 批修錯 Z1–Z5（動態字卡停在最後、格子分隔線粗細、版型裡刪軌道、畫面撐滿／視窗留白、字級統一）→ 第 2 批 Z6–Z12（播放列垃圾桶、空軌道消失、加進版型、各格卡片、文字特效合一、基本特效示意圖、副標移到內容）→ 第 3 批 Z13 預覽變順（Y10）＋聲音不斷
+- **下一步**：PR #20（U1–U6）已開、等使用者合併。**feedback-15 第 1 批（Z1–Z5）做完**，接著照 `docs/plans/2026-11-24-feedback-15.md` 做第 2 批 Z6–Z12（播放列垃圾桶、空軌道消失、加進版型、各格卡片、文字特效合一＋文字類別〔特效〕、基本特效示意圖、副標移到內容）→ 第 3 批 Z13 預覽變順（Y10）＋聲音不斷
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-24 feedback-15 第 1 批 Z1–Z5（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：Z1 動態字卡「停在最後」：`KineticDef.hold(words)`（`core.ts`）＋ hit／flap／flip／slot／through／block／corrupt／torch／scatter／popsync 各自算停點（時間常數跟字數有關的式子不能再用固定比例），flip、slot 的 `len` 改成「詞數 × 一輪」；設定顯示「停在 X 秒」。Z2 找不到「分隔線不動」的錯（引擎、先拖各格再調粗細都重現不出來，分隔線和邊距都 ×倍數），改加獨立〔分隔線粗細〕滑桿（`frameStyle.gap`，沒設＝跟 `line` 一樣）。Z3 `removeTrack` 依軌道角色處理：成員軌只刪那一條、格子軌＝清空這一格（`clearCellTrack`）、外框軌才刪整個版型。Z4 `.ps-body .panel` 不再多留 Home 橫條的空白；加到主畫面時用 `window.innerHeight` 當整頁高（`useAppHeight` → `--app-h`）。Z5 `.fb-row .tool` 字級＝類別字級
+  - 動了哪些檔：`src/engine/kinetic/{core,hold,fx/*}.ts`、`src/engine/{debug,layouts}.ts`、`src/store/actions.ts`、`src/app/{App.tsx,useAppHeight.ts,styles.css}`、`src/app/editor/{Timeline,tabs/LayoutTab,tabs/EffectTab,LayoutDiagram,frameRestyle}.tsx`、`src/model/types.ts`、`e2e/{kinetic-hold,l5,z4-space,…}.spec.ts`
+  - 驗證：✅ `npm run check`（1151 單元測試）；✅ 完整 e2e 341 過／2 跳過（l5 偶爾量不到格子的那一瞬間 → 量測函式改成沒資料就回 NaN 下一輪再量）；✅ `kinetic-hold`：64 式 × 7 組文字（1、2、5、6、8、14 字、多詞）停點那格最後一個詞的每個字都畫出來；🟡 沙盒沒有 iPhone 的主畫面模式，Z4 的 `--app-h` 要在手機上看（PLAN §7）
+  - 踩到的坑：檢查「字有沒有畫出來」不能看墨量（動畫會過衝、閃白）；改成同一格畫兩次、只差一個字（換成「丑」），畫面不同＝那個字有畫出來（`__videoclip.kineticHoldCheck`）。`.panel` 的 `padding-bottom` 含 `--safe-bottom`，在升起的視窗裡重複留了一次（沙盒 `--safe-bottom` 是 0 看不出來，e2e 用 `:root{--safe-bottom:34px}` 模擬）
+  - 使用者的決定/回饋：（Z2）使用者原話「格子框線粗細調整，分隔線的粗細如圖十一樣沒動，只有動邊框」——我量到引擎兩者同比例變，所以改成加獨立滑桿，請使用者在手機上確認
+  - 下一步：第 2 批 Z6–Z12
 - 2026-11-24 規劃 feedback-15（Opus，claude/zen-tesla-v3brj5）
   - 做了什麼：使用者 iPhone 回饋（錄影 2 段、截圖 10 張）討論後寫成 `docs/plans/2026-11-24-feedback-15.md`（Z1–Z13，分三批）；查到「停在最後」不準的原因：停點是範例字量出的固定比例，「蔡氏家族聚餐」沒空格＝一個 6 字詞，`hit` 停在 0.6×3.02 秒＝第 5 字「聚」
   - 動了哪些檔：`docs/plans/2026-11-24-feedback-15.md`（新）、`docs/PROGRESS.md`
