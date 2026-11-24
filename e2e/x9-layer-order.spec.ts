@@ -88,45 +88,51 @@ test('X9 播放軸換順序只在同一類、跨過夾在中間的別類，不�
   await page.locator('.menu-item', { hasText: '往上一層' }).tap();
   expect((await tracks(page)).map((t) => t.id)).toEqual([text!.id, green!.id, red!.id]);
   await expect.poll(async () => isRed(await samplePreview(page, 0.5, 0.5))).toBe(true);
-  // 文字軌在播放軸上只有一條字卡：往上一層＝提示到圖層分頁調整
+  // 文字軌在播放軸上只有一條字卡：往上一層＝提示到預覽〔圖層〕清單調整
   await page.locator(`[data-testid="track"][data-track-id="${text!.id}"] [data-testid="track-chip"]`).tap();
   await page.locator('.menu-item', { hasText: '往上一層' }).tap();
-  await expect(page.locator('.toast').filter({ hasText: '到「圖層」分頁調整' })).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: '預覽右上角的〔圖層〕' })).toBeVisible();
 });
 
-test('X9 圖層分頁「更多排序」：移到最下層／最上層；已穿插的小標點了切到圖層分頁', async ({ page }) => {
+test('X9 〔圖層〕清單：文字往下一層再往上一層回到最上面；到頂再往上有提示；已穿插的小標點了有提示', async ({
+  page,
+}) => {
   test.setTimeout(120_000);
   await sandwichProject(page);
   await openLayerList(page);
   await textRow(page)
-    .getByRole('button', { name: /更多排序/ })
+    .getByRole('button', { name: /往下一層/ })
     .tap();
-  await page.getByRole('button', { name: /移到最下層/ }).tap();
+  expect(await kinds(page)).toBe('media,text,media');
+  await textRow(page)
+    .getByRole('button', { name: /往下一層/ })
+    .tap();
   expect(await kinds(page)).toBe('text,media,media');
   expect(await listKinds(page)).toBe('media,media,text');
   await textRow(page)
-    .getByRole('button', { name: /更多排序/ })
+    .getByRole('button', { name: /往上一層/ })
     .tap();
-  await page.getByRole('button', { name: /移到最上層/ }).tap();
-  expect(await kinds(page)).toBe('media,media,text');
-  // 最上面再移到最上層 → 提示
   await textRow(page)
-    .getByRole('button', { name: /更多排序/ })
+    .getByRole('button', { name: /往上一層/ })
     .tap();
-  await page.getByRole('button', { name: /移到最上層/ }).tap();
+  expect(await kinds(page)).toBe('media,media,text');
+  // 最上面再往上一層 → 提示
+  await textRow(page)
+    .getByRole('button', { name: /往上一層/ })
+    .tap();
   await expect(page.locator('.toast').filter({ hasText: '已經是最上面的圖層' })).toBeVisible();
 
-  // 夾心之後到播放軸，點「已穿插」→ 切到圖層分頁
+  // 夾心之後到播放軸，點「已穿插」→ 提示怎麼看完整順序
   await textRow(page)
     .getByRole('button', { name: /往下一層/ })
     .tap();
   await openTab(page, '剪輯');
   await showTimeline(page);
   await page.locator('[data-testid="cat-head"][data-kind="media"]').getByTestId('cat-mixed').tap();
-  await expect(page.getByTestId('layer-list')).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: '預覽右上角的〔圖層〕' })).toBeVisible();
 });
 
-test('X9 圖層分頁 320 寬：每一列的按鈕不換行、不橫向捲動', async ({ page }) => {
+test('X9 〔圖層〕清單 320 寬：每一列的按鈕不換行、不橫向捲動', async ({ page }) => {
   test.setTimeout(120_000);
   await sandwichProject(page);
   await openLayerList(page);
@@ -139,7 +145,7 @@ test('X9 圖層分頁 320 寬：每一列的按鈕不換行、不橫向捲動', 
         const r = b.getBoundingClientRect();
         if (r.right > window.innerWidth + 0.5) out.push(`${b.getAttribute('aria-label')} 超出螢幕`);
       }
-      const btns = Array.from(row.querySelectorAll('.layer-btns button')).map(
+      const btns = Array.from(row.querySelectorAll('.peek-move button')).map(
         (b) => b.getBoundingClientRect().top,
       );
       if (Math.max(...btns) - Math.min(...btns) > 2) out.push('按鈕換行');
