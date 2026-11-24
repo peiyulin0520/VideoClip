@@ -166,6 +166,7 @@ test('字卡文字特效：閃爍（亮光掃過，不同時間亮的地方不�
   await page.getByLabel('文字內容').fill('閃爍的字');
   await openTab(page, '特效');
   await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByRole('radio', { name: '文字特效 閃爍' }).tap();
   const it = () =>
     (project(page) as Promise<{ tracks: { items: { type: string; textFx?: { kind: string } }[] }[] }>).then(
@@ -201,6 +202,7 @@ test('字卡文字特效：閃爍（亮光掃過，不同時間亮的地方不�
     await expect.poll(() => countColor(page, WHITE, 60, region)).toBeGreaterThan(50); // 字還看得到
     await page.screenshot({ path: `${SHOT}/text-${name}.png` });
   }
+  await openTool(page, 'fx.textfx');
   await page.getByRole('radio', { name: '文字特效 無' }).tap();
   expect((await it()).textFx).toBeUndefined();
   await expect(page.getByTestId('fx-circle-style')).toHaveCount(0);
@@ -393,7 +395,7 @@ test('匯出的單格跟預覽一樣：進場「捲簾放下」在 1.5 秒（一
   expect(dark(out.samples[1]!)).toBe(true);
 });
 
-test('音訊的特效：選到音樂時特效分頁只有淡入（逐漸變大聲）、淡出（逐漸變小聲）', async ({ page }) => {
+test('音訊的淡入淡出：選到音樂時畫面特效變淡，淡入、淡出在音訊工具列的〔淡入淡出〕', async ({ page }) => {
   test.setTimeout(120_000);
   const { fixture: fx } = await import('./helpers');
   await createProjectWith(page, ['solid-red.webm']);
@@ -406,8 +408,8 @@ test('音訊的特效：選到音樂時特效分頁只有淡入（逐漸變大�
   for (const id of ['fx.in', 'fx.out', 'fx.seam', 'fx.whole'])
     await expect(page.getByTestId(`tool-${id}`)).toHaveClass(/dim/); // 音樂沒有畫面特效，按鈕變淡
   await openTool(page, 'audio.fade');
-  await page.getByLabel('淡入').fill('1.5');
-  await page.getByLabel('淡出（逐漸變小聲）').fill('0.5');
+  await page.getByRole('slider', { name: '淡入', exact: true }).fill('1.5');
+  await page.getByRole('slider', { name: '淡出', exact: true }).fill('0.5');
   const a = (
     (await project(page)).tracks as unknown as {
       kind: string;

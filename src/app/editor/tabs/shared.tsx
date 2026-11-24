@@ -84,7 +84,7 @@ export function ToolButton({
       onClick={onClick}
       aria-label={ariaLabel ?? label}
       aria-pressed={fill === undefined ? undefined : fill}
-      aria-disabled={dim ? true : undefined}
+      data-dim={dim ? 'true' : undefined}
       data-testid={testId}
     >
       <span className="tool-ico">

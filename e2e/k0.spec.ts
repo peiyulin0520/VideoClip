@@ -1,14 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import {
-  countColor,
-  createProjectWith,
-  exportFrame,
-  openTab,
-  openTool,
-  project,
-  samplePreview,
-  seekTo,
-} from './helpers';
+import { countColor, createProjectWith, exportFrame, openTab, openTool, project, samplePreview, seekTo } from './helpers';
 
 const SHOT = 'docs/screenshots/kinetic';
 type Kin = { id: string; accent?: string; bg?: string; speed?: number };
@@ -48,8 +39,11 @@ test('K0 動態字卡：動態字卡視窗分組（登場／流動…）、選�
     '綜藝',
     '恐怖',
   ]);
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-in').tap();
+  await openTool(page, 'fx.kinetic');
   await expect(page.getByTestId('kn-card')).toHaveCount(8);
+  await openTool(page, 'fx.textfx');
   await page.getByRole('radio', { name: '文字特效 爆出' }).tap();
   const it = await textItem(page);
   expect(it.kinetic?.id).toBe('burst');
@@ -61,17 +55,22 @@ test('K0 動態字卡：動態字卡視窗分組（登場／流動…）、選�
   await expect(page.locator('.fx-span.style')).toHaveCount(1);
   await expect(page.getByTestId('tool-fx.kinetic')).toContainText('動態字卡'); // 按鈕上的項目名固定不變，值顯示在圖示那格
   // 設定：強調色、底色、速度、一輪幾秒（2 個詞 × 2.2 秒）
+  await openTool(page, 'fx.kinetic');
   await expect(page.getByTestId('kn-settings')).toContainText('一輪 4.4 秒');
   await page.screenshot({ path: `${SHOT}/k0-effect-tab-390.png` });
   // 換成舊的「基本」特效會拿掉動態字卡；選動態字卡會拿掉舊的
-  await page.getByTestId('kn-group-basic').tap();
+  await openTool(page, 'fx.textfx');
+  await openTool(page, 'fx.textfx');
   await page.getByRole('radio', { name: '文字特效 閃爍' }).tap();
   expect(await textItem(page)).toMatchObject({ textFx: { kind: 'shimmer' } });
   expect((await textItem(page)).kinetic).toBeUndefined();
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-in').tap();
+  await openTool(page, 'fx.textfx');
   await page.getByRole('radio', { name: '文字特效 爆出' }).tap();
   expect((await textItem(page)).textFx).toBeUndefined();
   // 無
+  await openTool(page, 'fx.textfx');
   await page.getByRole('radio', { name: '文字特效 無' }).tap();
   expect((await textItem(page)).kinetic).toBeUndefined();
   await expect(page.getByTestId('fx-circle-style')).toHaveCount(0);
@@ -83,7 +82,9 @@ test('K0 動態字卡：爆出會動（字從小變大、放射線出現又消�
 }) => {
   test.setTimeout(180_000);
   await addText(page, '開場');
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-in').tap();
+  await openTool(page, 'fx.textfx');
   await page.getByRole('radio', { name: '文字特效 爆出' }).tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   // 字體可能還在載入：多量幾個點，看「畫面中間有沒有跟底下藍色影片不一樣的顏色」
@@ -130,12 +131,15 @@ test('K0 動態字卡：爆出會動（字從小變大、放射線出現又消�
   // 速度 2×：一輪 2.2 秒；寫進字卡、一輪的秒數更新
   await page.getByRole('radio', { name: '速度 2×' }).tap();
   expect((await textItem(page)).kinetic?.speed).toBe(2);
+  await openTool(page, 'fx.kinetic');
   await expect(page.getByTestId('kn-settings')).toContainText('一輪 1.1 秒');
   await page.getByRole('radio', { name: '速度 1×' }).tap();
   expect((await textItem(page)).kinetic?.speed).toBeUndefined();
 
   // 巨字橫移：底下一條強調色窄帶（#ff4d2e）；預覽與單格輸出同一個時間畫面一樣
+  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-flow').tap();
+  await openTool(page, 'fx.textfx');
   await page.getByRole('radio', { name: '文字特效 巨字橫移' }).tap();
   expect((await textItem(page)).kinetic?.id).toBe('crawl');
   await page.getByRole('radio', { name: '底色 墨黑' }).tap();
@@ -164,8 +168,10 @@ test('K1 登場與流動各 8 式：每張卡片都能選、寫進字卡、預�
     ['flow', ['crawl', 'drift', 'echo', 'slant', 'path', 'ticker', 'depth', 'tape']],
   ] as const) {
     await page.getByTestId(`kn-group-${group}`).tap();
+    await openTool(page, 'fx.kinetic');
     await expect(page.getByTestId('kn-card')).toHaveCount(8);
     expect(
+      await openTool(page, 'fx.kinetic');
       await page.getByTestId('kn-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-kn-id'))),
     ).toEqual(ids);
     for (const id of ids) {
@@ -212,6 +218,7 @@ test('K2 切換與強調各 8 式：每張卡片都能選、寫進字卡', async
   ] as const) {
     await page.getByTestId(`kn-group-${group}`).tap();
     expect(
+      await openTool(page, 'fx.kinetic');
       await page.getByTestId('kn-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-kn-id'))),
     ).toEqual(ids);
     for (const id of ids) {
@@ -230,6 +237,7 @@ test('K3 空間與歌詞各 8 式：每張卡片都能選、寫進字卡', async
   ] as const) {
     await page.getByTestId(`kn-group-${group}`).tap();
     expect(
+      await openTool(page, 'fx.kinetic');
       await page.getByTestId('kn-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-kn-id'))),
     ).toEqual(ids);
     for (const id of ids) {
@@ -254,6 +262,7 @@ test('K4 綜藝與恐怖各 8 式：每張卡片都能選、寫進字卡（64 �
   ] as const) {
     await page.getByTestId(`kn-group-${group}`).tap();
     expect(
+      await openTool(page, 'fx.kinetic');
       await page.getByTestId('kn-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-kn-id'))),
     ).toEqual(ids);
     for (const id of ids) {
