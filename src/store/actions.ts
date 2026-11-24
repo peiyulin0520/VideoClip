@@ -1134,6 +1134,24 @@ export function removeGroup(group: string) {
   );
 }
 
+/** 清空版型的一格（這一條格子軌的素材全刪、色塊上的文字一起刪）：軌道留著，依序時不補位。一步復原 */
+export function clearCellTrack(trackId: string) {
+  const p = store().project;
+  const tr = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !tr || tr.groupRole !== 'cell' || tr.items.length === 0) return;
+  const gone = new Set<string>();
+  for (const it of tr.items) {
+    gone.add(it.id);
+    for (const x of textsOnItem(p.tracks as Track[], it.id)) gone.add(x.id);
+  }
+  store().apply(
+    (d) => {
+      for (const t of d.tracks) t.items = t.items.filter((x) => !gone.has(x.id)) as never;
+    },
+    { select: null },
+  );
+}
+
 /** 轉場資料換成新的總長（前後的分配照原本的比例；沒分別設定就維持對稱） */
 function withDuration(
   prev: { duration: number; before?: number; after?: number } | undefined,
@@ -2136,9 +2154,21 @@ export function mergeTracksMulti(ids: string[]): { merged: number; kept: number 
   return { merged: r.merged, kept: r.kept };
 }
 
+/**
+ * 刪掉一條軌道（含裡面的物件）。版型的軌道各自處理（不再整個版型一起刪）：
+ * 成員軌（版型裡的文字、貼圖、音效）＝只刪這一條；格子軌＝清空這一格（軌道留著，版型不會少一格）；
+ * 外框軌＝整個版型拿掉。一步復原。
+ */
 export function removeTrack(trackId: string) {
   const t0 = store().project?.tracks.find((t) => t.id === trackId);
-  if (t0?.group) return removeGroup(t0.group); // 版型的格子軌：整個版型一起拿掉
+  if (t0?.groupRole === 'member') {
+    store().apply((d) => void (d.tracks = d.tracks.filter((t) => t.id !== trackId) as never), {
+      select: null,
+    });
+    return;
+  }
+  if (t0?.groupRole === 'cell') return clearCellTrack(trackId);
+  if (t0?.group) return removeGroup(t0.group); // 版型的外框軌：整個版型拿掉
   // 軌道上有版型的外框：那些版型一起拿掉（格子軌留著會變孤兒）
   const frameGroups = [...new Set((t0?.items ?? []).filter(isFrameItem).map((x) => x.group!))];
   for (const g of frameGroups) removeGroup(g);
