@@ -21,7 +21,7 @@ async function nameFirstClip(page: Page, name: string) {
   await page.getByRole('button', { name: '關閉', exact: true }).last().tap(); // 套用後視窗不會自動關，按 ✕ 關
 }
 
-test('X1-1 播放列按鈕叫「定格」；整個頁面看不到「定位」', async ({ page }) => {
+test('X1-1 剪輯工具列按鈕叫「關鍵格」；整個頁面看不到「定位」', async ({ page }) => {
   await createProjectWith(page, ['solid-red.webm']);
   await clips(page).first().tap();
   await openTab(page, '剪輯');
