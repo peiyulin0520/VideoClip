@@ -7,6 +7,7 @@ import {
   isRed,
   isWhite,
   openTab,
+  openTool,
   project,
   samplePreview,
   seekTo,
@@ -34,10 +35,7 @@ test('時間軸兩個緊接的片段中間有小圓圈（沒轉場是「＋」�
   await expect(page.getByTestId('tr-circle')).toHaveCount(1);
   await expect(page.getByTestId('tr-circle')).toHaveText('＋');
   await page.getByTestId('tr-circle').tap();
-  await expect(page.locator('.tabs').getByRole('tab', { name: '特效' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await expect(page.getByTestId('tool-fx.seam')).toHaveClass(/active/); // 功能列跳到特效的〔轉場〕視窗
   await expect(page.getByTestId('effect-panel')).toBeVisible();
   const [, b] = await items(page);
   await expect(page.getByTestId('tr-circle')).toHaveClass(/sel/); // 選取中＝實心
@@ -133,7 +131,8 @@ test('套用到這一軌全部銜接處；分割後轉場只留在前半；刪�
   // 一步復原
   await undo(page);
   expect((await items(page))[2]!.transitionIn).toBeUndefined();
-  // 選「無」
+  // 選「無」（復原前要先收起視窗，這裡再打開〔轉場〕）
+  await openTool(page, 'fx.seam');
   await page.getByRole('radio', { name: '轉場 無' }).tap();
   expect((await items(page))[1]!.transitionIn).toBeUndefined();
   void clips;

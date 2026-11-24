@@ -133,6 +133,6 @@ test('字卡也能調色：色調分頁選字卡 → 選黑白，look 寫進字�
   // 在色調分頁點影片：留在色調分頁
   await clips(page).first().tap();
   await page.waitForTimeout(600);
-  await expect(page.getByRole('tab', { name: '色調', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('toolbar', { name: '色調', exact: true })).toBeVisible(); // 功能列還在色調
   await expect(page.getByTestId('color-panel')).toBeVisible();
 });
