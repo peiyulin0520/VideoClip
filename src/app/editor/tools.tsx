@@ -62,6 +62,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { toast, useUI } from '../../store/uiStore';
 import { PromptSheet } from '../../ui/PromptSheet';
 import { ShadowFrameIcon, TransitionIcon } from './toolIcons';
+import { GroupToggleButton } from './AddToGroupToggle';
 import { GradePeekButton } from './GradePeekButton';
 import { KeyframeButton } from './KeyframeButton';
 import { MuteSheet } from './MuteSheet';
@@ -407,6 +408,14 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
       },
     },
     {
+      id: 'text.togroup',
+      label: '加進版型',
+      icon: Type,
+      zone: 'add',
+      kind: 'toggle',
+      custom: () => <GroupToggleButton what="新增的文字" />,
+    },
+    {
       id: 'text.content',
       label: '內容',
       icon: TextCursorInput,
@@ -739,6 +748,14 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
       zone: 'add',
       kind: 'action',
       run: (e) => e.pickMusic(),
+    },
+    {
+      id: 'audio.togroup',
+      label: '加進版型',
+      icon: Music,
+      zone: 'add',
+      kind: 'toggle',
+      custom: () => <GroupToggleButton what="新增的音樂／音效" />,
     },
     {
       id: 'audio.split',

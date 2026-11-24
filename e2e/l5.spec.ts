@@ -133,13 +133,16 @@ test('L7 版型格式：有「左右雙格」「上下雙格」和「自訂格�
   const cellsOf = async () => (await tracks(page)).filter((t) => t.groupRole === 'cell');
   expect(await cellsOf()).toHaveLength(6); // 3 列 × 2 欄
   // 選到的版型：加欄 → 9 格；放一個素材到最後一格後減欄 → 要確認
+  await openTool(page, 'layout.size');
   await expect(page.getByTestId('shape-rows')).toHaveText('3');
+  await openTool(page, 'layout.size');
   await page.getByRole('button', { name: '這個版型的欄數 加 1' }).tap();
   await expect.poll(async () => (await cellsOf()).length).toBe(9);
   await openTool(page, 'layout.cells');
   await page.getByTestId('ld-cell').nth(8).tap();
   await page.getByTestId('cell-assets').getByRole('button').first().tap();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
+  await openTool(page, 'layout.size');
   await page.getByRole('button', { name: '這個版型的欄數 減 1' }).tap();
   await expect(page.getByRole('dialog', { name: '格數變少' })).toBeVisible();
   await page.getByRole('button', { name: '拿掉，改格數' }).tap();
@@ -219,6 +222,7 @@ test('L7 格子框線粗細：滑桿 0%＝格子貼在一起、300%＝框線變�
   };
   const g1 = await gap();
   expect(g1).toBeGreaterThan(0);
+  await openTool(page, 'layout.frame');
   const slider = page.getByLabel('格子框線粗細');
   await expect(slider).toHaveValue('100');
   await slider.fill('300');
@@ -249,6 +253,7 @@ test('L7 拍立得（只有一格）也有框線粗細滑桿：白邊跟著變�
   await openTab(page, '版型');
   await openTool(page, 'layout.size');
   await expect(page.getByTestId('layout-shape')).toBeVisible();
+  await openTool(page, 'layout.frame');
   const slider = page.getByLabel('格子框線粗細');
   await expect(slider).toBeVisible();
   const w = async () => (await tracks(page)).filter((t) => t.groupRole === 'cell')[0]!.items[0]!.cell!.w;

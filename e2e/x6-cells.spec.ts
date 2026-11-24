@@ -149,10 +149,12 @@ test('X6 同步／依序：排好各格素材、版型長度跟著；依序時�
   expect(await row(page, 1)).toEqual([[6, 4]]);
 });
 
-test('X6 移至格子：剪輯分頁［移至格子］把素材搬到別格，畫面換成新格子；預覽框出那一格', async ({ page }) => {
+test('X6 選到格子裡的素材：預覽框出那一格、標出每一格的格號；剪輯工具列不再有〔移至格子〕', async ({
+  page,
+}) => {
   test.setTimeout(180_000);
   await twoCellLayout(page);
-  const [c1, c2] = await cells(page);
+  const [c1] = await cells(page);
   const it = c1!.items[0]!;
   await showTimeline(page);
   await closePanel(page);
@@ -160,15 +162,7 @@ test('X6 移至格子：剪輯分頁［移至格子］把素材搬到別格，�
   await expect(page.getByTestId('clip-area')).toBeVisible();
   await expect(page.getByTestId('preview-cell-no')).toHaveText(['1', '2']);
   await openTab(page, '剪輯');
-  await page.getByRole('button', { name: '移至格子' }).tap();
-  await page.getByRole('button', { name: '移至第 2 格' }).tap();
-  const after = await cells(page);
-  expect(after[0]!.items).toHaveLength(0);
-  expect(after[1]!.items).toHaveLength(2);
-  const moved = after[1]!.items.find((i) => i.id === it.id)!;
-  expect(moved.cell!.y).toBeCloseTo(c2!.items[0]!.cell!.y, 3);
-  // 兩個素材同時間在第 2 格：後來搬的找空位 → 接在後面
-  expect(moved.start).toBeGreaterThanOrEqual(c2!.items[0]!.start + c2!.items[0]!.duration - 1e-6);
+  await expect(page.getByRole('button', { name: '移至格子' })).toHaveCount(0);
 });
 
 test('X6 這一格視窗：素材清單、加色塊、改色塊顏色與文字（套用）、刪除一段（文字一起刪）', async ({

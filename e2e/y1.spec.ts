@@ -40,6 +40,7 @@ test('Y1 版型工具列：播放方式、外框、大小各自一個視窗', as
   // 外框顏色、透明度、框線粗細都在〔外框〕視窗裡
   await openTool(page, 'layout.frame');
   const frame = page.getByTestId('layout-frame');
+  await openTool(page, 'layout.frame');
   await expect(frame.getByLabel('格子框線粗細')).toBeVisible();
   await expect(frame.getByRole('radio', { name: '外框 白' })).toBeVisible();
 });
@@ -58,6 +59,7 @@ test('Y1 外框顏色（含選色器的顏色）都會換；框線粗細連外�
   await expect.poll(async () => (await frameOf(page)).frameStyle?.color, { timeout: 15_000 }).toBe('#ffd23f');
 
   const [a0, b0] = await cells(page);
+  await openTool(page, 'layout.frame');
   await page.getByLabel('格子框線粗細').fill('300');
   await expect.poll(async () => (await cells(page))[0]!.x, { timeout: 15_000 }).toBeGreaterThan(a0!.x * 2.5); // 外圍邊距變粗
   const [a1, b1] = await cells(page);
