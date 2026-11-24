@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   addOverlays,
+  closePanel,
   createProjectWith,
   finishLayout,
   fixture,
@@ -133,18 +134,20 @@ test('回報14 調整版型大小：「寬 × 高、套用」那一排不蓋住�
   await page.screenshot({ path: `${SHOT}/layout-resize-card-390.png` });
 });
 
-test('回報14 特效分頁：選了特效之後，「文字特效」那一格的字也不被切掉', async ({ page }) => {
+test('回報14 特效工具列：選了特效之後，〔文字特效〕〔動態字卡〕按鈕的字不被切掉', async ({ page }) => {
   test.setTimeout(120_000);
   await addKinetic(page);
   await page.getByTestId('kn-group-flow').tap();
   await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
+  await closePanel(page);
   for (const w of [320, 390]) {
     await page.setViewportSize({ width: w, height: 844 });
-    const t = await page.getByTestId('fx-part-style').evaluate((el) => [el.scrollWidth, el.clientWidth]);
-    expect(t[0], `@${w}`).toBeLessThanOrEqual(t[1]! + 1);
-    const seg = (await page.getByTestId('fx-where').boundingBox())!;
-    const b = (await page.getByTestId('fx-part-style').boundingBox())!;
-    expect(b.x + b.width, `@${w}`).toBeLessThanOrEqual(seg.x + seg.width + 0.5);
+    for (const id of ['fx.textfx', 'fx.kinetic']) {
+      const t = await page
+        .getByTestId(`tool-${id}`)
+        .evaluate((el) => [el.scrollWidth, el.clientWidth, el.querySelector('span:last-child')!.scrollWidth]);
+      expect(t[0], `@${w} ${id}`).toBeLessThanOrEqual(t[1]! + 1);
+    }
   }
   await page.screenshot({ path: `${SHOT}/effect-part-tab-390.png` });
 });

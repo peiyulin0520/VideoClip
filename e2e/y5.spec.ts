@@ -4,6 +4,7 @@ import {
   finishLayout,
   fixture,
   isRed,
+  openCat,
   openTab,
   openTool,
   project,
@@ -36,16 +37,13 @@ async function twoCells(page: Page) {
   await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]);
 }
 
-test('Y5 特效分頁：「作用在」是分段式切換（進場、出場、轉場、整段），「效果」在有標題的區塊；沒有另外的版型動畫區', async ({
-  page,
-}) => {
+test('Y5 特效工具列：進場、出場、轉場、整段各一顆按鈕，沒有另外的版型動畫區', async ({ page }) => {
   test.setTimeout(120_000);
   await twoCells(page);
-  await openTab(page, '特效');
-  const where = page.getByTestId('fx-where');
-  await expect(where.getByRole('tab')).toHaveText([/進場/, /出場/, /轉場/, /整段/]);
-  await expect(where.locator('.seg')).toHaveCount(1);
-  await expect(page.getByTestId('fx-effects').locator('.zone-title')).toHaveText('效果');
+  await openCat(page, '特效');
+  const row = page.getByRole('toolbar', { name: '特效', exact: true });
+  for (const name of ['進場', '出場', '轉場', '整段'])
+    await expect(row.getByRole('button', { name })).toBeVisible();
   await expect(page.getByTestId('layout-motion')).toHaveCount(0);
   await page.screenshot({ path: `${SHOT}/y5-effect-tab-390.png` });
 });
@@ -56,7 +54,7 @@ test('Y5 版型裡的素材可以有自己的進場特效（選到格子素材�
   test.setTimeout(150_000);
   await twoCells(page); // 選到第 1 格
   await openTab(page, '特效');
-  await expect(page.getByTestId('fx-where')).toBeVisible(); // 以前格子素材看到的是「請到版型分頁」
+  await expect(page.getByTestId('tool-fx.in')).not.toHaveClass(/dim/); // 以前格子素材看到的是「請到版型分頁」
   await page.getByRole('radio', { name: '進場 疊化' }).tap();
   const cell = (await cells(page))[0]!.items[0]!;
   expect(cell.inEffect?.kind).toBe('dissolve');

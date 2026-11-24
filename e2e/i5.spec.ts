@@ -28,14 +28,7 @@ test('單一素材進場：選「捲簾放下」3 秒 → 開頭看不到、中�
   await createProjectWith(page, ['solid-red.webm']); // 紅色 4 秒
   await clips(page).first().tap();
   await openTab(page, '特效');
-  await expect(page.locator('.fx-legend .lg.seam')).toHaveText('雙影片銜接');
-  await expect(page.locator('.fx-legend .lg.single')).toHaveText('單影片進出場');
-  // 圖例用「選取中」的顏色：雙影片銜接＝橘棕底白字、單影片進出場＝深綠底淺字
-  const lg = (c: string) =>
-    page.locator(`.fx-legend .lg.${c}`).evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(await lg('seam')).toBe('rgb(184, 85, 58)');
-  expect(await lg('single')).toBe('rgb(30, 59, 47)');
-  await expect(page.getByTestId('fx-part-in')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('tool-fx.in')).toHaveClass(/active/); // 特效預設在〔進場〕
   await page.getByRole('radio', { name: '進場 捲簾放下' }).tap();
   await page.getByLabel('進場幾秒').fill('30'); // 3.0 秒
   const it = await first(page);
@@ -94,7 +87,7 @@ test('單一素材可以同時有進場與出場（不同特效）：出場「�
   await page.screenshot({ path: `${SHOT}/in-out.png` });
   // 點進場圓圈 → 切到進場、顏色對調
   await page.getByTestId('fx-circle-in').tap();
-  await expect(page.getByTestId('fx-part-in')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('tool-fx.in')).toHaveClass(/active/); // 特效預設在〔進場〕
   expect(await bg('fx-circle-in')).toBe('rgb(30, 59, 47)');
 });
 
