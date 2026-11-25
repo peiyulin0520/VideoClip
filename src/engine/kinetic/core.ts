@@ -53,6 +53,8 @@ export type KineticDef = {
   hold?: (words: string[]) => number;
   /** 這一式有副標可以改：輸入框裡灰色提示字（沒打副標時用什麼） */
   sub?: string;
+  /** 副標輸入框的名稱（顯示在文字〔內容〕視窗：這個字會用在哪裡） */
+  subLabel?: string;
   /** 原版的固定標籤（標題輪替的「速報」）、預設數字（跳錶）：字卡文字裡沒有時用它 */
   label?: string;
   num?: string;

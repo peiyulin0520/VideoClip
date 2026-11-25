@@ -24,6 +24,7 @@ import {
   SlidersHorizontal,
   Smile,
   Sparkles,
+  WandSparkles,
   SquareStack,
   Trash2,
   Type,
@@ -198,6 +199,15 @@ const clip = (panel: Exclude<Panel, null>) =>
 const text = (section: TextSection) => (e: ToolEnv) => <TextTab found={e.found} section={section} />;
 const fx = (part: FxPart) => (e: ToolEnv) => <EffectTab found={e.found} part={part} />;
 const layout = (part: LayoutPart) => (e: ToolEnv) => <LayoutTab found={e.found} part={part} />;
+
+/** 文字特效按鈕上的值：基本特效的代表字，或動態字卡那一式的第一個字 */
+const textFxBadge = (e: ToolEnv): Badge | null => {
+  const i = sel(e);
+  if (i?.type !== 'text') return null;
+  if (i.textFx) return { type: 'char', text: textFxCode(i.textFx.kind) };
+  const d = i.kinetic ? kineticById(i.kinetic.id) : undefined;
+  return d ? { type: 'char', text: d.zh.slice(0, 1) } : null;
+};
 
 const gradeBadge = (e: ToolEnv): Badge | null => {
   const i = sel(e);
@@ -483,6 +493,18 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
       },
       popup: text('裝飾'),
     },
+    {
+      // 跟〔特效〕類別裡的〔文字特效〕是同一個視窗（不跳類別，免得找不到剛才在調的東西）
+      id: 'text.fx',
+      label: '特效',
+      icon: WandSparkles,
+      zone: 'fx',
+      kind: 'popup',
+      enabled: isText,
+      need: NEED_TEXT,
+      badge: textFxBadge,
+      popup: fx('textfx'),
+    },
   ],
   layout: [
     {
@@ -636,31 +658,13 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
     {
       id: 'fx.textfx',
       label: '文字特效',
-      icon: Sparkles,
+      icon: WandSparkles,
       zone: 'text',
       kind: 'popup',
       enabled: isText,
       need: NEED_TEXT,
-      badge: (e) => {
-        const i = sel(e);
-        return i?.type === 'text' && i.textFx ? { type: 'char', text: textFxCode(i.textFx.kind) } : null;
-      },
+      badge: textFxBadge,
       popup: fx('textfx'),
-    },
-    {
-      id: 'fx.kinetic',
-      label: '動態字卡',
-      icon: Type,
-      zone: 'text',
-      kind: 'popup',
-      enabled: isText,
-      need: NEED_TEXT,
-      badge: (e) => {
-        const i = sel(e);
-        const d = i?.type === 'text' && i.kinetic ? kineticById(i.kinetic.id) : undefined;
-        return d ? { type: 'char', text: d.zh.slice(0, 1) } : null;
-      },
-      popup: fx('kinetic'),
     },
   ],
   color: [

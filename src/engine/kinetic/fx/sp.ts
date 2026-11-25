@@ -125,6 +125,7 @@ export const FX_SP: KineticDef[] = [
     poster: 1,
     area: 'wide',
     sub: '同主標',
+    subLabel: '外圈文字',
     len: () => null,
     draw(s, t) {
       const { g, W, H } = s;

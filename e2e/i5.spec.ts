@@ -167,8 +167,9 @@ test('字卡文字特效：閃爍（亮光掃過，不同時間亮的地方不�
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('閃爍的字');
   await openTab(page, '特效');
-  await openTool(page, 'fx.kinetic');
   await openTool(page, 'fx.textfx');
+  await openTool(page, 'fx.textfx');
+  await page.getByTestId('kn-group-basic').tap();
   await page.getByRole('radio', { name: '文字特效 閃爍' }).tap();
   const it = () =>
     (project(page) as Promise<{ tracks: { items: { type: string; textFx?: { kind: string } }[] }[] }>).then(

@@ -10,7 +10,7 @@ import {
   TYPEWRITER_CODE,
   type TransitionCat,
 } from '../../../engine/transitions';
-import type { EffectKind, Item, KineticFade, TextFxKind, TextItem } from '../../../model/types';
+import type { EffectKind, Item, KineticFade, TextItem } from '../../../model/types';
 import {
   setItemMotion,
   setItemEffect,
@@ -30,7 +30,7 @@ import type { KineticDef, KineticGroup } from '../../../engine/kinetic/core';
 import { kineticWords } from '../../../engine/kinetic/render';
 import { TEXT_FXS } from '../../../engine/textFx';
 import { ColorPicker } from '../../../ui/ColorPicker';
-import { KineticCard } from '../KineticCards';
+import { KineticCard, TextFxCard } from '../KineticCards';
 import { useProjectStore } from '../../../store/projectStore';
 import { toast, useUI } from '../../../store/uiStore';
 import { Slider } from '../../../ui/Slider';
@@ -39,7 +39,7 @@ import { TransitionAudioBlock } from '../TransitionAudio';
 import { TransitionCard } from '../TransitionCards';
 import type { Found } from './shared';
 
-export type FxPart = 'in' | 'out' | 'seam' | 'whole' | 'textfx' | 'kinetic';
+export type FxPart = 'in' | 'out' | 'seam' | 'whole' | 'textfx';
 type CatKey = TransitionCat | '文字';
 
 /** 特效工具列每一項的視窗：進場、出場、轉場、整段、文字特效、動態字卡（各自一項，沒有分段切換列） */
@@ -59,9 +59,9 @@ export function EffectTab({ found, part }: { found: Found; part: FxPart }) {
             <SeamBlock item={item} track={track} cat={cat} setCat={setCat} />
           ) : part === 'whole' ? (
             <WholeBlock item={item} />
-          ) : part === 'textfx' || part === 'kinetic' ? (
+          ) : part === 'textfx' ? (
             item.type === 'text' ? (
-              <StyleBlock item={item} mode={part === 'textfx' ? 'basic' : 'kinetic'} />
+              <StyleBlock item={item} />
             ) : null
           ) : (
             <SingleBlock item={item} role={part} cat={cat} setCat={setCat} />
@@ -103,60 +103,48 @@ function WholeBlock({ item }: { item: Item }) {
   );
 }
 
-/** 字卡的文字特效：整段字一直在動。［基本］是舊的 4 種；其他組是動態字卡 64 式（照原版分組），選一種或「無」 */
-function StyleBlock({ item, mode }: { item: Item; mode: 'basic' | 'kinetic' }) {
+/**
+ * 字卡的文字特效（一個視窗）：整段字一直在動。上面一排分組——［基本］是 4 種文字樣式特效，
+ * 其他組是動態字卡 64 式（照原版分組）；選一種或「無」（兩種本來就二選一）。
+ */
+function StyleBlock({ item }: { item: Item }) {
   const textFx = item.type === 'text' ? item.textFx?.kind : undefined;
   const kin = item.type === 'text' ? item.kinetic : undefined;
   const kdef = kin ? kineticById(kin.id) : undefined;
-  const groups = KINETIC_GROUPS.filter((g) => KINETIC.some((f) => f.group === g.id));
-  const [pickedGroup, setGroup] = useState<KineticGroup | null>(null);
-  const grp: KineticGroup = pickedGroup ?? kdef?.group ?? groups[0]!.id;
+  const kgroups = KINETIC_GROUPS.filter((g) => KINETIC.some((f) => f.group === g.id));
+  const groups: { id: KineticGroup | 'basic'; name: string }[] = [{ id: 'basic', name: '基本' }, ...kgroups];
+  const [pickedGroup, setGroup] = useState<KineticGroup | 'basic' | null>(null);
+  const grp: KineticGroup | 'basic' = pickedGroup ?? kdef?.group ?? 'basic';
   const focus = () => useUI.setState({ fxFocus: { id: item.id, role: 'style' } });
-  const pickBasic = (k: TextFxKind | null) => {
-    setTextFx(item.id, k);
-    focus();
-  };
-  const pickKinetic = (id: KineticDef['id'] | null) => {
-    setKinetic(item.id, id);
-    focus();
-  };
   const run = item.type === 'text' ? item.card.runs[0] : undefined;
   const words = item.type === 'text' && kdef ? kineticWords(item, kdef.words) : [];
   const cardWords = (def: KineticDef) => (item.type === 'text' ? kineticWords(item, def.words) : def.words);
-  // 基本文字特效（4 種）與動態字卡（64 式）各一個視窗；「無」只清掉這一個視窗管的那一種
-  const none = mode === 'basic' ? !textFx : !kin;
+  const none = !textFx && !kin;
   return (
     <>
-      {mode === 'kinetic' && (
-        <div className="seg" role="tablist" aria-label="動態字卡分組" data-testid="kn-groups">
-          {groups.map((g) => (
-            <button
-              key={g.id}
-              role="tab"
-              aria-selected={grp === g.id}
-              data-testid={`kn-group-${g.id}`}
-              className={`seg-btn${grp === g.id ? ' on' : ''}`}
-              onClick={() => setGroup(g.id)}
-            >
-              {g.name}
-            </button>
-          ))}
-        </div>
-      )}
-      <div
-        className="tr-grid"
-        role="radiogroup"
-        aria-label={mode === 'basic' ? '文字特效' : '動態字卡'}
-        data-testid="tr-grid"
-      >
+      <div className="seg" role="tablist" aria-label="文字特效分組" data-testid="kn-groups">
+        {groups.map((g) => (
+          <button
+            key={g.id}
+            role="tab"
+            aria-selected={grp === g.id}
+            data-testid={`kn-group-${g.id}`}
+            className={`seg-btn${grp === g.id ? ' on' : ''}`}
+            onClick={() => setGroup(g.id)}
+          >
+            {g.name}
+          </button>
+        ))}
+      </div>
+      <div className="tr-grid" role="radiogroup" aria-label="文字特效" data-testid="tr-grid">
         <button
           role="radio"
           aria-checked={none}
-          aria-label={mode === 'basic' ? '文字特效 無' : '動態字卡 無'}
+          aria-label="文字特效 無"
           className={`tr-card${none ? ' on' : ''}`}
           onClick={() => {
-            if (mode === 'basic') setTextFx(item.id, null);
-            else setKinetic(item.id, null);
+            setTextFx(item.id, null);
+            setKinetic(item.id, null);
             focus();
           }}
         >
@@ -165,21 +153,20 @@ function StyleBlock({ item, mode }: { item: Item; mode: 'basic' | 'kinetic' }) {
           </span>
           <span className="tr-name">無</span>
         </button>
-        {mode === 'basic'
+        {grp === 'basic' && item.type === 'text'
           ? TEXT_FXS.map((f) => (
-              <button
+              <TextFxCard
                 key={f.id}
-                role="radio"
-                aria-checked={textFx === f.id}
-                aria-label={`文字特效 ${f.name}`}
-                className={`tr-card${textFx === f.id ? ' on' : ''}`}
-                onClick={() => pickBasic(f.id)}
-              >
-                <span className="tr-none" aria-hidden="true">
-                  {f.code}
-                </span>
-                <span className="tr-name">{f.name}</span>
-              </button>
+                kind={f.id}
+                name={f.name}
+                card={item.card}
+                seed={item.id}
+                active={textFx === f.id}
+                onPick={() => {
+                  setTextFx(item.id, f.id);
+                  focus();
+                }}
+              />
             ))
           : KINETIC.filter((f) => f.group === grp).map((f) => (
               <KineticCard
@@ -188,13 +175,14 @@ function StyleBlock({ item, mode }: { item: Item; mode: 'basic' | 'kinetic' }) {
                 words={cardWords(f)}
                 fontId={run?.fontId ?? ''}
                 active={kin?.id === f.id}
-                onPick={() => pickKinetic(f.id)}
+                onPick={() => {
+                  setKinetic(item.id, f.id);
+                  focus();
+                }}
               />
             ))}
       </div>
-      {mode === 'kinetic' && kin && kdef && item.type === 'text' && (
-        <KineticSettings item={item} def={kdef} words={words} />
-      )}
+      {kin && kdef && item.type === 'text' && <KineticSettings item={item} def={kdef} words={words} />}
     </>
   );
 }
@@ -308,20 +296,6 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
           ))}
         </div>
       </div>
-      {def.sub && (
-        <div className="zone-soft" data-testid="kn-sub">
-          <div className="zone-title">副標</div>
-          <input
-            className="text-input"
-            data-testid="kn-sub-input"
-            aria-label="副標文字"
-            maxLength={40}
-            placeholder={def.sub}
-            value={k.sub ?? ''}
-            onChange={(e) => patchKinetic(item.id, { sub: e.target.value || undefined })}
-          />
-        </div>
-      )}
       <div className="zone-soft" data-testid="kn-speed">
         <div className="zone-title">速度與播放</div>
         <div className="chips" role="radiogroup" aria-label="動態字卡速度">
