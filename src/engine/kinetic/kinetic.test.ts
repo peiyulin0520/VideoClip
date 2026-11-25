@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { clamp, E, fit, marquee, rnd, seg, splitWords, wlen, type Stage } from './core';
+import { clamp, E, fadeEdges, fit, marquee, rnd, seg, splitWords, wlen, type Stage } from './core';
 import { beforeAll } from 'vitest';
 import { KINETIC, kineticById, schemeOf } from './index';
+import { lineSizes } from './fx/in';
 
 // jsdom 沒有真的 canvas：暫存畫布（scratch／圖案）也用假的 2D（只記呼叫）
 beforeAll(() => {
@@ -201,6 +202,103 @@ describe('動態字卡：換行與邊緣淡出', () => {
     for (const l of wrapLines(g, '中文 and english 混在一起 的長句子 should wrap nicely', 90))
       expect(l.length * 10).toBeLessThanOrEqual(90);
   });
+  it('重擊排字換行：預設全部一行（字再多也一行、字縮小）；按 Enter 照使用者的行；自動換行超過 8 字才換', () => {
+    expect(lineSizes(10, undefined, false)).toEqual([10]);
+    expect(lineSizes(24, undefined, false)).toEqual([24]);
+    expect(lineSizes(10, undefined, true)).toEqual([5, 5]);
+    expect(lineSizes(8, undefined, true)).toEqual([8]);
+    expect(lineSizes(6, ['蔡氏家', '族聚餐'], false)).toEqual([3, 3]);
+    expect(lineSizes(6, ['蔡氏', '家', '族聚餐'], true)).toEqual([2, 1, 3]);
+    expect(lineSizes(6, ['蔡氏家族聚餐'], true)).toEqual([6]); // 只有一行：不手動換
+  });
+  it('重擊排字：字再多也縮小排在同一行；按 Enter（lines）真的分成多行', () => {
+    const def = kineticById('hitline')!;
+    const total = (n: number) => n * 0.42 + 0.8;
+    const ys = (words: string[], lines?: string[], wrap?: 'auto') => {
+      const { s, log } = stage(words);
+      def.draw({ ...s, lines, wrap }, total(Array.from(words.join('')).length) - 0.3);
+      return new Set(
+        log
+          .filter((l) => l.startsWith('translate('))
+          .map((l) => Math.round(Number(/,([-\d.]+)\)/.exec(l)![1]))),
+      );
+    };
+    const ten = ['一二三四五六七八九十'];
+    expect(ys(ten).size).toBe(1); // 預設一行
+    expect(ys(ten, undefined, 'auto').size).toBe(2); // 自動換行
+    expect(ys(ten, ['一二三四五', '六七八九十']).size).toBe(2); // 按了 Enter
+    const long = ['一二三四五六七八九十甲乙丙丁戊己庚辛壬癸']; // 20 個字
+    expect(ys(long).size).toBe(1);
+  });
+  it('停在最後畫面（settle）：重拍殘影的殘影收合（只剩主字）、隧道只剩一個正常大小的字；上下裂開停在字完整的那一刻', async () => {
+    const strokes = (id: string, t: number, settle: number) => {
+      const { s, log } = stage(['回聲']);
+      kineticById(id)!.draw({ ...s, settle }, t);
+      return log.filter((l) => l.startsWith('strokeText(')).length;
+    };
+    expect(strokes('trail', 0.1, 0)).toBeGreaterThan(0); // 打拍當下有空心殘影
+    expect(strokes('trail', 0.1, 1)).toBe(0); // 停下來：殘影收合
+    const words = (settle: number) => {
+      const { s, log } = stage(['前進']);
+      kineticById('tunnel')!.draw({ ...s, settle }, 1);
+      return log.filter((l) => l.startsWith('fillText(') || l.startsWith('strokeText(')).length;
+    };
+    expect(words(0)).toBeGreaterThan(1); // 一層一層飛過來
+    expect(words(1)).toBe(1); // 停下來只剩一個字
+    const { holdTime } = await import('./hold');
+    const split = kineticById('split')!;
+    // 最後一個詞的第 1.3 秒：還沒開始裂開（1.45 秒起）
+    expect(holdTime(split, ['結束', '開始'])).toBeCloseTo(2.2 + 1.3, 6);
+    expect(holdTime(split, ['結束', '開始'])).toBeLessThan(split.len(['結束', '開始'])!);
+  });
+  it('一直流動的式子停在最後畫面：流動內容淡掉、整句完整的字淡入（paintKinetic 的 settle）', async () => {
+    const { paintKinetic } = await import('./render');
+    const texts = (id: string, settle: number) => {
+      const log: string[] = [];
+      HTMLCanvasElement.prototype.getContext = (() => fakeCtx(log).ctx) as never;
+      const c = document.createElement('canvas');
+      c.width = 180;
+      c.height = 320;
+      const def = kineticById(id)!;
+      paintKinetic(
+        c,
+        def,
+        {
+          words: ['蔡氏家族聚餐'],
+          fg: '#fff',
+          paper: '#000',
+          hi: '#f00',
+          hifg: '#000',
+          bg: null,
+          family: 'sans-serif',
+          settle,
+        },
+        def.poster,
+      );
+      return log.filter((l) => l.startsWith('fillText(')).map((l) => l.split(',')[0]);
+    };
+    for (const id of ['crawl', 'drift', 'slant', 'ticker', 'tape', 'led', 'depth', 'echo']) {
+      expect(kineticById(id)!.len(['蔡氏家族聚餐']), id).toBeNull();
+      // 淡入的整句字（alpha 要 settle 才看得到）：settle=1 時畫了整句字，settle=0 沒有這一筆
+      expect(texts(id, 1).filter((x) => x === 'fillText(蔡氏家族聚餐').length, id).toBeGreaterThan(
+        texts(id, 0).filter((x) => x === 'fillText(蔡氏家族聚餐').length - 1,
+      );
+    }
+    // 環繞、歌詞捲動本來整句都看得到：不處理
+    expect(kineticById('orbit')!.calm).toBe(false);
+    expect(kineticById('lyrics')!.calm).toBe(false);
+  });
+  it('彎道停在最後畫面：S 形帶子拉直成橫條、整句完整的字（一個字一次）排在帶子上', () => {
+    const def = kineticById('path')!;
+    expect(def.calm).toBe(false);
+    const drawn = (settle: number) => {
+      const { s, log } = stage(['順著河走', '就會到海'], 180, 320);
+      def.draw({ ...s, settle }, 1);
+      return log.filter((l) => l.startsWith('fillText(')).map((l) => l.slice(9, 10));
+    };
+    expect(drawn(0).length).toBeGreaterThan(9); // 流動：重複的一長串字
+    expect(drawn(1).join('')).toBe('順著河走 就會到海'); // 停下來：整句一遍，空格也算
+  });
   it('fadeEdges：none 什麼都不畫；v／h 各畫兩條漸層（destination-out）', async () => {
     const { fadeEdges } = await import('./core');
     const none = fakeCtx();
@@ -287,6 +385,74 @@ describe('動態字卡：副標、停在最後畫面', () => {
       expect(h, f.id).toBeGreaterThanOrEqual(total - last);
       expect(h, f.id).toBeLessThanOrEqual(total);
     }
+  });
+  it('fadeEdges：淡出寬度＝框長邊 × fadeW（預設 12%），上下／左右各一條漸層', () => {
+    const grad = (fade: 'v' | 'h', w?: number) => {
+      const { ctx, log } = fakeCtx();
+      fadeEdges(ctx, 400, 200, fade, w);
+      return log.filter((l) => l.startsWith('fillRect('));
+    };
+    // 上下：高 200，fadeW 0.25 → 50；上條 (0,0,400,50)，下條從 150 起
+    expect(grad('v', 0.25)).toEqual([
+      'fillRect(0.00,0.00,400.00,50.00)',
+      'fillRect(0.00,150.00,400.00,50.00)',
+    ]);
+    // 左右：寬 400，fadeW 0.05 → 20
+    expect(grad('h', 0.05)).toEqual([
+      'fillRect(0.00,0.00,20.00,200.00)',
+      'fillRect(380.00,0.00,20.00,200.00)',
+    ]);
+    // 沒給＝12%
+    expect(grad('v')[0]).toBe('fillRect(0.00,0.00,400.00,24.00)');
+  });
+  it('重擊排字：停在最後時 6 個字都在自己的位置（由左到右）、沒放大沒轉；播放中途前面的字已經留在原位', async () => {
+    const { holdTime } = await import('./hold');
+    const def = kineticById('hitline')!;
+    const words = ['蔡氏家族聚餐'];
+    const at = (t: number) => {
+      const { s, log } = stage(words);
+      def.draw(s, t);
+      const tr = log
+        .filter((l) => l.startsWith('translate('))
+        .map((l) => Number(/translate\(([-\d.]+),/.exec(l)![1]));
+      const sc = log
+        .filter((l) => l.startsWith('scale('))
+        .map((l) => l.replace('scale(', '').replace(')', ''));
+      return { tr, sc };
+    };
+    const h = holdTime(def, words);
+    expect(h).toBeCloseTo(5 * 0.42 + 0.3, 6);
+    const end = at(h + 0.05);
+    expect(end.tr).toHaveLength(6);
+    expect(end.tr).toEqual([...end.tr].sort((a, b) => a - b)); // 由左到右
+    expect(new Set(end.tr).size).toBe(6);
+    expect(new Set(end.sc)).toEqual(new Set(['1.00,1.00'])); // 都落定了
+    // 第 3 個字剛開始砸（0.84 秒 + 0.02）：已經畫了 3 個字，前兩個是原大小
+    const mid = at(2 * 0.42 + 0.02);
+    expect(mid.tr).toHaveLength(3);
+    expect(mid.sc.slice(0, 2)).toEqual(['1.00,1.00', '1.00,1.00']);
+    expect(mid.sc[2]).not.toBe('1.00,1.00');
+    // 逐字重擊照舊：同一時間只畫一個字
+    const { s: s2, log: l2 } = stage(words);
+    kineticById('hit')!.draw(s2, 2 * 0.42 + 0.02);
+    expect(l2.filter((l) => l.startsWith('translate(')).length).toBe(1);
+  });
+  it('停在最後畫面（settle）：拉長每個字都回到原樣；沒 settle 時有字在被拉', () => {
+    const def = kineticById('stretch')!;
+    const words = ['蔡氏家族聚餐'];
+    const scales = (settle: number) => {
+      const { s, log } = stage(words);
+      def.draw({ ...s, settle }, 2.35);
+      return log.filter((l) => l.startsWith('scale(')).map((l) => l.replace('scale(', '').replace(')', ''));
+    };
+    expect(new Set(scales(1))).toEqual(new Set(['1.00,1.00']));
+    expect(new Set(scales(0)).size).toBeGreaterThan(1);
+    const words12 = ['一二三四五六七八九十甲乙'];
+    const { s, log } = stage(words12);
+    def.draw({ ...s, settle: 1 }, 2.35);
+    expect(new Set(log.filter((l) => l.startsWith('scale(')).map((l) => l))).toEqual(
+      new Set(['scale(1.00,1.00)']),
+    );
   });
   it('holdTime：時間跟字數有關的式子（逐字重擊、翻牌、翻卡、拉霸…）停在最後一個詞完整的那一刻，字多也一樣', async () => {
     const { holdTime } = await import('./hold');

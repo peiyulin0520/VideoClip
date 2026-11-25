@@ -3874,6 +3874,13 @@ button:not(:disabled):active,
 .clip.is-frame .clip-label {
   padding-left: 26px;
 }
+/* 選到版型時左端有拖拉把手：展開鈕往右挪一點，不要蓋住把手 */
+.clip.is-frame.selected .grp-toggle {
+  left: 14px;
+}
+.clip.is-frame.selected .clip-label {
+  padding-left: 38px;
+}
 /* 選到版型裡的某個素材（素材層）：框線用虛線，跟「整個版型」（實線）分得出來 */
 .selbox.member {
   border-style: dashed;
@@ -4762,4 +4769,44 @@ button:not(:disabled):active,
   font-size: var(--fs-note);
   border-radius: 10px;
   white-space: nowrap;
+}
+
+/* 動態字卡邊緣淡出的範圍（編輯時才顯示）：框的兩端各一條漸層色帶＋虛線 */
+.kf-guide {
+  position: absolute;
+  pointer-events: none;
+  z-index: 8;
+  outline: 1px dashed var(--accent);
+}
+.kf-band {
+  position: absolute;
+  display: block;
+}
+.kf-band.v {
+  left: 0;
+  right: 0;
+}
+.kf-band.h {
+  top: 0;
+  bottom: 0;
+}
+.kf-band.v.a {
+  top: 0;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+  border-bottom: 1px dashed var(--accent);
+}
+.kf-band.v.b {
+  bottom: 0;
+  background: linear-gradient(to top, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+  border-top: 1px dashed var(--accent);
+}
+.kf-band.h.a {
+  left: 0;
+  background: linear-gradient(to right, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+  border-right: 1px dashed var(--accent);
+}
+.kf-band.h.b {
+  right: 0;
+  background: linear-gradient(to left, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+  border-left: 1px dashed var(--accent);
 }

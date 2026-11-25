@@ -36,7 +36,7 @@ export const FX_EM: KineticDef[] = [
       const tt = t - i * D;
       const word = pick(s.words, i);
       const px = fit(s, word, 42, 76);
-      const g = tt < 0.3 || (tt > 1.15 && tt < 1.45) || tt > 2.3 ? 1 : 0;
+      const g = (tt < 0.3 || (tt > 1.15 && tt < 1.45) || tt > 2.3) && (s.settle ?? 0) < 0.5 ? 1 : 0;
       const st = Math.floor(t * 20);
       const y1 = g ? rnd(st, 1, 1) * 70 : 0;
       const y2 = y1 + (g ? 12 + rnd(st, 2, 1) * 22 : 0);
@@ -122,7 +122,7 @@ export const FX_EM: KineticDef[] = [
         [1.9, 0.12],
         [2.4, 0.12],
       ];
-      const amp = keys(tt, A);
+      const amp = keys(tt, A) * (1 - (s.settle ?? 0));
       const st = Math.floor(t * 24);
       // 每個字各自亂抖：每秒 24 次隨機跳到新的位置、帶小角度旋轉，不平滑過渡
       drawChars(s, word, W / 2, H / 2, px, (j) => ({
@@ -158,7 +158,7 @@ export const FX_EM: KineticDef[] = [
         if (tt < tj) on = 0;
         else if (tt < tj + 0.35) on = Math.floor((tt - tj) * 28) % 3 ? 1 : 0;
         else if (tt > 3.6) on = tt < 3.6 + j * 0.05 ? 1 : 0;
-        else on = j === lucky && tt > 2.4 && tt < 2.62 && Math.floor(tt * 30) % 2 ? 0 : 1;
+        else on = j === lucky && tt > 2.4 && tt < 2.62 && Math.floor(tt * 30) % 2 && !(s.settle ?? 0) ? 0 : 1;
         return {
           alpha: on ? 1 : 0.14,
           color: s.hi,
@@ -184,7 +184,8 @@ export const FX_EM: KineticDef[] = [
       const px = fit(s, word, 38, 74);
       drawChars(s, word, W / 2, H / 2, px, (j) => {
         const ph = t * 4 - j * 0.6;
-        return { dy: Math.sin(ph) * 8 * cqmin, rot: Math.cos(ph) * 6 };
+        const k = 1 - (s.settle ?? 0);
+        return { dy: Math.sin(ph) * 8 * cqmin * k, rot: Math.cos(ph) * 6 * k };
       });
     },
   },

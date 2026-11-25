@@ -6,9 +6,9 @@
 - **日期**：2026-11-24
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
-- **測試**：1194 個單元測試、約 363 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
+- **測試**：1209 個單元測試、約 369 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-16 全部做完（Z14 凍住／Z15 底下空間／Z16–Z17 轉場／Z18–Z19 預先解碼＋等一下），**還沒開 PR**（問使用者要不要開）。使用者在 iPhone 看後回報：效能框「合成：準備／繪製／等 GPU」「凍住」「最近轉場」（預先解好 n/m、用預解／用影片、等了幾 ms）的截圖
+- **下一步**：feedback-17 的 Z22（部分）、Z23 做完；分支上 Z20、Z21、版型格子停格轉場、Z22、Z23 都還沒進 PR（建 PR 被權限擋，請使用者自己開或允許）。Z22 還沒改的式子見下面日誌「還沒改」，等使用者看過 iPhone 再說
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,58 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-26 彎道的 ∞ 改大、不縮小（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：使用者說不必是完整的 ∞ 圖案，是白帶繞一個大 ∞ 再往回一拉變橫條。把 ∞ 半寬固定 125、帶子與字不再縮小（`sc=1`），直式畫面只看得到中間一段、兩邊超出畫面
+  - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`
+  - 驗證：✅ 單元測試、`npm run check`；用 320×180、180×320 畫 q＝0.15～1 的圖確認
+- 2026-11-26 彎道改成「繞 ∞ 再抽成橫條」（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：使用者要彎道停在最後畫面時先繞個 ∞、最後往回一抽變橫條。`path` 的收尾改成 1.8 秒（`KineticDef.settleLen`，`hold` 2.6 秒）：S 形帶子 → ∞（雙紐線，半寬依畫面看得到的寬度縮，帶子與字也跟著縮）→ 停一拍 → 拉直成橫的白帶子，繞的時候字繼續沿著帶子跑，最後整句完整的字淡入排在橫條上。`resample`／`toRibPts`／`ribbonAt` 在 S、∞、直線之間內插。`render.ts` 的 settle 視窗改用 `def.settleLen ?? 0.5`
+  - 動了哪些檔：`src/engine/kinetic/{core,render,fx/flow}.ts`；單元測試沿用（彎道停格：整句一遍）
+  - 驗證：✅ `npm run check`；用 320×180、180×320 畫 q＝0～1 的圖確認 S → ∞ → 橫條；kinetic e2e 過
+- 2026-11-26 彎道停在最後畫面（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：〔彎道〕（`path`）選〔停在最後畫面〕時，S 形白帶子在停點前 0.5 秒內「繞一繞」（中間控制點左右甩一下）拉直成畫面正中間一條橫的白帶子，流動的字淡出、整句完整的字（一遍，縮到畫面看得到的寬度）淡入排在帶子上，靜止；`calm:false`（自己處理，不走流動式子的通用淡入）。帶子的取樣改成 `sampleRib`／`ribAtIn`；`ribMorph(q)`。`kineticPaint` 除錯掛鉤多一個 `settle` 參數
+  - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、`src/engine/debug.ts`；單元測試 `kinetic.test`（彎道停格：整句一遍、帶子拉直）
+  - 驗證：✅ `npm run check`；kinetic 相關 e2e 過；用 180×320、320×180 兩種框畫了 0／0.6／1 的圖確認
+- 2026-11-26 一直流動的式子停在最後畫面（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：`len` 回傳 null 的式子（巨字橫移、直排對流、重複波浪、斜帶、彎道、多層跑馬燈、遠近直書、交叉封條、透視字幕、點陣看板）選〔停在最後畫面〕時，`paintKinetic` 把流動的內容畫到暫存畫布、用 `1 − settle` 的透明度疊上去，再把整句完整的字（每個詞一行、置中、一樣大，`drawRest`）用 `settle` 的透明度淡入；環繞、歌詞捲動本來整句都看得到，`calm:false` 不處理。對照圖 `hold-sheet-after.png` 更新
+  - 動了哪些檔：`src/engine/kinetic/{core,render,fx/sp,fx/mv}.ts`；單元測試 `kinetic.test`（八式 settle 後有整句字）
+  - 驗證：✅ `npm run check`（1213 單元測試）、kinetic 相關 e2e 過
+- 2026-11-26 殘影類停在最後畫面（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：用 `settle` 讓〔重拍殘影〕停下來時殘影收合（只剩主字、不再放大）；〔隧道〕停下來時飛來的層淡掉、一個正常大小的字淡入；〔上下裂開〕的 `hold` 改成最後一個詞還沒開始裂開的那一刻（不用 settle）；重拍殘影透明的層不畫。對照圖 `hold-sheet-after.png` 更新
+  - 還沒改：一直流動的式子（跑馬燈、透視字幕、環繞、點陣看板…）照 poster 停；鏡中倒影的倒影本來就是那一式的樣子沒動
+  - 驗證：✅ `npm run check`、kinetic 相關 e2e 過
+- 2026-11-25 重擊排字的換行（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：〔重擊排字〕預設**全部排成一行**（最多 24 個字，字再多也縮小，不再超過 8 字就換行）；文字〔內容〕按 Enter 就照使用者的行排（`textLines(item)` → `Stage.lines`，`lineSizes()`）；設定視窗（只有重擊排字）多〔換行〕：〔排成一行〕（預設）／〔自動換行〕（超過 8 字才換，`kinetic.wrap:'auto'`）；字高也跟著行數縮小，不會超出框
+  - 動了哪些檔：`src/engine/kinetic/{core,render,fx/in}.ts`、`src/model/types.ts`、`src/store/actions.ts`、`src/app/editor/tabs/EffectTab.tsx`；單元測試 `kinetic.test`（`lineSizes`、一行／自動／Enter 的行數）；e2e `z22-hitline`
+  - 驗證：✅ `npm run check`；k0、kinetic-hold、z22-hitline 的 e2e 過；截圖確認 Enter 分成兩行（4＋3 字）
+- 2026-11-25 feedback-17 Z22（部分）＋Z23（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：①**〔重擊排字〕**（`hitline`，第 65 式，登場組，在逐字重擊後面）：整句先排好位置（超過 8 字兩行），第 n 個字放大 2.4 倍＋旋轉砸到自己的位置後留著，最後一整句；〔逐字重擊〕維持原樣；②**「快到停點慢慢靜下來」機制**：`Stage.settle`（0→1，停點前 0.5 秒起，只有〔停在最後畫面〕才有，`render.ts` 算），一直在動的式子把閒著也在動的部分乘 `(1 − settle)`：拉長、波浪起伏、抖動、訊號故障（不再閃）、霓虹燈管（不再閃一個字）、重影抽搐（不抽、重影靜止）；③逐字蹦跳 `hold` 改成整句跳完、還沒退場的那一刻；④**Z23**：`kinetic.fadeW`（0.05～0.45，沒有＝0.25，`DEFAULT_FADE_W`）、`fadeEdges(…, fadeW)`、設定視窗〔淡出寬度〕滑桿＋提示字、設定視窗開著且有淡出時預覽上有色帶（`KineticFadeGuide`，`ui.kineticFadeGuide`，`data-testid="kn-fade-guide"`）
+  - **還沒改**（對照圖 `docs/screenshots/feedback-17/hold-sheet-after.png`，用「蔡氏家族聚餐」看停下來那格）：上下裂開（split，字還在變形）、重拍殘影（trail，有殘影拖尾）、隧道（tunnel，很大）、點陣看板／透視字幕等一直流動的式子照 poster 停；翻牌、翻卡、跟唱、逐字踩拍、打字機、拉霸停下來那一格本來就是每個字都完整乖乖待著，沒動
+  - 動了哪些檔：`src/engine/kinetic/{core,render,fx/in,fx/em,fx/hr,fx/tv}.ts`、`src/engine/debug.ts`（`kineticHoldSheet`）、`src/model/types.ts`、`src/store/{actions,uiStore}.ts`、`src/app/editor/{Preview,KineticFadeGuide}.tsx`、`src/app/editor/tabs/EffectTab.tsx`、`src/app/styles.css`；單元測試 `kinetic.test`（重擊排字、拉長 settle、fadeEdges）；e2e `z23-fade`、`z22-hold-sheet`（`Z22_SHEET=before|after` 才跑，產生對照圖）、`k0`／`kinetic-hold`（65 式）
+  - 驗證：✅ `npm run check`（1209 單元測試）；✅ 完整 e2e 364 過／4 跳過＋1 個（layout 拍貼機）在 4 個 worker 同時跑時逾時、單獨跑都過
+  - 下一步：開 PR（等使用者說）；使用者 iPhone 看拉長、重擊排字、邊緣淡出
+- 2026-11-25 規劃 feedback-17（Opus，claude/zen-tesla-v3brj5）
+  - 做了什麼：看錄影（拉長＋停在最後畫面）：`stretch` 的波浪跟一輪無關、6 個字時任何時刻都有字被拉長，停格那一格是第二波開頭；邊緣淡出只擦框邊 12%，字離邊緣遠就看不出來。寫成 Z22、Z23。建 PR 被權限擋
+  - 動了哪些檔：`docs/plans/2026-11-25-feedback-17.md`（新）、`docs/PROGRESS.md`
+  - 驗證：🟡 只看程式＋錄影，還沒寫測試
+  - 下一步：切 Sonnet 做 Z22、Z23
+- 2026-11-25 版型格子裡的停格轉場（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：`setTransitionMode` 不再擋格子軌；`actions.ts` 的 `shiftFrom(d, tr, it, delta)` 遇到版型格子軌時：依序播放用 `rippleAfter`（這一格後面的素材、後面各格一起挪、外框變長／變短），同步播放用新的 `cellOps.shiftCellTrack`（只挪這一格、`fitFrameToCells`）；`applyTransition`、`setTransition`、`setTransitionAll`、`setTransitionMode` 都改成先改轉場設定、最後才挪（挪格子軌會換掉整個 `d.tracks`）。引擎（`activeTransition`、`scene.ts`、Player）本來就不分軌道種類，沒改
+  - 注意：格子軌的〔排成一個接一個〕（`arrangeGroup`／`packCell`）會把空白拿掉，那時停格轉場的空白也沒了（轉場不畫，跟刪掉前一段一樣）
+  - 動了哪些檔：`src/store/actions.ts`、`src/engine/cellOps.ts`；單元測試 `src/store/cellHold.test.ts`（同步、依序、改長度、切回、復原）；e2e `z17-hold-transition`（版型格子：UI 切停格、空白中間左右各一種顏色、切回挪回去、復原）
+  - 驗證：✅ `npm run check`（1205 單元測試）；完整 e2e 362 過／3 跳過＋2 個（k0 動態字卡取樣、x9 播放軸換順序）在 4 個 worker 同時跑時逾時、單獨跑都過
+  - 下一步：開 PR（等使用者說）
+- 2026-11-25 Z20／Z21（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：①**Z20** `scene.ts` `buildScene` 的轉場分支（格子軌）把虛擬 A／B 先過 `guardCell` 再畫（裁切模式 `guardCells:false` 照舊不過），格子素材位置跟格子對不上（版型動過）時，轉場那一秒格子不再是空的、露出下面；②**Z21** 新增 `setGroupStart(group, start)`（`actions.ts`：結尾不動；往右切掉各格開頭、影片 `trimIn` 加 `切掉秒數×speed`、整段在前面的拿掉、被切開頭的素材取消轉場；往左不動素材；最短 0.5 秒、不小於 0；一步復原）；播放軸選到版型左端也有把手（`Timeline.tsx` startTrim 的 frame 'start' 走 `setGroupStart`；展開鈕往右挪一點）；版型工具列新增〔時間〕（`layout.time`，`LayoutTab` `TimeControls`，用 `EffectTimingSheet` 匯出的 `Num`：開始、長度各一組 −0.1／＋0.1＋輸入，立刻生效、一次一步復原）
+  - 沒照規劃做：右端在畫面外時「把手貼在畫面右緣」沒做（`position: sticky` 在絕對定位的片段裡不好做），改靠〔時間〕直接打數字；〔時間〕不是「套用」模式，每次改都立刻生效（跟〔大小〕一樣）
+  - 動了哪些檔：`src/engine/{scene,debug}.ts`、`src/store/actions.ts`、`src/app/editor/{Timeline,EffectTimingSheet,tools}.tsx`、`src/app/editor/tabs/LayoutTab.tsx`、`src/app/styles.css`；單元測試 `sceneCell`（沒修正 3 個都失敗）、`groupStart`；e2e `y5`（Z20：偏掉位置後轉場中間要紅綠混色；沒修正會失敗）、`z21-group-time`
+  - 驗證：✅ `npm run check`（1203 單元測試）；✅ 完整 e2e 363 過／3 跳過（4 個 worker）
+  - 下一步：開 PR（等使用者說）
+- 2026-11-25 規劃 Z20／Z21（Opus，claude/zen-tesla-v3brj5）
+  - 做了什麼：看使用者兩段錄影＋截圖（第 1 格兩張照片疊化、自訂分配 0.62／0.39）；沙盒重現：格子素材的 `transform` 跟格子對不上時，轉場分支沒過 `guardCell` → 兩段畫在舊位置被格子裁掉 → 露出下面。版型片段只有右端把手。寫成 Z20、Z21
+  - 動了哪些檔：`docs/plans/2026-11-25-feedback-16.md`、`docs/PROGRESS.md`
+  - 驗證：🟡 只用暫時的除錯掛鉤＋暫時的 e2e 重現（沒留下）
+  - 下一步：切 Sonnet 做 Z20、Z21
 - 2026-11-25 feedback-16 Z14／Z15／Z18／Z19（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：①**Z18 轉場預先解碼**（`src/engine/transitionFrames.ts`）：專案打開／改轉場後，在背景用 Mediabunny 把每個轉場用到的前後兩段（`activeTransition` 逐格走一遍算出素材秒數，30 格／秒、長邊 640／流暢 480）解成 `ImageBitmap` 存起來；離播放線近的先解、總量超過 160MB 丟最遠的；播放經過轉場直接用（`Player` provider 的 `frames.frameAt`），匯出不用。②**Z19 備用**：轉場中後一段沒預解好、`<video>` 也還沒準備好 → 時間暫停等它，總共最多 0.3 秒／次（`STALL_S`，音樂、影片同步一起停）；**拿掉播放中的縮圖頂著**（暫停、拖時間軸仍用縮圖）。③**Z14** 影片畫面上傳判斷抽成 `videoUpload.ts` 的 `shouldUpload`：rVFC 計數變了就上傳；計數超過 80 ms 沒變（Safari 對看不到的影片會這樣）而影片時間（30 格／秒量化）在走，就改用時間上傳；效能框多「凍住」計數（影片時間走了 0.1 秒卻沒上傳，應為 0）。④**Z15** 新增 `--bar-pad = safe-bottom × 0.45`，`.tabs`／`.fb-row` 底下留白與升起視窗位置都改用它（34pt → 約 15pt）；CSS 預設高度 `100svh` → `100dvh`
   - 沒照規劃做：`useAppHeight` 沒改成 Safari 也用 JS 寫 `--app-h`（網址列伸縮時會抖），只靠 `100dvh`

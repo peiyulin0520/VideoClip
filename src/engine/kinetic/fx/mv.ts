@@ -169,6 +169,7 @@ export const FX_MV: KineticDef[] = [
   },
   {
     id: 'lyrics',
+    calm: false,
     group: 'mv',
     zh: '歌詞捲動',
     en: 'Lyric scroll',
@@ -225,15 +226,16 @@ export const FX_MV: KineticDef[] = [
       const i = Math.floor(b / 4);
       const word = pick(s.words, i);
       const px = fit(s, word, 40, 70);
-      const d = E.out(seg(bt, 0, 0.16)) * (1 - E.io(seg(bt, 0.16, 0.58)));
+      const calm = 1 - (s.settle ?? 0); // 停在最後畫面：殘影慢慢收合回主字，最後只剩一個字
+      const d = E.out(seg(bt, 0, 0.16)) * (1 - E.io(seg(bt, 0.16, 0.58))) * calm;
       const dir = b % 2 ? 1 : -1;
       // 每一拍甩出 6 層空心殘影（越遠越淡），再收回來；主字在最上面，剛打拍時稍微放大
-      for (let j = N; j >= 1; j--)
-        drawWord(s, word, W / 2, H / 2 + dir * j * d * 7.5 * cqmin, px, {
-          stroke: 0.03 * px,
-          alpha: clamp((1 - j / (N + 1)) * Math.min(1, d * 4)),
-        });
-      const sc = 1 + 0.08 * (1 - seg(bt, 0, 0.2));
+      for (let j = N; j >= 1; j--) {
+        const alpha = clamp((1 - j / (N + 1)) * Math.min(1, d * 4));
+        if (alpha <= 0) continue; // 殘影收合了就不畫
+        drawWord(s, word, W / 2, H / 2 + dir * j * d * 7.5 * cqmin, px, { stroke: 0.03 * px, alpha });
+      }
+      const sc = 1 + 0.08 * (1 - seg(bt, 0, 0.2)) * calm;
       drawWord(s, word, W / 2, H / 2, px, { sx: sc, sy: sc });
     },
   },

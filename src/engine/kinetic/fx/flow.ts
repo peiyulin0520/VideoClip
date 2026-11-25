@@ -1,37 +1,40 @@
 // 流動（09–16）。改寫自 claude-animated-text（MIT，© 2026 pound / POUND0423）。
-import { band, clamp, cs, drawWord, fontOf, marquee, pick, wlen, type KineticDef } from '../core';
+import { band, clamp, cs, drawWord, E, fontOf, marquee, pick, wlen, type KineticDef } from '../core';
 
 // 彎道（path）的帶子：原版 SVG 的路徑（座標系 320×180，S 形曲線），兩段三次貝茲曲線
 const RIB: [number, number, number, number, number, number, number, number][] = [
   [-60, 128, 30, 20, 110, 30, 165, 92],
   [165, 92, 220, 154, 300, 170, 390, 50],
 ];
-let ribPts: { x: number; y: number; a: number; s: number }[] | null = null;
-/** 把路徑取樣成一串點（含累計長度與切線角），算一次就好 */
-function ribSamples() {
-  if (ribPts) return ribPts;
-  const out: { x: number; y: number; a: number; s: number }[] = [];
+type RibPt = { x: number; y: number; a: number; s: number };
+type Rib = number[][];
+let ribPts: RibPt[] | null = null;
+/** 把路徑取樣成一串點（含累計長度與切線角） */
+function sampleRib(rib: Rib): RibPt[] {
+  const out: RibPt[] = [];
   let acc = 0;
-  for (const [x0, y0, x1, y1, x2, y2, x3, y3] of RIB) {
+  for (const [x0, y0, x1, y1, x2, y2, x3, y3] of rib as number[][]) {
     for (let i = 0; i <= 120; i++) {
       const u = i / 120;
       const m = 1 - u;
-      const x = m * m * m * x0 + 3 * m * m * u * x1 + 3 * m * u * u * x2 + u * u * u * x3;
-      const y = m * m * m * y0 + 3 * m * m * u * y1 + 3 * m * u * u * y2 + u * u * u * y3;
-      const dx = 3 * m * m * (x1 - x0) + 6 * m * u * (x2 - x1) + 3 * u * u * (x3 - x2);
-      const dy = 3 * m * m * (y1 - y0) + 6 * m * u * (y2 - y1) + 3 * u * u * (y3 - y2);
+      const x = m * m * m * x0! + 3 * m * m * u * x1! + 3 * m * u * u * x2! + u * u * u * x3!;
+      const y = m * m * m * y0! + 3 * m * m * u * y1! + 3 * m * u * u * y2! + u * u * u * y3!;
+      const dx = 3 * m * m * (x1! - x0!) + 6 * m * u * (x2! - x1!) + 3 * u * u * (x3! - x2!);
+      const dy = 3 * m * m * (y1! - y0!) + 6 * m * u * (y2! - y1!) + 3 * u * u * (y3! - y2!);
       const prev = out[out.length - 1];
       if (prev && i === 0) continue; // 兩段的接點只留一個
       if (prev) acc += Math.hypot(x - prev.x, y - prev.y);
       out.push({ x, y, a: Math.atan2(dy, dx), s: acc });
     }
   }
-  ribPts = out;
   return out;
 }
+/** 原本的 S 形路徑取樣（算一次就好） */
+function ribSamples() {
+  return (ribPts ??= sampleRib(RIB));
+}
 /** 路徑上離起點 d 的位置（超出就停在兩端） */
-function ribAt(d: number) {
-  const pts = ribSamples();
+function ribAtIn(pts: RibPt[], d: number): RibPt {
   if (d <= 0) return pts[0]!;
   const last = pts[pts.length - 1]!;
   if (d >= last.s) return last;
@@ -46,6 +49,50 @@ function ribAt(d: number) {
   const b = pts[hi]!;
   const f = (d - a.s) / Math.max(b.s - a.s, 1e-6);
   return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, a: a.a + (b.a - a.a) * f, s: d };
+}
+
+/** 把一串點重新取樣成 n 個、沿路徑等距（0～1 對應整條帶子），拿來在兩條形狀之間內插 */
+function resample(pts: RibPt[], n: number): { x: number; y: number }[] {
+  const total = pts[pts.length - 1]!.s;
+  return Array.from({ length: n }, (_, i) => {
+    const p = ribAtIn(pts, (total * i) / (n - 1));
+    return { x: p.x, y: p.y };
+  });
+}
+/** 一串 xy 點 → 帶有累計長度與切線角的路徑點 */
+function toRibPts(xy: { x: number; y: number }[]): RibPt[] {
+  let acc = 0;
+  return xy.map((p, i) => {
+    const prev = xy[i - 1];
+    if (prev) acc += Math.hypot(p.x - prev.x, p.y - prev.y);
+    const a = xy[Math.min(i + 1, xy.length - 1)]!;
+    const b = xy[Math.max(i - 1, 0)]!;
+    return { x: p.x, y: p.y, a: Math.atan2(a.y - b.y, a.x - b.x), s: acc };
+  });
+}
+const RIB_N = 200;
+let sRes: { x: number; y: number }[] | null = null;
+/** ∞ 形（雙紐線）的帶子：中心 (160, 90)、半寬 A；起點在最右端繞一整圈 */
+function infinityXY(A: number): { x: number; y: number }[] {
+  return Array.from({ length: RIB_N }, (_, i) => {
+    const th = (i / (RIB_N - 1)) * Math.PI * 2;
+    const d = 1 + Math.sin(th) * Math.sin(th);
+    return { x: 160 + (A * Math.cos(th)) / d, y: 90 + (A * 1.25 * Math.sin(th) * Math.cos(th)) / d };
+  });
+}
+/** 拉直後的橫條：畫面正中間、兩端超出畫面 */
+function lineXY(): { x: number; y: number }[] {
+  return Array.from({ length: RIB_N }, (_, i) => ({ x: -60 + (450 * i) / (RIB_N - 1), y: 90 }));
+}
+const mixXY = (a: { x: number; y: number }[], b: { x: number; y: number }[], f: number) =>
+  a.map((p, i) => ({ x: p.x + (b[i]!.x - p.x) * f, y: p.y + (b[i]!.y - p.y) * f }));
+/** 停在最後畫面（q 0→1）：S 形帶子先繞成 ∞，停一拍，再往回一抽拉直成橫條 */
+function ribbonAt(q: number, A: number): RibPt[] {
+  const sXY = (sRes ??= resample(ribSamples(), RIB_N));
+  const e1 = E.io(clamp((q - 0) / 0.42));
+  const e2 = E.io(clamp((q - 0.58) / 0.42));
+  const inf = infinityXY(A);
+  return toRibPts(mixXY(mixXY(sXY, inf, e1), lineXY(), e2));
 }
 
 export const FX_FLOW: KineticDef[] = [
@@ -219,26 +266,42 @@ export const FX_FLOW: KineticDef[] = [
     words: ['順著河走', '就會到海'],
     poster: 1,
     area: 'full',
+    calm: false,
+    // 停在最後畫面：S → ∞ → 抽成橫條要 1.8 秒（流動 0.8 秒之後開始）
+    settleLen: 1.8,
+    hold: () => 2.6,
     len: () => null,
     hit: [0, 0.2, 1, 0.6],
     draw(s, t) {
       const { g, W, H } = s;
+      const q = s.settle ?? 0;
       // 原版是 320×180 的 SVG（preserveAspectRatio slice＝蓋滿）：先算蓋滿的倍率與位移
       const k = Math.max(W / 320, H / 180);
       const ox = (W - 320 * k) / 2;
       const oy = (H - 180 * k) / 2;
+      const vw = W / k; // 畫面看得到的寬度（直式畫面只看得到 320 的一小段）
+      // 大大的 ∞（半寬 125，直式畫面看得到的範圍比它小，兩邊超出畫面也沒關係）；帶子和字維持原大小
+      const A = 125;
+      const sc = 1;
+      const pts = q > 0 ? ribbonAt(q, A) : ribSamples();
       g.save();
       g.translate(ox, oy);
       g.scale(k, k);
-      // 一條寬的強調色帶子沿 S 形曲線
+      // 一條寬的強調色帶子
       g.strokeStyle = s.hi;
-      g.lineWidth = 26;
+      g.lineWidth = 26 * sc;
       g.lineCap = 'butt';
+      g.lineJoin = 'round';
       g.beginPath();
-      g.moveTo(RIB[0]![0], RIB[0]![1]);
-      for (const [, , x1, y1, x2, y2, x3, y3] of RIB) g.bezierCurveTo(x1, y1, x2, y2, x3, y3);
+      if (q > 0) {
+        g.moveTo(pts[0]!.x, pts[0]!.y);
+        for (const p of pts) g.lineTo(p.x, p.y);
+      } else {
+        g.moveTo(RIB[0]![0], RIB[0]![1]);
+        for (const [, , x1, y1, x2, y2, x3, y3] of RIB) g.bezierCurveTo(x1, y1, x2, y2, x3, y3);
+      }
       g.stroke();
-      // 字沿著曲線排（字高 15、粗體），整串字以 24／秒的速度流過去
+      // 字沿著帶子排（字高 15、粗體），整串字以 24／秒的速度流過去；繞的時候照樣繼續跑
       const unit = s.words.join('・') + '・';
       g.font = fontOf(s, 15, 900);
       g.fillStyle = s.hifg;
@@ -247,20 +310,38 @@ export const FX_FLOW: KineticDef[] = [
       const unitLen = g.measureText(unit).width;
       const reps = Math.ceil(64 / wlen(unit)) + 2;
       const chars = cs(unit.repeat(reps));
-      const total = ribSamples()[ribSamples().length - 1]!.s;
-      let pos = -((t * 24) % unitLen);
-      for (const ch of chars) {
-        const w = g.measureText(ch).width;
-        if (pos > total) break;
-        if (pos + w >= 0) {
-          const p = ribAt(pos + w / 2);
-          g.save();
-          g.translate(p.x, p.y);
-          g.rotate(p.a);
-          g.fillText(ch, 0, 0);
-          g.restore();
+      const total = pts[pts.length - 1]!.s;
+      const place = (str: string[], start: number, alpha: number, size: number) => {
+        g.font = fontOf(s, size, 900);
+        let pos = start;
+        for (const ch of str) {
+          const w = g.measureText(ch).width;
+          if (pos > total) break;
+          if (pos + w >= 0) {
+            const p = ribAtIn(pts, pos + w / 2);
+            g.save();
+            g.globalAlpha *= alpha;
+            g.translate(p.x, p.y);
+            g.rotate(p.a);
+            g.fillText(ch, 0, 0);
+            g.restore();
+          }
+          pos += w;
         }
-        pos += w;
+      };
+      // 整句完整的字淡入（q 0.72～0.95），流動的字同時淡出
+      const fin = clamp((q - 0.72) / 0.23);
+      if (fin < 1) place(chars, -((t * 24) % unitLen) - q * unitLen * 1.2, 1 - fin, 15 * sc);
+      if (fin > 0) {
+        const sentence = cs(s.words.join(' '));
+        g.font = fontOf(s, 15, 900);
+        const sw = g.measureText(sentence.join('')).width;
+        const size = Math.min(15, (15 * vw * 0.88) / Math.max(sw, 1));
+        g.font = fontOf(s, size, 900);
+        const w2 = g.measureText(sentence.join('')).width;
+        // 橫條上看得到的正中間（x＝160）離起點多遠
+        const mid = pts.find((p) => p.x >= 160) ?? pts[pts.length - 1]!;
+        place(sentence, mid.s - w2 / 2, fin, size);
       }
       g.restore();
     },

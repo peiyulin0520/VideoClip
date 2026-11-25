@@ -32,6 +32,8 @@ type UI = {
   /** 預覽上拖格子大小：cells＝草稿（每格佔畫面寬、高的比例，照格號順序） */
   /** 預覽上調動態字卡的顯示範圍：草稿（中心 x、y 與大小 w、h，都是佔畫面的比例） */
   kineticEdit: { id: string; x: number; y: number; w: number; h: number } | null;
+  /** 動態字卡設定視窗開著、而且選了邊緣淡出：預覽上標出淡出的範圍（只在編輯時顯示）；值＝字卡 id */
+  kineticFadeGuide: string | null;
   cellEdit: { group: string; cells: { x: number; y: number; w: number; h: number }[] } | null;
 };
 
@@ -56,6 +58,7 @@ export const useUI = create<UI>((set, get) => ({
   layoutEdit: null,
   cellEdit: null,
   kineticEdit: null,
+  kineticFadeGuide: null,
 }));
 
 export const toast = (text: string, ms?: number) => useUI.getState().toast(text, ms);

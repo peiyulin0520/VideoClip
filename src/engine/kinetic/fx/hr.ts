@@ -153,7 +153,8 @@ export const FX_HR: KineticDef[] = [
       const D = 3.4;
       const i = Math.floor(t / D);
       const st = Math.floor(t * 24);
-      const tw = rnd(Math.floor(t * 3), 1, 9) < 0.32;
+      const calm = 1 - (s.settle ?? 0); // 停在最後畫面：不抽搐、重影也靜下來
+      const tw = rnd(Math.floor(t * 3), 1, 9) < 0.32 && calm > 0.5;
       const word = pick(s.words, i);
       const px = fit(s, word, 36, 78);
       const at = (dx: number, dy: number) => [W / 2 + dx * cqmin, H / 2 + dy * cqmin] as const;
@@ -171,8 +172,8 @@ export const FX_HR: KineticDef[] = [
         a2 = 0.4;
       } else {
         // 平常：兩層重影慢慢飄
-        p1 = at(Math.sin(t * 1.3) * 1.4, Math.cos(t * 1.1) * 0.9);
-        p2 = at(-Math.sin(t * 1.1) * 1.6, Math.cos(t * 1.5) * 0.7);
+        p1 = at(Math.sin(t * 1.3) * 1.4 * calm, Math.cos(t * 1.1) * 0.9 * calm);
+        p2 = at(-Math.sin(t * 1.1) * 1.6 * calm, Math.cos(t * 1.5) * 0.7 * calm);
         pm = at(0, 0);
         a1 = 0.45;
         a2 = 0.22;

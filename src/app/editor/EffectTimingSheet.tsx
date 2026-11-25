@@ -66,7 +66,7 @@ function MiniPreview({ item, t }: { item: Item; t: number }) {
   );
 }
 
-function Num({
+export function Num({
   label,
   value,
   min,

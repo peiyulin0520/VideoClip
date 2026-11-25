@@ -34,7 +34,7 @@ test('動態字卡停在最後：每一式的停點，最後一個詞的字都�
         ).__videoclip.kineticHoldCheck(t),
       text,
     )) as Row[];
-    expect(rows.length).toBe(64);
+    expect(rows.length).toBe(65);
     for (const r of rows) {
       if (r.total === null || SKIP.has(r.id)) continue; // 一直在跑的式子沒有「最後」
       if (r.hold > r.total + 1e-6) problems.push(`${text}/${r.id} 停點 ${r.hold} 超過一輪 ${r.total}`);

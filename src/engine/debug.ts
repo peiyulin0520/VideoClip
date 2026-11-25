@@ -34,7 +34,7 @@ export function installDebugHook(player: Player) {
   if (!on) return;
   const hook = {
     /** 測試／比對用：動態字卡某一式在 t 秒、W×H 畫布、指定的詞（沒給＝範例字）畫出來的圖（PNG dataURL，用原版配色、不淡出） */
-    kineticPaint: (id: string, t: number, W: number, H: number, words?: string[]) => {
+    kineticPaint: (id: string, t: number, W: number, H: number, words?: string[], settle?: number) => {
       const def = kineticById(id);
       if (!def) return null;
       const c = document.createElement('canvas');
@@ -52,6 +52,7 @@ export function installDebugHook(player: Player) {
           hifg: sch.hifg,
           bg: sch.bg,
           family: canvasFamily(''),
+          settle,
         },
         t,
       );
@@ -121,6 +122,54 @@ export function installDebugHook(player: Player) {
         }
         return [{ id: def.id, cycle, series }];
       }),
+    /**
+     * 測試用：每一式（有一輪長度的）用給的文字畫「停在最後」那一格，拼成一張對照圖（PNG dataURL），每格底下標式子名。
+     * 看每一式停下來時字是不是都乖乖待著（沒在動作中途）。ids 沒給＝全部。
+     */
+    kineticHoldSheet: (text: string, ids?: string[], cols = 6) => {
+      const defs = KINETIC.filter((d) => !ids || ids.includes(d.id));
+      const cw = 240;
+      const ch = 135;
+      const rows = Math.ceil(defs.length / cols);
+      const sheet = document.createElement('canvas');
+      sheet.width = cols * cw;
+      sheet.height = rows * (ch + 18);
+      const sg = sheet.getContext('2d')!;
+      sg.fillStyle = '#222';
+      sg.fillRect(0, 0, sheet.width, sheet.height);
+      defs.forEach((def, i) => {
+        const words = splitWords(text);
+        const hold = holdTime(def, words);
+        const sch = schemeOf(def);
+        const c = document.createElement('canvas');
+        const full = def.area === 'full';
+        c.width = full ? 76 : cw;
+        c.height = full ? ch : ch;
+        paintKinetic(
+          c,
+          def,
+          {
+            words,
+            fg: sch.fg,
+            paper: sch.bg,
+            hi: sch.hi,
+            hifg: sch.hifg,
+            bg: sch.bg,
+            family: canvasFamily(''),
+            settle: 1,
+          },
+          Math.floor(hold * 60 + 1e-6) / 60,
+          def.fade ?? 'none',
+        );
+        const x = (i % cols) * cw;
+        const y = Math.floor(i / cols) * (ch + 18);
+        sg.drawImage(c, x, y);
+        sg.fillStyle = '#fff';
+        sg.font = '12px sans-serif';
+        sg.fillText(`${def.id} ${def.zh}`, x + 4, y + ch + 13);
+      });
+      return sheet.toDataURL('image/png');
+    },
     /**
      * 測試用：每一式用給的文字（一段字串，照字卡的規則拆詞）算「停在最後」那一刻，畫兩張只差最後一個字的圖：
      * 兩張不一樣＝最後一個字有被畫出來。回傳停點、一輪長度、最後一個字有沒有畫出來、停點的墨量與最後一輪裡的最大墨量。
@@ -213,6 +262,24 @@ export function installDebugHook(player: Player) {
     },
     /** 測試用：轉場預先解碼的狀態，與開關（關掉＝一定走「等一下再轉」） */
     framesState: () => player.framesState(),
+    /** 測試用：把某個影像物件的位置往右挪 dx（0–1 的畫面寬度比例），不進復原紀錄 */
+    nudgeItem: (id: string, dx: number) => {
+      const pr = useProjectStore.getState().project;
+      if (!pr) return;
+      useProjectStore.setState({
+        project: {
+          ...pr,
+          tracks: pr.tracks.map((t) => ({
+            ...t,
+            items: t.items.map((i) =>
+              i.id === id && i.type !== 'audio'
+                ? { ...i, transform: { ...i.transform, x: i.transform.x + dx } }
+                : i,
+            ),
+          })),
+        } as typeof pr,
+      });
+    },
     setPredecode: (on: boolean) => {
       player.predecode = on;
     },

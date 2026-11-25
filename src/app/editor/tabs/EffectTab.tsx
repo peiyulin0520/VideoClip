@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DEFAULT_TRANSITION_DURATION,
   MAX_TRANSITION,
@@ -29,7 +29,7 @@ import { KINETIC, KINETIC_GROUPS, kineticById, resolveBg, schemeOf } from '../..
 import { kineticFrame } from '../../../engine/kinetic/hit';
 import { holdTime } from '../../../engine/kinetic/hold';
 import type { KineticDef, KineticGroup } from '../../../engine/kinetic/core';
-import { kineticWords } from '../../../engine/kinetic/render';
+import { DEFAULT_FADE_W, kineticWords } from '../../../engine/kinetic/render';
 import { TEXT_FXS } from '../../../engine/textFx';
 import { ColorPicker } from '../../../ui/ColorPicker';
 import { KineticCard, TextFxCard } from '../KineticCards';
@@ -228,6 +228,13 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
   const fade = k.fade ?? def.fade ?? 'none';
   const bg = resolveBg(k.bg);
   const player = useUI((s) => s.player);
+  // 設定視窗開著、而且有選邊緣淡出：預覽上標出淡出的範圍
+  const showGuide = fade !== 'none';
+  useEffect(() => {
+    if (!showGuide) return;
+    useUI.setState({ kineticFadeGuide: item.id });
+    return () => useUI.setState({ kineticFadeGuide: null });
+  }, [showGuide, item.id]);
   return (
     <div className="kn-set" data-testid="kn-settings">
       <div className="zone-soft" data-testid="kn-colors">
@@ -312,7 +319,51 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
             </button>
           ))}
         </div>
+        {fade !== 'none' && (
+          <>
+            <Slider
+              label="淡出寬度"
+              value={Math.round((k.fadeW ?? DEFAULT_FADE_W) * 100)}
+              min={5}
+              max={45}
+              step={1}
+              format={(v) => `${v}%`}
+              onChange={(v) => patchKinetic(item.id, { fadeW: v / 100 })}
+            />
+            <p className="hint" data-testid="kn-fade-hint">
+              字經過框的邊緣才會淡掉；字離邊緣遠就看不出來，可以把淡出寬度調大，或用〔調整範圍〕把框縮小到字附近。
+            </p>
+          </>
+        )}
       </div>
+      {k.id === 'hitline' && (
+        <div className="zone-soft" data-testid="kn-wrap">
+          <div className="zone-title">換行</div>
+          <div className="chips" role="radiogroup" aria-label="重擊排字換行">
+            {(
+              [
+                [undefined, '排成一行'],
+                ['auto', '自動換行'],
+              ] as const
+            ).map(([id, name]) => (
+              <button
+                key={name}
+                role="radio"
+                aria-checked={k.wrap === id}
+                aria-label={`換行 ${name}`}
+                className={`chip${k.wrap === id ? ' active' : ''}`}
+                onClick={() => patchKinetic(item.id, { wrap: id })}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+          <p className="hint">
+            〔排成一行〕字再多也排一行（字會縮小）；〔自動換行〕超過 8
+            個字才換行。想自己決定在哪裡換行，就在文字〔內容〕按 Enter。
+          </p>
+        </div>
+      )}
       <div className="zone-soft" data-testid="kn-speed">
         <div className="zone-title">速度與播放</div>
         <div className="chips" role="radiogroup" aria-label="動態字卡速度">

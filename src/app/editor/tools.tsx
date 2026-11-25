@@ -34,6 +34,7 @@ import {
   SquareRoundCorner,
   RectangleHorizontal,
   TextCursorInput,
+  Timer,
   type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -558,6 +559,22 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
           : null;
       },
       popup: layout('cells'),
+    },
+    {
+      id: 'layout.time',
+      label: '時間',
+      icon: Timer,
+      zone: 'adjust',
+      kind: 'popup',
+      enabled: isFrameSel,
+      need: NEED_LAYOUT,
+      badge: (e) => {
+        const i = sel(e);
+        const f =
+          i && i.type !== 'audio' && i.group ? frameOfGroup(e.project.tracks, i.group)?.item : undefined;
+        return f ? { type: 'text', text: `${f.duration.toFixed(1)}s` } : null;
+      },
+      popup: layout('time'),
     },
     {
       id: 'layout.play',

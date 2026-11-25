@@ -67,6 +67,7 @@ import {
   fitFrameToCells,
   moveToCellTracks,
   rippleAfter,
+  shiftCellTrack,
   textsOnItem,
 } from '../engine/cellOps';
 import { cellItems } from '../engine/cellGap';
@@ -1186,6 +1187,50 @@ export function setGroupDuration(group: string, duration: number, opts?: Opts) {
   }, opts);
 }
 
+/**
+ * 版型的開始時間（結尾不動，長度跟著變）：拖版型左端、〔時間〕視窗用。
+ * 往右（變短）：各格、文字、貼圖、音效在新開頭之前的部分切掉（影片的入點 trimIn 跟著往後，整段都在前面的拿掉）；
+ * 往左（變長）：各素材不動，開頭多出來的時間照版型的「空檔」設定顯示。最短 0.5 秒、不能小於 0 秒。一步復原。
+ */
+export function setGroupStart(group: string, start: number, opts?: Opts) {
+  const p = store().project;
+  const frame = p && groupFrame(p, group);
+  if (!p || !frame) return;
+  const end = frame.item.start + frame.item.duration;
+  const ns = Math.min(Math.max(start, 0), end - 0.5);
+  if (Math.abs(ns - frame.item.start) < 1e-9) return;
+  store().apply((d) => {
+    for (const track of d.tracks) {
+      const keep: Item[] = [];
+      for (const it of track.items) {
+        if (it.group !== group) {
+          keep.push(it as Item);
+          continue;
+        }
+        if (it.id === frame.item.id) {
+          it.start = ns;
+          it.duration = end - ns;
+          keep.push(it as Item);
+          continue;
+        }
+        if (it.start >= ns - 1e-9) {
+          keep.push(it as Item);
+          continue;
+        }
+        const itEnd = it.start + it.duration;
+        if (itEnd <= ns + 0.05) continue; // 整段都在新開頭之前：拿掉
+        const cut = ns - it.start;
+        it.start = ns;
+        it.duration = itEnd - ns;
+        if ('trimIn' in it && typeof it.trimIn === 'number') it.trimIn += cut * (it.speed ?? 1);
+        if ('transitionIn' in it) delete (it as { transitionIn?: unknown }).transitionIn; // 開頭被切掉，不再接在前一段後面
+        keep.push(it as Item);
+      }
+      track.items = keep as never;
+    }
+  }, opts);
+}
+
 /** 刪掉整個版型（同一個 group 的外框與所有格子），空掉的軌道一起拿掉；一步復原 */
 export function removeGroup(group: string) {
   store().apply(
@@ -1253,8 +1298,19 @@ function keepAudio(
 }
 
 /** 這個片段和它後面同一軌的所有片段整個往後（正）或往前（負）挪 delta 秒（停格轉場的空白長度變了、或開關停格轉場） */
-function shiftFrom(tr: { items: Item[] }, it: Item, delta: number) {
+function shiftFrom(d: { tracks: Track[] }, tr: { items: Item[] }, it: Item, delta: number) {
   if (Math.abs(delta) < 1e-6) return;
+  const cell = tr as Track;
+  if (cell.groupRole === 'cell' && cell.group) {
+    // 版型格子軌：依序播放時後面的格子一起挪（漣漪）；同步播放只挪這一格；外框長度跟著變。色塊上的文字跟著
+    const fr = frameOfGroup(d.tracks, cell.group);
+    const at = it.start - 1e-6;
+    if (fr?.item.layoutPlay === 'seq') {
+      const idx = cellTracksOf(d.tracks, cell.group).findIndex((c) => c.id === cell.id);
+      d.tracks = rippleAfter(d.tracks, cell.group, idx, at, delta) as never;
+    } else d.tracks = shiftCellTrack(d.tracks, cell.id, at, delta) as never;
+    return;
+  }
   const from = it.start - 1e-6;
   for (const x of tr.items) if (x.start >= from) x.start = Math.max(x.start + delta, 0);
 }
@@ -1264,6 +1320,7 @@ function shiftFrom(tr: { items: Item[] }, it: Item, delta: number) {
  * 所以改長度、取消時，這個片段和後面的片段要跟著挪。
  */
 function applyTransition(
+  d: { tracks: Track[] },
   tr: { items: Item[] },
   it: Item,
   kind: TransitionKind | null,
@@ -1284,7 +1341,7 @@ function applyTransition(
     };
     newD = wasHold ? nd : 0;
   }
-  if (wasHold) shiftFrom(tr, it, newD - oldD);
+  if (wasHold) shiftFrom(d, tr, it, newD - oldD);
 }
 
 /** 設定（或取消）一個片段的進場轉場；duration 沒給就沿用原本的 */
@@ -1292,7 +1349,7 @@ export function setTransition(id: string, kind: TransitionKind | null, duration?
   store().apply((d) => {
     for (const tr of d.tracks) {
       const it = tr.items.find((x) => x.id === id);
-      if (it) return applyTransition(tr as { items: Item[] }, it as Item, kind, duration);
+      if (it) return applyTransition(d, tr as { items: Item[] }, it as Item, kind, duration);
     }
   }, opts);
 }
@@ -1300,16 +1357,12 @@ export function setTransition(id: string, kind: TransitionKind | null, duration?
 /**
  * 轉場方式：'overlap'＝邊轉邊播（兩段重疊，預設）、'hold'＝停格轉場（前一段播完 → 轉場時間插在兩段中間、兩段都停格 → 後一段從頭播）。
  * 停格轉場會把這個片段和後面的片段往後挪一個轉場長度（中間多出空白）；切回邊轉邊播再挪回來。一步復原。
- * 版型的格子軌先不支援（回傳 false）。
+ * 版型的格子軌也可以：依序播放時後面的格子一起挪、外框跟著變長；同步播放只挪這一格。
  */
 export function setTransitionMode(id: string, mode: 'overlap' | 'hold'): boolean {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f || f.item.type === 'audio' || !f.item.transitionIn) return false;
-  if (f.track.groupRole) {
-    toast('版型的格子裡先只有邊轉邊播');
-    return false;
-  }
   const isHold = f.item.transitionIn.mode === 'hold';
   if (isHold === (mode === 'hold')) return true;
   const s = seamPrev(f.track.items, f.item);
@@ -1319,15 +1372,13 @@ export function setTransitionMode(id: string, mode: 'overlap' | 'hold'): boolean
     const tr = d.tracks[f.trackIndex]!;
     const it = tr.items.find((x) => x.id === id) as Item;
     if (it.type === 'audio' || !it.transitionIn) return;
+    // 先改轉場設定，最後才挪（挪版型格子會換掉整個 tracks，之後就不能再碰這個 draft 物件）
     if (mode === 'hold') {
-      shiftFrom(tr as { items: Item[] }, it, dur);
       it.transitionIn = { ...it.transitionIn, mode: 'hold' };
       delete it.transitionIn.before;
       delete it.transitionIn.after;
-    } else {
-      shiftFrom(tr as { items: Item[] }, it, -dur);
-      delete it.transitionIn.mode;
-    }
+    } else delete it.transitionIn.mode;
+    shiftFrom(d, tr as { items: Item[] }, it, mode === 'hold' ? dur : -dur);
   });
   return true;
 }
@@ -1387,6 +1438,8 @@ export function patchKinetic(
     bg?: string | undefined;
     speed?: number | undefined;
     fade?: KineticFade | undefined;
+    fadeW?: number | undefined;
+    wrap?: 'auto' | undefined;
     sub?: string | undefined;
     end?: 'loop' | 'hold' | undefined;
   },
@@ -1506,7 +1559,7 @@ export function setTransitionAll(trackId: string, kind: TransitionKind | null, d
     const order = [...t.items].sort((a, b) => a.start - b.start);
     for (const it of order) {
       if (!ids.includes(it.id) || it.type === 'audio') continue;
-      applyTransition(t as { items: Item[] }, it as Item, kind, duration);
+      applyTransition(d, t as { items: Item[] }, it as Item, kind, duration);
     }
   });
   return ids.length;
