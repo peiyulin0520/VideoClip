@@ -49,7 +49,9 @@ test('剪輯工具列只留跟剪輯影片有關的；沒有前後移；移除�
   await openTab(page, '剪輯');
   for (const n of ['分割', '刪除', '複製', '修剪', '變速', '裁切', '外觀', '關鍵格', '命名'])
     await expect(
-      n === '關鍵格' ? page.getByTestId('kf-btn') : page.getByRole('button', { name: n, exact: true }),
+      n === '關鍵格'
+        ? page.getByTestId('kf-btn')
+        : page.getByRole('toolbar', { name: '剪輯' }).getByRole('button', { name: n, exact: true }),
     ).toBeVisible();
   for (const n of [
     '匯入',

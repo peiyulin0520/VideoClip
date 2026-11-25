@@ -254,3 +254,11 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **刪軌道**：`removeTrack` 依 `groupRole` 分：member＝只刪那條、cell＝`clearCellTrack`、frame＝整個版型。
 - **畫面高度**：`useAppHeight`（只在加到主畫面時把 `window.innerHeight` 寫進 `--app-h`）；`.editor`、`--stage-cap`、`.panel-sheet`、`.crop-editor` 都用 `var(--app-h, 100svh)`。升起的視窗裡 `.panel` 不留 `--safe-bottom`。
 - **測試技巧**：沙盒 `--safe-bottom` 是 0；要驗 iPhone 的 Home 橫條空白，在 `addInitScript` 裡塞 `:root{--safe-bottom:34px !important}`（見 `e2e/z4-space.spec.ts`）。
+
+## feedback-15 第 2 批（2026-11-25）新增的東西（給下一位）
+- **播放列垃圾桶**：`pb-delete`（`pages/Editor.tsx`），呼叫 `removeAnyItem`；`removeAnyItem` 刪完空軌道會一起移除（最後一條非版型影像軌、格子軌除外）。注意：e2e 找「刪除」按鈕要限定在 `toolbar` 或用 testid（播放列與剪輯工具列各一顆）。
+- **加進／移出版型**：`groupToJoin(project, item)`（時間有重疊的版型外框，取最上層）、`attachToGroup`、`detachFromGroup`；工具 `text.togroup`、`audio.togroup`（`GroupToggleButton`，沒有版型時不顯示）。新增文字時選到版型物件仍會自動加進版型（`addTargetGroup`），想要在外面就選到文字按〔移出版型〕。
+- **各格**：`CellCards`（`editor/CellCards.tsx`）每格一張卡，testid `cell-card`／`cc-open`／`cc-add`；舊的示意圖（`LayoutDiagram`、`ld-cell`）已拿掉。e2e 的 `finishLayout` 用 `cc-open`。
+- **文字特效**：只剩一個工具 `fx.textfx`（特效類別）與 `text.fx`（文字類別），同一個 `EffectTab part="textfx"` 視窗；`StyleBlock` 上面分組〔基本〕＋動態字卡 8 組（testid `kn-group-basic`／`kn-group-in`…），卡片 `tfx-card`（基本）／`kn-card`（動態）；`文字特效 無` 兩種都清。副標輸入在文字〔內容〕視窗（`kn-sub-input`，`KineticDef.subLabel`）。
+- **型別檢查**：用 `npx tsc -b`（`npx tsc --noEmit -p .` 不會檢查 app 的檔案）。
+

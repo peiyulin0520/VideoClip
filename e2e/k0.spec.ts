@@ -39,6 +39,7 @@ test('K0 動態字卡：動態字卡視窗分組（登場／流動…）、選�
   test.setTimeout(150_000);
   await addText(page, '開場 登場');
   await expect(page.getByTestId('kn-groups').getByRole('tab')).toHaveText([
+    '基本',
     '登場',
     '流動',
     '切換',

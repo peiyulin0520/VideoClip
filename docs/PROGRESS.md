@@ -6,9 +6,9 @@
 - **日期**：2026-11-24
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
-- **測試**：1151 個單元測試、約 343 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
+- **測試**：1155 個單元測試、約 348 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #20（U1–U6）已開、等使用者合併。**feedback-15 第 1 批（Z1–Z5）做完**，接著照 `docs/plans/2026-11-24-feedback-15.md` 做第 2 批 Z6–Z12（播放列垃圾桶、空軌道消失、加進版型、各格卡片、文字特效合一＋文字類別〔特效〕、基本特效示意圖、副標移到內容）→ 第 3 批 Z13 預覽變順（Y10）＋聲音不斷
+- **下一步**：PR #20（U1–U6）已開、等使用者合併。**feedback-15 第 1、2 批（Z1–Z12）做完**，接著照 `docs/plans/2026-11-24-feedback-15.md` 做第 3 批 Z13 預覽變順（Y10：先量合成時間再改）＋聲音不斷；做之前請使用者在 iPhone 看第 1、2 批（`docs/PLAN.md §7`）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 feedback-15 第 2 批 Z6–Z12（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：Z6 播放列垃圾桶（`pb-delete`，復原左邊，沒選東西變淡＋提示）。Z7 `removeAnyItem` 刪完空軌道一起拿掉（最後一條影像軌、格子軌除外），同一步復原。Z8 〔加進版型〕改成作用在選到的文字／音樂：`groupToJoin`、`attachToGroup`、`detachFromGroup`（actions），按鈕亮著＝在版型裡、再按移出；拿掉 `addToGroupOff` 與素材分頁的切換。Z9 〔各格〕拿掉示意圖，改成 `CellCards`（每格一張：格號、縮圖、段數、＋加素材；`CellSheet autoAdd`）。Z10 `fx.textfx`＋`fx.kinetic` 合成一個 `fx.textfx`，視窗上面一排分組〔基本〕＋8 組，「無」兩種都清；文字類別加 `text.fx`（同一個視窗，不跳類別）。Z11 `TextFxCard`：基本 4 種用這段字畫出來（選中的才動）。Z12 副標輸入移到文字〔內容〕視窗（`KineticDef.subLabel`：底部小字、外圈文字、標籤）
+  - 動了哪些檔：`src/store/actions.ts`、`src/app/pages/Editor.tsx`、`src/app/editor/{AddToGroupToggle,CellCards(原 LayoutDiagram),CellSheet,KineticCards,TextPanel,tools}.tsx`、`src/app/editor/tabs/{EffectTab,LayoutTab,AssetsTab}.tsx`、`src/engine/kinetic/{core,fx/*}.ts`、`src/store/groupMember.test.ts`、`e2e/{z6-delete,z9-cell-cards,z10-textfx,l3,k0,k05,i5,feedback14,tabs,x5,l0,…}.spec.ts`
+  - 驗證：✅ `npm run check`（1155 單元測試）；✅ 完整 e2e 346 過／2 跳過＋修掉 2 個因新按鈕造成的舊測試（垃圾桶讓「刪除」按鈕名稱重複、分組多了〔基本〕）
+  - 踩到的坑：`npx tsc --noEmit -p .` 不檢查 `tsconfig.app.json` 的內容，要用 `npx tsc -b`（`npm run build` 才會抓到型別錯）；`aria-label="刪除"` 現在有兩顆（播放列、剪輯工具列），e2e 要用 testid 或限定在 `toolbar` 裡找
+  - 下一步：第 3 批 Z13（預覽變順＋聲音不斷）
 - 2026-11-24 feedback-15 第 1 批 Z1–Z5（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：Z1 動態字卡「停在最後」：`KineticDef.hold(words)`（`core.ts`）＋ hit／flap／flip／slot／through／block／corrupt／torch／scatter／popsync 各自算停點（時間常數跟字數有關的式子不能再用固定比例），flip、slot 的 `len` 改成「詞數 × 一輪」；設定顯示「停在 X 秒」。Z2 找不到「分隔線不動」的錯（引擎、先拖各格再調粗細都重現不出來，分隔線和邊距都 ×倍數），改加獨立〔分隔線粗細〕滑桿（`frameStyle.gap`，沒設＝跟 `line` 一樣）。Z3 `removeTrack` 依軌道角色處理：成員軌只刪那一條、格子軌＝清空這一格（`clearCellTrack`）、外框軌才刪整個版型。Z4 `.ps-body .panel` 不再多留 Home 橫條的空白；加到主畫面時用 `window.innerHeight` 當整頁高（`useAppHeight` → `--app-h`）。Z5 `.fb-row .tool` 字級＝類別字級
   - 動了哪些檔：`src/engine/kinetic/{core,hold,fx/*}.ts`、`src/engine/{debug,layouts}.ts`、`src/store/actions.ts`、`src/app/{App.tsx,useAppHeight.ts,styles.css}`、`src/app/editor/{Timeline,tabs/LayoutTab,tabs/EffectTab,LayoutDiagram,frameRestyle}.tsx`、`src/model/types.ts`、`e2e/{kinetic-hold,l5,z4-space,…}.spec.ts`
