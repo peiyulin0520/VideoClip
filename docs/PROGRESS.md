@@ -89,6 +89,10 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-26 彎道停在最後畫面（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：〔彎道〕（`path`）選〔停在最後畫面〕時，S 形白帶子在停點前 0.5 秒內「繞一繞」（中間控制點左右甩一下）拉直成畫面正中間一條橫的白帶子，流動的字淡出、整句完整的字（一遍，縮到畫面看得到的寬度）淡入排在帶子上，靜止；`calm:false`（自己處理，不走流動式子的通用淡入）。帶子的取樣改成 `sampleRib`／`ribAtIn`；`ribMorph(q)`。`kineticPaint` 除錯掛鉤多一個 `settle` 參數
+  - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、`src/engine/debug.ts`；單元測試 `kinetic.test`（彎道停格：整句一遍、帶子拉直）
+  - 驗證：✅ `npm run check`；kinetic 相關 e2e 過；用 180×320、320×180 兩種框畫了 0／0.6／1 的圖確認
 - 2026-11-26 一直流動的式子停在最後畫面（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：`len` 回傳 null 的式子（巨字橫移、直排對流、重複波浪、斜帶、彎道、多層跑馬燈、遠近直書、交叉封條、透視字幕、點陣看板）選〔停在最後畫面〕時，`paintKinetic` 把流動的內容畫到暫存畫布、用 `1 − settle` 的透明度疊上去，再把整句完整的字（每個詞一行、置中、一樣大，`drawRest`）用 `settle` 的透明度淡入；環繞、歌詞捲動本來整句都看得到，`calm:false` 不處理。對照圖 `hold-sheet-after.png` 更新
   - 動了哪些檔：`src/engine/kinetic/{core,render,fx/sp,fx/mv}.ts`；單元測試 `kinetic.test`（八式 settle 後有整句字）

@@ -288,6 +288,17 @@ describe('動態字卡：換行與邊緣淡出', () => {
     expect(kineticById('orbit')!.calm).toBe(false);
     expect(kineticById('lyrics')!.calm).toBe(false);
   });
+  it('彎道停在最後畫面：S 形帶子拉直成橫條、整句完整的字（一個字一次）排在帶子上', () => {
+    const def = kineticById('path')!;
+    expect(def.calm).toBe(false);
+    const drawn = (settle: number) => {
+      const { s, log } = stage(['順著河走', '就會到海'], 180, 320);
+      def.draw({ ...s, settle }, 1);
+      return log.filter((l) => l.startsWith('fillText(')).map((l) => l.slice(9, 10));
+    };
+    expect(drawn(0).length).toBeGreaterThan(9); // 流動：重複的一長串字
+    expect(drawn(1).join('')).toBe('順著河走 就會到海'); // 停下來：整句一遍，空格也算
+  });
   it('fadeEdges：none 什麼都不畫；v／h 各畫兩條漸層（destination-out）', async () => {
     const { fadeEdges } = await import('./core');
     const none = fakeCtx();
