@@ -70,14 +70,34 @@ function toRibPts(xy: { x: number; y: number }[]): RibPt[] {
     return { x: p.x, y: p.y, a: Math.atan2(a.y - b.y, a.x - b.x), s: acc };
   });
 }
-const RIB_N = 200;
-let sRes: { x: number; y: number }[] | null = null;
-/** ∞ 形（雙紐線）的帶子：中心 (160, 90)、半寬 A；起點在最右端繞一整圈 */
-function infinityXY(A: number): { x: number; y: number }[] {
-  return Array.from({ length: RIB_N }, (_, i) => {
-    const th = (i / (RIB_N - 1)) * Math.PI * 2;
+const RIB_N = 240;
+/** 彎道收尾的 ∞ 半寬 */
+const INF_A = 135;
+let lemPts: RibPt[] | null = null;
+/**
+ * 彎道收尾時帶子的頭走的路線（∞）：從中間的交叉點往右下出發（接著 S 形帶子中間的方向），
+ * 繞右圈 → 回到中間交叉 → 繞左圈 → 回到中間
+ */
+function lemniscate(): RibPt[] {
+  if (lemPts) return lemPts;
+  const xy: { x: number; y: number }[] = [];
+  const N = 720;
+  for (let i = 0; i <= N; i++) {
+    const th = Math.PI / 2 - (i / N) * Math.PI * 2;
     const d = 1 + Math.sin(th) * Math.sin(th);
-    return { x: 160 + (A * Math.cos(th)) / d, y: 90 + (A * 1.25 * Math.sin(th) * Math.cos(th)) / d };
+    xy.push({
+      x: 160 + (INF_A * Math.cos(th)) / d,
+      y: 90 + (INF_A * 1.25 * Math.sin(th) * Math.cos(th)) / d,
+    });
+  }
+  lemPts = toRibPts(xy);
+  return lemPts;
+}
+/** 路線上 [a, b] 那一段，取 n 個點 */
+function along(pts: RibPt[], a: number, b: number, n = RIB_N): { x: number; y: number }[] {
+  return Array.from({ length: n }, (_, i) => {
+    const p = ribAtIn(pts, a + ((b - a) * i) / (n - 1));
+    return { x: p.x, y: p.y };
   });
 }
 /** 拉直後的橫條：畫面正中間、兩端超出畫面 */
@@ -86,13 +106,24 @@ function lineXY(): { x: number; y: number }[] {
 }
 const mixXY = (a: { x: number; y: number }[], b: { x: number; y: number }[], f: number) =>
   a.map((p, i) => ({ x: p.x + (b[i]!.x - p.x) * f, y: p.y + (b[i]!.y - p.y) * f }));
-/** 停在最後畫面（q 0→1）：S 形帶子先繞成 ∞，停一拍，再往回一抽拉直成橫條 */
-function ribbonAt(q: number, A: number): RibPt[] {
-  const sXY = (sRes ??= resample(ribSamples(), RIB_N));
-  const e1 = E.io(clamp((q - 0) / 0.42));
-  const e2 = E.io(clamp((q - 0.58) / 0.42));
-  const inf = infinityXY(A);
-  return toRibPts(mixXY(mixXY(sXY, inf, e1), lineXY(), e2));
+/**
+ * 停在最後畫面（q 0→1）：S 形帶子的前半段不動，後半段從畫面中間轉進 ∞ 的路線，
+ * 帶子的頭沿著 ∞ 繞一大圈（右圈、左圈）回到中間；最後整條往兩邊一拉，拉直成畫面中間的橫條
+ */
+function ribbonAt(q: number): RibPt[] {
+  const sp = ribSamples();
+  const mid = sp[120]!.s; // S 形兩段曲線的接點＝畫面正中間
+  const sTotal = sp[sp.length - 1]!.s;
+  const lem = lemniscate();
+  const lemLen = lem[lem.length - 1]!.s;
+  const L2 = sTotal - mid;
+  const head = L2 + (lemLen - L2) * E.io(clamp((q - 0.1) / 0.5));
+  const first = along(sp, 0, mid, 100);
+  const bend = E.io(clamp(q / 0.1));
+  const rest =
+    bend < 1 ? mixXY(along(sp, mid, sTotal, 120), along(lem, 0, L2, 120), bend) : along(lem, 0, head, 120);
+  const whole = resample(toRibPts([...first, ...rest]), RIB_N);
+  return toRibPts(mixXY(whole, lineXY(), E.io(clamp((q - 0.64) / 0.26))));
 }
 
 export const FX_FLOW: KineticDef[] = [
@@ -267,9 +298,9 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1,
     area: 'full',
     calm: false,
-    // 停在最後畫面：S → ∞ → 抽成橫條要 1.8 秒（流動 0.8 秒之後開始）
-    settleLen: 1.8,
-    hold: () => 2.6,
+    // 停在最後畫面：帶子繞一大圈 ∞ 再往外一拉成橫條要 2.4 秒（流動 0.8 秒之後開始）
+    settleLen: 2.4,
+    hold: () => 3.2,
     len: () => null,
     hit: [0, 0.2, 1, 0.6],
     draw(s, t) {
@@ -280,10 +311,8 @@ export const FX_FLOW: KineticDef[] = [
       const ox = (W - 320 * k) / 2;
       const oy = (H - 180 * k) / 2;
       const vw = W / k; // 畫面看得到的寬度（直式畫面只看得到 320 的一小段）
-      // 大大的 ∞（半寬 125，直式畫面看得到的範圍比它小，兩邊超出畫面也沒關係）；帶子和字維持原大小
-      const A = 125;
       const sc = 1;
-      const pts = q > 0 ? ribbonAt(q, A) : ribSamples();
+      const pts = q > 0 ? ribbonAt(q) : ribSamples();
       g.save();
       g.translate(ox, oy);
       g.scale(k, k);
@@ -329,9 +358,9 @@ export const FX_FLOW: KineticDef[] = [
           pos += w;
         }
       };
-      // 整句完整的字淡入（q 0.72～0.95），流動的字同時淡出
-      const fin = clamp((q - 0.72) / 0.23);
-      if (fin < 1) place(chars, -((t * 24) % unitLen) - q * unitLen * 1.2, 1 - fin, 15 * sc);
+      // 帶子繞的時候字貼在帶子上（不另外流動）；拉直之後（q 0.88～1）整句完整的字淡入、原本的字淡出
+      const fin = clamp((q - 0.88) / 0.12);
+      if (fin < 1) place(chars, q > 0 ? 0 : -((t * 24) % unitLen), 1 - fin, 15 * sc);
       if (fin > 0) {
         const sentence = cs(s.words.join(' '));
         g.font = fontOf(s, 15, 900);
