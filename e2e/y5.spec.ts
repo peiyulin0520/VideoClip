@@ -137,3 +137,43 @@ test('Y5 整段效果：任何影像都能用「捲動」——開頭在畫面�
   await page.getByRole('radio', { name: '整段 無' }).tap();
   expect((await tracks(page)).flatMap((t) => t.items)[0]!.motion).toBeUndefined();
 });
+
+// feedback-16 Z20：格子裡的素材位置跟格子對不上時（版型動過），轉場那一秒格子也不能空、露出下面
+test('Z20 版型格子的轉場：素材位置偏掉，轉場中格子裡還是兩段混色、不露出下面的主軌', async ({ page }) => {
+  test.setTimeout(180_000);
+  await createProjectWith(page, ['solid-blue.webm']); // 主軌：藍色，露出來就是藍
+  await openTab(page, '版型');
+  await page.getByRole('button', { name: '版型 上下雙格', exact: true }).tap();
+  await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-red.webm')]);
+  await showTimeline(page);
+  await page.getByRole('button', { name: '第 1 格 加素材' }).tap();
+  await page.getByTestId('cell-add-file').setInputFiles(fixture('solid-green.webm'));
+  await expect.poll(async () => (await cells(page))[0]!.items.length, { timeout: 30_000 }).toBe(2);
+  await showTimeline(page);
+  await page.locator('.track.sub-row [data-testid="tr-circle"]').tap();
+  await page.getByRole('radio', { name: /疊化/ }).first().tap();
+  await closePanel(page);
+  const its = (await cells(page))[0]!.items;
+  const c0 = its[0]!.cell!;
+  for (const it of its)
+    await page.evaluate(
+      (id) =>
+        (
+          window as unknown as { __videoclip: { nudgeItem: (i: string, d: number) => void } }
+        ).__videoclip.nudgeItem(id, 1),
+      it.id,
+    );
+  for (const t of [3.2, 4, 4.4]) {
+    await seekTo(page, t);
+    const px = async () => (await samplePreview(page, c0.x + c0.w / 2, c0.y + c0.h / 2)) ?? [0, 0, 0, 0];
+    await expect
+      .poll(
+        async () => {
+          const [r, g, b] = await px();
+          return b < 100 && r + g > 150; // 藍（主軌）不能露出來；紅或綠或兩者混色
+        },
+        { message: `t=${t} 格子中間` },
+      )
+      .toBe(true);
+  }
+});

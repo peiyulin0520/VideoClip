@@ -211,7 +211,17 @@ export function buildScene(
       // 轉場期間：A、B 兩段同時畫（B 在上或 A 在上看轉場種類），各自套上位移、縮放、透明度、裁切、模糊
       const mk = (item: Item | null, look: (typeof at.frame)['a']): SceneLayer | null => {
         if (!item) return null;
-        const layer = toLayer(item, track, project, ctx, provide, { t });
+        // 格子裡的素材：位置跟格子對不上（版型動過）時拉回格子裡，跟沒有轉場時一樣（不然轉場那一秒格子是空的、露出下面）
+        const layer = toLayer(
+          track.groupRole === 'cell' && opts.guardCells !== false
+            ? guardCell(item, frame?.item, project, canvasW, canvasH)
+            : item,
+          track,
+          project,
+          ctx,
+          provide,
+          { t },
+        );
         if (!layer) return null;
         // 版型格子裡前後兩段素材之間的轉場：跟著整組動，畫面只露出這一格
         const inCell = track.groupRole === 'cell' && !!frame;
