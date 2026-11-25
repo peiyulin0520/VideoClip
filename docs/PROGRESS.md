@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：1155 個單元測試、約 351 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #20（U1–U6）已開、等使用者合併。**feedback-15 三批（Z1–Z13）程式都做完**；等使用者在 iPhone 看（`docs/PLAN.md §7`，特別是 Z13 的「合成：準備／繪製／等 GPU」截圖），再依數字決定要不要進一步降合成成本（遮罩快取、畫質、MSAA）。之後照 `docs/plans/2026-11-23-roadmap-ui.md` 做備份 → 畫畫 → …
+- **下一步**：PR #21（feedback-15）已開、等使用者合併。**接著照 `docs/plans/2026-11-25-feedback-16.md` 做（Sonnet）**：Z14 播放中影片畫面一定更新（修 0.3–0.4 秒凍住）→ Z15 Safari 也不留底下空間 → Z16 轉場時不空白（B 沒準備好用縮圖頂）→ Z17 B 提早 1.5 秒暖機
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 規劃 feedback-16（Opus，claude/zen-tesla-v3brj5）
+  - 做了什麼：使用者錄影逐格比對：效能框 60 fps、合成 2.5 ms，但預覽有好幾段 0.3–0.4 秒畫面完全不動 → 畫布有畫、影片畫面沒上傳；判斷是 Safari 對看不到的 `<video>`（`.pool` 1px、透明）`requestVideoFrameCallback` 不規律，上傳靠它計數。轉場空白在沙盒重現不出來（主軌、版型同一格的影片／照片／動圖疊化都正常），判斷是 iPhone 上 B 影片晚到、新圖層沒有上一格可留 → 不畫。寫成 Z14–Z17
+  - 動了哪些檔：`docs/plans/2026-11-25-feedback-16.md`（新）、`docs/PROGRESS.md`
+  - 驗證：🔴 只有規劃
+  - 使用者的決定/回饋：播放仍卡、手機底下仍有空間、版型同一格多素材＋轉場會空白露出下層、一般素材轉場也有幾秒空白、沒有絲滑感
+  - 下一步：切 Sonnet 做 Z14–Z17
 - 2026-11-25 feedback-15 第 3 批 Z13：預覽變順（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：效能框把「合成」拆成準備圖層／繪製／等 GPU（`Compositor.seg`、`measureGpu`＝效能框開著才每格多 `gl.finish`）。**播放中畫面沒變就不重畫**：`Compositor.render(layers, { skipIfIdle })` 比對每個圖層的樣子（JSON，不含來源）＋有沒有新的影片畫面，都沒變就跳過 `renderer.render`（畫布靠 `preserveDrawingBuffer` 留著上一格）；只在 `Player.playing` 時開，匯出、單格輸出照舊每次都畫。效能框加「畫了／跳過」計數
   - 沙盒量測（`e2e/z13-bench.spec.ts`，`Z13_BENCH=1` 才跑，軟體 GL，只看相對）：主軌 1080p＋傾斜 8° 版型兩格，fps 9.4～11 → 56～60；`Z13_PROFILE=1` 可抓 CPU profile（結果幾乎都在 `(program)`＝GPU／原生，影片貼圖上傳 `texSubImage2D` 約 10%）。🔴 使用者 iPhone 上「合成 45.6 ms、影片上傳 0.0」的真正原因沒量到：原本的「影片上傳」只量 `textureSource.update()`（只是標記），真正上傳在繪製裡；要靠新的「準備／繪製／等 GPU」在 iPhone 上看
