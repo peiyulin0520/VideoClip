@@ -5,7 +5,7 @@ import { Compositor } from './compositor';
 import { stageLayout } from './stage';
 import { VideoPool } from './mediaPool';
 import { expandThumbs, thumbCount, thumbIndex } from './thumbs';
-import { activeTransition, transitionAudioGain } from './transitions';
+import { activeTransition, transitionAudioGain, transitionSpan } from './transitions';
 import { showPlaceholders } from './placeholder';
 import { driftPlan, videoSyncPlan } from './videoSync';
 import { captureThumb } from './probe';
@@ -36,9 +36,9 @@ type Listener = (t: number, playing: boolean) => void;
 const IOS = isIOSDevice();
 const PREFETCH_S = 1.0;
 /** 有轉場的片段多提前這麼多秒開始準備（要同時解兩支影片，來不及會卡） */
-const PREFETCH_TRANSITION_S = 1.5;
+const PREFETCH_TRANSITION_S = 2.5;
 /** 轉場的 B 提早這麼多秒開始（靜音）播放暖機 */
-const WARM_S = 0.8;
+const WARM_S = 1.2;
 const POOL_SIZE = 6;
 const MUSIC_POOL_SIZE = 3;
 
@@ -94,7 +94,9 @@ export class Player {
   private transIds = new Set<string>();
   /** 每個影片物件最後一次套用的聲音倍數（測試、效能框用） */
   private gains = new Map<string, number>();
-  private trans = { frames: 0, drops: 0, hardSeeks: 0, lastAt: 0 };
+  private trans = { frames: 0, drops: 0, hardSeeks: 0, lastAt: 0, lastSeek: '' };
+  /** 這個物件畫面真的出現過（影片 ready 過）：還沒出現過、又還沒準備好的，用縮圖頂著 */
+  private everReady = new Set<string>();
   private transHeavyTold = false;
   private videoCount = 0;
   /** 效能框用：這一格正在解碼的每支影片（解碼後的大小、用預覽檔還是原檔）、播放中每秒格數的最低值 */
@@ -311,7 +313,7 @@ export class Player {
     dropped: number;
     video: string;
     /** 最近一次轉場：畫了幾格、兩格間隔超過 50ms 的次數、為了追時間硬 seek 的次數 */
-    transition: { frames: number; drops: number; hardSeeks: number };
+    transition: { frames: number; drops: number; hardSeeks: number; lastSeek: string };
     /** 目前每支在解碼的影片：解碼大小＋預覽檔／原檔 */
     sources: string[];
     /** 同時在用的影片數、影片池裡總共開著幾個解碼器 */
@@ -342,7 +344,12 @@ export class Player {
       skipped: this.compositor.skipped,
       dropped,
       video: this.videoInfo,
-      transition: { frames: this.trans.frames, drops: this.trans.drops, hardSeeks: this.trans.hardSeeks },
+      transition: {
+        frames: this.trans.frames,
+        drops: this.trans.drops,
+        hardSeeks: this.trans.hardSeeks,
+        lastSeek: this.trans.lastSeek,
+      },
       sources: this.sources,
       decoders: this.videoCount,
       pool: this.pool.els.length,
@@ -388,6 +395,9 @@ export class Player {
     }
     if (this.playing) {
       const transitioning = this.transIds.has(item.id);
+      // 後一段（B）：從暖機到轉場結束後 1 秒是保護期，不輕易硬 seek（seek 中的影片沒有畫面，轉場會黑掉）
+      const span = orig.transitionIn ? transitionSpan(track.items, orig) : null;
+      const protect = !!span && t >= span.cut - span.before - WARM_S && t < span.cut + span.after + 1;
       const plan = videoSyncPlan({
         target: s,
         current: el.currentTime,
@@ -397,10 +407,14 @@ export class Player {
         seeking: el.seeking,
         soft: !IOS,
         transitioning,
+        protect,
       });
       if (plan.seekTo !== undefined) {
+        if (plan.hardSeek && transitioning) {
+          this.trans.hardSeeks++;
+          this.trans.lastSeek = `${orig.transitionIn ? '後段' : '前段'} 目標 ${s.toFixed(2)} 實際 ${el.currentTime.toFixed(2)}`;
+        }
         el.currentTime = plan.seekTo;
-        if (plan.hardSeek && transitioning) this.trans.hardSeeks++;
       }
       // 素材放完了／還沒到開頭：停在那一格，不要呼叫 play()（ended 的影片 play() 會從頭播）
       if (plan.hold) {
@@ -514,7 +528,8 @@ export class Player {
     }
     if (this.playing && ids.size > 0) {
       const now = performance.now();
-      if (this.transIds.size === 0) this.trans = { frames: 0, drops: 0, hardSeeks: 0, lastAt: now };
+      if (this.transIds.size === 0)
+        this.trans = { frames: 0, drops: 0, hardSeeks: 0, lastAt: now, lastSeek: '' };
       else if (now - this.trans.lastAt > 50) this.trans.drops++;
       this.trans.lastAt = now;
       this.trans.frames++;
@@ -584,8 +599,10 @@ export class Player {
         if (track.kind === 'media' && el.videoWidth)
           this.videoInfo = `${el.videoWidth}×${el.videoHeight} ${asset.codec ?? ''}${asset.hdr ? ' HDR' : ''}｜預覽檔：${asset.proxy?.status ?? '無'}`;
         const ready = el.readyState >= 2 && !el.seeking && el.videoWidth > 0;
-        // 暫停（拖時間軸、點選）時影片還沒 seek 完：先畫素材縮圖頂著，不要留舊的一格或什麼都沒有
-        if (!ready && !this.playing) {
+        if (ready) this.everReady.add(item.id);
+        // 暫停（拖時間軸、點選）時影片還沒 seek 完：先畫素材縮圖頂著，不要留舊的一格或什麼都沒有。
+        // 播放中也一樣：這個物件還沒出現過畫面（例如轉場的後一段晚到）就用縮圖，不然那一塊是空的、露出下面那層
+        if (!ready && (!this.playing || !this.everReady.has(item.id))) {
           const th = this.thumbFallback(item, asset, t, true);
           if (th) return th;
         }
@@ -611,7 +628,8 @@ export class Player {
       used.add(el);
       // 有轉場的話 B 會提前出現（入點不夠的部分停在第一格）：從轉場開始的位置往前算
       const tr = item.transitionIn;
-      const before = tr ? (tr.before ?? tr.duration / 2) : 0;
+      // 提前幾秒：跟畫面、匯出用同一個函式（沒設分配＝各一半、夾在片段長度內），不要自己另外算
+      const before = tr ? (transitionSpan(track.items, item)?.before ?? 0) : 0;
       const early: VideoItem = {
         ...item,
         start: item.start - before,
@@ -681,10 +699,7 @@ export class Player {
       const next = items.find((x) => x.start > t);
       // 有轉場的要多提前：轉場在接縫前 before 秒開始，再加暖機的時間
       const lead = next?.transitionIn
-        ? Math.max(
-            PREFETCH_TRANSITION_S,
-            (next.transitionIn.before ?? next.transitionIn.duration / 2) + WARM_S + 0.5,
-          )
+        ? Math.max(PREFETCH_TRANSITION_S, (transitionSpan(items, next)?.before ?? 0) + WARM_S + 0.5)
         : PREFETCH_S;
       if (next && (cur || next.start <= t + lead)) push(next);
     }

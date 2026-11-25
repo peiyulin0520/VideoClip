@@ -62,6 +62,7 @@ export function PerfOverlay({ player }: { player: Player | null }) {
       {s.transition.frames > 0 && (
         <div>
           最近轉場 {s.transition.frames} 格｜卡頓 {s.transition.drops}｜硬跳 {s.transition.hardSeeks}
+          {s.transition.lastSeek ? `｜${s.transition.lastSeek}` : ''}
         </div>
       )}
       {s.video && <div>{s.video}</div>}

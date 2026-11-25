@@ -13,7 +13,7 @@ import { paintKinetic } from './kinetic/render';
 import { holdTime } from './kinetic/hold';
 import { splitWords } from './kinetic/core';
 import type { Player } from './player';
-import { setTransform } from '../store/actions';
+import { setTransform, setTransition, setTransitionSplit } from '../store/actions';
 import { isFrameItem } from './layoutTracks';
 
 let editorRenders = 0;
@@ -201,6 +201,15 @@ export function installDebugHook(player: Player) {
       const p = useProjectStore.getState().project;
       const fr = p?.tracks.flatMap((t) => t.items).find(isFrameItem);
       if (fr) setTransform(fr.id, { rotation: deg });
+    },
+    /** 測試用：幫第二個影像片段設轉場（疊化），自訂長度與前後分配（秒；沒給分配＝各一半） */
+    setSeam: (duration: number, before?: number, after?: number) => {
+      const p = useProjectStore.getState().project;
+      const items = p?.tracks.find((t) => t.kind === 'media')?.items ?? [];
+      const b = items[1];
+      if (!b) return;
+      setTransition(b.id, 'dissolve', duration);
+      if (before !== undefined && after !== undefined) setTransitionSplit(b.id, before, after);
     },
     kineticList: () => KINETIC.map((f) => ({ id: f.id, zh: f.zh, group: f.group, poster: f.poster })),
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
