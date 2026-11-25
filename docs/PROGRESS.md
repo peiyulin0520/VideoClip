@@ -89,6 +89,10 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-26 彎道改成「繞 ∞ 再抽成橫條」（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：使用者要彎道停在最後畫面時先繞個 ∞、最後往回一抽變橫條。`path` 的收尾改成 1.8 秒（`KineticDef.settleLen`，`hold` 2.6 秒）：S 形帶子 → ∞（雙紐線，半寬依畫面看得到的寬度縮，帶子與字也跟著縮）→ 停一拍 → 拉直成橫的白帶子，繞的時候字繼續沿著帶子跑，最後整句完整的字淡入排在橫條上。`resample`／`toRibPts`／`ribbonAt` 在 S、∞、直線之間內插。`render.ts` 的 settle 視窗改用 `def.settleLen ?? 0.5`
+  - 動了哪些檔：`src/engine/kinetic/{core,render,fx/flow}.ts`；單元測試沿用（彎道停格：整句一遍）
+  - 驗證：✅ `npm run check`；用 320×180、180×320 畫 q＝0～1 的圖確認 S → ∞ → 橫條；kinetic e2e 過
 - 2026-11-26 彎道停在最後畫面（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：〔彎道〕（`path`）選〔停在最後畫面〕時，S 形白帶子在停點前 0.5 秒內「繞一繞」（中間控制點左右甩一下）拉直成畫面正中間一條橫的白帶子，流動的字淡出、整句完整的字（一遍，縮到畫面看得到的寬度）淡入排在帶子上，靜止；`calm:false`（自己處理，不走流動式子的通用淡入）。帶子的取樣改成 `sampleRib`／`ribAtIn`；`ribMorph(q)`。`kineticPaint` 除錯掛鉤多一個 `settle` 參數
   - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、`src/engine/debug.ts`；單元測試 `kinetic.test`（彎道停格：整句一遍、帶子拉直）

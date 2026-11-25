@@ -57,7 +57,8 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   }
   const step = Math.floor(tt * STEP + 1e-6);
   // 快到停點：一直在動的式子慢慢靜下來（停點前 0.5 秒起）
-  const settle = k.end === 'hold' ? seg(tt, holdTime(def, words) - 0.5, holdTime(def, words)) : 0;
+  const settle =
+    k.end === 'hold' ? seg(tt, holdTime(def, words) - (def.settleLen ?? 0.5), holdTime(def, words)) : 0;
   const sub = k.sub?.trim() || undefined;
   const lines = textLines(item);
   const wrap = k.wrap;
