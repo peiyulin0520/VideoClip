@@ -99,6 +99,7 @@ import {
 import {
   DEFAULT_EFFECT_DURATION,
   DEFAULT_TRANSITION_DURATION,
+  seamPrev,
   seamsOf,
   type TransitionAudioMode,
 } from '../engine/transitions';
@@ -1251,25 +1252,84 @@ function keepAudio(
   };
 }
 
+/** 這個片段和它後面同一軌的所有片段整個往後（正）或往前（負）挪 delta 秒（停格轉場的空白長度變了、或開關停格轉場） */
+function shiftFrom(tr: { items: Item[] }, it: Item, delta: number) {
+  if (Math.abs(delta) < 1e-6) return;
+  const from = it.start - 1e-6;
+  for (const x of tr.items) if (x.start >= from) x.start = Math.max(x.start + delta, 0);
+}
+
+/**
+ * 在 draft 上設定（或取消）一個片段的進場轉場。停格轉場（mode:'hold'）保留模式；它的長度＝兩段中間空白的長度，
+ * 所以改長度、取消時，這個片段和後面的片段要跟著挪。
+ */
+function applyTransition(
+  tr: { items: Item[] },
+  it: Item,
+  kind: TransitionKind | null,
+  duration: number | undefined,
+) {
+  if (it.type === 'audio') return;
+  const old = it.transitionIn;
+  const wasHold = old?.mode === 'hold';
+  const oldD = wasHold ? old!.duration : 0;
+  let newD = 0;
+  if (!kind) delete it.transitionIn;
+  else {
+    const nd = duration ?? old?.duration ?? DEFAULT_TRANSITION_DURATION;
+    it.transitionIn = {
+      ...keepAudio(old),
+      kind,
+      ...(wasHold ? { duration: nd, mode: 'hold' as const } : withDuration(old, nd)),
+    };
+    newD = wasHold ? nd : 0;
+  }
+  if (wasHold) shiftFrom(tr, it, newD - oldD);
+}
+
 /** 設定（或取消）一個片段的進場轉場；duration 沒給就沿用原本的 */
 export function setTransition(id: string, kind: TransitionKind | null, duration?: number, opts?: Opts): void {
-  editItem(
-    id,
-    (it) => {
-      if (it.type === 'audio') return;
-      if (!kind) delete it.transitionIn;
-      else
-        it.transitionIn = {
-          ...keepAudio(it.transitionIn),
-          kind,
-          ...withDuration(
-            it.transitionIn,
-            duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
-          ),
-        };
-    },
-    opts,
-  );
+  store().apply((d) => {
+    for (const tr of d.tracks) {
+      const it = tr.items.find((x) => x.id === id);
+      if (it) return applyTransition(tr as { items: Item[] }, it as Item, kind, duration);
+    }
+  }, opts);
+}
+
+/**
+ * 轉場方式：'overlap'＝邊轉邊播（兩段重疊，預設）、'hold'＝停格轉場（前一段播完 → 轉場時間插在兩段中間、兩段都停格 → 後一段從頭播）。
+ * 停格轉場會把這個片段和後面的片段往後挪一個轉場長度（中間多出空白）；切回邊轉邊播再挪回來。一步復原。
+ * 版型的格子軌先不支援（回傳 false）。
+ */
+export function setTransitionMode(id: string, mode: 'overlap' | 'hold'): boolean {
+  const p = store().project;
+  const f = p && findItem(p, id);
+  if (!p || !f || f.item.type === 'audio' || !f.item.transitionIn) return false;
+  if (f.track.groupRole) {
+    toast('版型的格子裡先只有邊轉邊播');
+    return false;
+  }
+  const isHold = f.item.transitionIn.mode === 'hold';
+  if (isHold === (mode === 'hold')) return true;
+  const s = seamPrev(f.track.items, f.item);
+  if (!s) return false;
+  const dur = f.item.transitionIn.duration;
+  store().apply((d) => {
+    const tr = d.tracks[f.trackIndex]!;
+    const it = tr.items.find((x) => x.id === id) as Item;
+    if (it.type === 'audio' || !it.transitionIn) return;
+    if (mode === 'hold') {
+      shiftFrom(tr as { items: Item[] }, it, dur);
+      it.transitionIn = { ...it.transitionIn, mode: 'hold' };
+      delete it.transitionIn.before;
+      delete it.transitionIn.after;
+    } else {
+      shiftFrom(tr as { items: Item[] }, it, -dur);
+      delete it.transitionIn.mode;
+    }
+  });
+  return true;
 }
 
 /** 字卡的文字樣式特效（閃爍、發光閃亮、方格字、震動）；null＝取消。跟動態字卡二選一（選了這個會拿掉動態字卡） */
@@ -1441,18 +1501,12 @@ export function setTransitionAll(trackId: string, kind: TransitionKind | null, d
   if (ids.length === 0) return 0;
   store().apply((d) => {
     const t = d.tracks.find((x) => x.id === trackId);
-    for (const it of t?.items ?? []) {
+    if (!t) return;
+    // 照時間順序一個一個套：停格轉場改長度會把後面的片段往後挪，先挪前面的再處理後面的
+    const order = [...t.items].sort((a, b) => a.start - b.start);
+    for (const it of order) {
       if (!ids.includes(it.id) || it.type === 'audio') continue;
-      if (!kind) delete it.transitionIn;
-      else
-        it.transitionIn = {
-          ...keepAudio(it.transitionIn),
-          kind,
-          ...withDuration(
-            it.transitionIn,
-            duration ?? it.transitionIn?.duration ?? DEFAULT_TRANSITION_DURATION,
-          ),
-        };
+      applyTransition(t as { items: Item[] }, it as Item, kind, duration);
     }
   });
   return ids.length;

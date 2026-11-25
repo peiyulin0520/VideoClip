@@ -1089,6 +1089,13 @@ export function Timeline({
 
                 {!sub &&
                   gapsOf(track.items, track.id === baseId)
+                    // 停格轉場的空白（兩段中間，轉場圓圈在那裡）不是留白，不能「補齊」
+                    .filter(
+                      (g) =>
+                        !seamsOf(track.items).some(
+                          (s) => s.hold && Math.abs(s.next.start - (g.start + g.len)) < 0.03,
+                        ),
+                    )
                     .filter((g) => g.len * pps >= 24) // 太窄按不到：放大時間軸再按
                     .map((g) => (
                       <button
@@ -1211,7 +1218,7 @@ export function Timeline({
 
                 {track.kind !== 'audio' &&
                   (!track.groupRole || track.groupRole === 'cell') &&
-                  seamsOf(track.items).map(({ next }) => {
+                  seamsOf(track.items).map(({ next, hold }) => {
                     const sel = next.id === selectedId && fxFocus?.id === next.id && fxFocus.role === 'seam';
                     const tr = next.transitionIn;
                     return (
@@ -1221,13 +1228,17 @@ export function Timeline({
                         data-testid="tr-circle"
                         data-item-id={next.id}
                         aria-label={tr ? `轉場 ${transitionName(tr.kind)}` : '加轉場'}
-                        style={{ left: half + next.start * pps - 11, top: -9 }}
+                        style={{
+                          // 停格轉場：圓圈放在兩段中間那段空白的正中間；邊轉邊播放在接縫上
+                          left: half + (hold && tr ? next.start - tr.duration / 2 : next.start) * pps - 11,
+                          top: -9,
+                        }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();
                           useProjectStore.getState().select(next.id);
                           useUI.setState({ requestTab: 'effect', fxFocus: { id: next.id, role: 'seam' } });
-                          player?.seek(next.start + 0.02);
+                          player?.seek(hold && tr ? next.start - tr.duration / 2 : next.start + 0.02);
                         }}
                       >
                         {tr ? transitionCode(tr.kind) : '＋'}

@@ -5,7 +5,7 @@ import { Compositor } from './compositor';
 import { stageLayout } from './stage';
 import { VideoPool } from './mediaPool';
 import { expandThumbs, thumbCount, thumbIndex } from './thumbs';
-import { activeTransition, transitionAudioGain, transitionSpan } from './transitions';
+import { activeTransition, earlyOf, transitionAudioGain, transitionSpan } from './transitions';
 import { showPlaceholders } from './placeholder';
 import { driftPlan, videoSyncPlan } from './videoSync';
 import { captureThumb } from './probe';
@@ -629,7 +629,7 @@ export class Player {
       // 有轉場的話 B 會提前出現（入點不夠的部分停在第一格）：從轉場開始的位置往前算
       const tr = item.transitionIn;
       // 提前幾秒：跟畫面、匯出用同一個函式（沒設分配＝各一半、夾在片段長度內），不要自己另外算
-      const before = tr ? (transitionSpan(track.items, item)?.before ?? 0) : 0;
+      const before = tr ? earlyOf(track.items, item) : 0;
       const early: VideoItem = {
         ...item,
         start: item.start - before,
@@ -699,7 +699,7 @@ export class Player {
       const next = items.find((x) => x.start > t);
       // 有轉場的要多提前：轉場在接縫前 before 秒開始，再加暖機的時間
       const lead = next?.transitionIn
-        ? Math.max(PREFETCH_TRANSITION_S, (transitionSpan(items, next)?.before ?? 0) + WARM_S + 0.5)
+        ? Math.max(PREFETCH_TRANSITION_S, earlyOf(items, next) + WARM_S + 0.5)
         : PREFETCH_S;
       if (next && (cur || next.start <= t + lead)) push(next);
     }

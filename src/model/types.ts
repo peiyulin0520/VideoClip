@@ -65,6 +65,8 @@ export type ItemBase = {
   transitionIn?: {
     kind: TransitionKind;
     duration: number;
+    /** 沒寫＝邊轉邊播（兩段重疊，市面上的做法）；'hold'＝停格轉場：前一段播完、轉場時間插在兩段中間（兩段都停格）、後一段再從頭播。後一段的 start 已經往後挪了 duration，中間是空白 */
+    mode?: 'hold';
     before?: number;
     after?: number;
     /** 轉場時的聲音（沒寫＝交叉淡化）；cut／custom 的時間點都是「相對接縫的秒數」 */

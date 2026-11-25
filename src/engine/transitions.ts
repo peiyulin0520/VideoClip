@@ -1,4 +1,5 @@
 import type { EffectKind, Item, TransitionKind, VideoItem } from '../model/types';
+import { HOLD_TAIL } from './cellGap';
 
 // 轉場（兩個緊接的片段 A、B 之間）。效果以「接縫」為中心的一小段時間（duration 秒）：
 // 前半 A 還在、B 提前出現；後半 B 在、A 延長（用素材在出點之後／入點之前的畫面，沒有就停在邊緣那一格），
@@ -94,9 +95,23 @@ export function splitTransition(
   };
 }
 
-/** 這個片段前面緊接著另一個同類片段（同一軌，接縫誤差 30ms 內）才算有轉場 */
+/**
+ * 這個片段前面接著的同類片段：邊轉邊播＝緊接（接縫誤差 30ms 內）；停格轉場＝中間隔著剛好轉場那麼長的空白。
+ * 都沒有就是 null。
+ */
+export function seamPrev(items: Item[], it: Item): { prev: Item; hold: boolean } | null {
+  if (it.type === 'audio') return null;
+  const hold = it.transitionIn?.mode === 'hold';
+  const gap = hold ? it.transitionIn!.duration : 0;
+  const prev = items.find(
+    (x) => x !== it && sameFamily(x, it) && Math.abs(x.start + x.duration + gap - it.start) < EPS,
+  );
+  return prev ? { prev, hold } : null;
+}
+
+/** 這個片段前面緊接著另一個同類片段（同一軌，接縫誤差 30ms 內）才算有轉場；停格轉場沒有重疊，不算（走 holdSpan） */
 export function transitionSpan(items: Item[], it: Item): TransitionSpan | null {
-  if (it.type === 'audio' || !it.transitionIn) return null;
+  if (it.type === 'audio' || !it.transitionIn || it.transitionIn.mode === 'hold') return null;
   const prev = items.find(
     (x) => x !== it && sameFamily(x, it) && Math.abs(x.start + x.duration - it.start) < EPS,
   );
@@ -201,17 +216,32 @@ export function seamAudioExtent(
 }
 
 /** 一軌上緊接在一起的同類片段（接縫處）：可以在這裡加轉場 */
-export function seamsOf(items: Item[]): { prev: Item; next: Item }[] {
+export function seamsOf(items: Item[]): { prev: Item; next: Item; hold: boolean }[] {
   // 版型的外框跟一般片段一樣可以接轉場；格子裡前後兩段素材之間也可以；版型裡的文字、貼圖不行
   const vids = items.filter((x) => x.type !== 'audio' && (!x.group || (x.type !== 'text' && !x.member)));
-  const out: { prev: Item; next: Item }[] = [];
+  const out: { prev: Item; next: Item; hold: boolean }[] = [];
   for (const next of vids) {
-    const prev = vids.find(
-      (x) => x !== next && sameFamily(x, next) && Math.abs(x.start + x.duration - next.start) < EPS,
-    );
-    if (prev) out.push({ prev, next });
+    const s = seamPrev(vids, next);
+    if (s) out.push({ prev: s.prev, next, hold: s.hold });
   }
   return out;
+}
+
+/** 轉場讓後一段提前幾秒出現（預載、暖機用）：邊轉邊播＝前後分配的 before；停格轉場＝整個空白（轉場一開始它就停在第一格） */
+export function earlyOf(items: Item[], it: Item): number {
+  if (it.type === 'audio' || !it.transitionIn) return 0;
+  if (it.transitionIn.mode === 'hold') return holdSpan(items, it)?.d ?? 0;
+  return transitionSpan(items, it)?.before ?? 0;
+}
+
+/** 停格轉場的位置：空白從 start 到 end（＝後一段開始），長度 d；前一段 prev */
+export type HoldSpan = { start: number; end: number; d: number; prev: Item };
+export function holdSpan(items: Item[], it: Item): HoldSpan | null {
+  if (it.type === 'audio' || it.transitionIn?.mode !== 'hold') return null;
+  const s = seamPrev(items, it);
+  if (!s || !s.hold) return null;
+  const d = it.transitionIn.duration;
+  return d > 0.05 ? { start: it.start - d, end: it.start, d, prev: s.prev } : null;
 }
 
 /** 目前時間 t 在這個轉場的哪裡：0＝開始、0.5＝接縫、1＝結束；不在轉場裡就是 null */
@@ -564,6 +594,17 @@ export function extendForGroupTransition(
 export function activeTransition(items: Item[], t: number): ActiveTransition | null {
   for (const it of items) {
     if (it.type === 'audio' || !it.transitionIn) continue;
+    if (it.transitionIn.mode === 'hold') {
+      // 停格轉場：前一段播完 → 中間的空白裡兩段都停格（前一段最後一格、後一段第一格）一起做轉場 → 後一段從頭播
+      const hs = holdSpan(items, it);
+      if (!hs) continue;
+      const p = (t - hs.start) / hs.d;
+      if (p < 0 || p >= 1) continue;
+      const A = hs.prev;
+      const a = silent({ ...A, start: t - Math.max(A.duration - HOLD_TAIL, 0), hold: 'after' } as Item);
+      const b = silent({ ...it, transitionIn: undefined, start: t, hold: 'before' } as Item);
+      return { kind: it.transitionIn.kind, p, a, b, frame: transitionFrame(it.transitionIn.kind, p) };
+    }
     const span = transitionSpan(items, it);
     if (!span) continue;
     const p = transitionProgress(span, t);
