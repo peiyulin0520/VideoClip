@@ -267,3 +267,11 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **效能框**：`Player.stats()` 多 `prepMs／drawMs／gpuMs／renders／skipped`；`gpuMs` 只有效能框開著時才量（`Player.setMeasureGpu`）。
 - **量測**：`Z13_BENCH=1 npx playwright test e2e/z13-bench.spec.ts`（`Z13_PROFILE=1` 抓 CPU profile）；`__videoclip.rotateFrame(deg)` 把第一個版型整個轉某個角度。沙盒是軟體 GL，數字只能看相對。
 
+## feedback-16 轉場（2026-11-25）新增的東西（給下一位）
+- **轉場兩種方式**：預設邊轉邊播（兩段重疊，`transitionIn.before／after`）；`transitionIn.mode:'hold'`＝停格轉場：後一段 `start` 已經往後挪了 `duration`，兩段中間的空白就是轉場。`seamPrev(items, it)` 找前一段（緊接，或隔著剛好 `duration` 的空白）；`transitionSpan` 只管重疊的；`holdSpan` 管停格的；`earlyOf` 是預載／暖機用的「後一段提前幾秒」。`activeTransition` 在空白裡回傳前一段最後一格、後一段第一格（`hold:'after'／'before'` 的虛擬物件，沿用版型空檔停格的做法）。
+- **改轉場一律走 `applyTransition`**（`actions.ts`）：停格轉場改長度、取消時要把後面的片段挪動（`shiftFrom`）；`setTransitionMode(id, 'hold'|'overlap')` 切換；版型格子軌不支援。刪掉前一段後，後一段會留著 `mode:'hold'` 但找不到前一段（轉場不畫，空白還在）。
+- **播放時的保護**：`player.ts` 的 `everReady`（沒出現過畫面又沒準備好就用縮圖）、`HARD_DRIFT_PROTECT`、`transitionSpan` 算保護期；效能框 `lastSeek`。測試用 `__videoclip.setSeam(duration, before?, after?)`。
+- **Z18／Z19 預先解碼**：`TransitionFrames`（`transitionFrames.ts`）管背景解碼與快取：`transitionNeeds(project, side)` 算要解什麼（快取鍵含素材、秒數範圍、解析度、是否 proxy，變了就作廢）；`Player.updateFrames` 在每次 `render` 呼叫 `update`。播放時 provider 先找 `frames.frameAt(asset, 素材秒數)`；沒有再用 `<video>`；`<video>` 也沒準備好就設 `stallWanted`，`tick()` 把時間暫停（`wallStart` 往後挪、`stalled` 讓影片音樂不播），一次轉場累計最多 `STALL_S`＝0.3 秒。測試開關：`__videoclip.setPredecode(false)`、`framesState()`。
+- **Z14**：`videoUpload.ts` `shouldUpload`（單元測試好測）；`Compositor.frozen`。**Z15**：`--bar-pad`。
+- **模擬 iPhone 晚到**：e2e 把 `HTMLMediaElement.prototype.readyState` 在一段時間內回 1（`z16-transition.spec.ts`）。
+

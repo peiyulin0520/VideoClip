@@ -6,9 +6,9 @@
 - **日期**：2026-11-24
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
-- **測試**：1155 個單元測試、約 351 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
+- **測試**：1194 個單元測試、約 363 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #20（U1–U6）已開、等使用者合併。**feedback-15 三批（Z1–Z13）程式都做完**；等使用者在 iPhone 看（`docs/PLAN.md §7`，特別是 Z13 的「合成：準備／繪製／等 GPU」截圖），再依數字決定要不要進一步降合成成本（遮罩快取、畫質、MSAA）。之後照 `docs/plans/2026-11-23-roadmap-ui.md` 做備份 → 畫畫 → …
+- **下一步**：feedback-16 全部做完（Z14 凍住／Z15 底下空間／Z16–Z17 轉場／Z18–Z19 預先解碼＋等一下），**還沒開 PR**（問使用者要不要開）。使用者在 iPhone 看後回報：效能框「合成：準備／繪製／等 GPU」「凍住」「最近轉場」（預先解好 n/m、用預解／用影片、等了幾 ms）的截圖
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,24 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 feedback-16 Z14／Z15／Z18／Z19（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：①**Z18 轉場預先解碼**（`src/engine/transitionFrames.ts`）：專案打開／改轉場後，在背景用 Mediabunny 把每個轉場用到的前後兩段（`activeTransition` 逐格走一遍算出素材秒數，30 格／秒、長邊 640／流暢 480）解成 `ImageBitmap` 存起來；離播放線近的先解、總量超過 160MB 丟最遠的；播放經過轉場直接用（`Player` provider 的 `frames.frameAt`），匯出不用。②**Z19 備用**：轉場中後一段沒預解好、`<video>` 也還沒準備好 → 時間暫停等它，總共最多 0.3 秒／次（`STALL_S`，音樂、影片同步一起停）；**拿掉播放中的縮圖頂著**（暫停、拖時間軸仍用縮圖）。③**Z14** 影片畫面上傳判斷抽成 `videoUpload.ts` 的 `shouldUpload`：rVFC 計數變了就上傳；計數超過 80 ms 沒變（Safari 對看不到的影片會這樣）而影片時間（30 格／秒量化）在走，就改用時間上傳；效能框多「凍住」計數（影片時間走了 0.1 秒卻沒上傳，應為 0）。④**Z15** 新增 `--bar-pad = safe-bottom × 0.45`，`.tabs`／`.fb-row` 底下留白與升起視窗位置都改用它（34pt → 約 15pt）；CSS 預設高度 `100svh` → `100dvh`
+  - 沒照規劃做：`useAppHeight` 沒改成 Safari 也用 JS 寫 `--app-h`（網址列伸縮時會抖），只靠 `100dvh`
+  - 動了哪些檔：`src/engine/{transitionFrames,videoUpload,player,compositor,debug}.ts`、`src/app/editor/PerfOverlay.tsx`、`src/app/styles.css`；單元測試 `transitionFrames`（需求範圍、快取鍵、離播放線排序、預算淘汰、解碼失敗）、`videoUpload`；e2e `z16-transition`（Z18 預解後 0 等待、Z19 關預解 → 等 ≤ 0.3 秒不黑）、`z14-upload`（rVFC 停掉，播放畫面仍更新；拿掉備援會失敗）、`z4-space`（Z15）
+  - 驗證：✅ `npm run check`（1194 單元測試）；✅ 完整 e2e 360 過／3 跳過（4 個 worker）；🟡 沙盒是軟體 GL、Chromium 不是 Safari，iPhone 上要看效能框數字
+  - 下一步：開 PR（等使用者說）；使用者 iPhone 回報效能框數字
+- 2026-11-25 feedback-16 轉場部分（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：①後一段晚到不空白：播放中還沒出現過畫面（`everReady`）又沒準備好的影片用縮圖頂；②播放器預載、暖機和畫面、匯出用同一個函式算前後分配（`earlyOf`／`transitionSpan`，不再自己 `before ?? duration/2`）；③後一段的保護期（從暖機到轉場結束後 1 秒，`HARD_DRIFT_PROTECT` 1.5 秒）不輕易硬 seek；④暖機提早（預載 2.5 秒、暖機 1.2 秒）；效能框「最近轉場」多顯示最近一次硬跳是前段／後段、目標與實際秒數；⑤轉場位置〔置中／接縫前／接縫後／自訂〕；⑥**停格轉場**（`transitionIn.mode:'hold'`）：後一段 `start` 往後挪一個轉場長度，中間空白做轉場（`activeTransition` 在空白裡畫前一段最後一格＋後一段第一格，靜音）；`setTransitionMode`、`setTransition`（改長度、換種類、取消都會挪後面的片段）、`setTransitionAll`；時間軸圓圈在空白中間、空白不顯示「補齊」箭頭
+  - **沒做的**：規劃的「B 提前起跑（Z16b）」——預覽會比匯出早播後一段、而且 iPhone 不微調速度會一直差一截，改成只靠縮圖頂、保護期、更早暖機；版型格子軌的停格轉場（`setTransitionMode` 會提示「版型的格子裡先只有邊轉邊播」）
+  - 動了哪些檔：`src/engine/{player,videoSync,transitions,debug}.ts`、`src/model/types.ts`、`src/store/actions.ts`、`src/app/editor/{Timeline,PerfOverlay}.tsx`、`src/app/editor/tabs/EffectTab.tsx`、單元測試 `videoSync`／`transitionSync`／`holdTransition`（engine、store）、e2e `z16-transition`（模擬後一段晚到：readyState 暫時回 1）、`z17-hold-transition`
+  - 驗證：✅ `npm run check`（1177 單元測試）；✅ 完整 e2e 353 過／3 跳過＋3 個取樣預覽顏色的測試在 4 個 worker 同時跑時偶爾逾時（單獨跑都過）；🟡 沙盒重現不了 iPhone 的解碼延遲，用 readyState 模擬；`z16` 在拿掉縮圖頂著的修正時會失敗（已確認）
+  - 下一步：Z14、Z15
+- 2026-11-25 規劃 feedback-16（Opus，claude/zen-tesla-v3brj5）
+  - 做了什麼：使用者錄影逐格比對：效能框 60 fps、合成 2.5 ms，但預覽有好幾段 0.3–0.4 秒畫面完全不動 → 畫布有畫、影片畫面沒上傳；判斷是 Safari 對看不到的 `<video>`（`.pool` 1px、透明）`requestVideoFrameCallback` 不規律，上傳靠它計數。轉場空白在沙盒重現不出來（主軌、版型同一格的影片／照片／動圖疊化都正常），判斷是 iPhone 上 B 影片晚到、新圖層沒有上一格可留 → 不畫。寫成 Z14–Z17
+  - 動了哪些檔：`docs/plans/2026-11-25-feedback-16.md`（新）、`docs/PROGRESS.md`
+  - 驗證：🔴 只有規劃
+  - 使用者的決定/回饋：播放仍卡、手機底下仍有空間、版型同一格多素材＋轉場會空白露出下層、一般素材轉場也有幾秒空白、沒有絲滑感
+  - 下一步：切 Sonnet 做 Z14–Z17
 - 2026-11-25 feedback-15 第 3 批 Z13：預覽變順（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：效能框把「合成」拆成準備圖層／繪製／等 GPU（`Compositor.seg`、`measureGpu`＝效能框開著才每格多 `gl.finish`）。**播放中畫面沒變就不重畫**：`Compositor.render(layers, { skipIfIdle })` 比對每個圖層的樣子（JSON，不含來源）＋有沒有新的影片畫面，都沒變就跳過 `renderer.render`（畫布靠 `preserveDrawingBuffer` 留著上一格）；只在 `Player.playing` 時開，匯出、單格輸出照舊每次都畫。效能框加「畫了／跳過」計數
   - 沙盒量測（`e2e/z13-bench.spec.ts`，`Z13_BENCH=1` 才跑，軟體 GL，只看相對）：主軌 1080p＋傾斜 8° 版型兩格，fps 9.4～11 → 56～60；`Z13_PROFILE=1` 可抓 CPU profile（結果幾乎都在 `(program)`＝GPU／原生，影片貼圖上傳 `texSubImage2D` 約 10%）。🔴 使用者 iPhone 上「合成 45.6 ms、影片上傳 0.0」的真正原因沒量到：原本的「影片上傳」只量 `textureSource.update()`（只是標記），真正上傳在繪製裡；要靠新的「準備／繪製／等 GPU」在 iPhone 上看

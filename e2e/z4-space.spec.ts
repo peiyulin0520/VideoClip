@@ -53,3 +53,37 @@ test('Z5 功能列第一層（類別）與第二層（工具）字級一樣', as
   await openCat(page, '剪輯');
   expect(await fs('.fb-row .tool')).toBe(tab);
 });
+
+// feedback-16 Z15：功能列文字下面只留一小條（Home 橫條上面一點），不是整條 34pt
+test('Z15 模擬 Home 橫條 34px：功能列文字下緣離畫面底 ≤ 28px（原本約 40），視窗貼在功能列上面', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.addInitScript(() => {
+    const st = document.createElement('style');
+    st.textContent = ':root{--safe-bottom:34px !important}';
+    document.addEventListener('DOMContentLoaded', () => document.head.appendChild(st));
+  });
+  await createProjectWith(page, ['clip-a.webm']);
+  const vh = page.viewportSize()!.height;
+  const textGap = (sel: string) =>
+    page.evaluate(
+      ([s, h]) => {
+        const e = document.querySelector(s as string)!;
+        return (h as number) - e.getBoundingClientRect().bottom;
+      },
+      [sel, vh],
+    );
+  expect(await textGap('.tabs .tab span')).toBeLessThanOrEqual(28);
+  await closePanel(page);
+  await page.getByTestId('clip').first().tap();
+  await openCat(page, '剪輯');
+  expect(await textGap('.fb-row .tool span:not(.tool-ico)')).toBeLessThanOrEqual(28);
+  await openTool(page, 'edit.speed');
+  const g = await page.evaluate(() => {
+    const sheet = document.querySelector('.panel-sheet')!.getBoundingClientRect();
+    const bar = document.querySelector('.fb-row')!.getBoundingClientRect();
+    return bar.top - sheet.bottom;
+  });
+  expect(Math.abs(g), '視窗下緣貼著功能列上緣').toBeLessThanOrEqual(2);
+});

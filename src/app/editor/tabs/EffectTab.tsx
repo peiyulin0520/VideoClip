@@ -6,6 +6,7 @@ import {
   MIN_TRANSITION,
   TRANSITION_CATS,
   TRANSITIONS,
+  seamPrev,
   transitionSpan,
   TYPEWRITER_CODE,
   type TransitionCat,
@@ -21,6 +22,7 @@ import {
   setTextFx,
   setTransition,
   setTransitionAll,
+  setTransitionMode,
   setTransitionSplit,
 } from '../../../store/actions';
 import { KINETIC, KINETIC_GROUPS, kineticById, resolveBg, schemeOf } from '../../../engine/kinetic';
@@ -70,6 +72,21 @@ export function EffectTab({ found, part }: { found: Found; part: FxPart }) {
       )}
     </div>
   );
+}
+
+/** 轉場位置：置中（前後各一半，預設）、接縫前（全部在前一段結尾）、接縫後（全部在後一段開頭）、自訂 */
+function alignOf(tr: {
+  duration: number;
+  before?: number;
+  after?: number;
+}): 'center' | 'before' | 'after' | 'custom' {
+  if (tr.before === undefined && tr.after === undefined) return 'center';
+  const b = tr.before ?? tr.duration / 2;
+  const a = tr.after ?? tr.duration / 2;
+  if (Math.abs(b - a) < 0.02) return 'center';
+  if (a < 0.02 && b > 0.02) return 'before';
+  if (b < 0.02 && a > 0.02) return 'after';
+  return 'custom';
 }
 
 /** 整段效果：捲動（從畫面下面外面一路捲到上面外面）、滑入滑出；版型外框＝整組一起動 */
@@ -475,7 +492,12 @@ function SeamBlock({
   setCat: (c: CatKey) => void;
 }) {
   const cur = item.type === 'audio' ? undefined : item.transitionIn;
-  const spanNow = transitionSpan(track.items, { ...item, transitionIn: { kind: 'dissolve', duration: 1 } });
+  const holdNow = cur?.mode === 'hold';
+  const spanNow = holdNow
+    ? seamPrev(track.items, item)
+      ? { prev: seamPrev(track.items, item)!.prev }
+      : null
+    : transitionSpan(track.items, { ...item, transitionIn: { kind: 'dissolve', duration: 1 } });
   const hasPrev = !!spanNow;
   const [adjust, setAdjust] = useState(false);
   const shown =
@@ -532,9 +554,63 @@ function SeamBlock({
       )}
       {cur && (
         <>
-          <button className="btn" data-testid="fx-adjust" onClick={() => setAdjust(true)}>
-            調整分配（前後各幾秒）
-          </button>
+          <div className="chips" role="radiogroup" aria-label="轉場方式" data-testid="tr-mode">
+            {(
+              [
+                ['overlap', '邊轉邊播'],
+                ['hold', '停格轉場'],
+              ] as const
+            ).map(([id, name]) => (
+              <button
+                key={id}
+                role="radio"
+                aria-checked={(holdNow ? 'hold' : 'overlap') === id}
+                aria-label={`轉場方式 ${name}`}
+                className={`chip${(holdNow ? 'hold' : 'overlap') === id ? ' active' : ''}`}
+                data-testid={`tr-mode-${id}`}
+                onClick={() => {
+                  if (setTransitionMode(item.id, id)) focus();
+                }}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+          {!holdNow && (
+            <>
+              <div className="chips" role="radiogroup" aria-label="轉場位置" data-testid="tr-align">
+                {(
+                  [
+                    ['center', '置中', 0.5],
+                    ['before', '接縫前', 1],
+                    ['after', '接縫後', 0],
+                  ] as const
+                ).map(([id, name, frac]) => (
+                  <button
+                    key={id}
+                    role="radio"
+                    aria-checked={alignOf(cur) === id}
+                    aria-label={`轉場位置 ${name}`}
+                    className={`chip${alignOf(cur) === id ? ' active' : ''}`}
+                    data-testid={`tr-align-${id}`}
+                    onClick={() => {
+                      setTransitionSplit(item.id, cur.duration * frac, cur.duration * (1 - frac));
+                      focus();
+                    }}
+                  >
+                    {name}
+                  </button>
+                ))}
+                <button
+                  className={`chip${alignOf(cur) === 'custom' ? ' active' : ''}`}
+                  data-testid="fx-adjust"
+                  onClick={() => setAdjust(true)}
+                >
+                  自訂
+                </button>
+              </div>
+            </>
+          )}
           <Slider
             label="轉場長度"
             value={Math.round(cur.duration * 10)}
@@ -553,7 +629,7 @@ function SeamBlock({
           >
             全部套用（這一軌所有銜接處）
           </button>
-          {spanNow && <TransitionAudioBlock item={item} prev={spanNow.prev} />}
+          {spanNow && !holdNow && <TransitionAudioBlock item={item} prev={spanNow.prev} />}
         </>
       )}
     </>

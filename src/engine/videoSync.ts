@@ -6,6 +6,8 @@
 /** 影片和時鐘差超過這個秒數才硬跳（會頓一下）；轉場中放寬一點 */
 export const HARD_DRIFT = 0.5;
 export const HARD_DRIFT_TRANSITION = 0.6;
+/** 轉場前後的保護期（後一段剛要開始播、iPhone 的 play() 還沒真的動）：落後在這個秒數以內不硬 seek，讓它自己追，畫面至少一直有它 */
+export const HARD_DRIFT_PROTECT = 1.5;
 export const SOFT_DRIFT = 0.04;
 /** 素材最後這麼多秒以內就當成「放完了」 */
 export const END_EPS = 0.06;
@@ -52,6 +54,8 @@ export function videoSyncPlan(o: {
   soft: boolean;
   /** 轉場進行中：放寬硬 seek、iPhone 也允許微調一點追上 */
   transitioning: boolean;
+  /** 轉場前後的保護期（後一段的暖機到轉場結束後 1 秒）：硬 seek 的門檻放到 HARD_DRIFT_PROTECT */
+  protect?: boolean;
 }): SyncPlan {
   const { target, current, duration, speed } = o;
   // 素材放完了：停在最後一格
@@ -66,7 +70,7 @@ export function videoSyncPlan(o: {
     return { hold: true, seekTo: need ? 0 : undefined, rate: speed, hardSeek: false };
   }
   const plan = driftPlan(target - current, speed, o.soft || o.transitioning, {
-    hard: o.transitioning ? HARD_DRIFT_TRANSITION : HARD_DRIFT,
+    hard: o.protect ? HARD_DRIFT_PROTECT : o.transitioning ? HARD_DRIFT_TRANSITION : HARD_DRIFT,
     maxAdj: o.transitioning && !o.soft ? 0.08 : 0.15,
   });
   return {

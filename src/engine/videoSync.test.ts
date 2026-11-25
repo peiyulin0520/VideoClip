@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { driftPlan, videoSyncPlan } from './videoSync';
+import { HARD_DRIFT_PROTECT, driftPlan, videoSyncPlan } from './videoSync';
 
 const base = {
   target: 2,
@@ -54,6 +54,14 @@ describe('videoSyncPlan：素材放完了／還沒開始就停住，不要 play(
     expect(videoSyncPlan({ ...base, current: 1.45 }).hardSeek).toBe(true);
     expect(videoSyncPlan({ ...base, current: 1.45, transitioning: true }).hardSeek).toBe(false);
     expect(videoSyncPlan({ ...base, current: 1.3, transitioning: true }).hardSeek).toBe(true);
+  });
+  it('轉場前後的保護期：落後 1 秒也不硬 seek（讓它自己追，畫面一直有），超過 HARD_DRIFT_PROTECT 才跳', () => {
+    expect(videoSyncPlan({ ...base, current: 1.0, transitioning: true, protect: true }).hardSeek).toBe(false);
+    expect(videoSyncPlan({ ...base, current: 2 - HARD_DRIFT_PROTECT - 0.1, protect: true }).hardSeek).toBe(
+      true,
+    );
+    // 沒有保護期：跟以前一樣
+    expect(videoSyncPlan({ ...base, current: 1.0, transitioning: true }).hardSeek).toBe(true);
   });
   it('不知道素材長度（0）不會誤判成放完了', () => {
     expect(videoSyncPlan({ ...base, duration: 0, target: 5, current: 5 }).hold).toBe(false);
