@@ -52,7 +52,7 @@ test('K0 動態字卡：動態字卡視窗分組（登場／流動…）、選�
   await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-group-in').tap();
   await openTool(page, 'fx.textfx');
-  await expect(page.getByTestId('kn-card')).toHaveCount(8);
+  await expect(page.getByTestId('kn-card')).toHaveCount(9);
   await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-group-in').tap();
   await page.getByRole('radio', { name: '文字特效 爆出' }).tap();
@@ -177,12 +177,12 @@ test('K1 登場與流動各 8 式：每張卡片都能選、寫進字卡、預�
   test.setTimeout(240_000);
   await addText(page, '開場 登場');
   for (const [group, ids] of [
-    ['in', ['burst', 'hit', 'stamp', 'punch', 'stack', 'stretch', 'through', 'squash']],
+    ['in', ['burst', 'hit', 'hitline', 'stamp', 'punch', 'stack', 'stretch', 'through', 'squash']],
     ['flow', ['crawl', 'drift', 'echo', 'slant', 'path', 'ticker', 'depth', 'tape']],
   ] as const) {
     await page.getByTestId(`kn-group-${group}`).tap();
     await openTool(page, 'fx.textfx');
-    await expect(page.getByTestId('kn-card')).toHaveCount(8);
+    await expect(page.getByTestId('kn-card')).toHaveCount(ids.length);
     await openTool(page, 'fx.textfx');
     expect(
       await page.getByTestId('kn-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-kn-id'))),
@@ -203,6 +203,7 @@ test('K1 登場與流動各 8 式：每張卡片都能選、寫進字卡、預�
     expect.arrayContaining([
       'burst',
       'hit',
+      'hitline',
       'stamp',
       'punch',
       'stack',
@@ -260,7 +261,7 @@ test('K3 空間與歌詞各 8 式：每張卡片都能選、寫進字卡', async
   }
 });
 
-test('K4 綜藝與恐怖各 8 式：每張卡片都能選、寫進字卡（64 式齊了）', async ({ page }) => {
+test('K4 綜藝與恐怖各 8 式：每張卡片都能選、寫進字卡（65 式齊了）', async ({ page }) => {
   test.setTimeout(240_000);
   await addText(page, '開場 登場');
   let total = 0;
@@ -268,7 +269,7 @@ test('K4 綜藝與恐怖各 8 式：每張卡片都能選、寫進字卡（64 �
     await page.getByTestId(`kn-group-${g}`).tap();
     total += await page.getByTestId('kn-card').count();
   }
-  expect(total).toBe(64);
+  expect(total).toBe(65);
   for (const [group, ids] of [
     ['tv', ['vpop', 'slam', 'lines', 'marks', 'telop', 'emph', 'bouncy', 'star']],
     ['hr', ['flick', 'drip', 'creep', 'ghost', 'corrupt', 'mirror', 'torch', 'melt']],

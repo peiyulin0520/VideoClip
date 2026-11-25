@@ -2,7 +2,7 @@
 import { cssFamily, requestFont } from '../../fonts/fontStore';
 import type { TextItem } from '../../model/types';
 import { canvasFamily } from '../textRender';
-import { fadeEdges, inkOn, splitWords, type KineticDef, type Stage } from './core';
+import { fadeEdges, inkOn, seg, splitWords, type KineticDef, type Stage } from './core';
 import { kineticContent, kineticFrame } from './hit';
 import { holdTime } from './hold';
 import { kineticById, resolveBg, schemeOf } from './index';
@@ -46,12 +46,15 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
     tt = Math.min(tt, holdTime(def, words));
   }
   const step = Math.floor(tt * STEP + 1e-6);
+  // 快到停點：一直在動的式子慢慢靜下來（停點前 0.5 秒起）
+  const settle = k.end === 'hold' ? seg(tt, holdTime(def, words) - 0.5, holdTime(def, words)) : 0;
   const sub = k.sub?.trim() || undefined;
   const fg = run?.color ?? sch.fg;
   const hi = k.accent ?? sch.hi;
   const hifg = k.accent ? inkOn(k.accent) : sch.hifg;
   const bg = resolveBg(k.bg);
   const fade = k.fade ?? def.fade ?? 'none';
+  const fadeW = k.fadeW ?? DEFAULT_FADE_W;
   const fr = kineticFrame(item, W, H);
   const key = [
     item.id,
@@ -65,6 +68,7 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
     hi,
     bg ?? '',
     fade,
+    fadeW,
     cssFamily(fontId) ? 1 : 0,
   ].join('~');
 
@@ -80,20 +84,28 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   paintKinetic(
     canvas,
     def,
-    { words, sub, fg, paper: sch.bg, hi, hifg, bg, family: canvasFamily(fontId) },
+    { words, sub, fg, paper: sch.bg, hi, hifg, bg, family: canvasFamily(fontId), settle },
     step / STEP,
     fade,
+    fadeW,
   );
   return { canvas, w: fr.w, h: fr.h, key, content: kineticContent(item, W, H) };
 }
+
+/** 邊緣淡出寬度的預設值（佔框的比例） */
+export const DEFAULT_FADE_W = 0.25;
 
 /** 把某一式在 t 秒畫到 canvas 上（整張清掉重畫；單位＝這張畫布的大小）。卡片縮圖、字卡的框共用 */
 export function paintKinetic(
   canvas: HTMLCanvasElement,
   def: KineticDef,
-  p: Pick<Stage, 'words' | 'fg' | 'paper' | 'hi' | 'hifg' | 'bg' | 'family'> & { sub?: string },
+  p: Pick<Stage, 'words' | 'fg' | 'paper' | 'hi' | 'hifg' | 'bg' | 'family'> & {
+    sub?: string;
+    settle?: number;
+  },
   t: number,
   fade: 'none' | 'v' | 'h' = 'none',
+  fadeW = 0.12,
 ) {
   const W = canvas.width;
   const H = canvas.height;
@@ -108,5 +120,5 @@ export function paintKinetic(
   g.save();
   def.draw({ g, W, H, cqmin: Math.min(W, H) / 100, cqw: W / 100, cqh: H / 100, ...p }, t);
   g.restore();
-  fadeEdges(g, W, H, fade);
+  fadeEdges(g, W, H, fade, fadeW);
 }

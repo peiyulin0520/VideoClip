@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clamp, E, fit, marquee, rnd, seg, splitWords, wlen, type Stage } from './core';
+import { clamp, E, fadeEdges, fit, marquee, rnd, seg, splitWords, wlen, type Stage } from './core';
 import { beforeAll } from 'vitest';
 import { KINETIC, kineticById, schemeOf } from './index';
 
@@ -287,6 +287,74 @@ describe('動態字卡：副標、停在最後畫面', () => {
       expect(h, f.id).toBeGreaterThanOrEqual(total - last);
       expect(h, f.id).toBeLessThanOrEqual(total);
     }
+  });
+  it('fadeEdges：淡出寬度＝框長邊 × fadeW（預設 12%），上下／左右各一條漸層', () => {
+    const grad = (fade: 'v' | 'h', w?: number) => {
+      const { ctx, log } = fakeCtx();
+      fadeEdges(ctx, 400, 200, fade, w);
+      return log.filter((l) => l.startsWith('fillRect('));
+    };
+    // 上下：高 200，fadeW 0.25 → 50；上條 (0,0,400,50)，下條從 150 起
+    expect(grad('v', 0.25)).toEqual([
+      'fillRect(0.00,0.00,400.00,50.00)',
+      'fillRect(0.00,150.00,400.00,50.00)',
+    ]);
+    // 左右：寬 400，fadeW 0.05 → 20
+    expect(grad('h', 0.05)).toEqual([
+      'fillRect(0.00,0.00,20.00,200.00)',
+      'fillRect(380.00,0.00,20.00,200.00)',
+    ]);
+    // 沒給＝12%
+    expect(grad('v')[0]).toBe('fillRect(0.00,0.00,400.00,24.00)');
+  });
+  it('重擊排字：停在最後時 6 個字都在自己的位置（由左到右）、沒放大沒轉；播放中途前面的字已經留在原位', async () => {
+    const { holdTime } = await import('./hold');
+    const def = kineticById('hitline')!;
+    const words = ['蔡氏家族聚餐'];
+    const at = (t: number) => {
+      const { s, log } = stage(words);
+      def.draw(s, t);
+      const tr = log
+        .filter((l) => l.startsWith('translate('))
+        .map((l) => Number(/translate\(([-\d.]+),/.exec(l)![1]));
+      const sc = log
+        .filter((l) => l.startsWith('scale('))
+        .map((l) => l.replace('scale(', '').replace(')', ''));
+      return { tr, sc };
+    };
+    const h = holdTime(def, words);
+    expect(h).toBeCloseTo(5 * 0.42 + 0.3, 6);
+    const end = at(h + 0.05);
+    expect(end.tr).toHaveLength(6);
+    expect(end.tr).toEqual([...end.tr].sort((a, b) => a - b)); // 由左到右
+    expect(new Set(end.tr).size).toBe(6);
+    expect(new Set(end.sc)).toEqual(new Set(['1.00,1.00'])); // 都落定了
+    // 第 3 個字剛開始砸（0.84 秒 + 0.02）：已經畫了 3 個字，前兩個是原大小
+    const mid = at(2 * 0.42 + 0.02);
+    expect(mid.tr).toHaveLength(3);
+    expect(mid.sc.slice(0, 2)).toEqual(['1.00,1.00', '1.00,1.00']);
+    expect(mid.sc[2]).not.toBe('1.00,1.00');
+    // 逐字重擊照舊：同一時間只畫一個字
+    const { s: s2, log: l2 } = stage(words);
+    kineticById('hit')!.draw(s2, 2 * 0.42 + 0.02);
+    expect(l2.filter((l) => l.startsWith('translate(')).length).toBe(1);
+  });
+  it('停在最後畫面（settle）：拉長每個字都回到原樣；沒 settle 時有字在被拉', () => {
+    const def = kineticById('stretch')!;
+    const words = ['蔡氏家族聚餐'];
+    const scales = (settle: number) => {
+      const { s, log } = stage(words);
+      def.draw({ ...s, settle }, 2.35);
+      return log.filter((l) => l.startsWith('scale(')).map((l) => l.replace('scale(', '').replace(')', ''));
+    };
+    expect(new Set(scales(1))).toEqual(new Set(['1.00,1.00']));
+    expect(new Set(scales(0)).size).toBeGreaterThan(1);
+    const words12 = ['一二三四五六七八九十甲乙'];
+    const { s, log } = stage(words12);
+    def.draw({ ...s, settle: 1 }, 2.35);
+    expect(new Set(log.filter((l) => l.startsWith('scale(')).map((l) => l))).toEqual(
+      new Set(['scale(1.00,1.00)']),
+    );
   });
   it('holdTime：時間跟字數有關的式子（逐字重擊、翻牌、翻卡、拉霸…）停在最後一個詞完整的那一刻，字多也一樣', async () => {
     const { holdTime } = await import('./hold');

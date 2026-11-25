@@ -27,6 +27,7 @@ import { useQuality } from '../../store/qualityStore';
 import { AspectOverlay } from './AspectOverlay';
 import { LayoutResize } from './LayoutResize';
 import { LayoutCellResize } from './LayoutCellResize';
+import { KineticFadeGuide } from './KineticFadeGuide';
 import { KineticAreaEdit } from './KineticAreaEdit';
 import { LayerPeek } from './LayerPeek';
 import { PerfOverlay } from './PerfOverlay';
@@ -255,6 +256,8 @@ export function Preview({
   const cellEdit = useUI((s) => s.cellEdit);
   const kineticEdit = useUI((s) => s.kineticEdit);
   const keItem = kineticEdit ? findItem(rproject, kineticEdit.id)?.item : undefined;
+  const fadeGuideId = useUI((s) => s.kineticFadeGuide);
+  const fadeGuideItem = fadeGuideId ? findItem(rproject, fadeGuideId)?.item : undefined;
   const ceFrame = cellEdit ? (frameOfGroup(rproject.tracks, cellEdit.group)?.item ?? null) : null;
   const lrFrame = layoutEdit ? (frameOfGroup(rproject.tracks, layoutEdit.group)?.item ?? null) : null;
   // 選到版型裡的素材（素材層）：把「畫面只露出來的範圍」畫成虛線框（版型旋轉也跟著轉），知道超出去的部分不會出現
@@ -609,6 +612,9 @@ export function Preview({
           {ceFrame && !playing && <LayoutCellResize frame={ceFrame} geo={geo} k={k} W={width} H={height} />}
           {keItem && keItem.type === 'text' && !playing && (
             <KineticAreaEdit item={keItem} k={k} W={width} H={height} />
+          )}
+          {fadeGuideItem && fadeGuideItem.type === 'text' && !playing && !keItem && (
+            <KineticFadeGuide item={fadeGuideItem} k={k} W={width} H={height} />
           )}
           {box && sel && !cropping && !playing && (
             <div

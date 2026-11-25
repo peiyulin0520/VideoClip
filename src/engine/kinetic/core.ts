@@ -25,6 +25,11 @@ export type Stage = {
   bg: string | null;
   /** 使用者自己打的副標（空白＝沒有，用那一式原來的） */
   sub?: string;
+  /**
+   * 〔停在最後畫面〕快到停點時 0→1（停點前約 0.5 秒開始）：一直在動的式子（拉長、波浪、抖動、閃爍…）
+   * 把「閒著也在動」的部分乘上 (1 − settle)，停下來時每個字都乖乖待在自己的位置。沒給＝0（照常動）。
+   */
+  settle?: number;
   /** 字體（canvas font 的 family 部分，含備用字體）與字重（原版用 900 的地方請求 900，沒有的字體會用最接近的） */
   family: string;
 };
@@ -325,10 +330,17 @@ export function wrapLines(g: CanvasRenderingContext2D, text: string, maxW: numbe
 }
 
 /** 框的邊緣淡出：上下（v）或左右（h）各 12% 慢慢變透明（Spotify 歌詞框那種），畫完整個舞台之後呼叫 */
-export function fadeEdges(g: CanvasRenderingContext2D, W: number, H: number, fade: KineticFade) {
+/** 邊緣淡出：框的兩端各擦掉一段漸層（寬度＝框長邊的 fadeW 倍，預設 12%）。字經過邊緣才看得到 */
+export function fadeEdges(
+  g: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  fade: KineticFade,
+  fadeW = 0.12,
+) {
   if (fade === 'none') return;
   const v = fade === 'v';
-  const len = (v ? H : W) * 0.12;
+  const len = (v ? H : W) * fadeW;
   g.save();
   g.globalCompositeOperation = 'destination-out';
   for (const end of [0, 1]) {

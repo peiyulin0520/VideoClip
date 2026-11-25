@@ -301,6 +301,11 @@ export const FX_TV: KineticDef[] = [
     words: ['開心到飛起來', '大成功'],
     poster: 1.5,
     len: (w) => w.reduce((a, x) => a + cs(x).length * 0.1 + 2.4, 0),
+    // 最後一個詞：每個字都落地、整句跳完（還沒開始退場）的那一刻
+    hold: (w) =>
+      w.slice(0, -1).reduce((a, x) => a + cs(x).length * 0.1 + 2.4, 0) +
+      cs(w[w.length - 1]!).length * 0.1 +
+      1.4,
     draw(s, t) {
       const { W, H, cqh } = s;
       const T = s.words.map((w) => cs(w).length * 0.1 + 2.4);

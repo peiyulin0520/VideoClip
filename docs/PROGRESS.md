@@ -6,9 +6,9 @@
 - **日期**：2026-11-24
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
-- **測試**：1205 個單元測試、約 367 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
+- **測試**：1209 個單元測試、約 369 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：分支上 Z20、Z21、版型格子停格轉場還沒進 PR（建 PR 被權限擋，請使用者自己開或允許）。**照 `docs/plans/2026-11-25-feedback-17.md` 做 Z22（拉長停格不重播）、Z23（邊緣淡出寬度可調＋編輯時顯示範圍）**，切 Sonnet 實作
+- **下一步**：feedback-17 的 Z22（部分）、Z23 做完；分支上 Z20、Z21、版型格子停格轉場、Z22、Z23 都還沒進 PR（建 PR 被權限擋，請使用者自己開或允許）。Z22 還沒改的式子見下面日誌「還沒改」，等使用者看過 iPhone 再說
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 feedback-17 Z22（部分）＋Z23（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：①**〔重擊排字〕**（`hitline`，第 65 式，登場組，在逐字重擊後面）：整句先排好位置（超過 8 字兩行），第 n 個字放大 2.4 倍＋旋轉砸到自己的位置後留著，最後一整句；〔逐字重擊〕維持原樣；②**「快到停點慢慢靜下來」機制**：`Stage.settle`（0→1，停點前 0.5 秒起，只有〔停在最後畫面〕才有，`render.ts` 算），一直在動的式子把閒著也在動的部分乘 `(1 − settle)`：拉長、波浪起伏、抖動、訊號故障（不再閃）、霓虹燈管（不再閃一個字）、重影抽搐（不抽、重影靜止）；③逐字蹦跳 `hold` 改成整句跳完、還沒退場的那一刻；④**Z23**：`kinetic.fadeW`（0.05～0.45，沒有＝0.25，`DEFAULT_FADE_W`）、`fadeEdges(…, fadeW)`、設定視窗〔淡出寬度〕滑桿＋提示字、設定視窗開著且有淡出時預覽上有色帶（`KineticFadeGuide`，`ui.kineticFadeGuide`，`data-testid="kn-fade-guide"`）
+  - **還沒改**（對照圖 `docs/screenshots/feedback-17/hold-sheet-after.png`，用「蔡氏家族聚餐」看停下來那格）：上下裂開（split，字還在變形）、重拍殘影（trail，有殘影拖尾）、隧道（tunnel，很大）、點陣看板／透視字幕等一直流動的式子照 poster 停；翻牌、翻卡、跟唱、逐字踩拍、打字機、拉霸停下來那一格本來就是每個字都完整乖乖待著，沒動
+  - 動了哪些檔：`src/engine/kinetic/{core,render,fx/in,fx/em,fx/hr,fx/tv}.ts`、`src/engine/debug.ts`（`kineticHoldSheet`）、`src/model/types.ts`、`src/store/{actions,uiStore}.ts`、`src/app/editor/{Preview,KineticFadeGuide}.tsx`、`src/app/editor/tabs/EffectTab.tsx`、`src/app/styles.css`；單元測試 `kinetic.test`（重擊排字、拉長 settle、fadeEdges）；e2e `z23-fade`、`z22-hold-sheet`（`Z22_SHEET=before|after` 才跑，產生對照圖）、`k0`／`kinetic-hold`（65 式）
+  - 驗證：✅ `npm run check`（1209 單元測試）；✅ 完整 e2e 364 過／4 跳過＋1 個（layout 拍貼機）在 4 個 worker 同時跑時逾時、單獨跑都過
+  - 下一步：開 PR（等使用者說）；使用者 iPhone 看拉長、重擊排字、邊緣淡出
 - 2026-11-25 規劃 feedback-17（Opus，claude/zen-tesla-v3brj5）
   - 做了什麼：看錄影（拉長＋停在最後畫面）：`stretch` 的波浪跟一輪無關、6 個字時任何時刻都有字被拉長，停格那一格是第二波開頭；邊緣淡出只擦框邊 12%，字離邊緣遠就看不出來。寫成 Z22、Z23。建 PR 被權限擋
   - 動了哪些檔：`docs/plans/2026-11-25-feedback-17.md`（新）、`docs/PROGRESS.md`

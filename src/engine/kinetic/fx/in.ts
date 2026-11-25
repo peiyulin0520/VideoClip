@@ -87,6 +87,49 @@ export const FX_IN: KineticDef[] = [
     },
   },
   {
+    // 重擊排字：一個字一個字砸到自己在整句裡的位置，砸完留在原位（不再動），最後排成一整句
+    id: 'hitline',
+    group: 'in',
+    zh: '重擊排字',
+    en: 'Hit and stay',
+    scheme: 'verm',
+    words: ['一刀未剪'],
+    poster: 1.4,
+    len: (w) => hitChars(w).length * 0.42 + 0.8,
+    // 最後一個字砸好的那一刻
+    hold: (w) => (hitChars(w).length - 1) * 0.42 + 0.3,
+    draw(s, t) {
+      const { W, H, cqmin } = s;
+      const S = hitChars(s.words);
+      const n = S.length;
+      const D = 0.42;
+      const total = n * D + 0.8;
+      const tt = t % total;
+      // 超過 8 個字換成兩行
+      const rows = n > 8 ? 2 : 1;
+      const perRow = Math.ceil(n / rows);
+      const px = Math.min(30 * cqmin, ((84 / perRow) * s.cqw) / 1.08);
+      const out = 1 - seg(tt, total - 0.2, total);
+      S.forEach((ch, i) => {
+        const lt = tt - i * D;
+        if (lt < 0) return;
+        const p = E.out(seg(lt, 0, 0.13));
+        const sc = lerp(2.4, 1, p);
+        const row = Math.floor(i / perRow);
+        const col = i % perRow;
+        const inRow = row === rows - 1 ? n - row * perRow : perRow;
+        drawWord(
+          s,
+          ch,
+          W / 2 + (col - (inRow - 1) / 2) * px * 1.08,
+          H / 2 + (row - (rows - 1) / 2) * px * 1.25,
+          px,
+          { sx: sc, sy: sc, rot: (i % 2 ? 1 : -1) * lerp(7, 0, p), alpha: out },
+        );
+      });
+    },
+  },
+  {
     id: 'stamp',
     group: 'in',
     zh: '蓋章',
@@ -260,7 +303,8 @@ export const FX_IN: KineticDef[] = [
       // 每個字以自己的底部為基準，輪流往上拉長再彈回來
       drawChars(s, word, W / 2, H / 2 + 9 * cqh, px, (j) => {
         const v = Math.pow(Math.max(0, Math.sin(t * 3.6 - j * 0.75)), 2.2);
-        return { sx: 1 - 0.22 * v, sy: 1 + v };
+        const k = 1 - (s.settle ?? 0); // 停在最後畫面時慢慢靜下來，每個字都回到原樣
+        return { sx: 1 - 0.22 * v * k, sy: 1 + v * k };
       });
     },
   },

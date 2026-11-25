@@ -422,6 +422,8 @@ export type TextItem = ItemBase & {
     size?: { w: number; h: number };
     /** 框的邊緣淡出：none 不淡、v 上下、h 左右；沒有＝那一式的預設 */
     fade?: KineticFade;
+    /** 邊緣淡出的寬度（佔框的比例，0.05～0.45）；沒有＝0.25 */
+    fadeW?: number;
     /** 速度倍數（0.5、1、1.5、2）；沒有＝1 */
     speed?: number;
     /** 副標（有副標的那幾式：巨字橫移的底帶小字、環繞的圈上字、標題輪替的標籤）；沒有或空白＝照那一式原來的 */
@@ -434,10 +436,11 @@ export type TextItem = ItemBase & {
 /** 動態字卡框的邊緣淡出：不淡、上下、左右 */
 export type KineticFade = 'none' | 'v' | 'h';
 
-/** 動態字卡 64 式的 id（照原版順序：登場、流動、切換、強調、空間、歌詞、綜藝、恐怖各 8 式） */
+/** 動態字卡 65 式的 id（照原版順序：登場、流動、切換、強調、空間、歌詞、綜藝、恐怖各 8 式） */
 export type KineticId =
   | 'burst'
   | 'hit'
+  | 'hitline'
   | 'stamp'
   | 'punch'
   | 'stack'
