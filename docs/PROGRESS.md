@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：1205 個單元測試、約 367 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-16 的 Z20、Z21 做完（PR #22 已被使用者合併，這兩項在 `claude/zen-tesla-v3brj5` 上、還沒開 PR）。等使用者說要不要開 PR，並在 iPhone 看效能框數字（預先解好 n/m、等了幾 ms、凍住）
+- **下一步**：分支上 Z20、Z21、版型格子停格轉場還沒進 PR（建 PR 被權限擋，請使用者自己開或允許）。**照 `docs/plans/2026-11-25-feedback-17.md` 做 Z22（拉長停格不重播）、Z23（邊緣淡出寬度可調＋編輯時顯示範圍）**，切 Sonnet 實作
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 規劃 feedback-17（Opus，claude/zen-tesla-v3brj5）
+  - 做了什麼：看錄影（拉長＋停在最後畫面）：`stretch` 的波浪跟一輪無關、6 個字時任何時刻都有字被拉長，停格那一格是第二波開頭；邊緣淡出只擦框邊 12%，字離邊緣遠就看不出來。寫成 Z22、Z23。建 PR 被權限擋
+  - 動了哪些檔：`docs/plans/2026-11-25-feedback-17.md`（新）、`docs/PROGRESS.md`
+  - 驗證：🟡 只看程式＋錄影，還沒寫測試
+  - 下一步：切 Sonnet 做 Z22、Z23
 - 2026-11-25 版型格子裡的停格轉場（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：`setTransitionMode` 不再擋格子軌；`actions.ts` 的 `shiftFrom(d, tr, it, delta)` 遇到版型格子軌時：依序播放用 `rippleAfter`（這一格後面的素材、後面各格一起挪、外框變長／變短），同步播放用新的 `cellOps.shiftCellTrack`（只挪這一格、`fitFrameToCells`）；`applyTransition`、`setTransition`、`setTransitionAll`、`setTransitionMode` 都改成先改轉場設定、最後才挪（挪格子軌會換掉整個 `d.tracks`）。引擎（`activeTransition`、`scene.ts`、Player）本來就不分軌道種類，沒改
   - 注意：格子軌的〔排成一個接一個〕（`arrangeGroup`／`packCell`）會把空白拿掉，那時停格轉場的空白也沒了（轉場不畫，跟刪掉前一段一樣）
