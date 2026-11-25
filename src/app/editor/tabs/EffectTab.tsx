@@ -336,6 +336,34 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
           </>
         )}
       </div>
+      {k.id === 'hitline' && (
+        <div className="zone-soft" data-testid="kn-wrap">
+          <div className="zone-title">換行</div>
+          <div className="chips" role="radiogroup" aria-label="重擊排字換行">
+            {(
+              [
+                [undefined, '排成一行'],
+                ['auto', '自動換行'],
+              ] as const
+            ).map(([id, name]) => (
+              <button
+                key={name}
+                role="radio"
+                aria-checked={k.wrap === id}
+                aria-label={`換行 ${name}`}
+                className={`chip${k.wrap === id ? ' active' : ''}`}
+                onClick={() => patchKinetic(item.id, { wrap: id })}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+          <p className="hint">
+            〔排成一行〕字再多也排一行（字會縮小）；〔自動換行〕超過 8
+            個字才換行。想自己決定在哪裡換行，就在文字〔內容〕按 Enter。
+          </p>
+        </div>
+      )}
       <div className="zone-soft" data-testid="kn-speed">
         <div className="zone-title">速度與播放</div>
         <div className="chips" role="radiogroup" aria-label="動態字卡速度">

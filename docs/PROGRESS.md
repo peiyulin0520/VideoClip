@@ -89,6 +89,10 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 重擊排字的換行（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：〔重擊排字〕預設**全部排成一行**（最多 24 個字，字再多也縮小，不再超過 8 字就換行）；文字〔內容〕按 Enter 就照使用者的行排（`textLines(item)` → `Stage.lines`，`lineSizes()`）；設定視窗（只有重擊排字）多〔換行〕：〔排成一行〕（預設）／〔自動換行〕（超過 8 字才換，`kinetic.wrap:'auto'`）；字高也跟著行數縮小，不會超出框
+  - 動了哪些檔：`src/engine/kinetic/{core,render,fx/in}.ts`、`src/model/types.ts`、`src/store/actions.ts`、`src/app/editor/tabs/EffectTab.tsx`；單元測試 `kinetic.test`（`lineSizes`、一行／自動／Enter 的行數）；e2e `z22-hitline`
+  - 驗證：✅ `npm run check`；k0、kinetic-hold、z22-hitline 的 e2e 過；截圖確認 Enter 分成兩行（4＋3 字）
 - 2026-11-25 feedback-17 Z22（部分）＋Z23（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：①**〔重擊排字〕**（`hitline`，第 65 式，登場組，在逐字重擊後面）：整句先排好位置（超過 8 字兩行），第 n 個字放大 2.4 倍＋旋轉砸到自己的位置後留著，最後一整句；〔逐字重擊〕維持原樣；②**「快到停點慢慢靜下來」機制**：`Stage.settle`（0→1，停點前 0.5 秒起，只有〔停在最後畫面〕才有，`render.ts` 算），一直在動的式子把閒著也在動的部分乘 `(1 − settle)`：拉長、波浪起伏、抖動、訊號故障（不再閃）、霓虹燈管（不再閃一個字）、重影抽搐（不抽、重影靜止）；③逐字蹦跳 `hold` 改成整句跳完、還沒退場的那一刻；④**Z23**：`kinetic.fadeW`（0.05～0.45，沒有＝0.25，`DEFAULT_FADE_W`）、`fadeEdges(…, fadeW)`、設定視窗〔淡出寬度〕滑桿＋提示字、設定視窗開著且有淡出時預覽上有色帶（`KineticFadeGuide`，`ui.kineticFadeGuide`，`data-testid="kn-fade-guide"`）
   - **還沒改**（對照圖 `docs/screenshots/feedback-17/hold-sheet-after.png`，用「蔡氏家族聚餐」看停下來那格）：上下裂開（split，字還在變形）、重拍殘影（trail，有殘影拖尾）、隧道（tunnel，很大）、點陣看板／透視字幕等一直流動的式子照 poster 停；翻牌、翻卡、跟唱、逐字踩拍、打字機、拉霸停下來那一格本來就是每個字都完整乖乖待著，沒動

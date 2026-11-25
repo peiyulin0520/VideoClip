@@ -30,6 +30,16 @@ export function kineticWords(item: TextItem, example: string[]): string[] {
   return w.length ? w : example;
 }
 
+/** 字卡文字按 Enter 分成的行（每行去掉空白、逗號、頓號；空行不算）；還沒輸入＝沒有 */
+export function textLines(item: TextItem): string[] {
+  if (item.placeholder) return [];
+  const text = item.card.runs.map((r) => r.text).join('');
+  return text
+    .split('\n')
+    .map((l) => l.replace(/[\s,，、]+/g, ''))
+    .filter(Boolean);
+}
+
 /** t＝字卡自己的時間（開始後幾秒）；W、H＝合成畫布（畫面）大小。回傳 null＝這個 id 還沒改寫好（不畫） */
 export function renderKinetic(item: TextItem, t: number, W: number, H: number): KineticRender | null {
   const k = item.kinetic;
@@ -49,6 +59,8 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   // 快到停點：一直在動的式子慢慢靜下來（停點前 0.5 秒起）
   const settle = k.end === 'hold' ? seg(tt, holdTime(def, words) - 0.5, holdTime(def, words)) : 0;
   const sub = k.sub?.trim() || undefined;
+  const lines = textLines(item);
+  const wrap = k.wrap;
   const fg = run?.color ?? sch.fg;
   const hi = k.accent ?? sch.hi;
   const hifg = k.accent ? inkOn(k.accent) : sch.hifg;
@@ -63,6 +75,8 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
     fr.w,
     fr.h,
     words.join('|'),
+    lines.join('/'),
+    wrap ?? '',
     sub ?? '',
     fg,
     hi,
@@ -84,7 +98,7 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   paintKinetic(
     canvas,
     def,
-    { words, sub, fg, paper: sch.bg, hi, hifg, bg, family: canvasFamily(fontId), settle },
+    { words, sub, fg, paper: sch.bg, hi, hifg, bg, family: canvasFamily(fontId), settle, lines, wrap },
     step / STEP,
     fade,
     fadeW,
@@ -102,6 +116,8 @@ export function paintKinetic(
   p: Pick<Stage, 'words' | 'fg' | 'paper' | 'hi' | 'hifg' | 'bg' | 'family'> & {
     sub?: string;
     settle?: number;
+    lines?: string[];
+    wrap?: 'auto';
   },
   t: number,
   fade: 'none' | 'v' | 'h' = 'none',

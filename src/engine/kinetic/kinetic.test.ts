@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { clamp, E, fadeEdges, fit, marquee, rnd, seg, splitWords, wlen, type Stage } from './core';
 import { beforeAll } from 'vitest';
 import { KINETIC, kineticById, schemeOf } from './index';
+import { lineSizes } from './fx/in';
 
 // jsdom 沒有真的 canvas：暫存畫布（scratch／圖案）也用假的 2D（只記呼叫）
 beforeAll(() => {
@@ -200,6 +201,34 @@ describe('動態字卡：換行與邊緣淡出', () => {
     // 每一行都不超過 maxW
     for (const l of wrapLines(g, '中文 and english 混在一起 的長句子 should wrap nicely', 90))
       expect(l.length * 10).toBeLessThanOrEqual(90);
+  });
+  it('重擊排字換行：預設全部一行（字再多也一行、字縮小）；按 Enter 照使用者的行；自動換行超過 8 字才換', () => {
+    expect(lineSizes(10, undefined, false)).toEqual([10]);
+    expect(lineSizes(24, undefined, false)).toEqual([24]);
+    expect(lineSizes(10, undefined, true)).toEqual([5, 5]);
+    expect(lineSizes(8, undefined, true)).toEqual([8]);
+    expect(lineSizes(6, ['蔡氏家', '族聚餐'], false)).toEqual([3, 3]);
+    expect(lineSizes(6, ['蔡氏', '家', '族聚餐'], true)).toEqual([2, 1, 3]);
+    expect(lineSizes(6, ['蔡氏家族聚餐'], true)).toEqual([6]); // 只有一行：不手動換
+  });
+  it('重擊排字：字再多也縮小排在同一行；按 Enter（lines）真的分成多行', () => {
+    const def = kineticById('hitline')!;
+    const total = (n: number) => n * 0.42 + 0.8;
+    const ys = (words: string[], lines?: string[], wrap?: 'auto') => {
+      const { s, log } = stage(words);
+      def.draw({ ...s, lines, wrap }, total(Array.from(words.join('')).length) - 0.3);
+      return new Set(
+        log
+          .filter((l) => l.startsWith('translate('))
+          .map((l) => Math.round(Number(/,([-\d.]+)\)/.exec(l)![1]))),
+      );
+    };
+    const ten = ['一二三四五六七八九十'];
+    expect(ys(ten).size).toBe(1); // 預設一行
+    expect(ys(ten, undefined, 'auto').size).toBe(2); // 自動換行
+    expect(ys(ten, ['一二三四五', '六七八九十']).size).toBe(2); // 按了 Enter
+    const long = ['一二三四五六七八九十甲乙丙丁戊己庚辛壬癸']; // 20 個字
+    expect(ys(long).size).toBe(1);
   });
   it('fadeEdges：none 什麼都不畫；v／h 各畫兩條漸層（destination-out）', async () => {
     const { fadeEdges } = await import('./core');

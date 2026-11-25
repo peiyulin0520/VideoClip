@@ -1439,6 +1439,7 @@ export function patchKinetic(
     speed?: number | undefined;
     fade?: KineticFade | undefined;
     fadeW?: number | undefined;
+    wrap?: 'auto' | undefined;
     sub?: string | undefined;
     end?: 'loop' | 'hold' | undefined;
   },
