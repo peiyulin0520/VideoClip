@@ -71,6 +71,8 @@ export const FX_IN: KineticDef[] = [
     words: ['一刀未剪'],
     poster: 0.3,
     len: (w) => hitChars(w).length * 0.42 + 0.5,
+    // 一個字一個字重擊：停在最後一個字砸完的那一刻
+    hold: (w) => (hitChars(w).length - 1) * 0.42 + 0.3,
     draw(s, t) {
       const { W, H, cqmin } = s;
       const S = hitChars(s.words);
@@ -271,6 +273,8 @@ export const FX_IN: KineticDef[] = [
     words: ['入口', '深處', '出口'],
     poster: 1.55,
     len: (w) => 1.9 * w.length,
+    // 最後一個詞還沒開始穿過鏡頭（Hd＝1.25 秒才開始）
+    hold: (w) => 1.9 * (w.length - 1) + 1.0,
     draw(s, t) {
       const { W, H } = s;
       const D = 1.9;

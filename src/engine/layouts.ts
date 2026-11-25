@@ -405,6 +405,8 @@ export type LayoutShape = {
   box?: { w: number; h: number };
   /** 格子之間框線的粗細倍數（沒有＝1） */
   line?: number;
+  /** 只有格子之間分隔線的粗細倍數（沒有＝跟 line 一樣） */
+  gap?: number;
 };
 
 export const LINE_MAX = 3;
@@ -464,9 +466,11 @@ function edgeLine(
  * 格子離外框邊的距離也變 scale 倍（拍立得的白邊也是）。每一格往內縮（變粗）或往外長（變細）。
  * 完全沒有框線可調的版型（格子貼滿又沒有外框）就不動。
  */
-export function applyLineScale(b: ReturnType<LayoutDef['build']>, scale: number) {
+export function applyLineScale(b: ReturnType<LayoutDef['build']>, scale: number, gapScale?: number) {
   const s = Math.min(Math.max(scale, 0), LINE_MAX);
-  if (Math.abs(s - 1) < 1e-3 || !hasFrameLine(b)) return b;
+  // 格子之間的分隔線：有單獨設分隔線粗細（gapScale）就用它，沒有就跟整體粗細一樣
+  const sIn = gapScale === undefined ? s : Math.min(Math.max(gapScale, 0), LINE_MAX);
+  if ((Math.abs(s - 1) < 1e-3 && Math.abs(sIn - 1) < 1e-3) || !hasFrameLine(b)) return b;
   const outer = b.panels.length ? unionRect(b.panels) : null;
   return {
     ...b,
@@ -474,7 +478,7 @@ export function applyLineScale(b: ReturnType<LayoutDef['build']>, scale: number)
       // 隔壁有格子：空隙兩邊各負擔一半；外框邊：整條都是這一格的
       const grow = (side: 'l' | 'r' | 't' | 'b') => {
         const e = edgeLine(b.windows, i, side, outer);
-        return (e.width * (1 - s)) / (e.inner ? 2 : 1); // 往外長為正、往內縮為負
+        return (e.width * (1 - (e.inner ? sIn : s))) / (e.inner ? 2 : 1); // 往外長為正、往內縮為負
       };
       const gl = grow('l');
       const gr = grow('r');
@@ -523,9 +527,10 @@ export function buildIn(
   box?: { w: number; h: number },
   line?: number,
   cells?: Rect[],
+  gap?: number,
 ): ReturnType<LayoutDef['build']> {
   const b0 = buildBox(def, W, H, box);
-  const b = line === undefined ? b0 : applyLineScale(b0, line);
+  const b = line === undefined && gap === undefined ? b0 : applyLineScale(b0, line ?? 1, gap);
   // 使用者在預覽上拖過格子大小：格子範圍照記下來的（比例 × 畫面），外框的底板不動
   if (cells && cells.length === b.windows.length)
     return { ...b, windows: cells.map((c) => ({ x: c.x * W, y: c.y * H, w: c.w * W, h: c.h * H })) };
@@ -572,8 +577,9 @@ export function paintFrame(
   box?: { w: number; h: number },
   line?: number,
   cells?: Rect[],
+  gap?: number,
 ) {
-  const b = buildIn(def, W, H, box, line, cells);
+  const b = buildIn(def, W, H, box, line, cells, gap);
   const rr = (r: Rect, radius: number) => {
     ctx.roundRect(r.x, r.y, r.w, r.h, Math.min(radius, r.w / 2, r.h / 2));
   };
@@ -605,11 +611,12 @@ export async function renderFramePng(
   box?: { w: number; h: number },
   line?: number,
   cells?: Rect[],
+  gap?: number,
 ): Promise<Blob> {
   const c = document.createElement('canvas');
   c.width = Math.round(W);
   c.height = Math.round(H);
-  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity, box, line, cells);
+  paintFrame(c.getContext('2d')!, def, c.width, c.height, color, undefined, opacity, box, line, cells, gap);
   return new Promise((ok, bad) =>
     c.toBlob((b) => (b ? ok(b) : bad(new Error('外框轉成圖片失敗'))), 'image/png'),
   );

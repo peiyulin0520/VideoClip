@@ -134,17 +134,17 @@ test('回報14 調整版型大小：「寬 × 高、套用」那一排不蓋住�
   await page.screenshot({ path: `${SHOT}/layout-resize-card-390.png` });
 });
 
-test('回報14 特效工具列：選了特效之後，〔文字特效〕〔動態字卡〕按鈕的字不被切掉', async ({ page }) => {
+test('回報14 特效工具列：選了特效之後，〔文字特效〕按鈕的字不被切掉', async ({ page }) => {
   test.setTimeout(120_000);
   await addKinetic(page);
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-group-flow').tap();
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
   await closePanel(page);
   for (const w of [320, 390]) {
     await page.setViewportSize({ width: w, height: 844 });
-    for (const id of ['fx.textfx', 'fx.kinetic']) {
+    for (const id of ['fx.textfx']) {
       const t = await page
         .getByTestId(`tool-${id}`)
         .evaluate((el) => [el.scrollWidth, el.clientWidth, el.querySelector('span:last-child')!.scrollWidth]);
@@ -211,27 +211,34 @@ async function addKinetic(page: Page) {
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('蔡氏家族聚餐');
   await openTab(page, '特效');
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
 }
 const textItem = async (page: Page) =>
   (await tracks(page)).flatMap((t) => t.items).find((i) => i.type === 'text')!;
 
-test('回報14 副標：有副標的特效多一個副標輸入框，打了就存進字卡；沒有副標的特效沒有', async ({ page }) => {
+test('回報14 副標：有副標的特效，〔內容〕視窗多一個輸入框（名稱照用途），打了就存進字卡；沒有副標的特效沒有', async ({
+  page,
+}) => {
   test.setTimeout(150_000);
   await addKinetic(page);
-  await openTool(page, 'fx.kinetic');
   await page.getByTestId('kn-group-flow').tap();
-  await openTool(page, 'fx.kinetic');
   await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
+  // 特效視窗裡不再有副標輸入框；到文字類別的〔內容〕輸入
+  await expect(page.getByTestId('kn-sub-input')).toHaveCount(0);
+  await openTab(page, '文字');
+  await openTool(page, 'text.content');
   await expect(page.getByTestId('kn-sub-input')).toBeVisible();
+  await expect(page.getByLabel('底部小字')).toBeVisible();
   await page.getByTestId('kn-sub-input').fill('家族大團圓');
   await expect.poll(async () => (await textItem(page)).kinetic?.sub).toBe('家族大團圓');
   await page.getByTestId('kn-sub-input').fill('');
   await expect.poll(async () => (await textItem(page)).kinetic?.sub).toBeUndefined();
-  await openTool(page, 'fx.kinetic');
+  await openTab(page, '特效');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-group-sp').tap();
-  await openTool(page, 'fx.kinetic');
   await page.locator('[data-testid="kn-card"][data-kn-id="cube"]').tap();
+  await openTab(page, '文字');
+  await openTool(page, 'text.content');
   await expect(page.getByTestId('kn-sub-input')).toHaveCount(0);
   await page.screenshot({ path: `${SHOT}/kinetic-sub-390.png` });
 });
@@ -241,9 +248,9 @@ test('回報14 字卡比一輪長時：重複播放／停在最後畫面（每�
 }) => {
   test.setTimeout(150_000);
   await addKinetic(page);
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-group-in').tap();
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.locator('[data-testid="kn-card"][data-kn-id="burst"]').tap();
   await expect(page.getByTestId('kn-end-loop')).toBeVisible();
   await expect(page.getByTestId('kn-end-loop')).toHaveAttribute('aria-checked', 'true');
@@ -251,9 +258,9 @@ test('回報14 字卡比一輪長時：重複播放／停在最後畫面（每�
   await expect.poll(async () => (await textItem(page)).kinetic?.end).toBe('hold');
   await page.getByTestId('kn-end-loop').tap();
   await expect.poll(async () => (await textItem(page)).kinetic?.end).toBeUndefined();
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-group-flow').tap();
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
   await expect(page.getByTestId('kn-end-hold')).toBeVisible();
   await page.screenshot({ path: `${SHOT}/kinetic-end-390.png` });
@@ -264,9 +271,9 @@ test('回報14 停在最後畫面：選了之後過了停點畫面不再動；�
 }) => {
   test.setTimeout(150_000);
   await addKinetic(page);
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-group-flow').tap();
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.locator('[data-testid="kn-card"][data-kn-id="crawl"]').tap();
   const it = await textItem(page);
   const dur = ((await project(page)).tracks as unknown as { items: { id: string; duration: number }[] }[])

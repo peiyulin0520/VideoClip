@@ -247,3 +247,23 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **選到東西跳類別**：`Toolbar.tsx` 的 `targetForSelection`；`requestTab`（時間軸特效圓圈等）由 `requestTarget` 對到類別＋視窗（特效看 `fxFocus.role`）。
 - **e2e**：`helpers.ts` 的 `openCat`／`openTool`（用工具 id）、`openTab`（舊名稱對照）；視窗開著會蓋住播放列、時間軸，點之前先 `closePanel`；剪輯／加入／文字／版型…的按鈕只在那個類別的工具列顯示。
 - **U6 補充（e2e 改寫時確認的行為）**：①變淡的按鈕用 class `dim`＋`data-dim`（不是 `aria-disabled`，Playwright 會一直等）；②預覽上開始拖調整（自訂比例、版型大小、格子大小、動態字卡顯示範圍）時，升起的視窗自動收起；③在版型類別點格子／整個版型，功能列留在版型；④選到東西 250 ms 後才跳類別（避免手指放開補送的 click 落在別的按鈕）；⑤預覽高度跟專案比例（方形、橫式比較矮），編輯畫面一個螢幕高、整頁不捲，時間軸自己上下捲（軌道多時下面幾條要捲才看得到）；⑥e2e 的 `undo`／`redo` 會先收視窗、按完再把原本開著的視窗升回來；⑦預覽右上〔圖層〕清單是平的一條，每列有 ▲▼（`<軌名> 往上一層／往下一層`），沒有收合、隱藏、鎖定、更多排序
+
+## feedback-15 第 1 批（2026-11-24）新增的東西（給下一位）
+- **動態字卡停點**：`KineticDef.hold?(words)`（`engine/kinetic/core.ts`）；沒給就用 `hold.ts` 的 `HOLD_F` 比例。時間常數跟字數有關的式子一定要自己給 `hold`。新增或改動式子後跑 `e2e/kinetic-hold.spec.ts`（64 式 × 7 組文字，用 `__videoclip.kineticHoldCheck(text)`：停點那格畫兩次、只差一個字，畫面不同＝那個字有畫出來；一直在跑的式子與跳錶不檢查）。
+- **版型框線**：`frameStyle.line`（整體：外框邊距＋分隔線）、`frameStyle.gap`（只有分隔線；沒設＝跟 `line` 一樣）；`applyLineScale(b, scale, gapScale?)`、`buildIn/paintFrame/renderFramePng` 最後多一個 `gap` 參數；`reshapeLayout(group, { line, gap })`（調整體粗細要一起傳 `gap: undefined`）。
+- **刪軌道**：`removeTrack` 依 `groupRole` 分：member＝只刪那條、cell＝`clearCellTrack`、frame＝整個版型。
+- **畫面高度**：`useAppHeight`（只在加到主畫面時把 `window.innerHeight` 寫進 `--app-h`）；`.editor`、`--stage-cap`、`.panel-sheet`、`.crop-editor` 都用 `var(--app-h, 100svh)`。升起的視窗裡 `.panel` 不留 `--safe-bottom`。
+- **測試技巧**：沙盒 `--safe-bottom` 是 0；要驗 iPhone 的 Home 橫條空白，在 `addInitScript` 裡塞 `:root{--safe-bottom:34px !important}`（見 `e2e/z4-space.spec.ts`）。
+
+## feedback-15 第 2 批（2026-11-25）新增的東西（給下一位）
+- **播放列垃圾桶**：`pb-delete`（`pages/Editor.tsx`），呼叫 `removeAnyItem`；`removeAnyItem` 刪完空軌道會一起移除（最後一條非版型影像軌、格子軌除外）。注意：e2e 找「刪除」按鈕要限定在 `toolbar` 或用 testid（播放列與剪輯工具列各一顆）。
+- **加進／移出版型**：`groupToJoin(project, item)`（時間有重疊的版型外框，取最上層）、`attachToGroup`、`detachFromGroup`；工具 `text.togroup`、`audio.togroup`（`GroupToggleButton`，沒有版型時不顯示）。新增文字時選到版型物件仍會自動加進版型（`addTargetGroup`），想要在外面就選到文字按〔移出版型〕。
+- **各格**：`CellCards`（`editor/CellCards.tsx`）每格一張卡，testid `cell-card`／`cc-open`／`cc-add`；舊的示意圖（`LayoutDiagram`、`ld-cell`）已拿掉。e2e 的 `finishLayout` 用 `cc-open`。
+- **文字特效**：只剩一個工具 `fx.textfx`（特效類別）與 `text.fx`（文字類別），同一個 `EffectTab part="textfx"` 視窗；`StyleBlock` 上面分組〔基本〕＋動態字卡 8 組（testid `kn-group-basic`／`kn-group-in`…），卡片 `tfx-card`（基本）／`kn-card`（動態）；`文字特效 無` 兩種都清。副標輸入在文字〔內容〕視窗（`kn-sub-input`，`KineticDef.subLabel`）。
+- **型別檢查**：用 `npx tsc -b`（`npx tsc --noEmit -p .` 不會檢查 app 的檔案）。
+
+## feedback-15 第 3 批 Z13（2026-11-25）新增的東西（給下一位）
+- **播放中不重畫沒變的格子**：`Compositor.render(layers, { skipIfIdle })`（`Player.render` 在 `playing` 時傳 true）。判斷＝所有圖層的 JSON（去掉 `source`、`maskBitmap`，`mask` 只取長度與頭中尾）沒變、這格沒有新的影片畫面上傳（`uploadedNow`）、沒有圖層被銷毀。新增會改變畫面、但不在 `SceneLayer` 欄位裡的東西時，記得讓它進 `SceneLayer` 或設 `uploadedNow`，不然播放中會漏畫。
+- **效能框**：`Player.stats()` 多 `prepMs／drawMs／gpuMs／renders／skipped`；`gpuMs` 只有效能框開著時才量（`Player.setMeasureGpu`）。
+- **量測**：`Z13_BENCH=1 npx playwright test e2e/z13-bench.spec.ts`（`Z13_PROFILE=1` 抓 CPU profile）；`__videoclip.rotateFrame(deg)` 把第一個版型整個轉某個角度。沙盒是軟體 GL，數字只能看相對。
+

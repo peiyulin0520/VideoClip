@@ -881,6 +881,72 @@ export function addGroupMember(group: string, item: Item): string | null {
   return item.id;
 }
 
+/**
+ * 這個物件可以加進哪個版型：時間有重疊的版型外框（沒有重疊＝不能加）；有好幾個取最上層（圖層順序最後）的那個。
+ * 已經在版型裡、或是格子上的色塊文字（onItem）回傳 null。
+ */
+export function groupToJoin(p: Project, item: Item): string | null {
+  if (item.group || (item.type === 'text' && item.onItem)) return null;
+  let found: string | null = null;
+  for (const t of p.tracks)
+    for (const x of t.items)
+      if (
+        isFrameItem(x) &&
+        x.group &&
+        x.start < item.start + item.duration - 1e-6 &&
+        item.start < x.start + x.duration - 1e-6
+      )
+        found = x.group;
+  return found;
+}
+
+/** 把選到的文字、貼圖、音效加進版型（搬到版型自己的成員軌，時間夾在版型範圍內，之後跟著版型動）。一步復原 */
+export function attachToGroup(itemId: string, group: string): boolean {
+  const p = store().project;
+  const f = p && findItem(p, itemId);
+  const span = p && groupSpan(p, group);
+  if (!p || !f || !span || f.item.group) return false;
+  const kind = trackKindOf(f.item, p.assets);
+  store().apply((d) => {
+    const from = d.tracks[f.trackIndex]!;
+    const idx = from.items.findIndex((x) => x.id === itemId);
+    if (idx < 0) return;
+    const it = from.items.splice(idx, 1)[0] as Item;
+    const start = Math.min(Math.max(it.start, span.start), Math.max(span.end - 0.2, span.start));
+    it.start = start;
+    it.duration = Math.max(Math.min(it.duration, span.end - start), 0.2);
+    it.group = group;
+    if (it.type !== 'text') (it as VideoItem).member = true;
+    if (from.items.length === 0 && !from.groupRole) {
+      const lastMedia =
+        from.kind === 'media' && d.tracks.filter((t) => t.kind === 'media' && !t.groupRole).length <= 1;
+      if (!lastMedia) d.tracks.splice(d.tracks.indexOf(from), 1);
+    }
+    memberTrackFor(d as { tracks: Track[] }, group, kind, it.start, it.duration).items.push(it as never);
+  });
+  return true;
+}
+
+/** 把版型裡的文字、貼圖、音效移出版型（搬到一般的軌道，位置、時間不變）。一步復原 */
+export function detachFromGroup(itemId: string): boolean {
+  const p = store().project;
+  const f = p && findItem(p, itemId);
+  if (!p || !f || !f.item.group || f.track.groupRole !== 'member') return false;
+  const kind = f.track.kind;
+  store().apply((d) => {
+    const from = d.tracks[f.trackIndex]!;
+    const idx = from.items.findIndex((x) => x.id === itemId);
+    if (idx < 0) return;
+    const it = from.items.splice(idx, 1)[0] as Item;
+    delete it.group;
+    if (it.type !== 'text') delete (it as VideoItem).member;
+    if (from.items.length === 0) d.tracks.splice(d.tracks.indexOf(from), 1);
+    const ti = trackIndexFor(d.tracks as Track[], kind, it.start, it.duration);
+    d.tracks[ti]!.items.push(it as never);
+  });
+  return true;
+}
+
 /** 版型成員的時間夾在版型範圍裡（拖移、修剪用）：回傳夾好的 start、duration */
 export function clampToGroup(
   p: Project,
@@ -969,7 +1035,7 @@ export function applyLayoutShape(
   const H = p.height;
   const oldBox = fr.item.frameStyle?.box ?? { w: 1, h: 1 };
   const newBox = style.box ?? { w: 1, h: 1 };
-  const b = buildIn(defOf(style), W, H, style.box, style.line, style.cells);
+  const b = buildIn(defOf(style), W, H, style.box, style.line, style.cells, style.gap);
   const rs = b.panels.length ? b.panels : b.windows;
   const l = Math.min(...rs.map((r) => r.x));
   const tp = Math.min(...rs.map((r) => r.y));
@@ -1129,6 +1195,24 @@ export function removeGroup(group: string) {
       d.tracks = d.tracks.filter(
         (t) => t.id === keep || t.items.length > 0 || (t.groupRole === 'cell' && t.group !== group),
       ) as never;
+    },
+    { select: null },
+  );
+}
+
+/** 清空版型的一格（這一條格子軌的素材全刪、色塊上的文字一起刪）：軌道留著，依序時不補位。一步復原 */
+export function clearCellTrack(trackId: string) {
+  const p = store().project;
+  const tr = p?.tracks.find((t) => t.id === trackId);
+  if (!p || !tr || tr.groupRole !== 'cell' || tr.items.length === 0) return;
+  const gone = new Set<string>();
+  for (const it of tr.items) {
+    gone.add(it.id);
+    for (const x of textsOnItem(p.tracks as Track[], it.id)) gone.add(x.id);
+  }
+  store().apply(
+    (d) => {
+      for (const t of d.tracks) t.items = t.items.filter((x) => !gone.has(x.id)) as never;
     },
     { select: null },
   );
@@ -1823,11 +1907,10 @@ export function setCellTrim(itemId: string, trimIn: number) {
 }
 
 /**
- * 現在選到的東西屬於哪個版型（外框、格子、版型裡的文字貼圖都算），而且使用者沒有在分頁裡關掉「加到版型裡」：
- * 新增文字、貼圖、音效就加進這個版型（成員軌、時間夾在版型範圍內）。沒有就是 null（照一般流程）。
+ * 現在選到的東西屬於哪個版型（外框、格子、版型裡的文字貼圖都算）：
+ * 新增文字、貼圖、音效就加進這個版型（成員軌、時間夾在版型範圍內；不要的話選到文字後按〔移出版型〕）。沒有就是 null（照一般流程）。
  */
 export function addTargetGroup(): string | null {
-  if (useUI.getState().addToGroupOff) return null;
   const p = store().project;
   const id = store().selectedId;
   const f = p && id ? findItem(p, id) : null;
@@ -1921,6 +2004,14 @@ export function removeAnyItem(id: string): boolean {
     (d) => {
       const tr = d.tracks[f.trackIndex]!;
       tr.items = tr.items.filter((x) => x.id !== id) as never;
+      // 刪完軌道空了就一起拿掉（最後一條影像軌、版型的格子軌除外）；復原時軌道跟物件一起回來
+      if (tr.items.length === 0 && tr.groupRole !== 'cell') {
+        const lastMedia =
+          tr.kind === 'media' &&
+          !tr.groupRole &&
+          d.tracks.filter((t) => t.kind === 'media' && !t.groupRole).length <= 1;
+        if (!lastMedia) d.tracks.splice(f.trackIndex, 1);
+      }
     },
     { select: null },
   );
@@ -2136,9 +2227,21 @@ export function mergeTracksMulti(ids: string[]): { merged: number; kept: number 
   return { merged: r.merged, kept: r.kept };
 }
 
+/**
+ * 刪掉一條軌道（含裡面的物件）。版型的軌道各自處理（不再整個版型一起刪）：
+ * 成員軌（版型裡的文字、貼圖、音效）＝只刪這一條；格子軌＝清空這一格（軌道留著，版型不會少一格）；
+ * 外框軌＝整個版型拿掉。一步復原。
+ */
 export function removeTrack(trackId: string) {
   const t0 = store().project?.tracks.find((t) => t.id === trackId);
-  if (t0?.group) return removeGroup(t0.group); // 版型的格子軌：整個版型一起拿掉
+  if (t0?.groupRole === 'member') {
+    store().apply((d) => void (d.tracks = d.tracks.filter((t) => t.id !== trackId) as never), {
+      select: null,
+    });
+    return;
+  }
+  if (t0?.groupRole === 'cell') return clearCellTrack(trackId);
+  if (t0?.group) return removeGroup(t0.group); // 版型的外框軌：整個版型拿掉
   // 軌道上有版型的外框：那些版型一起拿掉（格子軌留著會變孤兒）
   const frameGroups = [...new Set((t0?.items ?? []).filter(isFrameItem).map((x) => x.group!))];
   for (const g of frameGroups) removeGroup(g);

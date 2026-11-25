@@ -410,7 +410,7 @@ export async function finishLayout(page: Page, files: string[], opts: { motion?:
   // 選項區收起來＝新版型已經加好、而且選到它了（不然讀到的是上一個版型的示意圖）
   await expect(page.getByTestId('layout-options')).toHaveCount(0, { timeout: 30_000 });
   await openTool(page, 'layout.cells'); // 新版型選到了：升起〔各格〕視窗（示意圖）
-  const cells = page.getByTestId('ld-cell');
+  const cells = page.getByTestId('cc-open');
   await expect(cells.first()).toBeVisible({ timeout: 30_000 });
   const n = await cells.count();
   if (opts.motion) {

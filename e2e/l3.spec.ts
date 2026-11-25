@@ -100,7 +100,7 @@ test('L3 版型尾端「加入」→ 文字：進版型自己的文字軌（不�
   await showTimeline(page);
 });
 
-test('L4 選到版型時，文字分頁新增文字／素材分頁加貼圖都加進版型裡（版型的成員軌）；關掉切換就加在一般軌道', async ({
+test('L4 選到版型時，文字分頁新增文字／素材分頁加貼圖都加進版型裡（版型的成員軌）；選到文字按〔移出版型〕就搬到一般軌道，再按一次又加回去', async ({
   page,
 }) => {
   test.setTimeout(150_000);
@@ -110,12 +110,8 @@ test('L4 選到版型時，文字分頁新增文字／素材分頁加貼圖都�
   const frameGroup = async () =>
     (await tracks(page)).flatMap((t) => t.items).find((i) => i.group && !i.cell && i.type !== 'text')!.group;
 
-  // 文字工具列：選到版型時有〔加進版型〕切換、預設開；新增文字 → 版型的文字成員軌
+  // 文字工具列：選到版型時新增文字 → 版型的文字成員軌
   await openTab(page, '文字');
-  await expect(page.getByRole('button', { name: /新增的文字加到版型/ })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
   await page.getByTestId('tool-text.add').tap();
   const ms = await members();
   expect(ms.filter((t) => t.kind === 'text')).toHaveLength(1);
@@ -123,7 +119,6 @@ test('L4 選到版型時，文字分頁新增文字／素材分頁加貼圖都�
 
   // 素材分頁：貼圖加進版型（成員軌 kind=sticker、物件標成版型成員，不是外框也不是格子）
   await openTab(page, '素材');
-  await expect(page.getByRole('switch', { name: /新增的貼圖加到版型/ })).toBeVisible();
   await page.getByRole('tablist', { name: '貼圖分類' }).getByRole('tab').nth(3).tap(); // 愛心
   await page.getByRole('button', { name: '貼圖 red heart' }).tap();
   await expect
@@ -149,11 +144,21 @@ test('L4 選到版型時，文字分頁新增文字／素材分頁加貼圖都�
   await expect(page.getByTestId('sub-head').filter({ hasText: '文字' })).toContainText('文字 1');
   await page.screenshot({ path: `${SHOT}/layout-members.png` });
 
-  // 關掉切換：新增的文字就在一般的字卡軌道
+  // 選到版型裡的文字，〔移出版型〕：搬到一般的字卡軌道（時間、位置不變）；再按一次〔加進版型〕又加回去
+  await closePanel(page);
+  await page.locator('[data-testid="clip"][data-kind="text"]').first().tap();
   await openTab(page, '文字');
-  await page.getByRole('button', { name: /新增的文字加到版型/ }).tap();
-  await page.getByTestId('tool-text.add').tap();
+  const btn = page.getByTestId('tool-text.togroup');
+  await expect(btn).toHaveClass(/active/);
+  await btn.tap();
+  await expect(page.locator('.toast').filter({ hasText: '已移出版型' })).toBeVisible();
   const plain = (await tracks(page)).filter((t) => t.kind === 'text' && !t.groupRole);
   expect(plain).toHaveLength(1);
   expect(plain[0]!.items[0]!.group).toBeUndefined();
+  expect((await members()).filter((t) => t.kind === 'text')).toHaveLength(0);
+  await expect(btn).not.toHaveClass(/active/);
+  await btn.tap();
+  await expect(page.locator('.toast').filter({ hasText: '已加進版型' })).toBeVisible();
+  expect((await members()).filter((t) => t.kind === 'text')).toHaveLength(1);
+  expect((await tracks(page)).filter((t) => t.kind === 'text' && !t.groupRole)).toHaveLength(0);
 });

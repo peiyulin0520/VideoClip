@@ -28,7 +28,7 @@ async function setup(page: Page, kid: string, group = 'in') {
   await page.getByTestId('tool-text.add').tap();
   await page.getByLabel('文字內容').fill('開場');
   await openTab(page, '特效');
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId(`kn-group-${group}`).tap();
   await page.getByRole('radio', { name: `文字特效 ${kid}` }).tap();
 }
@@ -80,7 +80,7 @@ test('K0.5 顯示範圍：預設是畫面中間一條 16:9；調整範圍（拖�
   expect(dark(await samplePreview(page, 0.1, 0.4))).toBe(true);
   expect(blue(await samplePreview(page, 0.1, 0.2))).toBe(true);
   // 調整範圍：按鈕 → 預覽上有虛線框＋把手；把下邊往下拖 → 套用 → 框變高
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-area-edit').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(page.getByTestId('ka-frame')).toBeVisible();
@@ -100,7 +100,7 @@ test('K0.5 顯示範圍：預設是畫面中間一條 16:9；調整範圍（拖�
   // 往下多出來的範圍現在也是墨黑（0.4 往下一點點）
   expect(dark(await samplePreview(page, 0.1, 0.63))).toBe(true);
   // 縮窄：把框縮成原本的一半高 → 框外看不到
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-area-edit').tap();
   await page.evaluate(() => window.scrollTo(0, 0));
   const hb = (await page.getByTestId('ka-h-b').boundingBox())!;
@@ -114,20 +114,21 @@ test('K0.5 顯示範圍：預設是畫面中間一條 16:9；調整範圍（拖�
   await seekTo(page, 1.0);
   expect(blue(await samplePreview(page, 0.1, 0.63))).toBe(true); // 框外：底下的影片
   // 重置範圍
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-area-reset').tap();
   expect((await textItem(page)).kinetic?.size).toBeUndefined();
   // 放棄：按 ✕ 不改
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-area-edit').tap();
   await page.getByTestId('ka-close').tap();
   await expect(page.getByTestId('ka-frame')).toHaveCount(0);
   expect((await textItem(page)).kinetic?.size).toBeUndefined();
 
   // 巨字橫移：預設整個畫面、左右淡出（框的左右邊緣是透明的，影片的藍色透出來）
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-group-flow').tap();
-  await openTool(page, 'fx.kinetic');
+  await openTool(page, 'fx.textfx');
+  await page.getByTestId('kn-group-flow').tap();
   await page.getByRole('radio', { name: '文字特效 巨字橫移' }).tap();
   await expect(page.getByRole('radio', { name: '邊緣淡出 左右' })).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('radio', { name: '邊緣淡出 無' }).tap();

@@ -27,7 +27,6 @@ type UI = {
   /** 自訂比例：預覽上正在拖版面的框（fx、fy＝框占 9:16 底的寬、高比例）；沒有＝沒在調 */
   frameEdit: { fx: number; fy: number; fill: boolean } | null;
   /** 選到版型（或版型裡的東西）時，新增文字／貼圖／音效預設加進那個版型；使用者在各分頁關掉＝這個旗標 true */
-  addToGroupOff: boolean;
   /** 調整版型大小：預覽上正在拖版型的邊（sx、sy＝相對於開始時的寬、高倍數）；沒有＝沒在調 */
   layoutEdit: { group: string; sx: number; sy: number } | null;
   /** 預覽上拖格子大小：cells＝草稿（每格佔畫面寬、高的比例，照格號順序） */
@@ -54,7 +53,6 @@ export const useUI = create<UI>((set, get) => ({
   timelinePps: 40,
   gradeScope: null,
   frameEdit: null,
-  addToGroupOff: false,
   layoutEdit: null,
   cellEdit: null,
   kineticEdit: null,

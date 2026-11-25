@@ -1,33 +1,54 @@
-import { test } from '@playwright/test';
-import fs from 'node:fs';
+import { expect, test } from '@playwright/test';
 import { createProjectWith, waitHook } from './helpers';
 
-// 動態字卡「停在最後畫面」要停在哪一刻：量每一式第一個詞那一輪每個時間點的墨量，取「墨量接近最大」那一段的中間，換成一輪的比例。
-// 不是一般測試：KINETIC_HOLD=1 才跑，結果印出 JSON（貼進 src/engine/kinetic/hold.ts）。
-test('動態字卡完整呈現的時間（比例）', async ({ page }) => {
-  test.skip(!process.env.KINETIC_HOLD, '設 KINETIC_HOLD=1 才跑');
+// 動態字卡「停在最後畫面」：每一式、不同長度的文字，停點那一格最後一個詞的字都要畫出來（不能停在「聚」沒播到「餐」，
+// 也不能停在下一輪開頭）。做法：停點那一格畫兩次，只差某一個字（換成「丑」），畫面不一樣＝那個字有畫出來。
+// 例外：一直在跑的式子（沒有「一輪」）、一次只出現一個字的「逐字重擊」只檢查最後一個字；
+// 牌子數有上限的式子（翻牌 7、翻卡 7、拉霸 6、字被換掉 10）超過的字本來就不顯示；手電筒只照一部分、跳錶不是照字畫的。
+const TEXTS = [
+  '蔡氏家族聚餐',
+  '環島公路 一路向南',
+  'Hello',
+  '好',
+  '一二三四五六七八九十甲乙丙丁',
+  '開場 登場 來了',
+  '春日限定 夏夜特映 秋季新番',
+];
+const LIMIT: Record<string, number> = { flap: 7, flip: 7, slot: 6, corrupt: 10 };
+const LAST_ONLY = new Set(['hit']);
+const SKIP = new Set(['odo']);
+const SOME_ONLY = new Set(['torch']);
+
+type Row = { id: string; hold: number; total: number | null; lastDiff: number; perChar: number[] };
+
+test('動態字卡停在最後：每一式的停點，最後一個詞的字都畫出來', async ({ page }) => {
   test.setTimeout(300_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await waitHook(page);
-  const rows = (await page.evaluate(() =>
-    (
-      window as unknown as {
-        __videoclip: { kineticInk: () => { id: string; cycle: number; series: number[] }[] };
+  const problems: string[] = [];
+  for (const text of TEXTS) {
+    const rows = (await page.evaluate(
+      (t) =>
+        (
+          window as unknown as { __videoclip: { kineticHoldCheck: (t: string) => unknown[] } }
+        ).__videoclip.kineticHoldCheck(t),
+      text,
+    )) as Row[];
+    expect(rows.length).toBe(64);
+    for (const r of rows) {
+      if (r.total === null || SKIP.has(r.id)) continue; // 一直在跑的式子沒有「最後」
+      if (r.hold > r.total + 1e-6) problems.push(`${text}/${r.id} 停點 ${r.hold} 超過一輪 ${r.total}`);
+      const want = LAST_ONLY.has(r.id)
+        ? [r.perChar.length - 1]
+        : r.perChar.map((_, i) => i).filter((i) => i < (LIMIT[r.id] ?? 99));
+      if (SOME_ONLY.has(r.id)) {
+        if (!r.perChar.some((d) => d > 0)) problems.push(`${text}/${r.id} 一個字都沒畫出來`);
+        continue;
       }
-    ).__videoclip.kineticInk(),
-  )) as { id: string; cycle: number; series: number[] }[];
-  const out: Record<string, number> = {};
-  const dbg: string[] = [];
-  for (const r of rows) {
-    const max = Math.max(...r.series);
-    const idx = r.series
-      .map((v, i) => [v, i] as const)
-      .filter(([v]) => v >= 0.92 * max)
-      .map(([, i]) => i);
-    const med = idx[Math.floor(idx.length / 2)] ?? 0;
-    out[r.id] = Math.round((med / (r.series.length - 1)) * 100) / 100;
-    dbg.push(`${r.id}:max=${max.toFixed(3)} n=${idx.length} f=${out[r.id]}`);
+      const missing = want.filter((i) => r.perChar[i] === 0);
+      if (missing.length)
+        problems.push(`${text}/${r.id} 停點 ${r.hold.toFixed(2)} 第 ${missing.join(',')} 個字沒畫出來`);
+    }
   }
-  fs.writeFileSync(process.env.KINETIC_HOLD_OUT ?? '/tmp/kinetic-hold.json', JSON.stringify(out, null, 1));
-  console.log('HOLD ' + dbg.join('\n'));
+  expect(problems).toEqual([]);
 });

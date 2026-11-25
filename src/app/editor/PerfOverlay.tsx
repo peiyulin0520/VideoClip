@@ -27,8 +27,12 @@ export function PerfOverlay({ player }: { player: Player | null }) {
   const [s, setS] = useState<Stats | null>(null);
   useEffect(() => {
     if (!player || !isPerfOn()) return;
+    player.setMeasureGpu(true);
     const id = window.setInterval(() => setS(player.stats()), 500);
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      player.setMeasureGpu(false);
+    };
   }, [player]);
   const q = useQuality((x) => x.q);
   if (!player || !isPerfOn() || !s) return null;
@@ -40,6 +44,9 @@ export function PerfOverlay({ player }: { player: Player | null }) {
       </div>
       <div>
         場景 {f(s.buildMs)}｜影片上傳 {f(s.uploadMs)}｜合成 {f(s.compMs)}
+      </div>
+      <div>
+        合成：準備 {f(s.prepMs)}｜繪製 {f(s.drawMs)}｜等 GPU {f(s.gpuMs)}
       </div>
       <div>
         掉格 {s.dropped}｜最低 {f(s.fpsMin)} fps

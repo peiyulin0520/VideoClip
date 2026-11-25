@@ -60,6 +60,7 @@ export const FX_FLOW: KineticDef[] = [
     area: 'full',
     fade: 'h',
     sub: '同主標',
+    subLabel: '底部小字',
     len: () => null,
     hit: [0, 0.2, 1, 0.6],
     draw(s, t) {

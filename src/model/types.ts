@@ -199,6 +199,8 @@ export type VideoItem = ItemBase & {
     cells?: { x: number; y: number; w: number; h: number }[];
     /** 格子之間框線的粗細倍數（沒有＝1，原本的粗細；0＝沒有框線，最大 3） */
     line?: number;
+    /** 只有格子之間分隔線的粗細倍數（0＝格子貼在一起，最大 3）。沒有＝分隔線跟 line 一樣；有＝分隔線用它，格子離外框邊的距離仍用 line */
+    gap?: number;
   };
   /** 版型外框專用：最後選的排法（同步＝各格都從版型開頭；依序＝一格接一格，之後加素材／改長度會把後面的格子往後推）。沒有＝同步 */
   layoutPlay?: 'sync' | 'seq';

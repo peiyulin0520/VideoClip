@@ -79,10 +79,16 @@ export class Player {
   private statBuild = 0;
   private statComp = 0;
   private statUpload = 0;
+  private statPrep = 0;
+  private statDraw = 0;
+  private statGpu = 0;
+  private accPrep = 0;
+  private accDraw = 0;
+  private accGpu = 0;
   private accBuild = 0;
   private accComp = 0;
   private accUpload = 0;
-  private seg = { build: 0, comp: 0, upload: 0 };
+  private seg = { build: 0, comp: 0, upload: 0, prep: 0, draw: 0, gpu: 0 };
   private videoInfo = '';
   /** 這一刻正在轉場的片段 id（A、B）：對時規則放寬、統計轉場掉格 */
   private transIds = new Set<string>();
@@ -248,6 +254,9 @@ export class Player {
     this.accBuild += this.seg.build;
     this.accComp += this.seg.comp;
     this.accUpload += this.seg.upload;
+    this.accPrep += this.seg.prep;
+    this.accDraw += this.seg.draw;
+    this.accGpu += this.seg.gpu;
     this.statFrames++;
     if (this.statSince === 0) this.statSince = now;
     if (now - this.statSince >= 1000) {
@@ -265,7 +274,10 @@ export class Player {
       this.statBuild = this.accBuild / this.statFrames;
       this.statComp = this.accComp / this.statFrames;
       this.statUpload = this.accUpload / this.statFrames;
-      this.accBuild = this.accComp = this.accUpload = 0;
+      this.statPrep = this.accPrep / this.statFrames;
+      this.statDraw = this.accDraw / this.statFrames;
+      this.statGpu = this.accGpu / this.statFrames;
+      this.accBuild = this.accComp = this.accUpload = this.accPrep = this.accDraw = this.accGpu = 0;
       this.statFrames = 0;
       this.statMs = 0;
       this.statSince = now;
@@ -278,12 +290,24 @@ export class Player {
     return Object.fromEntries(this.gains);
   }
 
+  /** 效能框要看「等 GPU」那一段時打開（每格多等一次 gl.finish，會稍微拖慢） */
+  setMeasureGpu(on: boolean) {
+    this.compositor.measureGpu = on;
+  }
+
   stats(): {
     fps: number;
     renderMs: number;
     buildMs: number;
     compMs: number;
     uploadMs: number;
+    /** 合成再拆開：準備圖層、送出繪製（含影片貼圖上傳）、等 GPU 畫完（要開「顯示播放效能」才量） */
+    prepMs: number;
+    drawMs: number;
+    gpuMs: number;
+    /** 播放中真的重畫了幾格、因為畫面沒變而跳過幾格（累計） */
+    renders: number;
+    skipped: number;
     dropped: number;
     video: string;
     /** 最近一次轉場：畫了幾格、兩格間隔超過 50ms 的次數、為了追時間硬 seek 的次數 */
@@ -311,6 +335,11 @@ export class Player {
       buildMs: this.statBuild,
       compMs: this.statComp,
       uploadMs: this.statUpload,
+      prepMs: this.statPrep,
+      drawMs: this.statDraw,
+      gpuMs: this.statGpu,
+      renders: this.compositor.renders,
+      skipped: this.compositor.skipped,
       dropped,
       video: this.videoInfo,
       transition: { frames: this.trans.frames, drops: this.trans.drops, hardSeeks: this.trans.hardSeeks },
@@ -605,9 +634,9 @@ export class Player {
     this.syncMusic(p, t);
     if (this.playing) this.audio.keepAlive();
     const t1 = performance.now();
-    this.settledNow = comp.render(scene);
+    this.settledNow = comp.render(scene, { skipIfIdle: this.playing });
     const t2 = performance.now();
-    this.seg = { build: t1 - t0, comp: t2 - t1, upload: comp.takeUploadMs() };
+    this.seg = { build: t1 - t0, comp: t2 - t1, upload: comp.takeUploadMs(), ...comp.seg };
   }
 
   /**

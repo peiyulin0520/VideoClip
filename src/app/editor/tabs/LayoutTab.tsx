@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { GRID_MAX, LINE_MAX, buildIn, defOf, hasFrameLine } from '../../../engine/layouts';
+import { GRID_MAX, LINE_MAX, buildIn, cellGap, defOf, hasFrameLine } from '../../../engine/layouts';
 import { Slider } from '../../../ui/Slider';
 import type { Project, VideoItem } from '../../../model/types';
 import { useUI } from '../../../store/uiStore';
@@ -10,7 +10,7 @@ import { reshapeLayout, restyleFrame } from '../frameRestyle';
 import { useProjectStore } from '../../../store/projectStore';
 import { cellsOf, frameOfGroup } from '../../../engine/layoutTracks';
 import { CellSheet } from '../CellSheet';
-import { LayoutDiagram } from '../LayoutDiagram';
+import { CellCards } from '../CellCards';
 import { LayoutPicker } from '../LayoutPicker';
 import type { Found } from './shared';
 
@@ -33,24 +33,32 @@ function FrameStyleEditor({ group, color, opacity }: { group: string; color: str
   );
 }
 
-/** 各格：版型示意圖，點一格選到那一格並開「這一格」視窗（換素材、調那一格的大小） */
+/** 各格：每一格一張卡片，點卡片選到那一格並開「這一格」視窗（換素材、調那一格的大小），〔＋加素材〕直接加 */
 function CellsBlock({ project, group }: { project: Project; group: string }) {
   const selectedId = useProjectStore((s) => s.selectedId);
   const select = useProjectStore((s) => s.select);
-  const [cell, setCell] = useState<{ id: string; index: number } | null>(null);
+  const [cell, setCell] = useState<{ id: string; index: number; add?: boolean } | null>(null);
   return (
     <>
-      <LayoutDiagram
+      <CellCards
         project={project}
         group={group}
         selectedId={selectedId}
-        onPick={(id, i) => {
+        onPick={(id, i, add) => {
           const it = project.tracks.find((t) => t.id === id)?.items[0];
           if (it) select(it.id);
-          setCell({ id, index: i });
+          setCell({ id, index: i, add });
         }}
       />
-      {cell && <CellSheet key={cell.id} trackId={cell.id} index={cell.index} onClose={() => setCell(null)} />}
+      {cell && (
+        <CellSheet
+          key={`${cell.id}-${cell.add ? 'add' : ''}`}
+          trackId={cell.id}
+          index={cell.index}
+          autoAdd={cell.add}
+          onClose={() => setCell(null)}
+        />
+      )}
     </>
   );
 }
@@ -83,6 +91,16 @@ function FrameBlock({ project, group, frame }: { project: Project; group: string
         buildIn(defOf(frame.frameStyle), project.width, project.height, frame.frameStyle.box),
       ) && (
         <LineSlider key={`${frame.frameStyle.line ?? 1}`} group={group} line={frame.frameStyle.line ?? 1} />
+      )}
+      {cellGap(
+        buildIn(defOf(frame.frameStyle), project.width, project.height, frame.frameStyle.box).windows,
+      ) !== undefined && (
+        <LineSlider
+          key={`gap-${frame.frameStyle.gap ?? frame.frameStyle.line ?? 1}`}
+          group={group}
+          line={frame.frameStyle.gap ?? frame.frameStyle.line ?? 1}
+          only="gap"
+        />
       )}
     </div>
   );
@@ -141,13 +159,13 @@ function PlayControls({ frame }: { frame: VideoItem }) {
 }
 
 /** 格子之間框線的粗細：0%（沒有框線）～300%；停下來 0.4 秒才重畫外框（每次重畫都是一張新的外框圖） */
-function LineSlider({ group, line }: { group: string; line: number }) {
+function LineSlider({ group, line, only }: { group: string; line: number; only?: 'gap' }) {
   const [v, setV] = useState(Math.round(line * 100));
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   return (
     <Slider
-      label="格子框線粗細"
+      label={only === 'gap' ? '分隔線粗細' : '格子框線粗細'}
       value={v}
       min={0}
       max={LINE_MAX * 100}
@@ -156,7 +174,15 @@ function LineSlider({ group, line }: { group: string; line: number }) {
       onChange={(n) => {
         setV(n);
         window.clearTimeout(timer.current);
-        timer.current = window.setTimeout(() => void reshapeLayout(group, { line: n / 100 }), 400);
+        timer.current = window.setTimeout(
+          () =>
+            void reshapeLayout(
+              group,
+              // 整體粗細：分隔線跟著一起變（清掉單獨設的分隔線粗細）；分隔線粗細：只動格子之間
+              only === 'gap' ? { gap: n / 100 } : { line: n / 100, gap: undefined },
+            ),
+          400,
+        );
       }}
     />
   );
@@ -224,6 +250,7 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
                 style.box,
                 style.line,
                 style.cells,
+                style.gap,
               );
               useUI.setState({
                 cellEdit: {

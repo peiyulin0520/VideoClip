@@ -39,10 +39,13 @@ export function CellSheet({
   trackId,
   index,
   onClose,
+  autoAdd = false,
 }: {
   trackId: string;
   index: number;
   onClose: () => void;
+  /** 一開就升起「加素材」（從〔各格〕卡片的〔＋加素材〕進來） */
+  autoAdd?: boolean;
 }) {
   const project = useProjectStore((s) => s.project)!;
   const track = project.tracks.find((t) => t.id === trackId);
@@ -55,7 +58,7 @@ export function CellSheet({
     .find((x) => x.type === 'text' && x.cellFor === trackId);
   const [draft, setDraft] = useState<CellDraft | null>(null);
   const [ranging, setRanging] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(autoAdd);
   const [edit, setEdit] = useState<{ id: string; color: string; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   if (!track || !frameItem) return null;

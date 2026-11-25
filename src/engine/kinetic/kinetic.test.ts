@@ -288,4 +288,32 @@ describe('動態字卡：副標、停在最後畫面', () => {
       expect(h, f.id).toBeLessThanOrEqual(total);
     }
   });
+  it('holdTime：時間跟字數有關的式子（逐字重擊、翻牌、翻卡、拉霸…）停在最後一個詞完整的那一刻，字多也一樣', async () => {
+    const { holdTime } = await import('./hold');
+    const six = ['蔡氏家族聚餐'];
+    // 逐字重擊：6 個字一個一個砸，停在第 6 個字砸完（不是第 5 個「聚」）
+    const hit = kineticById('hit')!;
+    expect(holdTime(hit, six)).toBeCloseTo(5 * 0.42 + 0.3, 6);
+    expect(holdTime(hit, six)).toBeLessThan(hit.len(six)!);
+    expect(holdTime(hit, ['好'])).toBeCloseTo(0.3, 6);
+    // 翻牌：每一格牌都翻定了（第 6 格 0.35 + 5×0.28 秒）才停
+    const flap = kineticById('flap')!;
+    expect(holdTime(flap, six)).toBeGreaterThan(0.35 + 5 * 0.28);
+    expect(holdTime(flap, six)).toBeLessThan(flap.len(six)!);
+    // 翻卡、拉霸：總長是「詞數 × 一輪」，停點在最後一個詞那一輪裡
+    for (const id of ['flip', 'slot']) {
+      const f = kineticById(id)!;
+      const one = f.len(['一二三四'])!;
+      expect(f.len(['一二三四', '五六七八'])!, id).toBeCloseTo(one * 2, 6);
+      expect(holdTime(f, ['一二三四', '五六七八']), id).toBeGreaterThan(one);
+      expect(holdTime(f, ['一二三四', '五六七八']), id).toBeLessThan(one * 2);
+    }
+    // 每一式、各種字數：停點不超過一輪
+    for (const f of KINETIC)
+      for (const w of [['好'], six, ['環島公路', '一路向南'], ['開場', '登場', '來了']]) {
+        const total = f.len(w);
+        if (total === null) continue;
+        expect(holdTime(f, w), `${f.id} ${w.join('/')}`).toBeLessThanOrEqual(total + 1e-6);
+      }
+  });
 });

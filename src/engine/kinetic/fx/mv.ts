@@ -50,6 +50,12 @@ export const FX_MV: KineticDef[] = [
     poster: 1.3,
     area: 'lyrics',
     len: (w) => w.reduce((a, x) => a + cs(x).length * 0.3 + 1.2, 0),
+    // 最後一個詞每個字都蹦出來了（第 j 個 0.15 + j×0.3 秒），還沒開始淡出（T − 0.25 秒）
+    hold: (w) => {
+      const n = cs(w[w.length - 1]!).length;
+      const before = w.slice(0, -1).reduce((a, x) => a + cs(x).length * 0.3 + 1.2, 0);
+      return before + n * 0.3 + 0.4;
+    },
     draw(s, t) {
       const { W, H } = s;
       const T = s.words.map((w) => cs(w).length * 0.3 + 1.2);

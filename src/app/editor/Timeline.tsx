@@ -1457,7 +1457,11 @@ export function Timeline({
                       setMenuTrackId(null);
                     }}
                   >
-                    刪除這條軌道（含裡面的物件）
+                    {menuTrack.groupRole === 'cell'
+                      ? '清空這一格'
+                      : menuTrack.groupRole === 'frame'
+                        ? '刪除整個版型'
+                        : '刪除這條軌道（含裡面的物件）'}
                   </button>
                 )}
               </>

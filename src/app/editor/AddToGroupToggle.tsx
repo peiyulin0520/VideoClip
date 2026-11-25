@@ -1,61 +1,42 @@
-import { Group } from 'lucide-react';
+import { Group, Ungroup } from 'lucide-react';
 import { ToolButton } from './tabs/shared';
+import { attachToGroup, detachFromGroup, groupToJoin } from '../../store/actions';
 import { useProjectStore } from '../../store/projectStore';
-import { useUI } from '../../store/uiStore';
+import { toast } from '../../store/uiStore';
 import { findItem } from '../../engine/timeline';
-import { frameOfGroup } from '../../engine/layoutTracks';
+import { isFrameItem } from '../../engine/layoutTracks';
 
 /**
- * 選到版型（或版型裡的東西）時，文字、素材（貼圖）、音訊分頁最上面的一列：新增的東西要不要加進這個版型。
- * 預設加進去（時間只能在版型範圍內、跟著整個版型動）；關掉＝照一般素材加在專案裡。
- * 用淡底的區塊跟下面的新增按鈕分開（不同層級的設定）。
+ * 文字、音訊工具列的〔加進版型〕：作用在目前選到的文字（音樂／音效）。
+ * 還不在版型裡：按了就加進這一段時間有的版型（跟著版型動、時間夾在版型範圍內）；已經在版型裡（按鈕亮著）：按了移出版型。
+ * 專案裡沒有版型時不顯示。
  */
-export function AddToGroupToggle({ what }: { what: string }) {
+export function GroupToggleButton({ testId }: { testId: string }) {
   const project = useProjectStore((s) => s.project);
   const selectedId = useProjectStore((s) => s.selectedId);
-  const off = useUI((s) => s.addToGroupOff);
-  const f = project && selectedId ? findItem(project, selectedId) : null;
-  const g = f?.item.group;
-  const frame = project && g ? frameOfGroup(project.tracks, g) : null;
-  if (!g || !frame) return null;
-  const on = !off;
-  return (
-    <div className="zone-soft" data-testid="add-to-group">
-      <button
-        role="switch"
-        aria-checked={on}
-        aria-label={`${what}加到版型「${frame.item.label ?? '版型'}」裡`}
-        className={`btn${on ? ' primary' : ''}`}
-        onClick={() => useUI.setState({ addToGroupOff: on })}
-      >
-        {on ? '✓ ' : ''}
-        {what}加到版型「{frame.item.label ?? '版型'}」裡
-      </button>
-    </div>
-  );
-}
-
-/**
- * 工具列上的〔加進版型〕開關：選到版型（或版型裡的東西）時才出現，跟〔新增〕放在一起——
- * 新增的文字、音樂要不要加進這個版型。開著＝強調色。
- */
-export function GroupToggleButton({ what }: { what: string }) {
-  const project = useProjectStore((s) => s.project);
-  const selectedId = useProjectStore((s) => s.selectedId);
-  const off = useUI((s) => s.addToGroupOff);
-  const f = project && selectedId ? findItem(project, selectedId) : null;
-  const g = f?.item.group;
-  const frame = project && g ? frameOfGroup(project.tracks, g) : null;
-  if (!g || !frame) return null;
-  const on = !off;
+  if (!project || !project.tracks.some((t) => t.items.some(isFrameItem))) return null;
+  const f = selectedId ? findItem(project, selectedId) : null;
+  const item = f && (f.item.type === 'text' || f.item.type === 'audio') ? f.item : null;
+  const inGroup = !!item && !!item.group && f!.track.groupRole === 'member';
+  const target = item ? groupToJoin(project, item) : null;
+  const dim = !item || (!inGroup && !target);
   return (
     <ToolButton
-      icon={Group}
-      label="加進版型"
-      ariaLabel={`${what}加到版型「${frame.item.label ?? '版型'}」裡`}
-      fill={on}
-      active={on}
-      onClick={() => useUI.setState({ addToGroupOff: on })}
+      icon={inGroup ? Ungroup : Group}
+      label={inGroup ? '移出版型' : '加進版型'}
+      testId={testId}
+      fill={inGroup}
+      active={inGroup}
+      dim={dim}
+      onClick={() => {
+        if (!item) return toast('先點一段文字或音樂');
+        if (inGroup) {
+          if (detachFromGroup(item.id)) toast('已移出版型');
+          return;
+        }
+        if (!target) return toast('這段的時間沒有版型');
+        if (attachToGroup(item.id, target)) toast('已加進版型');
+      }}
     />
   );
 }

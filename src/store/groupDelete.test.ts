@@ -42,13 +42,36 @@ describe('刪除版型：不能留下孤兒格子', () => {
     removeAnyItem(frameId());
     expect(groupLeft()).toBe(0);
   });
-  it('刪外框的軌道（軌道選單）＝整個版型拿掉；刪格子的軌道也一樣', () => {
+  it('刪外框的軌道（軌道選單「刪除整個版型」）＝整個版型拿掉', () => {
     removeTrack(frameTrack().id);
     expect(groupLeft()).toBe(0);
-    mk();
+  });
+  it('格子的軌道（軌道選單「清空這一格」）＝只清空那一格：軌道和版型都還在', () => {
     const cellTrack = s().project!.tracks.find((t) => t.groupRole === 'cell')!;
     removeTrack(cellTrack.id);
-    expect(groupLeft()).toBe(0);
+    const after = s().project!.tracks.find((t) => t.id === cellTrack.id)!;
+    expect(after.items).toHaveLength(0);
+    expect(groupLeft()).toBe(2); // 外框＋另一格
+    expect(s().project!.tracks.filter((t) => t.groupRole === 'cell')).toHaveLength(2);
+  });
+  it('版型的成員軌（版型裡的文字）＝只刪那一條，版型還在', () => {
+    const frame = s()
+      .project!.tracks.flatMap((t) => t.items)
+      .find((x) => x.type !== 'text' && x.type !== 'audio' && !!x.group && !x.cell)!;
+    const group = (frame as VideoItem).group!;
+    s().apply((d) => {
+      d.tracks.push({
+        id: 'tm',
+        kind: 'text',
+        name: '文字 1',
+        group,
+        groupRole: 'member',
+        items: [{ id: 'tx', type: 'text', start: 0, duration: 2, group } as never],
+      } as never);
+    });
+    removeTrack('tm');
+    expect(s().project!.tracks.some((t) => t.id === 'tm')).toBe(false);
+    expect(groupLeft()).toBe(3); // 外框＋兩格都還在
   });
   it('刪單一格子：只有那一格沒了，版型還在（那一格之後顯示色塊）', () => {
     const cell = s().project!.tracks.find((t) => t.groupRole === 'cell')!.items[0]!;

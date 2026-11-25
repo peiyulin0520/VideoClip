@@ -125,6 +125,7 @@ export const FX_SP: KineticDef[] = [
     poster: 1,
     area: 'wide',
     sub: '同主標',
+    subLabel: '外圈文字',
     len: () => null,
     draw(s, t) {
       const { g, W, H } = s;
@@ -212,6 +213,8 @@ export const FX_SP: KineticDef[] = [
     words: ['拼起來', '找到了'],
     poster: 1.6,
     len: (w) => 3.2 * w.length,
+    // 每個字依序飛回來（第 j 個 0.75 + j×0.06 秒到位），在 2.5 秒開始炸開以前
+    hold: (w) => 3.2 * (w.length - 1) + 1.0 + (cs(w[w.length - 1]!).length - 1) * 0.06,
     draw(s, t) {
       const { W, H, cqw, cqh } = s;
       const D = 3.2;
@@ -320,6 +323,8 @@ export const FX_SP: KineticDef[] = [
     words: ['導演版', '未公開', '獨家'],
     poster: 1.4,
     len: (w) => 2.8 * w.length,
+    // 字露出來、色塊還沒回來帶走（0.76–2.0 秒之間）
+    hold: (w) => 2.8 * (w.length - 1) + 1.4,
     draw(s, t) {
       const { g, W, H } = s;
       const D = 2.8;

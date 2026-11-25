@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CardBox, Stroke, TextItem } from '../../model/types';
-import { applyTextStyleToAll, editText, removeAnyItem } from '../../store/actions';
+import { applyTextStyleToAll, editText, patchKinetic, removeAnyItem } from '../../store/actions';
+import { kineticById } from '../../engine/kinetic';
 import { toast } from '../../store/uiStore';
 import { useProjectStore } from '../../store/projectStore';
 import { SHAPE_LINE } from '../../model/defaults';
@@ -54,6 +55,7 @@ export function TextPanel({
   const card = item.card;
   const run = card.runs[0]!;
   const id = item.id;
+  const subDef = item.kinetic ? kineticById(item.kinetic.id) : undefined;
   const box = card.box;
   const edit = (recipe: Parameters<typeof editText>[1], key?: string) =>
     editText(id, recipe, key ? { coalesce: `${key}:${id}` } : undefined);
@@ -92,6 +94,18 @@ export function TextPanel({
             value={run.text}
             onChange={(e) => edit((c) => void (c.runs[0]!.text = e.target.value), 'txt')}
           />
+          {subDef?.sub && (
+            // 這一式的第二個字（巨字橫移的底部小字、環繞的外圈文字、標題輪替的標籤）：跟主文字一起在〔內容〕輸入
+            <input
+              className="text-input"
+              data-testid="kn-sub-input"
+              aria-label={subDef.subLabel ?? '副標'}
+              maxLength={40}
+              placeholder={`${subDef.subLabel ?? '副標'}（${subDef.sub}）`}
+              value={item.kinetic?.sub ?? ''}
+              onChange={(e) => patchKinetic(id, { sub: e.target.value || undefined })}
+            />
+          )}
           <div className="font-row-wrap">
             <FontSelect
               value={run.fontId}

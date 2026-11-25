@@ -58,7 +58,7 @@ test('Y6 這一格視窗：選哪一段就換哪一段的素材（標題「換�
   test.setTimeout(150_000);
   await twoCells(page);
   await openTool(page, 'layout.cells');
-  await page.getByTestId('ld-cell').first().tap();
+  await page.getByTestId('cc-open').first().tap();
   await page.getByRole('button', { name: '＋ 加素材' }).tap();
   await page.getByTestId('cell-add-file').setInputFiles(fixture('solid-green.webm'));
   await expect.poll(async () => (await cells(page))[0]!.items.length, { timeout: 30_000 }).toBe(2);
@@ -80,7 +80,7 @@ test('Y6 各格各影像單獨調色：選到第 2 格調成黑白，第 1 格�
   await twoCells(page);
   const [c1, c2] = (await cells(page)).map((t) => t.items[0]!);
   await openTool(page, 'layout.cells');
-  await page.getByTestId('ld-cell').nth(1).tap();
+  await page.getByTestId('cc-open').nth(1).tap();
   await page.getByRole('button', { name: '關閉', exact: true }).last().tap();
   expect(await selectedItemId(page)).toBe(c2!.id);
   await openTab(page, '色調');

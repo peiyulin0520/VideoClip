@@ -139,7 +139,7 @@ test('L7 版型格式：有「左右雙格」「上下雙格」和「自訂格�
   await page.getByRole('button', { name: '這個版型的欄數 加 1' }).tap();
   await expect.poll(async () => (await cellsOf()).length).toBe(9);
   await openTool(page, 'layout.cells');
-  await page.getByTestId('ld-cell').nth(8).tap();
+  await page.getByTestId('cc-open').nth(8).tap();
   await page.getByTestId('cell-assets').getByRole('button').first().tap();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
   await openTool(page, 'layout.size');
@@ -216,8 +216,9 @@ test('L7 格子框線粗細：滑桿 0%＝格子貼在一起、300%＝框線變�
   await openTab(page, '版型');
   const gap = async () => {
     const cs = (await tracks(page)).filter((t) => t.groupRole === 'cell');
-    const a = cs[0]!.items[0]!.cell!;
-    const b = cs[1]!.items[0]!.cell!;
+    const a = cs[0]?.items[0]?.cell;
+    const b = cs[1]?.items[0]?.cell;
+    if (!a || !b) return Number.NaN; // 外框重畫、格子換位置的那一瞬間還沒有資料：下一輪再量
     return b.x - (a.x + a.w);
   };
   const g1 = await gap();
@@ -241,6 +242,36 @@ test('L7 格子框線粗細：滑桿 0%＝格子貼在一起、300%＝框線變�
   await undo(page);
   await undo(page);
   await expect.poll(gap, { timeout: 5000 }).toBeCloseTo(g1, 3);
+});
+
+test('Z2 分隔線粗細：單獨調格子之間的線，外框邊距不動；調整體粗細時兩者一起變；一步復原', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await createProjectWith(page, ['solid-blue.webm']);
+  await openTab(page, '版型');
+  await page.getByRole('button', { name: '版型 上下雙格', exact: true }).tap();
+  await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]);
+  await selectFrame(page);
+  await openTab(page, '版型');
+  const geo = async () => {
+    const cs = (await tracks(page)).filter((t) => t.groupRole === 'cell');
+    const a = cs[0]!.items[0]!.cell!;
+    const b = cs[1]!.items[0]!.cell!;
+    return { gap: b.y - (a.y + a.h), margin: a.y };
+  };
+  const g0 = await geo();
+  await openTool(page, 'layout.frame');
+  await expect(page.getByLabel('分隔線粗細')).toHaveValue('100');
+  await page.getByLabel('分隔線粗細').fill('300');
+  await expect.poll(async () => (await geo()).gap, { timeout: 15_000 }).toBeGreaterThan(g0.gap * 2.5);
+  expect((await geo()).margin).toBeCloseTo(g0.margin, 3); // 外框邊距沒動
+  // 整體粗細拉到 200%：邊距 2 倍、分隔線也回到跟整體一樣（2 倍）
+  await page.getByLabel('格子框線粗細').fill('200');
+  await expect.poll(async () => (await geo()).margin, { timeout: 15_000 }).toBeGreaterThan(g0.margin * 1.8);
+  expect((await geo()).gap).toBeCloseTo(g0.gap * 2, 3);
+  await undo(page);
+  await expect.poll(async () => (await geo()).gap, { timeout: 5000 }).toBeGreaterThan(g0.gap * 2.5);
 });
 
 test('L7 拍立得（只有一格）也有框線粗細滑桿：白邊跟著變粗細', async ({ page }) => {
