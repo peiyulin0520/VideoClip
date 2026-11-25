@@ -6,7 +6,9 @@ import { closePanel, createProjectWith, pressPlay, samplePreview, seekTo, waitHo
 type Hook = {
   setSeam: (d: number, b?: number, a?: number) => void;
   time: () => number;
-  stats: () => { transition: { hardSeeks: number } };
+  stats: () => { transition: { hardSeeks: number; waitMs: number; cached: number } };
+  framesState: () => { ready: number; total: number };
+  setPredecode: (on: boolean) => void;
 };
 const CASES: [string, number, number | undefined, number | undefined][] = [
   ['各一半 1 秒', 1, undefined, undefined],
@@ -71,3 +73,75 @@ for (const [name, d, before, after] of CASES)
     }
     expect(bad, '轉場中後一段（綠）要有畫面').toEqual([]);
   });
+
+// feedback-16 Z18／Z19：轉場用預先解好的畫面（做法一）；沒解好才「等一下再轉」（做法二，最多 0.3 秒），不用縮圖。
+const hook = <T>(page: import('@playwright/test').Page, f: (h: Hook) => T) =>
+  page.evaluate(
+    (src) =>
+      new Function('h', `return (${src})(h)`)((window as unknown as { __videoclip: Hook }).__videoclip),
+    f.toString(),
+  );
+
+test('Z18 專案打開後背景把轉場畫面解好，播放經過轉場用預先解好的畫面、不用等', async ({ page }) => {
+  test.setTimeout(120_000);
+  await createProjectWith(page, ['solid-red.webm', 'solid-green.webm']);
+  await waitHook(page);
+  await hook(page, (h) => h.setSeam(1));
+  await closePanel(page);
+  await expect
+    .poll(() => hook(page, (h) => h.framesState().ready), { timeout: 30_000 })
+    .toBeGreaterThanOrEqual(2);
+  await seekTo(page, 2.5);
+  await page.waitForTimeout(400);
+  await pressPlay(page);
+  await page.waitForTimeout(2800);
+  const t = await hook(page, (h) => h.stats().transition);
+  expect(t.cached, '轉場期間用了預先解好的畫面').toBeGreaterThan(5);
+  expect(t.waitMs, '沒有「等一下」').toBe(0);
+});
+
+test('Z19 預先解碼沒準備好：等一下再轉（最多 0.3 秒），轉場照樣做完、不黑', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    const w = window as unknown as { __notReadyFrom: number; __notReadyUntil: number };
+    w.__notReadyFrom = 0;
+    w.__notReadyUntil = 0;
+    const desc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'readyState')!;
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      get() {
+        const n = performance.now();
+        return n >= w.__notReadyFrom && n < w.__notReadyUntil ? 1 : desc.get!.call(this);
+      },
+    });
+  });
+  await createProjectWith(page, ['solid-red.webm', 'solid-green.webm']);
+  await waitHook(page);
+  await hook(page, (h) => h.setSeam(1));
+  await hook(page, (h) => h.setPredecode(false));
+  await closePanel(page);
+  await seekTo(page, 2.5);
+  await page.waitForTimeout(600);
+  await page.evaluate(() => {
+    const w = window as unknown as { __notReadyFrom: number; __notReadyUntil: number };
+    w.__notReadyFrom = performance.now() + 700;
+    w.__notReadyUntil = w.__notReadyFrom + 1e9; // 等到「等一下」累積到 150 ms 才放行（下面的迴圈）
+  });
+  await pressPlay(page);
+  const bad: string[] = [];
+  const t0 = Date.now();
+  let last = 0;
+  while (Date.now() - t0 < 4200) {
+    const [c, time] = await Promise.all([samplePreview(page, 0.5, 0.5), hook(page, (h) => h.time())]);
+    last = time;
+    if ((await hook(page, (h) => h.stats().transition.waitMs)) >= 150)
+      await page.evaluate(() => ((window as unknown as { __notReadyUntil: number }).__notReadyUntil = 0));
+    const p = time - 3.5;
+    if (c && p > 0.4 && p < 0.9 && c[1] < 255 * p * 0.5) bad.push(`${time.toFixed(2)} ${JSON.stringify(c)}`);
+    await page.waitForTimeout(50);
+  }
+  const t = await hook(page, (h) => h.stats().transition);
+  expect(bad, '轉場中後一段（綠）要有畫面').toEqual([]);
+  expect(t.waitMs, '有等，但不超過 0.3 秒').toBeGreaterThan(0);
+  expect(t.waitMs).toBeLessThanOrEqual(320);
+  expect(last, '轉場做完、繼續播').toBeGreaterThan(4.2);
+});

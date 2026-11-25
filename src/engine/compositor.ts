@@ -356,7 +356,12 @@ export class Compositor {
     } else {
       const fw = Math.max(Math.round(layer.frameW ?? layer.box.w), 2);
       const fh = Math.max(Math.round(layer.frameH ?? layer.box.h), 2);
-      if (!o.frameCanvas || o.frameCanvas.width !== fw || o.frameCanvas.height !== fh) {
+      if (
+        !o.frameCanvas ||
+        o.frameCanvas.width !== fw ||
+        o.frameCanvas.height !== fh ||
+        o.textureSource?.resource !== o.frameCanvas // 之前換成影片貼圖了（轉場預先解好的畫面 ⇄ 影片）：換回來
+      ) {
         const c = o.frameCanvas ?? document.createElement('canvas');
         c.width = fw;
         c.height = fh;

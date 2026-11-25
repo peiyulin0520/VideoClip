@@ -211,6 +211,11 @@ export function installDebugHook(player: Player) {
       setTransition(b.id, 'dissolve', duration);
       if (before !== undefined && after !== undefined) setTransitionSplit(b.id, before, after);
     },
+    /** 測試用：轉場預先解碼的狀態，與開關（關掉＝一定走「等一下再轉」） */
+    framesState: () => player.framesState(),
+    setPredecode: (on: boolean) => {
+      player.predecode = on;
+    },
     kineticList: () => KINETIC.map((f) => ({ id: f.id, zh: f.zh, group: f.group, poster: f.poster })),
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,
