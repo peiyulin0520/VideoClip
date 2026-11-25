@@ -6,9 +6,9 @@
 - **日期**：2026-11-24
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
-- **測試**：1155 個單元測試、約 351 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
+- **測試**：1177 個單元測試、約 356 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #21（feedback-15）已合併。**接著照 `docs/plans/2026-11-25-feedback-16.md` 做（Sonnet）**：Z14 播放中影片畫面一定更新 → Z15 功能列下面不留一大塊 → Z16 轉場時不空白（一套前後分配規則、B 提前起跑、轉場中不硬跳 B、縮圖頂）→ Z17 提早 2 秒準備 → 轉場位置三個選項（置中／接縫前／接縫後＋自訂）＋新增「停格轉場」（時間插在兩段中間）
+- **下一步**：PR #21（feedback-15）已合併。feedback-16 的**轉場部分（Z16／Z17＋轉場位置＋停格轉場）已做完**，剩 Z14 播放中影片畫面一定更新（修 0.3–0.4 秒凍住）、Z15 功能列下面不留一大塊（加到主畫面），照 `docs/plans/2026-11-25-feedback-16.md`；等使用者在 iPhone 看轉場（`docs/PLAN.md §7`）
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 feedback-16 轉場部分（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：①後一段晚到不空白：播放中還沒出現過畫面（`everReady`）又沒準備好的影片用縮圖頂；②播放器預載、暖機和畫面、匯出用同一個函式算前後分配（`earlyOf`／`transitionSpan`，不再自己 `before ?? duration/2`）；③後一段的保護期（從暖機到轉場結束後 1 秒，`HARD_DRIFT_PROTECT` 1.5 秒）不輕易硬 seek；④暖機提早（預載 2.5 秒、暖機 1.2 秒）；效能框「最近轉場」多顯示最近一次硬跳是前段／後段、目標與實際秒數；⑤轉場位置〔置中／接縫前／接縫後／自訂〕；⑥**停格轉場**（`transitionIn.mode:'hold'`）：後一段 `start` 往後挪一個轉場長度，中間空白做轉場（`activeTransition` 在空白裡畫前一段最後一格＋後一段第一格，靜音）；`setTransitionMode`、`setTransition`（改長度、換種類、取消都會挪後面的片段）、`setTransitionAll`；時間軸圓圈在空白中間、空白不顯示「補齊」箭頭
+  - **沒做的**：規劃的「B 提前起跑（Z16b）」——預覽會比匯出早播後一段、而且 iPhone 不微調速度會一直差一截，改成只靠縮圖頂、保護期、更早暖機；版型格子軌的停格轉場（`setTransitionMode` 會提示「版型的格子裡先只有邊轉邊播」）
+  - 動了哪些檔：`src/engine/{player,videoSync,transitions,debug}.ts`、`src/model/types.ts`、`src/store/actions.ts`、`src/app/editor/{Timeline,PerfOverlay}.tsx`、`src/app/editor/tabs/EffectTab.tsx`、單元測試 `videoSync`／`transitionSync`／`holdTransition`（engine、store）、e2e `z16-transition`（模擬後一段晚到：readyState 暫時回 1）、`z17-hold-transition`
+  - 驗證：✅ `npm run check`（1177 單元測試）；✅ 完整 e2e 353 過／3 跳過＋3 個取樣預覽顏色的測試在 4 個 worker 同時跑時偶爾逾時（單獨跑都過）；🟡 沙盒重現不了 iPhone 的解碼延遲，用 readyState 模擬；`z16` 在拿掉縮圖頂著的修正時會失敗（已確認）
+  - 下一步：Z14、Z15
 - 2026-11-25 規劃 feedback-16（Opus，claude/zen-tesla-v3brj5）
   - 做了什麼：使用者錄影逐格比對：效能框 60 fps、合成 2.5 ms，但預覽有好幾段 0.3–0.4 秒畫面完全不動 → 畫布有畫、影片畫面沒上傳；判斷是 Safari 對看不到的 `<video>`（`.pool` 1px、透明）`requestVideoFrameCallback` 不規律，上傳靠它計數。轉場空白在沙盒重現不出來（主軌、版型同一格的影片／照片／動圖疊化都正常），判斷是 iPhone 上 B 影片晚到、新圖層沒有上一格可留 → 不畫。寫成 Z14–Z17
   - 動了哪些檔：`docs/plans/2026-11-25-feedback-16.md`（新）、`docs/PROGRESS.md`
