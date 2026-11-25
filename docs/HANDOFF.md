@@ -273,5 +273,6 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **播放時的保護**：`player.ts` 的 `everReady`（沒出現過畫面又沒準備好就用縮圖）、`HARD_DRIFT_PROTECT`、`transitionSpan` 算保護期；效能框 `lastSeek`。測試用 `__videoclip.setSeam(duration, before?, after?)`。
 - **Z18／Z19 預先解碼**：`TransitionFrames`（`transitionFrames.ts`）管背景解碼與快取：`transitionNeeds(project, side)` 算要解什麼（快取鍵含素材、秒數範圍、解析度、是否 proxy，變了就作廢）；`Player.updateFrames` 在每次 `render` 呼叫 `update`。播放時 provider 先找 `frames.frameAt(asset, 素材秒數)`；沒有再用 `<video>`；`<video>` 也沒準備好就設 `stallWanted`，`tick()` 把時間暫停（`wallStart` 往後挪、`stalled` 讓影片音樂不播），一次轉場累計最多 `STALL_S`＝0.3 秒。測試開關：`__videoclip.setPredecode(false)`、`framesState()`。
 - **Z14**：`videoUpload.ts` `shouldUpload`（單元測試好測）；`Compositor.frozen`。**Z15**：`--bar-pad`。
+- **Z20／Z21**：格子軌轉場的虛擬 A／B 也要過 `guardCell`（`scene.ts`）；測試用 `__videoclip.nudgeItem(id, dx)` 把素材位置挪偏（不進復原）。`setGroupStart` 跟 `setGroupDuration` 是一對（改版型開始／長度）；版型的時間 UI＝播放軸兩端把手＋〔時間〕。
 - **模擬 iPhone 晚到**：e2e 把 `HTMLMediaElement.prototype.readyState` 在一段時間內回 1（`z16-transition.spec.ts`）。
 
