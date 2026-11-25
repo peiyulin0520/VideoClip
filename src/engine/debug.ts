@@ -13,6 +13,8 @@ import { paintKinetic } from './kinetic/render';
 import { holdTime } from './kinetic/hold';
 import { splitWords } from './kinetic/core';
 import type { Player } from './player';
+import { setTransform } from '../store/actions';
+import { isFrameItem } from './layoutTracks';
 
 let editorRenders = 0;
 /** 編輯器本體每重畫一次就加 1（測試用：播放時不該每一格都重畫） */
@@ -194,6 +196,12 @@ export function installDebugHook(player: Player) {
         }
         return { id: def.id, hold, total, lastDiff, perChar, inkAtHold: ink(draw(words, hold)), maxInk };
       }),
+    /** 測試用：把畫面上第一個版型整個轉 deg 度（效能量測：傾斜的版型最慢） */
+    rotateFrame: (deg: number) => {
+      const p = useProjectStore.getState().project;
+      const fr = p?.tracks.flatMap((t) => t.items).find(isFrameItem);
+      if (fr) setTransform(fr.id, { rotation: deg });
+    },
     kineticList: () => KINETIC.map((f) => ({ id: f.id, zh: f.zh, group: f.group, poster: f.poster })),
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,

@@ -149,6 +149,14 @@ export class Compositor {
     return new Compositor(app, opts.width, opts.height, opts.offsetX ?? 0, opts.offsetY ?? 0);
   }
 
+  /** 效能框用：true 時每格畫完多等一次 GPU（gl.finish），才量得出 GPU 真正花的時間（會稍微拖慢，只在顯示播放效能時開） */
+  measureGpu = false;
+  /** 最近一格合成各段花的毫秒：準備圖層（含建遮罩、換貼圖）、送出繪製（含影片貼圖上傳）、等 GPU 畫完 */
+  seg = { prep: 0, draw: 0, gpu: 0 };
+  /** 播放中因為沒有變化而跳過的格數、真的畫了的格數（效能框、測試用） */
+  skipped = 0;
+  renders = 0;
+
   takeUploadMs(): number {
     const v = this.uploadMs;
     this.uploadMs = 0;
@@ -159,11 +167,21 @@ export class Compositor {
     return this.app.canvas as HTMLCanvasElement;
   }
 
-  /** 回傳：這一輪的圖層是不是全部準備好了（影片都 seek 完、圖都載好） */
-  render(layers: SceneLayer[]): boolean {
+  /** 這一格有沒有新的影片畫面上傳（updateVideo 設；render 用它判斷畫面變了沒） */
+  private uploadedNow = false;
+  private lastSig = '';
+
+  /**
+   * 回傳：這一輪的圖層是不是全部準備好了（影片都 seek 完、圖都載好）。
+   * skipIfIdle：播放中螢幕 60 格、影片只有 30 格——這一格如果所有圖層的樣子跟上一格一模一樣、也沒有新的影片畫面，
+   * 就不重畫（畫布留著上一格，preserveDrawingBuffer）。預設（匯出、單格輸出）每次都畫。
+   */
+  render(layers: SceneLayer[], opts?: { skipIfIdle?: boolean }): boolean {
+    this.uploadedNow = false;
     const stage = this.world;
     const seen = new Set<string>();
     let allReady = true;
+    const s0 = performance.now();
 
     layers.forEach((layer, index) => {
       seen.add(layer.id);
@@ -175,15 +193,46 @@ export class Compositor {
     });
 
     // 還沒準備好的新圖層出現時，先留著舊圖層（例如換片時的上一個片段），避免閃黑
+    let destroyedAny = false;
     if (allReady) {
       for (const [id, o] of this.objs) {
         if (!seen.has(id)) {
           this.destroyObj(o);
           this.objs.delete(id);
+          destroyedAny = true;
         }
       }
     }
+    const s1 = performance.now();
+    // 圖層的樣子（位置、大小、透明度、遮罩、文字內容…；不含來源本身）加上有沒有新的影片畫面
+    const sig = layers
+      .map((l) =>
+        JSON.stringify(l, (k, v) =>
+          k === 'source' || k === 'maskBitmap'
+            ? undefined
+            : k === 'mask' && Array.isArray(v)
+              ? `${v.length}|${v[0]}|${v[v.length >> 1]}`
+              : v,
+        ),
+      )
+      .join('\n');
+    const idle = !this.uploadedNow && sig === this.lastSig && !destroyedAny;
+    this.lastSig = sig;
+    if (opts?.skipIfIdle && idle) {
+      this.seg = { prep: s1 - s0, draw: 0, gpu: 0 };
+      this.skipped++;
+      return allReady;
+    }
+    this.renders++;
     this.app.renderer.render({ container: stage });
+    const s2 = performance.now();
+    let gpu = 0;
+    if (this.measureGpu) {
+      const gl = (this.app.renderer as unknown as { gl?: WebGLRenderingContext }).gl;
+      gl?.finish();
+      gpu = performance.now() - s2;
+    }
+    this.seg = { prep: s1 - s0, draw: s2 - s1, gpu };
     return allReady;
   }
 
@@ -281,6 +330,7 @@ export class Compositor {
       try {
         const t0 = performance.now();
         o.textureSource?.update();
+        this.uploadedNow = true;
         this.uploadMs += performance.now() - t0;
         o.hasFrame = true;
         o.uploadKey = uploadKey;
