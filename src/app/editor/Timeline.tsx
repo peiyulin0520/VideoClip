@@ -65,6 +65,7 @@ import {
   moveTracksMulti,
   removeTracksMulti,
   setGroupDuration,
+  setGroupStart,
   shiftTrackInKind,
 } from '../../store/actions';
 import { setTrackItems, useProjectStore } from '../../store/projectStore';
@@ -766,6 +767,12 @@ export function Timeline({
         player?.peek(item.start + Math.max(item.duration + delta, 0.2) - 0.05);
         return;
       }
+      if (isFrameItem(item) && side === 'start') {
+        // 版型左端：改開始的秒數、結尾不動（各格在新開頭前面的部分切掉）
+        setGroupStart(item.group!, item.start + delta, { coalesce: `trim:${item.id}` });
+        player?.peek(Math.max(item.start + delta, 0));
+        return;
+      }
       if (isFrameItem(item)) {
         // 版型：改整組的長度（各格超出的部分切掉）
         setGroupDuration(item.group!, item.duration + delta, { coalesce: `trim:${item.id}` });
@@ -1178,13 +1185,11 @@ export function Timeline({
                       </div>
                       {selected && !dragging && !track.locked && (
                         <>
-                          {!isFrameItem(it) && (
-                            <div
-                              className="handle left"
-                              data-testid="trim-start"
-                              onPointerDown={(e) => startTrim(e, it, track, 'start')}
-                            />
-                          )}
+                          <div
+                            className="handle left"
+                            data-testid="trim-start"
+                            onPointerDown={(e) => startTrim(e, it, track, 'start')}
+                          />
                           <div
                             className="handle right"
                             data-testid="trim-end"

@@ -4,7 +4,8 @@ import { Slider } from '../../../ui/Slider';
 import type { Project, VideoItem } from '../../../model/types';
 import { useUI } from '../../../store/uiStore';
 import { ConfirmSheet } from '../../../ui/Sheet';
-import { arrangeGroup, editItem, setGapMode } from '../../../store/actions';
+import { arrangeGroup, editItem, setGapMode, setGroupDuration, setGroupStart } from '../../../store/actions';
+import { Num } from '../EffectTimingSheet';
 import { FrameStyleControls } from '../FrameStyleControls';
 import { reshapeLayout, restyleFrame } from '../frameRestyle';
 import { useProjectStore } from '../../../store/projectStore';
@@ -320,7 +321,36 @@ function ShapeControls({ project, group, frame }: { project: Project; group: str
   );
 }
 
-export type LayoutPart = 'add' | 'frame' | 'size' | 'cells' | 'play';
+/** 版型的時間：開始、長度（結尾 = 開始 + 長度）。每次改都是一步（可復原）；也可以在播放軸拖版型的左右兩端 */
+function TimeControls({ frame }: { frame: VideoItem }) {
+  const group = frame.group!;
+  const end = frame.start + frame.duration;
+  return (
+    <div className="zone-soft" data-testid="layout-time">
+      <div className="et-fields">
+        <Num
+          label="開始（秒）"
+          value={frame.start}
+          min={0}
+          max={Math.max(end - 0.5, 0)}
+          onChange={(v) => setGroupStart(group, v)}
+        />
+        <Num
+          label="長度（秒）"
+          value={frame.duration}
+          min={0.5}
+          max={600}
+          onChange={(v) => setGroupDuration(group, v)}
+        />
+      </div>
+      <p className="hint" data-testid="layout-time-end">
+        結尾 {end.toFixed(2)} 秒。改開始時結尾不動；開始往後挪會切掉前面的素材，往前挪則多出空檔。
+      </p>
+    </div>
+  );
+}
+
+export type LayoutPart = 'add' | 'frame' | 'size' | 'cells' | 'play' | 'time';
 
 /** 版型工具列每一項的視窗：〔版型〕挑版型加進專案；〔外框〕〔大小〕〔各格〕〔播放方式〕調選到的版型 */
 export function LayoutTab({ found, part }: { found: Found; part: LayoutPart }) {
@@ -343,6 +373,7 @@ export function LayoutTab({ found, part }: { found: Found; part: LayoutPart }) {
     <div className="panel group-panel" data-testid="group-panel">
       {part === 'cells' && <CellsBlock project={project} group={group} />}
       {part === 'play' && <PlayControls frame={frame} />}
+      {part === 'time' && <TimeControls frame={frame} />}
       {part === 'frame' && <FrameBlock project={project} group={group} frame={frame} />}
       {part === 'size' && frame.frameStyle && <ShapeControls project={project} group={group} frame={frame} />}
     </div>

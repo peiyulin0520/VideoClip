@@ -1186,6 +1186,50 @@ export function setGroupDuration(group: string, duration: number, opts?: Opts) {
   }, opts);
 }
 
+/**
+ * 版型的開始時間（結尾不動，長度跟著變）：拖版型左端、〔時間〕視窗用。
+ * 往右（變短）：各格、文字、貼圖、音效在新開頭之前的部分切掉（影片的入點 trimIn 跟著往後，整段都在前面的拿掉）；
+ * 往左（變長）：各素材不動，開頭多出來的時間照版型的「空檔」設定顯示。最短 0.5 秒、不能小於 0 秒。一步復原。
+ */
+export function setGroupStart(group: string, start: number, opts?: Opts) {
+  const p = store().project;
+  const frame = p && groupFrame(p, group);
+  if (!p || !frame) return;
+  const end = frame.item.start + frame.item.duration;
+  const ns = Math.min(Math.max(start, 0), end - 0.5);
+  if (Math.abs(ns - frame.item.start) < 1e-9) return;
+  store().apply((d) => {
+    for (const track of d.tracks) {
+      const keep: Item[] = [];
+      for (const it of track.items) {
+        if (it.group !== group) {
+          keep.push(it as Item);
+          continue;
+        }
+        if (it.id === frame.item.id) {
+          it.start = ns;
+          it.duration = end - ns;
+          keep.push(it as Item);
+          continue;
+        }
+        if (it.start >= ns - 1e-9) {
+          keep.push(it as Item);
+          continue;
+        }
+        const itEnd = it.start + it.duration;
+        if (itEnd <= ns + 0.05) continue; // 整段都在新開頭之前：拿掉
+        const cut = ns - it.start;
+        it.start = ns;
+        it.duration = itEnd - ns;
+        if ('trimIn' in it && typeof it.trimIn === 'number') it.trimIn += cut * (it.speed ?? 1);
+        if ('transitionIn' in it) delete (it as { transitionIn?: unknown }).transitionIn; // 開頭被切掉，不再接在前一段後面
+        keep.push(it as Item);
+      }
+      track.items = keep as never;
+    }
+  }, opts);
+}
+
 /** 刪掉整個版型（同一個 group 的外框與所有格子），空掉的軌道一起拿掉；一步復原 */
 export function removeGroup(group: string) {
   store().apply(
