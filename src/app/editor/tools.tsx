@@ -413,7 +413,7 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
       icon: Type,
       zone: 'add',
       kind: 'toggle',
-      custom: () => <GroupToggleButton what="新增的文字" />,
+      custom: () => <GroupToggleButton testId="tool-text.togroup" />,
     },
     {
       id: 'text.content',
@@ -755,7 +755,7 @@ export const TOOLS: Record<CatId, ToolDef[]> = {
       icon: Music,
       zone: 'add',
       kind: 'toggle',
-      custom: () => <GroupToggleButton what="新增的音樂／音效" />,
+      custom: () => <GroupToggleButton testId="tool-audio.togroup" />,
     },
     {
       id: 'audio.split',
