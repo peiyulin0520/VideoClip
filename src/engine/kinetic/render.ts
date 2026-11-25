@@ -2,7 +2,7 @@
 import { cssFamily, requestFont } from '../../fonts/fontStore';
 import type { TextItem } from '../../model/types';
 import { canvasFamily } from '../textRender';
-import { fadeEdges, inkOn, seg, splitWords, type KineticDef, type Stage } from './core';
+import { drawWord, fadeEdges, fit, inkOn, seg, splitWords, wlen, type KineticDef, type Stage } from './core';
 import { kineticContent, kineticFrame } from './hit';
 import { holdTime } from './hold';
 import { kineticById, resolveBg, schemeOf } from './index';
@@ -109,6 +109,31 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
 /** 邊緣淡出寬度的預設值（佔框的比例） */
 export const DEFAULT_FADE_W = 0.25;
 
+const scratches = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+/** 畫流動內容用的暫存畫布（跟 canvas 一樣大，每張主畫布一張） */
+function scratchOf(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  let sc = scratches.get(canvas);
+  if (!sc) {
+    sc = document.createElement('canvas');
+    scratches.set(canvas, sc);
+  }
+  if (sc.width !== canvas.width || sc.height !== canvas.height) {
+    sc.width = canvas.width;
+    sc.height = canvas.height;
+  }
+  return sc;
+}
+
+/** 停下來時整句完整的字：每個詞一行、置中、一樣大（字太多就縮小） */
+function drawRest(s: Stage, alpha: number) {
+  const rows = s.words.slice(0, 8);
+  const widest = rows.reduce((a, w) => (wlen(w) > wlen(a) ? w : a), rows[0] ?? '');
+  const px = Math.min(fit(s, widest, 34, 84), ((78 / rows.length) * s.cqh) / 1.25);
+  rows.forEach((w, i) =>
+    drawWord(s, w, s.W / 2, s.H / 2 + (i - (rows.length - 1) / 2) * px * 1.25, px, { alpha }),
+  );
+}
+
 /** 把某一式在 t 秒畫到 canvas 上（整張清掉重畫；單位＝這張畫布的大小）。卡片縮圖、字卡的框共用 */
 export function paintKinetic(
   canvas: HTMLCanvasElement,
@@ -133,8 +158,38 @@ export function paintKinetic(
     g.fillStyle = p.bg;
     g.fillRect(0, 0, W, H);
   }
-  g.save();
-  def.draw({ g, W, H, cqmin: Math.min(W, H) / 100, cqw: W / 100, cqh: H / 100, ...p }, t);
-  g.restore();
+  const stage = (c: CanvasRenderingContext2D): Stage => ({
+    g: c,
+    W,
+    H,
+    cqmin: Math.min(W, H) / 100,
+    cqw: W / 100,
+    cqh: H / 100,
+    ...p,
+  });
+  const rest = p.settle ?? 0;
+  if (rest > 0 && def.calm !== false && def.len(p.words) === null) {
+    // 一直流動的式子停在最後畫面：流動的內容淡掉、整句完整的字淡入（靜止）
+    const sc = scratchOf(canvas);
+    const sg = sc.getContext('2d')!;
+    sg.setTransform(1, 0, 0, 1, 0, 0);
+    sg.clearRect(0, 0, W, H);
+    sg.globalAlpha = 1;
+    sg.save();
+    def.draw(stage(sg), t);
+    sg.restore();
+    g.save();
+    g.globalAlpha = 1 - rest;
+    g.drawImage(sc, 0, 0);
+    g.globalAlpha = 1;
+    g.restore();
+    g.save();
+    drawRest(stage(g), rest);
+    g.restore();
+  } else {
+    g.save();
+    def.draw(stage(g), t);
+    g.restore();
+  }
   fadeEdges(g, W, H, fade, fadeW);
 }

@@ -117,6 +117,7 @@ export const FX_SP: KineticDef[] = [
   },
   {
     id: 'orbit',
+    calm: false,
     group: 'sp',
     zh: '環繞',
     en: 'Orbit ring',

@@ -73,6 +73,11 @@ export type KineticDef = {
   fade?: KineticFade;
   /** 框是整個畫面時，點選、選取框用的範圍（比例 x、y、w、h）；沒給＝中間一條 */
   hit?: [number, number, number, number];
+  /**
+   * 一直流動、沒有「一輪」的式子（len 回傳 null）在〔停在最後畫面〕時：流動的內容淡掉，整句完整的字淡入、靜止停著。
+   * false＝這一式本來就是整句都看得到的（環繞、歌詞捲動），不用這樣處理。
+   */
+  calm?: false;
   draw: (s: Stage, t: number) => void;
 };
 

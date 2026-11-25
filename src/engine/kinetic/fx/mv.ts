@@ -169,6 +169,7 @@ export const FX_MV: KineticDef[] = [
   },
   {
     id: 'lyrics',
+    calm: false,
     group: 'mv',
     zh: '歌詞捲動',
     en: 'Lyric scroll',

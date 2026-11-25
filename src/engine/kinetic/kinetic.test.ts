@@ -251,6 +251,43 @@ describe('動態字卡：換行與邊緣淡出', () => {
     expect(holdTime(split, ['結束', '開始'])).toBeCloseTo(2.2 + 1.3, 6);
     expect(holdTime(split, ['結束', '開始'])).toBeLessThan(split.len(['結束', '開始'])!);
   });
+  it('一直流動的式子停在最後畫面：流動內容淡掉、整句完整的字淡入（paintKinetic 的 settle）', async () => {
+    const { paintKinetic } = await import('./render');
+    const texts = (id: string, settle: number) => {
+      const log: string[] = [];
+      HTMLCanvasElement.prototype.getContext = (() => fakeCtx(log).ctx) as never;
+      const c = document.createElement('canvas');
+      c.width = 180;
+      c.height = 320;
+      const def = kineticById(id)!;
+      paintKinetic(
+        c,
+        def,
+        {
+          words: ['蔡氏家族聚餐'],
+          fg: '#fff',
+          paper: '#000',
+          hi: '#f00',
+          hifg: '#000',
+          bg: null,
+          family: 'sans-serif',
+          settle,
+        },
+        def.poster,
+      );
+      return log.filter((l) => l.startsWith('fillText(')).map((l) => l.split(',')[0]);
+    };
+    for (const id of ['crawl', 'drift', 'slant', 'ticker', 'tape', 'led', 'depth', 'echo']) {
+      expect(kineticById(id)!.len(['蔡氏家族聚餐']), id).toBeNull();
+      // 淡入的整句字（alpha 要 settle 才看得到）：settle=1 時畫了整句字，settle=0 沒有這一筆
+      expect(texts(id, 1).filter((x) => x === 'fillText(蔡氏家族聚餐').length, id).toBeGreaterThan(
+        texts(id, 0).filter((x) => x === 'fillText(蔡氏家族聚餐').length - 1,
+      );
+    }
+    // 環繞、歌詞捲動本來整句都看得到：不處理
+    expect(kineticById('orbit')!.calm).toBe(false);
+    expect(kineticById('lyrics')!.calm).toBe(false);
+  });
   it('fadeEdges：none 什麼都不畫；v／h 各畫兩條漸層（destination-out）', async () => {
     const { fadeEdges } = await import('./core');
     const none = fakeCtx();
