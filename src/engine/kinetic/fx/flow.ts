@@ -280,10 +280,9 @@ export const FX_FLOW: KineticDef[] = [
       const ox = (W - 320 * k) / 2;
       const oy = (H - 180 * k) / 2;
       const vw = W / k; // 畫面看得到的寬度（直式畫面只看得到 320 的一小段）
-      const A = Math.min(110, vw * 0.44); // ∞ 的半寬：要放得進畫面
-      // 繞 ∞ 的時候帶子與字縮小（跟 ∞ 的大小成比例），拉直後回到原大小
-      const bell = Math.min(clamp(q / 0.3), 1 - clamp((q - 0.7) / 0.3));
-      const sc = 1 + (A / 110 - 1) * bell;
+      // 大大的 ∞（半寬 125，直式畫面看得到的範圍比它小，兩邊超出畫面也沒關係）；帶子和字維持原大小
+      const A = 125;
+      const sc = 1;
       const pts = q > 0 ? ribbonAt(q, A) : ribSamples();
       g.save();
       g.translate(ox, oy);
