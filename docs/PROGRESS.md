@@ -6,7 +6,7 @@
 - **日期**：2026-11-24
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
-- **測試**：1203 個單元測試、約 366 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
+- **測試**：1205 個單元測試、約 367 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
 - **下一步**：feedback-16 的 Z20、Z21 做完（PR #22 已被使用者合併，這兩項在 `claude/zen-tesla-v3brj5` 上、還沒開 PR）。等使用者說要不要開 PR，並在 iPhone 看效能框數字（預先解好 n/m、等了幾 ms、凍住）
 - **等使用者的事**
@@ -89,6 +89,12 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 版型格子裡的停格轉場（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：`setTransitionMode` 不再擋格子軌；`actions.ts` 的 `shiftFrom(d, tr, it, delta)` 遇到版型格子軌時：依序播放用 `rippleAfter`（這一格後面的素材、後面各格一起挪、外框變長／變短），同步播放用新的 `cellOps.shiftCellTrack`（只挪這一格、`fitFrameToCells`）；`applyTransition`、`setTransition`、`setTransitionAll`、`setTransitionMode` 都改成先改轉場設定、最後才挪（挪格子軌會換掉整個 `d.tracks`）。引擎（`activeTransition`、`scene.ts`、Player）本來就不分軌道種類，沒改
+  - 注意：格子軌的〔排成一個接一個〕（`arrangeGroup`／`packCell`）會把空白拿掉，那時停格轉場的空白也沒了（轉場不畫，跟刪掉前一段一樣）
+  - 動了哪些檔：`src/store/actions.ts`、`src/engine/cellOps.ts`；單元測試 `src/store/cellHold.test.ts`（同步、依序、改長度、切回、復原）；e2e `z17-hold-transition`（版型格子：UI 切停格、空白中間左右各一種顏色、切回挪回去、復原）
+  - 驗證：✅ `npm run check`（1205 單元測試）；完整 e2e 362 過／3 跳過＋2 個（k0 動態字卡取樣、x9 播放軸換順序）在 4 個 worker 同時跑時逾時、單獨跑都過
+  - 下一步：開 PR（等使用者說）
 - 2026-11-25 Z20／Z21（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：①**Z20** `scene.ts` `buildScene` 的轉場分支（格子軌）把虛擬 A／B 先過 `guardCell` 再畫（裁切模式 `guardCells:false` 照舊不過），格子素材位置跟格子對不上（版型動過）時，轉場那一秒格子不再是空的、露出下面；②**Z21** 新增 `setGroupStart(group, start)`（`actions.ts`：結尾不動；往右切掉各格開頭、影片 `trimIn` 加 `切掉秒數×speed`、整段在前面的拿掉、被切開頭的素材取消轉場；往左不動素材；最短 0.5 秒、不小於 0；一步復原）；播放軸選到版型左端也有把手（`Timeline.tsx` startTrim 的 frame 'start' 走 `setGroupStart`；展開鈕往右挪一點）；版型工具列新增〔時間〕（`layout.time`，`LayoutTab` `TimeControls`，用 `EffectTimingSheet` 匯出的 `Num`：開始、長度各一組 −0.1／＋0.1＋輸入，立刻生效、一次一步復原）
   - 沒照規劃做：右端在畫面外時「把手貼在畫面右緣」沒做（`position: sticky` 在絕對定位的片段裡不好做），改靠〔時間〕直接打數字；〔時間〕不是「套用」模式，每次改都立刻生效（跟〔大小〕一樣）

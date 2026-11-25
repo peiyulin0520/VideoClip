@@ -79,6 +79,14 @@ export function rippleAfter(
   return fitFrameToCells(next, group);
 }
 
+/** 同步播放：只有這一格 from 秒之後的素材平移 delta 秒（停格轉場的空白插入／拿掉用），外框跟著變長／變短 */
+export function shiftCellTrack(tracks: Track[], trackId: string, from: number, delta: number): Track[] {
+  if (Math.abs(delta) < 1e-9) return tracks;
+  const t = tracks.find((x) => x.id === trackId);
+  if (!t?.group) return tracks;
+  return fitFrameToCells(shiftFrom(tracks, new Set([trackId]), from, delta), t.group);
+}
+
 /** 外框長度＝各格素材最後結束的時間（至少 0.5 秒）；沒有任何素材就不動 */
 export function fitFrameToCells(tracks: Track[], group: string): Track[] {
   const fr = frameOfGroup(tracks, group);

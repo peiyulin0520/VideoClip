@@ -67,6 +67,7 @@ import {
   fitFrameToCells,
   moveToCellTracks,
   rippleAfter,
+  shiftCellTrack,
   textsOnItem,
 } from '../engine/cellOps';
 import { cellItems } from '../engine/cellGap';
@@ -1297,8 +1298,19 @@ function keepAudio(
 }
 
 /** 這個片段和它後面同一軌的所有片段整個往後（正）或往前（負）挪 delta 秒（停格轉場的空白長度變了、或開關停格轉場） */
-function shiftFrom(tr: { items: Item[] }, it: Item, delta: number) {
+function shiftFrom(d: { tracks: Track[] }, tr: { items: Item[] }, it: Item, delta: number) {
   if (Math.abs(delta) < 1e-6) return;
+  const cell = tr as Track;
+  if (cell.groupRole === 'cell' && cell.group) {
+    // 版型格子軌：依序播放時後面的格子一起挪（漣漪）；同步播放只挪這一格；外框長度跟著變。色塊上的文字跟著
+    const fr = frameOfGroup(d.tracks, cell.group);
+    const at = it.start - 1e-6;
+    if (fr?.item.layoutPlay === 'seq') {
+      const idx = cellTracksOf(d.tracks, cell.group).findIndex((c) => c.id === cell.id);
+      d.tracks = rippleAfter(d.tracks, cell.group, idx, at, delta) as never;
+    } else d.tracks = shiftCellTrack(d.tracks, cell.id, at, delta) as never;
+    return;
+  }
   const from = it.start - 1e-6;
   for (const x of tr.items) if (x.start >= from) x.start = Math.max(x.start + delta, 0);
 }
@@ -1308,6 +1320,7 @@ function shiftFrom(tr: { items: Item[] }, it: Item, delta: number) {
  * 所以改長度、取消時，這個片段和後面的片段要跟著挪。
  */
 function applyTransition(
+  d: { tracks: Track[] },
   tr: { items: Item[] },
   it: Item,
   kind: TransitionKind | null,
@@ -1328,7 +1341,7 @@ function applyTransition(
     };
     newD = wasHold ? nd : 0;
   }
-  if (wasHold) shiftFrom(tr, it, newD - oldD);
+  if (wasHold) shiftFrom(d, tr, it, newD - oldD);
 }
 
 /** 設定（或取消）一個片段的進場轉場；duration 沒給就沿用原本的 */
@@ -1336,7 +1349,7 @@ export function setTransition(id: string, kind: TransitionKind | null, duration?
   store().apply((d) => {
     for (const tr of d.tracks) {
       const it = tr.items.find((x) => x.id === id);
-      if (it) return applyTransition(tr as { items: Item[] }, it as Item, kind, duration);
+      if (it) return applyTransition(d, tr as { items: Item[] }, it as Item, kind, duration);
     }
   }, opts);
 }
@@ -1344,16 +1357,12 @@ export function setTransition(id: string, kind: TransitionKind | null, duration?
 /**
  * 轉場方式：'overlap'＝邊轉邊播（兩段重疊，預設）、'hold'＝停格轉場（前一段播完 → 轉場時間插在兩段中間、兩段都停格 → 後一段從頭播）。
  * 停格轉場會把這個片段和後面的片段往後挪一個轉場長度（中間多出空白）；切回邊轉邊播再挪回來。一步復原。
- * 版型的格子軌先不支援（回傳 false）。
+ * 版型的格子軌也可以：依序播放時後面的格子一起挪、外框跟著變長；同步播放只挪這一格。
  */
 export function setTransitionMode(id: string, mode: 'overlap' | 'hold'): boolean {
   const p = store().project;
   const f = p && findItem(p, id);
   if (!p || !f || f.item.type === 'audio' || !f.item.transitionIn) return false;
-  if (f.track.groupRole) {
-    toast('版型的格子裡先只有邊轉邊播');
-    return false;
-  }
   const isHold = f.item.transitionIn.mode === 'hold';
   if (isHold === (mode === 'hold')) return true;
   const s = seamPrev(f.track.items, f.item);
@@ -1363,15 +1372,13 @@ export function setTransitionMode(id: string, mode: 'overlap' | 'hold'): boolean
     const tr = d.tracks[f.trackIndex]!;
     const it = tr.items.find((x) => x.id === id) as Item;
     if (it.type === 'audio' || !it.transitionIn) return;
+    // 先改轉場設定，最後才挪（挪版型格子會換掉整個 tracks，之後就不能再碰這個 draft 物件）
     if (mode === 'hold') {
-      shiftFrom(tr as { items: Item[] }, it, dur);
       it.transitionIn = { ...it.transitionIn, mode: 'hold' };
       delete it.transitionIn.before;
       delete it.transitionIn.after;
-    } else {
-      shiftFrom(tr as { items: Item[] }, it, -dur);
-      delete it.transitionIn.mode;
-    }
+    } else delete it.transitionIn.mode;
+    shiftFrom(d, tr as { items: Item[] }, it, mode === 'hold' ? dur : -dur);
   });
   return true;
 }
@@ -1550,7 +1557,7 @@ export function setTransitionAll(trackId: string, kind: TransitionKind | null, d
     const order = [...t.items].sort((a, b) => a.start - b.start);
     for (const it of order) {
       if (!ids.includes(it.id) || it.type === 'audio') continue;
-      applyTransition(t as { items: Item[] }, it as Item, kind, duration);
+      applyTransition(d, t as { items: Item[] }, it as Item, kind, duration);
     }
   });
   return ids.length;
