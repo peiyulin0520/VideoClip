@@ -15,6 +15,7 @@ import { isNeutral } from './grade';
 import { GradeFilter } from './gradeFilter';
 import type { Box } from './geometry';
 import { uiScale } from './textRender';
+import { freshUploadState, shouldUpload, type UploadState } from './videoUpload';
 
 /** 每個 <video> 已經呈現過幾個新畫面（requestVideoFrameCallback）；沒有這個 API 就回傳 null */
 const frameCounts = new WeakMap<HTMLVideoElement, number>();
@@ -88,7 +89,9 @@ type Obj = {
   /** 影片「直接當貼圖」模式：不經過暫存畫布，每格只通知 GPU 重新上傳 */
   videoEl: HTMLVideoElement | null;
   videoKey: string;
-  uploadKey: string;
+  uploadState: UploadState;
+  /** 影片時間：上次上傳時、以及上次算「凍住」時的位置（效能框用） */
+  upTime: number;
   frameCanvas: HTMLCanvasElement | null;
   frameCtx: CanvasRenderingContext2D | null;
   textKey: string | undefined;
@@ -107,6 +110,8 @@ export class Compositor {
   private objs = new Map<string, Obj>();
   /** 這一輪合成裡，影片貼圖上傳（update）花的毫秒；Player 讀走後歸零 */
   private uploadMs = 0;
+  /** 播放中影片畫面凍住的次數（累計；效能框、測試用） */
+  frozen = 0;
   /** 所有圖層放在這裡面；預覽時整個往右下移 offset，讓輸出範圍（版面）置中、範圍外的東西也畫得出來 */
   private world = new Container();
   private constructor(
@@ -258,7 +263,8 @@ export class Compositor {
       textureSource: null,
       videoEl: null,
       videoKey: '',
-      uploadKey: '',
+      uploadState: freshUploadState(),
+      upTime: 0,
       frameCanvas: null,
       frameCtx: null,
       textKey: undefined,
@@ -290,7 +296,7 @@ export class Compositor {
     o.textureSource = null;
     o.videoEl = null;
     o.videoKey = '';
-    o.uploadKey = '';
+    o.uploadState = freshUploadState();
   }
 
   /** 影片直接當貼圖：裁切改用貼圖的子矩形，不再每格 drawImage 到暫存畫布 */
@@ -325,15 +331,25 @@ export class Compositor {
     // 影片沒有新畫面（暫停、或螢幕更新比影片快）就不重新上傳：播放中看「呈現過幾個新畫面」，
     // 暫停（拖時間軸 seek）時看 currentTime（iPhone 播放中 currentTime 每次都不一樣，用它會每次都上傳）
     const fc = v.paused ? null : videoFrameCount(v);
-    const uploadKey = fc === null ? `t${v.currentTime}` : `f${fc}`;
-    if (!o.hasFrame || o.uploadKey !== uploadKey) {
+    const want = shouldUpload(o.uploadState, {
+      fc,
+      currentTime: v.currentTime,
+      paused: v.paused,
+      now: performance.now(),
+    });
+    // 「凍住」：播放中影片時間已經往前超過 0.1 秒、卻一直沒有上傳（應該永遠是 0）
+    if (v.paused || want) o.upTime = v.currentTime;
+    else if (v.currentTime - o.upTime > 0.1) {
+      this.frozen++;
+      o.upTime = v.currentTime;
+    }
+    if (!o.hasFrame || want) {
       try {
         const t0 = performance.now();
         o.textureSource?.update();
         this.uploadedNow = true;
         this.uploadMs += performance.now() - t0;
         o.hasFrame = true;
-        o.uploadKey = uploadKey;
       } catch {
         /* 解碼中，保留上一格 */
       }

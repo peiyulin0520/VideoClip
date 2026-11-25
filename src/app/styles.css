@@ -39,6 +39,8 @@
   --font-head: var(--font-body);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* 功能列下面留的空白：iPhone Home 橫條區 34pt 整條空著太浪費，只留 45%（橫條本身只佔最底下約 13pt） */
+  --bar-pad: calc(var(--safe-bottom) * 0.45);
 }
 /* 介面主題（設定頁切換；預覽畫面本身永遠是黑底）：dark 是預設，其他三個只覆蓋上面的變數 */
 :root[data-theme='mono'] {
@@ -487,7 +489,7 @@ button {
   --proj-aspect: 0.5625; /* 專案版面寬 ÷ 高（Editor 依專案設定） */
   display: flex;
   flex-direction: column;
-  height: var(--app-h, 100svh);
+  height: var(--app-h, 100dvh);
   overflow: hidden;
 }
 .ed-top {
@@ -528,8 +530,8 @@ button {
      用 svh：Safari 網址列伸縮時不會抖 */
   --stage-cap: min(
     calc(100vw * 16 / 9),
-    calc(var(--app-h, 100svh) - var(--top-h) - var(--playbar-h) - var(--tabbar-h) - 96px),
-    calc(var(--app-h, 100svh) * 0.54)
+    calc(var(--app-h, 100dvh) - var(--top-h) - var(--playbar-h) - var(--tabbar-h) - 96px),
+    calc(var(--app-h, 100dvh) * 0.54)
   );
   height: max(180px, min(var(--stage-cap), calc(100vw / var(--proj-aspect) * 1.12)));
   display: flex;
@@ -1051,7 +1053,7 @@ button {
   overflow-x: auto; /* 分頁放不下時可以左右滑 */
   scrollbar-width: none;
   border-top: 1px solid var(--line);
-  padding-bottom: var(--safe-bottom);
+  padding-bottom: var(--bar-pad);
   box-sizing: content-box;
 }
 .tabs::-webkit-scrollbar {
@@ -1062,11 +1064,11 @@ button {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 1px);
+  bottom: calc(var(--tabbar-h) + var(--bar-pad) + 1px);
   z-index: 30;
   display: flex;
   flex-direction: column;
-  max-height: min(calc(var(--app-h, 100svh) * 0.56), calc(var(--app-h, 100svh) - var(--top-h) - 160px));
+  max-height: min(calc(var(--app-h, 100dvh) * 0.56), calc(var(--app-h, 100dvh) - var(--top-h) - 160px));
   background: var(--panel);
   border-top: 1px solid var(--line);
   border-radius: 14px 14px 0 0;
@@ -1113,7 +1115,7 @@ button {
   display: flex;
   align-items: stretch;
   height: var(--tabbar-h);
-  padding-bottom: var(--safe-bottom);
+  padding-bottom: var(--bar-pad);
   box-sizing: content-box;
   border-top: 1px solid var(--line);
 }
@@ -3524,7 +3526,7 @@ button:not(:disabled):active,
   left: 0;
   right: 0;
   z-index: 60;
-  height: var(--app-h, 100svh);
+  height: var(--app-h, 100dvh);
   display: flex;
   flex-direction: column;
   gap: 6px;

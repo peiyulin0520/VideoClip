@@ -351,6 +351,8 @@ export class Player {
     gpuMs: number;
     /** 播放中真的重畫了幾格、因為畫面沒變而跳過幾格（累計） */
     renders: number;
+    /** 播放中影片畫面凍住的次數（影片時間在走、畫面卻沒更新；應該是 0） */
+    frozen: number;
     skipped: number;
     dropped: number;
     video: string;
@@ -394,6 +396,7 @@ export class Player {
       drawMs: this.statDraw,
       gpuMs: this.statGpu,
       renders: this.compositor.renders,
+      frozen: this.compositor.frozen,
       skipped: this.compositor.skipped,
       dropped,
       video: this.videoInfo,

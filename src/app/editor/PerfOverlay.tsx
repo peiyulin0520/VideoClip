@@ -49,7 +49,7 @@ export function PerfOverlay({ player }: { player: Player | null }) {
         合成：準備 {f(s.prepMs)}｜繪製 {f(s.drawMs)}｜等 GPU {f(s.gpuMs)}
       </div>
       <div>
-        掉格 {s.dropped}｜最低 {f(s.fpsMin)} fps
+        掉格 {s.dropped}｜凍住 {s.frozen}｜最低 {f(s.fpsMin)} fps
       </div>
       <div>
         畫質 {QUALITY_LABELS[q]} {s.canvas}｜解碼器 {s.decoders}/{s.pool}｜聲音 {s.audio}
