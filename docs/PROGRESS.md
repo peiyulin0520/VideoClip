@@ -6,9 +6,9 @@
 - **日期**：2026-11-24
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
-- **測試**：1155 個單元測試、約 348 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
+- **測試**：1155 個單元測試、約 351 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #20（U1–U6）已開、等使用者合併。**feedback-15 第 1、2 批（Z1–Z12）做完**，接著照 `docs/plans/2026-11-24-feedback-15.md` 做第 3 批 Z13 預覽變順（Y10：先量合成時間再改）＋聲音不斷；做之前請使用者在 iPhone 看第 1、2 批（`docs/PLAN.md §7`）
+- **下一步**：PR #20（U1–U6）已開、等使用者合併。**feedback-15 三批（Z1–Z13）程式都做完**；等使用者在 iPhone 看（`docs/PLAN.md §7`，特別是 Z13 的「合成：準備／繪製／等 GPU」截圖），再依數字決定要不要進一步降合成成本（遮罩快取、畫質、MSAA）。之後照 `docs/plans/2026-11-23-roadmap-ui.md` 做備份 → 畫畫 → …
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,13 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 feedback-15 第 3 批 Z13：預覽變順（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：效能框把「合成」拆成準備圖層／繪製／等 GPU（`Compositor.seg`、`measureGpu`＝效能框開著才每格多 `gl.finish`）。**播放中畫面沒變就不重畫**：`Compositor.render(layers, { skipIfIdle })` 比對每個圖層的樣子（JSON，不含來源）＋有沒有新的影片畫面，都沒變就跳過 `renderer.render`（畫布靠 `preserveDrawingBuffer` 留著上一格）；只在 `Player.playing` 時開，匯出、單格輸出照舊每次都畫。效能框加「畫了／跳過」計數
+  - 沙盒量測（`e2e/z13-bench.spec.ts`，`Z13_BENCH=1` 才跑，軟體 GL，只看相對）：主軌 1080p＋傾斜 8° 版型兩格，fps 9.4～11 → 56～60；`Z13_PROFILE=1` 可抓 CPU profile（結果幾乎都在 `(program)`＝GPU／原生，影片貼圖上傳 `texSubImage2D` 約 10%）。🔴 使用者 iPhone 上「合成 45.6 ms、影片上傳 0.0」的真正原因沒量到：原本的「影片上傳」只量 `textureSource.update()`（只是標記），真正上傳在繪製裡；要靠新的「準備／繪製／等 GPU」在 iPhone 上看
+  - 聲音：同步邏輯原本就不會一直硬 seek（差超過 0.5 秒才跳、iPhone 不微調速度），斷斷續續是畫面忙不過來連帶影響；`e2e/z13-smooth.spec.ts` 驗播放 2.5 秒影片 seek ≤ 8 次、有跳過也有畫
+  - 動了哪些檔：`src/engine/{compositor,player,debug}.ts`、`src/app/editor/PerfOverlay.tsx`、`e2e/z13-{bench,smooth}.spec.ts`
+  - 驗證：✅ `npm run check`（1155 單元測試）；✅ 完整 e2e 349 過／3 跳過（第一次跑有 4 個負載造成的偶發失敗：i6、y3、x1、w，單獨跑與第二次全跑都過）
+  - 下一步：等使用者 iPhone 回報的效能框數字；視結果再做遮罩快取／降畫質／關 MSAA
 - 2026-11-25 feedback-15 第 2 批 Z6–Z12（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：Z6 播放列垃圾桶（`pb-delete`，復原左邊，沒選東西變淡＋提示）。Z7 `removeAnyItem` 刪完空軌道一起拿掉（最後一條影像軌、格子軌除外），同一步復原。Z8 〔加進版型〕改成作用在選到的文字／音樂：`groupToJoin`、`attachToGroup`、`detachFromGroup`（actions），按鈕亮著＝在版型裡、再按移出；拿掉 `addToGroupOff` 與素材分頁的切換。Z9 〔各格〕拿掉示意圖，改成 `CellCards`（每格一張：格號、縮圖、段數、＋加素材；`CellSheet autoAdd`）。Z10 `fx.textfx`＋`fx.kinetic` 合成一個 `fx.textfx`，視窗上面一排分組〔基本〕＋8 組，「無」兩種都清；文字類別加 `text.fx`（同一個視窗，不跳類別）。Z11 `TextFxCard`：基本 4 種用這段字畫出來（選中的才動）。Z12 副標輸入移到文字〔內容〕視窗（`KineticDef.subLabel`：底部小字、外圈文字、標籤）
   - 動了哪些檔：`src/store/actions.ts`、`src/app/pages/Editor.tsx`、`src/app/editor/{AddToGroupToggle,CellCards(原 LayoutDiagram),CellSheet,KineticCards,TextPanel,tools}.tsx`、`src/app/editor/tabs/{EffectTab,LayoutTab,AssetsTab}.tsx`、`src/engine/kinetic/{core,fx/*}.ts`、`src/store/groupMember.test.ts`、`e2e/{z6-delete,z9-cell-cards,z10-textfx,l3,k0,k05,i5,feedback14,tabs,x5,l0,…}.spec.ts`

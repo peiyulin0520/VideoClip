@@ -262,3 +262,8 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **文字特效**：只剩一個工具 `fx.textfx`（特效類別）與 `text.fx`（文字類別），同一個 `EffectTab part="textfx"` 視窗；`StyleBlock` 上面分組〔基本〕＋動態字卡 8 組（testid `kn-group-basic`／`kn-group-in`…），卡片 `tfx-card`（基本）／`kn-card`（動態）；`文字特效 無` 兩種都清。副標輸入在文字〔內容〕視窗（`kn-sub-input`，`KineticDef.subLabel`）。
 - **型別檢查**：用 `npx tsc -b`（`npx tsc --noEmit -p .` 不會檢查 app 的檔案）。
 
+## feedback-15 第 3 批 Z13（2026-11-25）新增的東西（給下一位）
+- **播放中不重畫沒變的格子**：`Compositor.render(layers, { skipIfIdle })`（`Player.render` 在 `playing` 時傳 true）。判斷＝所有圖層的 JSON（去掉 `source`、`maskBitmap`，`mask` 只取長度與頭中尾）沒變、這格沒有新的影片畫面上傳（`uploadedNow`）、沒有圖層被銷毀。新增會改變畫面、但不在 `SceneLayer` 欄位裡的東西時，記得讓它進 `SceneLayer` 或設 `uploadedNow`，不然播放中會漏畫。
+- **效能框**：`Player.stats()` 多 `prepMs／drawMs／gpuMs／renders／skipped`；`gpuMs` 只有效能框開著時才量（`Player.setMeasureGpu`）。
+- **量測**：`Z13_BENCH=1 npx playwright test e2e/z13-bench.spec.ts`（`Z13_PROFILE=1` 抓 CPU profile）；`__videoclip.rotateFrame(deg)` 把第一個版型整個轉某個角度。沙盒是軟體 GL，數字只能看相對。
+
