@@ -139,7 +139,7 @@ test('L7 版型格式：有「左右雙格」「上下雙格」和「自訂格�
   await page.getByRole('button', { name: '這個版型的欄數 加 1' }).tap();
   await expect.poll(async () => (await cellsOf()).length).toBe(9);
   await openTool(page, 'layout.cells');
-  await page.getByTestId('ld-cell').nth(8).tap();
+  await page.getByTestId('cc-open').nth(8).tap();
   await page.getByTestId('cell-assets').getByRole('button').first().tap();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
   await openTool(page, 'layout.size');

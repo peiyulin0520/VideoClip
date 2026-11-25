@@ -3761,49 +3761,6 @@ button:not(:disabled):active,
 }
 
 /* 版型示意圖：外框（跟實際同色同透明度）＋每一格的素材縮圖，每一格可以點 */
-.layout-diagram {
-  position: relative;
-  width: min(160px, 100%);
-  margin: 8px 0;
-  background: #4a4a50;
-  border-radius: 8px;
-  overflow: hidden;
-}
-.ld-cell {
-  position: absolute;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: #6b6b73 center / cover no-repeat;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
-  overflow: hidden;
-  min-width: 0;
-  min-height: 0;
-}
-.ld-cell small {
-  max-width: 100%;
-  padding: 0 0.3em;
-  font-size: 10px;
-  line-height: 1.3;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.55);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ld-cell.active {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-.ld-frame {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
 .layout-preview {
   display: flex;
   justify-content: center;
@@ -3811,11 +3768,6 @@ button:not(:disabled):active,
 }
 .layout-preview .layout-thumb {
   width: min(160px, 60%);
-}
-.ld-cell.empty {
-  background: repeating-linear-gradient(135deg, #5a5a62 0 6px, #4a4a52 6px 12px);
-  outline: 1.5px dashed rgba(255, 255, 255, 0.55);
-  outline-offset: -3px;
 }
 /* 一小塊跟旁邊分開的區域（淡底）：例如特效分頁「整個版型的動畫」跟下面各素材特效的分隔 */
 .zone-soft {
@@ -4760,4 +4712,52 @@ button:not(:disabled):active,
 .badge-cells {
   color: var(--accent);
   overflow: visible;
+}
+
+/* 〔各格〕卡片：一格一張（格號、縮圖、段數、＋加素材） */
+.cell-cards {
+  display: flex;
+  gap: 10px;
+  padding: 4px 2px 8px;
+  overflow-x: auto;
+}
+.cell-card {
+  flex: none;
+  width: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cc-body {
+  position: relative;
+  height: 84px;
+  padding: 0;
+  border-radius: 10px;
+  background: #6b6b73 center / cover no-repeat;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.cell-card.empty .cc-body {
+  background: repeating-linear-gradient(135deg, #5a5a62 0 6px, #4a4a52 6px 12px);
+  outline: 1.5px dashed rgba(255, 255, 255, 0.55);
+  outline-offset: -3px;
+}
+.cell-card.active .cc-body {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.cc-body small {
+  padding: 0 0.4em;
+  font-size: var(--fs-note);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-top-right-radius: 6px;
+}
+.cc-add {
+  min-height: 36px;
+  gap: 2px;
+  font-size: var(--fs-note);
+  border-radius: 10px;
+  white-space: nowrap;
 }

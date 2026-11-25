@@ -10,7 +10,7 @@ import { reshapeLayout, restyleFrame } from '../frameRestyle';
 import { useProjectStore } from '../../../store/projectStore';
 import { cellsOf, frameOfGroup } from '../../../engine/layoutTracks';
 import { CellSheet } from '../CellSheet';
-import { LayoutDiagram } from '../LayoutDiagram';
+import { CellCards } from '../CellCards';
 import { LayoutPicker } from '../LayoutPicker';
 import type { Found } from './shared';
 
@@ -33,24 +33,32 @@ function FrameStyleEditor({ group, color, opacity }: { group: string; color: str
   );
 }
 
-/** 各格：版型示意圖，點一格選到那一格並開「這一格」視窗（換素材、調那一格的大小） */
+/** 各格：每一格一張卡片，點卡片選到那一格並開「這一格」視窗（換素材、調那一格的大小），〔＋加素材〕直接加 */
 function CellsBlock({ project, group }: { project: Project; group: string }) {
   const selectedId = useProjectStore((s) => s.selectedId);
   const select = useProjectStore((s) => s.select);
-  const [cell, setCell] = useState<{ id: string; index: number } | null>(null);
+  const [cell, setCell] = useState<{ id: string; index: number; add?: boolean } | null>(null);
   return (
     <>
-      <LayoutDiagram
+      <CellCards
         project={project}
         group={group}
         selectedId={selectedId}
-        onPick={(id, i) => {
+        onPick={(id, i, add) => {
           const it = project.tracks.find((t) => t.id === id)?.items[0];
           if (it) select(it.id);
-          setCell({ id, index: i });
+          setCell({ id, index: i, add });
         }}
       />
-      {cell && <CellSheet key={cell.id} trackId={cell.id} index={cell.index} onClose={() => setCell(null)} />}
+      {cell && (
+        <CellSheet
+          key={`${cell.id}-${cell.add ? 'add' : ''}`}
+          trackId={cell.id}
+          index={cell.index}
+          autoAdd={cell.add}
+          onClose={() => setCell(null)}
+        />
+      )}
     </>
   );
 }

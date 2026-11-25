@@ -172,7 +172,7 @@ test('X6 這一格視窗：素材清單、加色塊、改色塊顏色與文字�
   await twoCellLayout(page);
   await openTab(page, '版型');
   await openTool(page, 'layout.cells');
-  await page.getByTestId('ld-cell').first().tap();
+  await page.getByTestId('cc-open').first().tap();
   const dlg = page.getByRole('dialog', { name: '第 1 格' });
   await expect(dlg.getByTestId('cell-items').locator('li')).toHaveCount(1);
   await dlg.getByTestId('cell-add-open').tap();

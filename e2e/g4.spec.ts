@@ -111,8 +111,8 @@ test('版型：時間軸只有一條代表列；格子在版型分頁選；外�
   // 版型分頁列出每一格；點「選第 2 格」選到那一格
   await openTool(page, 'layout.cells');
   await expect(page.getByTestId('group-panel')).toBeVisible();
-  await expect(page.getByTestId('ld-cell')).toHaveCount(3);
-  await page.getByTestId('ld-cell').nth(1).tap(); // 點示意圖的第 2 格：選到那一格＋開「這一格」視窗
+  await expect(page.getByTestId('cc-open')).toHaveCount(3);
+  await page.getByTestId('cc-open').nth(1).tap(); // 點示意圖的第 2 格：選到那一格＋開「這一格」視窗
   await expect(page.getByRole('dialog', { name: '第 2 格' })).toBeVisible();
   await page.getByRole('button', { name: '關閉', exact: true }).tap();
   const cell2 = tr.filter((t) => t.groupRole === 'cell')[1]!.items[0]!;
@@ -164,7 +164,7 @@ test('版型：素材比版型短，剩下的秒數顯示色塊——反黑，�
   // 改成反白
   await openTab(page, '版型');
   await openTool(page, 'layout.cells');
-  await page.getByTestId('ld-cell').first().tap();
+  await page.getByTestId('cc-open').first().tap();
   await page.getByTestId('cell-mode-blank').tap();
   await page.getByRole('button', { name: '空白畫面顏色 #ffffff' }).tap();
   await page.getByTestId('cell-apply').tap();

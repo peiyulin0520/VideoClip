@@ -69,19 +69,13 @@ test('X5-1 示意圖：每一格有按鈕和縮圖；外框畫成實際的顏色
   expect(edge[1]).toBeLessThan(edge[0]!);
   await finishLayout(page, ['clip-a.webm', 'solid-red.webm'].map(fixture));
 
-  const diagram = page.getByTestId('layout-diagram');
-  await expect(diagram).toBeVisible();
   await openTool(page, 'layout.cells');
-  await expect(page.getByTestId('ld-cell')).toHaveCount(2);
+  await expect(page.getByTestId('cc-open')).toHaveCount(2);
   await openTool(page, 'layout.cells');
-  await expect(page.getByTestId('ld-cell').nth(0)).toHaveAttribute('aria-label', /^第 1 格/);
+  await expect(page.getByTestId('cc-open').nth(0)).toHaveAttribute('aria-label', /^第 1 格/);
   await openTool(page, 'layout.cells');
-  await expect(page.getByTestId('ld-cell').nth(1)).toHaveAttribute('aria-label', /^第 2 格/);
-  // 外框那層畫成粉色
-  const ex = await pixel(diagram.locator('.ld-frame'), 0.5, 0.01);
-  expect(ex[0]).toBeGreaterThan(200);
-  expect(ex[3]).toBeGreaterThan(200);
-  await page.screenshot({ path: `${SHOT}/layout-diagram.png` });
+  await expect(page.getByTestId('cc-open').nth(1)).toHaveAttribute('aria-label', /^第 2 格/);
+  await page.screenshot({ path: `${SHOT}/layout-cells.png` });
 });
 
 test('X5-2 這一格視窗：改名套用（視窗不關）、❌ 不存；換素材；選片段範圍；空白畫面（顏色＋文字＋前後）；慢動作', async ({
@@ -97,13 +91,13 @@ test('X5-2 這一格視窗：改名套用（視窗不關）、❌ 不存；換�
 
   // 名稱：改了按 ❌ → 沒變；改了按套用 → 變，視窗還開著
   await openTool(page, 'layout.cells');
-  await page.getByTestId('ld-cell').first().tap();
+  await page.getByTestId('cc-open').first().tap();
   await expect(dialog(page)).toHaveAccessibleName('第 1 格');
   await page.getByLabel('這一格的名稱').fill('不會存');
   await close(page);
   expect((await cell1()).items[0]!.label).toBeUndefined();
   await openTool(page, 'layout.cells');
-  await page.getByTestId('ld-cell').first().tap();
+  await page.getByTestId('cc-open').first().tap();
   await page.getByLabel('這一格的名稱').fill('主角');
   await page.getByTestId('cell-apply').tap();
   await expect(dialog(page)).toBeVisible();
@@ -151,7 +145,7 @@ test('X5-2 素材比這一格長：選片段範圍（只拖起點）、快動作
   expect(L).toBeLessThan(3.5);
   await openTab(page, '版型');
   await openTool(page, 'layout.cells');
-  await page.getByTestId('ld-cell').first().tap();
+  await page.getByTestId('cc-open').first().tap();
   await expect(page.getByTestId('cell-length-note')).toContainText(`這一格 ${L.toFixed(1)} 秒`);
   await page.getByTestId('cell-range').tap();
   const strip = (await page.getByTestId('trim-strip').boundingBox())!;
@@ -184,5 +178,5 @@ test('X5-3 多個版型：版型工具列的〔版型〕可以再加一個，兩
   const groups = new Set((await tracks(page)).filter((t) => t.group).map((t) => t.group));
   expect(groups.size).toBe(2);
   await openTool(page, 'layout.cells');
-  await expect(page.getByTestId('ld-cell')).toHaveCount(3); // 目前選到的是新的那個（三格）
+  await expect(page.getByTestId('cc-open')).toHaveCount(3); // 目前選到的是新的那個（三格）
 });
