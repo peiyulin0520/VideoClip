@@ -51,14 +51,6 @@ function ribAtIn(pts: RibPt[], d: number): RibPt {
   return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, a: a.a + (b.a - a.a) * f, s: d };
 }
 
-/** 把一串點重新取樣成 n 個、沿路徑等距（0～1 對應整條帶子），拿來在兩條形狀之間內插 */
-function resample(pts: RibPt[], n: number): { x: number; y: number }[] {
-  const total = pts[pts.length - 1]!.s;
-  return Array.from({ length: n }, (_, i) => {
-    const p = ribAtIn(pts, (total * i) / (n - 1));
-    return { x: p.x, y: p.y };
-  });
-}
 /** 一串 xy 點 → 帶有累計長度與切線角的路徑點 */
 function toRibPts(xy: { x: number; y: number }[]): RibPt[] {
   let acc = 0;
@@ -74,12 +66,8 @@ const RIB_N = 240;
 /** 彎道收尾的 ∞ 半寬 */
 const INF_A = 135;
 let lemPts: RibPt[] | null = null;
-/**
- * 彎道收尾時帶子的頭走的路線（∞）：從中間的交叉點往右下出發（接著 S 形帶子中間的方向），
- * 繞右圈 → 回到中間交叉 → 繞左圈 → 回到中間
- */
-function lemniscate(): RibPt[] {
-  if (lemPts) return lemPts;
+/** ∞ 路線：從中間的交叉點往右下出發（接著 S 形帶子中間的方向），繞右圈 → 回到中間交叉 → 繞左圈 → 回到中間 */
+function lemniscateXY(): { x: number; y: number }[] {
   const xy: { x: number; y: number }[] = [];
   const N = 720;
   for (let i = 0; i <= N; i++) {
@@ -90,8 +78,15 @@ function lemniscate(): RibPt[] {
       y: 90 + (INF_A * 1.25 * Math.sin(th) * Math.cos(th)) / d,
     });
   }
-  lemPts = toRibPts(xy);
-  return lemPts;
+  return xy;
+}
+/** 彎道收尾的路線：S 形帶子的前半段（到畫面正中間）＋ ∞ 一圈；回傳路線與「畫面正中間」在路線上的位置 */
+function route(): { pts: RibPt[]; mid: number } {
+  if (!lemPts) {
+    const sp = ribSamples();
+    lemPts = toRibPts([...sp.slice(0, 121).map((p) => ({ x: p.x, y: p.y })), ...lemniscateXY().slice(1)]);
+  }
+  return { pts: lemPts, mid: ribSamples()[120]!.s };
 }
 /** 路線上 [a, b] 那一段，取 n 個點 */
 function along(pts: RibPt[], a: number, b: number, n = RIB_N): { x: number; y: number }[] {
@@ -100,30 +95,24 @@ function along(pts: RibPt[], a: number, b: number, n = RIB_N): { x: number; y: n
     return { x: p.x, y: p.y };
   });
 }
-/** 拉直後的橫條：畫面正中間、兩端超出畫面 */
-function lineXY(): { x: number; y: number }[] {
-  return Array.from({ length: RIB_N }, (_, i) => ({ x: -60 + (450 * i) / (RIB_N - 1), y: 90 }));
-}
 const mixXY = (a: { x: number; y: number }[], b: { x: number; y: number }[], f: number) =>
   a.map((p, i) => ({ x: p.x + (b[i]!.x - p.x) * f, y: p.y + (b[i]!.y - p.y) * f }));
 /**
- * 停在最後畫面（q 0→1）：S 形帶子的前半段不動，後半段從畫面中間轉進 ∞ 的路線，
- * 帶子的頭沿著 ∞ 繞一大圈（右圈、左圈）回到中間；最後整條往兩邊一拉，拉直成畫面中間的橫條
+ * 停在最後畫面（q 0→1）：長長的 S 形帶子兩端往中間收，縮成跟字句一樣長的一條白帶；
+ * 這條白帶沿著 ∞ 的路線跑一圈（繞右圈、交叉、繞左圈）回到中間，最後轉平成畫面正中間的橫條。
+ * L＝白帶長度（字句長度＋左右留白）
  */
-function ribbonAt(q: number): RibPt[] {
+function ribbonAt(q: number, L: number): RibPt[] {
   const sp = ribSamples();
-  const mid = sp[120]!.s; // S 形兩段曲線的接點＝畫面正中間
   const sTotal = sp[sp.length - 1]!.s;
-  const lem = lemniscate();
-  const lemLen = lem[lem.length - 1]!.s;
-  const L2 = sTotal - mid;
-  const head = L2 + (lemLen - L2) * E.io(clamp((q - 0.1) / 0.5));
-  const first = along(sp, 0, mid, 100);
-  const bend = E.io(clamp(q / 0.1));
-  const rest =
-    bend < 1 ? mixXY(along(sp, mid, sTotal, 120), along(lem, 0, L2, 120), bend) : along(lem, 0, head, 120);
-  const whole = resample(toRibPts([...first, ...rest]), RIB_N);
-  return toRibPts(mixXY(whole, lineXY(), E.io(clamp((q - 0.64) / 0.26))));
+  const { pts, mid } = route();
+  const lemLen = pts[pts.length - 1]!.s - mid;
+  const shrink = E.io(clamp(q / 0.15));
+  if (shrink < 1) return toRibPts(along(sp, (mid - L) * shrink, sTotal + (mid - sTotal) * shrink));
+  const head = mid + lemLen * E.io(clamp((q - 0.15) / 0.68));
+  const snake = along(pts, head - L, head);
+  const flat = Array.from({ length: RIB_N }, (_, i) => ({ x: 160 - L / 2 + (L * i) / (RIB_N - 1), y: 90 }));
+  return toRibPts(mixXY(snake, flat, E.io(clamp((q - 0.85) / 0.15))));
 }
 
 export const FX_FLOW: KineticDef[] = [
@@ -311,14 +300,21 @@ export const FX_FLOW: KineticDef[] = [
       const ox = (W - 320 * k) / 2;
       const oy = (H - 180 * k) / 2;
       const vw = W / k; // 畫面看得到的寬度（直式畫面只看得到 320 的一小段）
-      const sc = 1;
-      const pts = q > 0 ? ribbonAt(q) : ribSamples();
+      // 收尾的那條白帶：整句字（每個詞空一格）＋左右留白；字太長就縮小，最後要放得進畫面
+      const sentence = cs(s.words.join(' '));
+      g.font = fontOf(s, 15, 900);
+      const sw0 = g.measureText(sentence.join('')).width;
+      const size = Math.min(15, (15 * vw * 0.8) / Math.max(sw0, 1));
+      const sw = (sw0 * size) / 15;
+      const L = sw + size * 1.2;
+      const pts = q > 0 ? ribbonAt(q, L) : ribSamples();
+      // 白帶粗細：平常 26；縮成字句長的白帶後跟著字的大小
+      const thick = 26 + (size * (26 / 15) - 26) * clamp(q / 0.15);
       g.save();
       g.translate(ox, oy);
       g.scale(k, k);
-      // 一條寬的強調色帶子
       g.strokeStyle = s.hi;
-      g.lineWidth = 26 * sc;
+      g.lineWidth = thick;
       g.lineCap = 'butt';
       g.lineJoin = 'round';
       g.beginPath();
@@ -330,7 +326,7 @@ export const FX_FLOW: KineticDef[] = [
         for (const [, , x1, y1, x2, y2, x3, y3] of RIB) g.bezierCurveTo(x1, y1, x2, y2, x3, y3);
       }
       g.stroke();
-      // 字沿著帶子排（字高 15、粗體），整串字以 24／秒的速度流過去；繞的時候照樣繼續跑
+      // 字沿著帶子排（字高 15、粗體），整串字以 24／秒的速度流過去
       const unit = s.words.join('・') + '・';
       g.font = fontOf(s, 15, 900);
       g.fillStyle = s.hifg;
@@ -340,8 +336,8 @@ export const FX_FLOW: KineticDef[] = [
       const reps = Math.ceil(64 / wlen(unit)) + 2;
       const chars = cs(unit.repeat(reps));
       const total = pts[pts.length - 1]!.s;
-      const place = (str: string[], start: number, alpha: number, size: number) => {
-        g.font = fontOf(s, size, 900);
+      const place = (str: string[], start: number, alpha: number, px: number) => {
+        g.font = fontOf(s, px, 900);
         let pos = start;
         for (const ch of str) {
           const w = g.measureText(ch).width;
@@ -358,20 +354,10 @@ export const FX_FLOW: KineticDef[] = [
           pos += w;
         }
       };
-      // 帶子繞的時候字貼在帶子上（不另外流動）；拉直之後（q 0.88～1）整句完整的字淡入、原本的字淡出
-      const fin = clamp((q - 0.88) / 0.12);
-      if (fin < 1) place(chars, q > 0 ? 0 : -((t * 24) % unitLen), 1 - fin, 15 * sc);
-      if (fin > 0) {
-        const sentence = cs(s.words.join(' '));
-        g.font = fontOf(s, 15, 900);
-        const sw = g.measureText(sentence.join('')).width;
-        const size = Math.min(15, (15 * vw * 0.88) / Math.max(sw, 1));
-        g.font = fontOf(s, size, 900);
-        const w2 = g.measureText(sentence.join('')).width;
-        // 橫條上看得到的正中間（x＝160）離起點多遠
-        const mid = pts.find((p) => p.x >= 160) ?? pts[pts.length - 1]!;
-        place(sentence, mid.s - w2 / 2, fin, size);
-      }
+      // 帶子縮短的時候（q 0～0.15）流動的字淡出、整句字淡入；之後整句字貼在白帶正中間跟著跑
+      const fin = clamp(q / 0.15);
+      if (fin < 1) place(chars, -((t * 24) % unitLen), 1 - fin, 15);
+      if (fin > 0) place(sentence, (total - sw) / 2, fin, size);
       g.restore();
     },
   },
