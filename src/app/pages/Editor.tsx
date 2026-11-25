@@ -1,11 +1,11 @@
-import { ChevronLeft, Pause, Play, Redo2, Share, Undo2 } from 'lucide-react';
+import { ChevronLeft, Pause, Play, Redo2, Share, Trash2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { countEditorRender } from '../../engine/debug';
 import { ensureUrls, findMissing, releaseProjectUrls } from '../../engine/assetUrls';
 import { importFiles } from '../../engine/importMedia';
 import { enqueueProxies } from '../../engine/proxyQueue';
-import { addOverlayClips, importToBase } from '../../store/actions';
+import { addOverlayClips, importToBase, removeAnyItem } from '../../store/actions';
 import { coverFromProject } from '../../engine/cover';
 import { formatTime, totalDuration } from '../../engine/timeline';
 import { getProjectMigrated, saveProject } from '../../storage/projects';
@@ -140,6 +140,7 @@ function EditorBody() {
   const project = useProjectStore((s) => s.project)!;
   const canUndo = useProjectStore((s) => s.past.length > 0);
   const canRedo = useProjectStore((s) => s.future.length > 0);
+  const hasSel = useProjectStore((s) => !!s.selectedId);
   const player = useUI((s) => s.player);
   const previewFull = useUI((s) => s.previewFull);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -300,6 +301,20 @@ function EditorBody() {
         <span className="spacer" />
         <span className="zone-sep" aria-hidden="true" />
         <div className="btn-zone" data-testid="zone-history">
+          <button
+            className={`icon-btn${hasSel ? '' : ' dim'}`}
+            aria-label="刪除"
+            data-testid="pb-delete"
+            data-dim={hasSel ? undefined : ''}
+            onClick={() => {
+              const id = useProjectStore.getState().selectedId;
+              if (!id) return toast('先點一個片段');
+              removeAnyItem(id);
+            }}
+          >
+            <Trash2 size={22} />
+          </button>
+          <span className="zone-sep" aria-hidden="true" />
           <button
             className="icon-btn"
             aria-label="復原"

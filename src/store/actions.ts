@@ -1939,6 +1939,14 @@ export function removeAnyItem(id: string): boolean {
     (d) => {
       const tr = d.tracks[f.trackIndex]!;
       tr.items = tr.items.filter((x) => x.id !== id) as never;
+      // 刪完軌道空了就一起拿掉（最後一條影像軌、版型的格子軌除外）；復原時軌道跟物件一起回來
+      if (tr.items.length === 0 && tr.groupRole !== 'cell') {
+        const lastMedia =
+          tr.kind === 'media' &&
+          !tr.groupRole &&
+          d.tracks.filter((t) => t.kind === 'media' && !t.groupRole).length <= 1;
+        if (!lastMedia) d.tracks.splice(f.trackIndex, 1);
+      }
     },
     { select: null },
   );

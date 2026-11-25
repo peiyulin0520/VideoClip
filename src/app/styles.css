@@ -4689,7 +4689,8 @@ button:not(:disabled):active,
   width: 26px;
   height: 22px;
 }
-.tool.dim {
+.tool.dim,
+.icon-btn.dim {
   opacity: 0.4;
 }
 .tool.danger {
