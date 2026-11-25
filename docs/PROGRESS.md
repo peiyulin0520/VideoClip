@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：1194 個單元測試、約 363 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-16 全部做完（Z14 凍住／Z15 底下空間／Z16–Z17 轉場／Z18–Z19 預先解碼＋等一下），**還沒開 PR**（問使用者要不要開）。使用者在 iPhone 看後回報：效能框「合成：準備／繪製／等 GPU」「凍住」「最近轉場」（預先解好 n/m、用預解／用影片、等了幾 ms）的截圖
+- **下一步**：PR #22 已開（feedback-16）。使用者回報版型格子轉場露出下面、版型不能拖兩端 → **照 `docs/plans/2026-11-25-feedback-16.md` 的 Z20（轉場分支補 `guardCell`）、Z21（版型左端把手、`setGroupStart`、〔時間〕視窗）**，切 Sonnet 實作
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-25 規劃 Z20／Z21（Opus，claude/zen-tesla-v3brj5）
+  - 做了什麼：看使用者兩段錄影＋截圖（第 1 格兩張照片疊化、自訂分配 0.62／0.39）；沙盒重現：格子素材的 `transform` 跟格子對不上時，轉場分支沒過 `guardCell` → 兩段畫在舊位置被格子裁掉 → 露出下面。版型片段只有右端把手。寫成 Z20、Z21
+  - 動了哪些檔：`docs/plans/2026-11-25-feedback-16.md`、`docs/PROGRESS.md`
+  - 驗證：🟡 只用暫時的除錯掛鉤＋暫時的 e2e 重現（沒留下）
+  - 下一步：切 Sonnet 做 Z20、Z21
 - 2026-11-25 feedback-16 Z14／Z15／Z18／Z19（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：①**Z18 轉場預先解碼**（`src/engine/transitionFrames.ts`）：專案打開／改轉場後，在背景用 Mediabunny 把每個轉場用到的前後兩段（`activeTransition` 逐格走一遍算出素材秒數，30 格／秒、長邊 640／流暢 480）解成 `ImageBitmap` 存起來；離播放線近的先解、總量超過 160MB 丟最遠的；播放經過轉場直接用（`Player` provider 的 `frames.frameAt`），匯出不用。②**Z19 備用**：轉場中後一段沒預解好、`<video>` 也還沒準備好 → 時間暫停等它，總共最多 0.3 秒／次（`STALL_S`，音樂、影片同步一起停）；**拿掉播放中的縮圖頂著**（暫停、拖時間軸仍用縮圖）。③**Z14** 影片畫面上傳判斷抽成 `videoUpload.ts` 的 `shouldUpload`：rVFC 計數變了就上傳；計數超過 80 ms 沒變（Safari 對看不到的影片會這樣）而影片時間（30 格／秒量化）在走，就改用時間上傳；效能框多「凍住」計數（影片時間走了 0.1 秒卻沒上傳，應為 0）。④**Z15** 新增 `--bar-pad = safe-bottom × 0.45`，`.tabs`／`.fb-row` 底下留白與升起視窗位置都改用它（34pt → 約 15pt）；CSS 預設高度 `100svh` → `100dvh`
   - 沒照規劃做：`useAppHeight` 沒改成 Safari 也用 JS 寫 `--app-h`（網址列伸縮時會抖），只靠 `100dvh`
