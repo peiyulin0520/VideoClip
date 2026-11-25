@@ -470,6 +470,8 @@ export const FX_SWAP: KineticDef[] = [
     words: ['結束', '開始'],
     poster: 1.9,
     len: (w) => 2.2 * w.length,
+    // 最後一個詞：還沒開始裂開（裂開從 1.45 秒起）、整個詞完整的那一刻
+    hold: (w) => 2.2 * (w.length - 1) + 1.3,
     draw(s, t) {
       const { W, H, cqw, cqh } = s;
       const D = 2.2;

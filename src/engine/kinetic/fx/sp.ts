@@ -191,9 +191,12 @@ export const FX_SP: KineticDef[] = [
       // 同一個詞 7 層，一層一層朝鏡頭飛過來（越近越大）；實心與空心描邊交錯，近的蓋在遠的上面
       const L = Array.from({ length: N }, (_, j) => ({ j, z: ((j + t * 0.9) % N) / N }));
       L.sort((a, b) => a.z - b.z);
+      // 停在最後畫面：飛過來的層慢慢淡掉，同時一個正常大小的字淡入，停下來就只剩這個字
+      const rest = s.settle ?? 0;
+      if (rest > 0) drawWord(s, word, W / 2, H / 2, px, { sx: 1, sy: 1, alpha: rest });
       for (const { j, z } of L) {
         const sc = 0.08 * Math.pow(60, z);
-        const alpha = Math.min(1, z * 5) * (1 - seg(z, 0.72, 1));
+        const alpha = Math.min(1, z * 5) * (1 - seg(z, 0.72, 1)) * (1 - rest);
         if (alpha <= 0) continue;
         drawWord(s, word, W / 2, H / 2, px, {
           sx: sc,

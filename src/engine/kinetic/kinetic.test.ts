@@ -230,6 +230,27 @@ describe('動態字卡：換行與邊緣淡出', () => {
     const long = ['一二三四五六七八九十甲乙丙丁戊己庚辛壬癸']; // 20 個字
     expect(ys(long).size).toBe(1);
   });
+  it('停在最後畫面（settle）：重拍殘影的殘影收合（只剩主字）、隧道只剩一個正常大小的字；上下裂開停在字完整的那一刻', async () => {
+    const strokes = (id: string, t: number, settle: number) => {
+      const { s, log } = stage(['回聲']);
+      kineticById(id)!.draw({ ...s, settle }, t);
+      return log.filter((l) => l.startsWith('strokeText(')).length;
+    };
+    expect(strokes('trail', 0.1, 0)).toBeGreaterThan(0); // 打拍當下有空心殘影
+    expect(strokes('trail', 0.1, 1)).toBe(0); // 停下來：殘影收合
+    const words = (settle: number) => {
+      const { s, log } = stage(['前進']);
+      kineticById('tunnel')!.draw({ ...s, settle }, 1);
+      return log.filter((l) => l.startsWith('fillText(') || l.startsWith('strokeText(')).length;
+    };
+    expect(words(0)).toBeGreaterThan(1); // 一層一層飛過來
+    expect(words(1)).toBe(1); // 停下來只剩一個字
+    const { holdTime } = await import('./hold');
+    const split = kineticById('split')!;
+    // 最後一個詞的第 1.3 秒：還沒開始裂開（1.45 秒起）
+    expect(holdTime(split, ['結束', '開始'])).toBeCloseTo(2.2 + 1.3, 6);
+    expect(holdTime(split, ['結束', '開始'])).toBeLessThan(split.len(['結束', '開始'])!);
+  });
   it('fadeEdges：none 什麼都不畫；v／h 各畫兩條漸層（destination-out）', async () => {
     const { fadeEdges } = await import('./core');
     const none = fakeCtx();

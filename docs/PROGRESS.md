@@ -89,6 +89,10 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-26 殘影類停在最後畫面（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：用 `settle` 讓〔重拍殘影〕停下來時殘影收合（只剩主字、不再放大）；〔隧道〕停下來時飛來的層淡掉、一個正常大小的字淡入；〔上下裂開〕的 `hold` 改成最後一個詞還沒開始裂開的那一刻（不用 settle）；重拍殘影透明的層不畫。對照圖 `hold-sheet-after.png` 更新
+  - 還沒改：一直流動的式子（跑馬燈、透視字幕、環繞、點陣看板…）照 poster 停；鏡中倒影的倒影本來就是那一式的樣子沒動
+  - 驗證：✅ `npm run check`、kinetic 相關 e2e 過
 - 2026-11-25 重擊排字的換行（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：〔重擊排字〕預設**全部排成一行**（最多 24 個字，字再多也縮小，不再超過 8 字就換行）；文字〔內容〕按 Enter 就照使用者的行排（`textLines(item)` → `Stage.lines`，`lineSizes()`）；設定視窗（只有重擊排字）多〔換行〕：〔排成一行〕（預設）／〔自動換行〕（超過 8 字才換，`kinetic.wrap:'auto'`）；字高也跟著行數縮小，不會超出框
   - 動了哪些檔：`src/engine/kinetic/{core,render,fx/in}.ts`、`src/model/types.ts`、`src/store/actions.ts`、`src/app/editor/tabs/EffectTab.tsx`；單元測試 `kinetic.test`（`lineSizes`、一行／自動／Enter 的行數）；e2e `z22-hitline`
