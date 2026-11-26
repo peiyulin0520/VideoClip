@@ -2,7 +2,7 @@ import { ALL_FORMATS, BlobSource, CanvasSink, Input } from 'mediabunny';
 import type { Asset, Item, Project, VideoItem } from '../model/types';
 import { getMedia } from '../storage/media';
 import { proxyKey } from './assetUrls';
-import { HANDOVER_AFTER, HANDOVER_BEFORE } from './handover';
+import { HANDOVER_A_LAG, HANDOVER_AFTER, HANDOVER_BEFORE } from './handover';
 import { canTransition } from './scene';
 import { sourceTimeClamped } from './timeline';
 import { activeTransition } from './transitions';
@@ -71,9 +71,9 @@ export function transitionNeeds(project: Project, side: number): FrameNeed[] {
       }
       if (!any) continue;
       for (const [assetId, r] of range) {
-        // 轉場前後的換手範圍也要有預解圖：前一段多解轉場前 0.5 秒、後一段多解轉場後 1 秒（見 handover.ts）
+        // 轉場前後的換手範圍也要有預解圖：前一段多解轉場前 0.5＋0.6 秒（0.6 是 <video> 可能的落後）、後一段多解轉場後 2 秒（見 handover.ts）
         const asset0 = project.assets.find((a) => a.id === assetId)!;
-        if (roleA.has(assetId)) r.t0 = Math.max(q(r.t0 - HANDOVER_BEFORE), 0);
+        if (roleA.has(assetId)) r.t0 = Math.max(q(r.t0 - HANDOVER_BEFORE - HANDOVER_A_LAG), 0);
         if (roleB.has(assetId))
           r.t1 = Math.min(q(r.t1 + HANDOVER_AFTER), Math.max(asset0.duration - 0.05, 0));
         const t1 = Math.min(r.t1, r.t0 + (MAX_FRAMES - 1) / FRAME_FPS);

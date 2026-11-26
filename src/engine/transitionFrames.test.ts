@@ -35,10 +35,10 @@ describe('transitionNeeds', () => {
     const a = needs.find((n) => n.assetId === 'a')!;
     const b = needs.find((n) => n.assetId === 'b')!;
     // 預設置中：3.5–4.5 秒；A 用到 3.5–4（之後凍結補足，範圍不超過 A 的尾端）、B 用到 0–0.5
-    expect(a.t0).toBeCloseTo(3.0, 1); // 轉場開始（3.5）前再多解 0.5 秒（換手範圍）
+    expect(a.t0).toBeCloseTo(2.4, 1); // 轉場開始（3.5）前再多解 0.5＋0.6 秒（換手範圍＋<video> 落後）
     expect(b.t0).toBeCloseTo(0, 1);
     expect(a.at).toBe(4);
-    expect(b.t1).toBeCloseTo(1.5, 1); // 轉場結束（0.5）後再多解 1 秒（換手範圍）
+    expect(b.t1).toBeCloseTo(2.5, 1); // 轉場結束（0.5）後再多解 2 秒（換手範圍）
   });
   it('同一個素材的鍵會隨素材秒數、解析度改變（改了就作廢重解）', () => {
     const base = transitionNeeds(proj([vid('A', 'a', 0, 4), withT(vid('B', 'b', 4, 4))]), 640);

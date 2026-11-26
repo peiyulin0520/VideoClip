@@ -19,7 +19,11 @@ import { freshUploadState, shouldUpload, type UploadState } from './videoUpload'
 
 /** 每個 <video> 已經呈現過幾個新畫面（requestVideoFrameCallback）；沒有這個 API 就回傳 null */
 const frameCounts = new WeakMap<HTMLVideoElement, number>();
-function videoFrameCount(v: HTMLVideoElement): number | null {
+/**
+ * 先呼叫過一次，瀏覽器才會一直「呈現」這支影片的新畫面（看不到的影片不註冊就不會更新目前畫面）。
+ * Player 在影片暖機、轉場藏著的時候就呼叫，免得換手那一刻第一次上傳到的是很久以前的舊畫面。
+ */
+export function videoFrameCount(v: HTMLVideoElement): number | null {
   if (typeof v.requestVideoFrameCallback !== 'function') return null;
   if (!frameCounts.has(v)) {
     frameCounts.set(v, 0);
