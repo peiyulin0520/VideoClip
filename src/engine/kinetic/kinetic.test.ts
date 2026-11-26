@@ -288,19 +288,19 @@ describe('動態字卡：換行與邊緣淡出', () => {
     expect(kineticById('orbit')!.calm).toBe(false);
     expect(kineticById('lyrics')!.calm).toBe(false);
   });
-  it('彎道停在最後畫面：S 形帶子拉直成橫條、整句完整的字（一個字一次）排在帶子上', () => {
+  it('彎道：從頭到尾只有一條緞帶、整句字只寫一遍；收尾 0.9＋2.3 秒、用真正的時間畫', () => {
     const def = kineticById('path')!;
     expect(def.calm).toBe(false);
-    expect(def.smooth).toBe(true); // 收尾的緞帶在飛：播放時也每秒畫 60 次
-    expect(def.settleLen).toBe(2.8);
-    expect(def.hold!([])).toBeCloseTo(0.8 + 2.8, 6); // 流動 0.8 秒之後開始收尾
+    expect(def.smooth).toBe(true); // 用真正的時間畫、不量化成步
+    expect(def.settleLen).toBe(2.3);
+    expect(def.hold!([])).toBeCloseTo(0.9 + 2.3, 6); // 緞帶滑到畫面正中間（第一輪的一半，0.9 秒）時開始收尾
     const drawn = (settle: number) => {
       const { s, log } = stage(['順著河走', '就會到海'], 180, 320);
       def.draw({ ...s, settle }, 1);
       return log.filter((l) => l.startsWith('fillText(')).map((l) => l.slice(9, 10));
     };
-    expect(drawn(0).length).toBeGreaterThan(9); // 流動：重複的一長串字
-    expect(drawn(1).join('')).toBe('順著河走 就會到海'); // 停下來：整句一遍，空格也算
+    expect(drawn(0).join('')).toBe('順著河走 就會到海'); // 平常滑的時候：整句一遍、不重複，空格也算
+    expect(drawn(1).join('')).toBe('順著河走 就會到海'); // 停下來：還是整句一遍
   });
   it('fadeEdges：none 什麼都不畫；v／h 各畫兩條漸層（destination-out）', async () => {
     const { fadeEdges } = await import('./core');
