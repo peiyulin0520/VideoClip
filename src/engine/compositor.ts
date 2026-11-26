@@ -90,6 +90,11 @@ type Obj = {
   videoEl: HTMLVideoElement | null;
   videoKey: string;
   uploadState: UploadState;
+  /** 預先解好的畫面（ImageBitmap）直接當貼圖時：目前的貼圖來源、大小、上一張圖 */
+  bmSrc: ImageSource | null;
+  bmW: number;
+  bmH: number;
+  lastBm: ImageBitmap | null;
   /** 影片時間：上次上傳時、以及上次算「凍住」時的位置（效能框用） */
   upTime: number;
   frameCanvas: HTMLCanvasElement | null;
@@ -264,6 +269,10 @@ export class Compositor {
       videoEl: null,
       videoKey: '',
       uploadState: freshUploadState(),
+      bmSrc: null,
+      bmW: 0,
+      bmH: 0,
+      lastBm: null,
       upTime: 0,
       frameCanvas: null,
       frameCtx: null,
@@ -297,6 +306,8 @@ export class Compositor {
     o.videoEl = null;
     o.videoKey = '';
     o.uploadState = freshUploadState();
+    o.bmSrc = null;
+    o.lastBm = null;
   }
 
   /** 影片直接當貼圖：裁切改用貼圖的子矩形，不再每格 drawImage 到暫存畫布 */
@@ -356,6 +367,49 @@ export class Compositor {
     }
   }
 
+  /**
+   * 預先解好的畫面（ImageBitmap）直接當貼圖：不經過暫存畫布（2D drawImage 再整張上傳在 iPhone 上很慢）。
+   * 同樣大小的圖只換 resource 再上傳；裁切改貼圖的子矩形（跟影片一樣）。
+   */
+  private updateBitmap(o: Obj, layer: SceneLayer, bm: ImageBitmap) {
+    const bw = bm.width;
+    const bh = bm.height;
+    if (bw <= 0 || bh <= 0) return;
+    const same = !!o.bmSrc && o.textureSource === o.bmSrc && !!o.texture && o.bmW === bw && o.bmH === bh;
+    if (!same) {
+      this.dropTexture(o);
+      const src = new ImageSource({ resource: bm, scaleMode: 'linear', autoGarbageCollect: false });
+      o.textureSource = src;
+      o.texture = new Texture({ source: src, frame: new Rectangle(0, 0, bw, bh) });
+      o.sprite.texture = o.texture;
+      o.bmSrc = src;
+      o.bmW = bw;
+      o.bmH = bh;
+      o.lastBm = bm;
+    } else if (o.lastBm !== bm) {
+      const t0 = performance.now();
+      o.bmSrc!.resource = bm;
+      o.bmSrc!.update();
+      this.uploadedNow = true;
+      this.uploadMs += performance.now() - t0;
+      o.lastBm = bm;
+    }
+    const c = layer.crop ?? { l: 0, t: 0, r: 0, b: 0 };
+    const f = o.texture!.frame;
+    const x = bw * c.l;
+    const y = bh * c.t;
+    const w = Math.max(bw * (1 - c.l - c.r), 1);
+    const h = Math.max(bh * (1 - c.t - c.b), 1);
+    if (f.x !== x || f.y !== y || f.width !== w || f.height !== h) {
+      f.x = x;
+      f.y = y;
+      f.width = w;
+      f.height = h;
+      o.texture!.update();
+    }
+    o.hasFrame = true;
+  }
+
   private update(o: Obj, layer: SceneLayer) {
     // ---- 內容 ----
     if (layer.kind === 'text') {
@@ -369,6 +423,8 @@ export class Compositor {
       }
     } else if (layer.kind === 'video' && layer.source instanceof HTMLVideoElement) {
       this.updateVideo(o, layer, layer.source);
+    } else if (typeof ImageBitmap !== 'undefined' && layer.source instanceof ImageBitmap && layer.ready) {
+      this.updateBitmap(o, layer, layer.source);
     } else {
       const fw = Math.max(Math.round(layer.frameW ?? layer.box.w), 2);
       const fh = Math.max(Math.round(layer.frameH ?? layer.box.h), 2);

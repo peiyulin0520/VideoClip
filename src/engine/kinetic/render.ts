@@ -17,7 +17,11 @@ export type KineticRender = {
   content: { x: number; y: number; w: number; h: number };
 };
 
-const STEP = 60; // 每秒 60 步：同一步畫面一樣
+/** 每秒幾步：同一步畫面一樣（不重畫、不上傳）。拖時間軸、暫停、匯出用 60；預覽播放用 30（畫面更新最多每秒 30 次，播放時負擔減半） */
+let STEP = 60;
+export function setKineticPlaying(on: boolean) {
+  STEP = on ? 30 : 60;
+}
 
 const canvases = new Map<string, HTMLCanvasElement>();
 const MAX_CANVASES = 8;
