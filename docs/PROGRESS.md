@@ -92,7 +92,7 @@
 - 2026-11-26 Z25 轉場不卡、不重播（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：①**預解圖直接當貼圖**（`compositor.ts` `updateBitmap`）：來源是 `ImageBitmap` 的圖層不再經過暫存畫布（2D `drawImage` 再整張上傳在 iPhone 上很慢），同樣大小只換 `ImageSource.resource` 再 `update()`，裁切改貼圖子矩形；遮罩、圓角、裁切照舊能用。沙盒量測（`Z13_BENCH=1 … -g Z25`，軟體 GL）：轉場中「合成：準備」中位數 **12.1 → 0.7 ms**；②**換手對時**（新檔 `handover.ts`：`inHandover`、`pickSource`）：前一段 A 在轉場開始前 0.5 秒、後一段 B 在轉場結束後 1.0 秒內，預解圖有畫面就等 `<video>` 準備好**而且**時間差 ≤ 0.04 秒才換回 `<video>`，不然繼續用預解圖（不再 `<video>` 落後就換過去造成往回跳＝「開頭重播」）；`transitionNeeds` 範圍跟著延長（A 往前 0.5、B 往後 1.0，`MAX_FRAMES` 240）；轉場中有預解圖時 B 不再有保護期（`<video>` 沒人看，趁機硬 seek 追對時間）；③**字卡預覽播放 30 步**（`setKineticPlaying`，播放中每秒最多重畫 30 次；暫停、拖時間軸、匯出照舊 60）；④效能框「最近轉場」多「換手 預解 n 回影片 n 差 x 秒」
   - 動了哪些檔：`src/engine/{compositor,player,handover,transitionFrames}.ts`、`src/engine/kinetic/render.ts`、`src/app/editor/PerfOverlay.tsx`；單元測試 `handover`（換手範圍、pickSource 各情況）、`transitionFrames`；e2e `z25-handover`（疊化中間紅綠混色不黑、換手差 ≤ 0.045；轉場後 B 的影片沒準備好 0.8 秒也一直是綠色）、`z13-bench`（量測）
-  - 驗證：✅ `npm run check`（1222 單元測試）；完整 e2e 見下一筆；🟡 iPhone 的實際效果要看效能框
+  - 驗證：✅ `npm run check`（1222 單元測試）；✅ 完整 e2e 366 過／5 跳過＋2 個（h3 修剪面板、x3 裁切筆刷）在 4 個 worker 同時跑時逾時、單獨跑都過；🟡 iPhone 的實際效果要看效能框
   - 下一步：使用者 iPhone 看轉場卡不卡、開頭有沒有重播；效能框「合成：準備」「換手差」截圖
 - 2026-11-26 彎道收尾：一條字句長的白帶沿 ∞ 路線跑（Opus，claude/zen-tesla-v3brj5）
   - 做了什麼：使用者說是「一條白帶繞著路線走」，不是形成 ∞ 圖案，白帶長度＝字句長度、不會累加。改成：長的 S 形帶子兩端往中間收，縮成跟整句字一樣長的白帶（字跟著淡入）；白帶沿 ∞ 路線（從畫面中間往右下 → 右圈 → 交叉 → 左圈 → 回中間）跑一圈，最後轉平成畫面正中間的短橫條，整句字在上面。白帶粗細跟字的大小走；字太長自動縮小到放得進畫面
