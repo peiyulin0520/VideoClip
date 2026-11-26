@@ -162,6 +162,7 @@ test('自由形狀（描邊）：手指畫一圈，只留圈裡面，外面透�
   await setup(page);
   await page.getByTestId('tool-edit.crop').tap();
   await page.getByTestId('crop-tool-lasso').tap();
+  await page.getByLabel('距離').fill('0'); // 自由裁切也有〔距離〕（預設 70）：這個測試要畫在手指位置
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;
   const cy = fr.y + fr.height / 2;
@@ -202,6 +203,7 @@ test('自由形狀（描邊）：手指畫一圈，只留圈裡面，外面透�
   await page.getByTestId('tool-edit.crop').tap();
   await expect(page.getByTestId('crop-polygon')).toBeVisible();
   await page.getByTestId('crop-tool-lasso').tap();
+  await page.getByLabel('距離').fill('0'); // 自由裁切也有〔距離〕（預設 70）：這個測試要畫在手指位置
   await page.getByRole('button', { name: '清除形狀' }).tap();
   await expect(page.getByTestId('crop-polygon')).toHaveCount(0);
   await page.getByTestId('crop-apply').tap();

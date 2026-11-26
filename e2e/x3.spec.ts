@@ -346,3 +346,81 @@ for (const w of [320, 390]) {
     );
   });
 }
+
+// feedback-17 Z26：筆刷第一筆刷的當下就看得到；被去掉的地方是變暗的素材（可切半透明棋盤格）；自由裁切也有兩個圓圈
+const tintAt = (page: Page, fx: number, fy: number) =>
+  page.getByTestId('crop-tint').evaluate(
+    (c, p) => {
+      const cv = c as HTMLCanvasElement;
+      return Array.from(
+        cv.getContext('2d')!.getImageData(Math.round(p[0]! * cv.width), Math.round(p[1]! * cv.height), 1, 1)
+          .data,
+      );
+    },
+    [fx, fy],
+  );
+
+test('Z26 筆刷：第一筆還沒放開手指就看得到（刷到的亮、其他變暗）；〔看棋盤格〕變半透明棋盤格；〔檢查結果〕不透明', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await setup(page);
+  await page.getByTestId('crop-tool-brush').tap();
+  await page.getByLabel('粗細').fill('10');
+  await page.getByLabel('距離').fill('0');
+  const fr = await frame(page);
+  const y = fr.y + fr.height * 0.5;
+  await page.mouse.move(fr.x + fr.width * 0.2, y);
+  await page.mouse.down();
+  await page.mouse.move(fr.x + fr.width * 0.5, y, { steps: 8 });
+  // 還沒放開：刷到的地方透明（看得到素材）、旁邊是變暗的素材（半透明黑，不是不透明棋盤格）
+  const on = await tintAt(page, 0.35, 0.5);
+  const off = await tintAt(page, 0.35, 0.15);
+  expect(on[3]!, '刷到的地方').toBeLessThan(20);
+  expect(off[3]!, '沒刷到的地方是半透明的暗色，看得到底下').toBeGreaterThan(100);
+  expect(off[3]!).toBeLessThan(200);
+  expect(off[0]!).toBeLessThan(40); // 黑色，不是棋盤格的灰白
+  await page.mouse.up();
+  // 〔看棋盤格〕：變成半透明棋盤格（灰白）
+  await page.getByTestId('paint-look').tap();
+  const soft = await tintAt(page, 0.35, 0.15);
+  expect(soft[0]!).toBeGreaterThan(150);
+  expect(soft[3]!).toBeGreaterThan(100);
+  expect(soft[3]!).toBeLessThan(200);
+  await page.getByTestId('paint-look').tap();
+  // 〔檢查結果〕：不透明棋盤格
+  await page.getByTestId('crop-check').tap();
+  const hard = await tintAt(page, 0.35, 0.15);
+  expect(hard[3]!).toBeGreaterThan(240);
+});
+
+test('Z26 自由裁切：有兩個圓圈（手指圓、往上偏的焦點圓），形狀畫在焦點圓；有〔距離〕', async ({ page }) => {
+  test.setTimeout(120_000);
+  await setup(page);
+  await page.getByTestId('crop-tool-lasso').tap();
+  await page.getByLabel('距離').fill('80');
+  const fr = await frame(page);
+  const y = fr.y + fr.height * 0.8;
+  await page.mouse.move(fr.x + fr.width * 0.3, y);
+  await page.mouse.down();
+  await page.mouse.move(fr.x + fr.width * 0.4, y, { steps: 4 });
+  const a = (await page.getByTestId('brush-finger').boundingBox())!;
+  const b = (await page.getByTestId('brush-cursor').boundingBox())!;
+  const dy = a.y + a.height / 2 - (b.y + b.height / 2);
+  expect(dy).toBeGreaterThan(75);
+  expect(dy).toBeLessThan(85);
+  // 畫一圈（手指在下面、焦點圓在上面 80px），放開
+  await page.mouse.move(fr.x + fr.width * 0.7, y, { steps: 6 });
+  await page.mouse.move(fr.x + fr.width * 0.7, y + 60, { steps: 4 });
+  await page.mouse.move(fr.x + fr.width * 0.3, y + 60, { steps: 6 });
+  await page.mouse.move(fr.x + fr.width * 0.3, y, { steps: 4 });
+  await page.mouse.up();
+  const poly = (await page.getByTestId('crop-polygon').getAttribute('points'))!
+    .split(' ')
+    .map((p) => p.split(',').map(Number) as [number, number]);
+  const minY = Math.min(...poly.map((p) => p[1]));
+  const maxY = Math.max(...poly.map((p) => p[1]));
+  // 手指走的 y 範圍在 0.8～0.8+60px；形狀整個往上偏 80px，所以最下緣在手指路線的最上緣附近或更上面
+  expect(maxY * fr.height + fr.y, '形狀在手指上方').toBeLessThan(y - 10);
+  expect(maxY - minY).toBeGreaterThan(0.05);
+});

@@ -90,3 +90,45 @@ describe('版型格子裡的轉場：素材要在格子裡', () => {
     expect(Math.abs(a.box.cx - b.box.cx)).toBeGreaterThan(100);
   });
 });
+
+describe('版型格子裡素材被裁成形狀：墊格子底色（Z26）', () => {
+  const fillIds = (layers: ReturnType<typeof buildScene>) => layers.filter((l) => l.id.startsWith('fill-'));
+  it('素材有 mask（多邊形）→ 圖層下面多一個格子大小的底色；沒裁、gapMode none 都沒有', () => {
+    mk();
+    const t = 2;
+    expect(fillIds(buildScene(s().project!, t, W, H, provide as never, {}))).toHaveLength(0);
+    s().apply((d) => {
+      const c = d.tracks.find((x) => x.groupRole === 'cell')!;
+      (c.items[0] as VideoItem).mask = [
+        [0.2, 0.2],
+        [0.8, 0.2],
+        [0.5, 0.8],
+      ] as never;
+    });
+    const withMask = buildScene(s().project!, t, W, H, provide as never, {});
+    const fills = fillIds(withMask);
+    expect(fills).toHaveLength(1);
+    // 底色在素材圖層的前面（下面）
+    const cellId = (cellOf().items[0] as Item).id;
+    expect(withMask.findIndex((l) => l.id === fills[0]!.id)).toBeLessThan(
+      withMask.findIndex((l) => l.id === cellId),
+    );
+    // 外框的空檔設〔透明〕（gapMode none）：不墊
+    s().apply((d) => {
+      const f = d.tracks
+        .flatMap((x) => x.items)
+        .find((i) => (i as VideoItem).group && !(i as VideoItem).cell && i.type !== 'text')!;
+      (f as VideoItem).gapMode = 'none';
+    });
+    expect(fillIds(buildScene(s().project!, t, W, H, provide as never, {}))).toHaveLength(0);
+  });
+  it('筆刷遮罩（maskBitmap）也一樣；轉場中的格子也墊', () => {
+    mk();
+    s().apply((d) => {
+      const c = d.tracks.find((x) => x.groupRole === 'cell')!;
+      (c.items[0] as VideoItem).maskBitmap = 'data:image/png;base64,AAAA';
+    });
+    expect(fillIds(buildScene(s().project!, 2, W, H, provide as never, {}))).toHaveLength(1);
+    expect(fillIds(buildScene(s().project!, 4, W, H, provide as never, {}))).toHaveLength(1); // 轉場中（置中 0.5 秒：3.75–4.25）
+  });
+});

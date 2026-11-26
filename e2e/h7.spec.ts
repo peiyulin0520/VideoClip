@@ -41,6 +41,7 @@ async function stroke(page: Page, from: [number, number], to: [number, number]) 
 
 async function lassoCircle(page: Page) {
   await page.getByTestId('crop-tool-lasso').tap();
+  await page.getByLabel('距離').fill('0'); // 自由裁切也有〔距離〕（預設 70）：這個測試要畫在手指位置
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;
   const cy = fr.y + fr.height / 2;
