@@ -80,6 +80,8 @@ export type KineticDef = {
    * false＝這一式本來就是整句都看得到的（環繞、歌詞捲動），不用這樣處理。
    */
   calm?: false;
+  /** 〔停在最後畫面〕的收尾動畫（settle＞0）在預覽播放時也每秒畫 60 次（快速移動的東西 30 次會一頓一頓） */
+  smooth?: true;
   draw: (s: Stage, t: number) => void;
 };
 
