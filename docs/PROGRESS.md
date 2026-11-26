@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：1209 個單元測試、約 369 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：Z27（轉場不重播）、Z28（彎道緞帶收尾）已做完、在分支、還沒進 PR；等使用者說要不要開 PR（要先看的話說「只建立 PR，不要合併」）。iPhone 上看 PLAN §7 的 Z27／Z28 兩條
+- **下一步**：PR #25（Z27、Z28）已合併部署。使用者 21:53 錄影：轉場還跳格、彎道跳格 → **照 `docs/plans/2026-11-25-feedback-17.md` 的 Z29（修 Z27：入點 0 秒的 B 被「停在第一格」規則暫停、預約重對輪不到；加 B 的量測）與 Z30（彎道不量化時間、緞帶只在字卡中心線附近飄）**，切 Sonnet 實作
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-26 規劃 Z29（轉場跳格）、Z30（彎道跳格）（claude/zen-tesla-v3brj5）
+  - 做了什麼：看 21:53 兩段錄影：效能框「硬跳 3、後段 目標 0.60 實際 0.00、回影片 0、重對 0」→ Z27 有 bug（入點 0 秒的 B 剛起跑就被「停在第一格」規則暫停）、預約重對被「聲音 ≤ 0.3」條件擋掉；彎道逐格看：流動 30 步、收尾 60 步量化造成每格移動量 3/5 交替，緞帶繞整個框、大半被影片蓋住或出畫面
+  - 動了哪些檔：docs/plans/2026-11-25-feedback-17.md、docs/screenshots/feedback-17/{z29-overlay,z30-ribbon-60fps}.png、docs/PROGRESS.md
+  - 驗證：🔴 只有規劃
+  - 使用者的決定/回饋：「彎道特效還是怪怪的，會跳格的感覺」「影片轉場銜接也是會跳格」
 - 2026-11-26 Z27 轉場不重播、Z28 彎道緞帶收尾（claude/zen-tesla-v3brj5）
   - 做了什麼：Z27——後一段影片藏著時（暖機、轉場中、換手範圍）落後超過 0.25 秒就預約重對（暫停→seek 到目標＋起跑延遲→時鐘走到再 play；入點不夠時提早 play），起跑延遲量中位數；換手範圍延長到轉場後 2 秒、最後 0.6 秒預解圖慢慢靠到影片那一格；A 進換手範圍時記下落後、預解圖畫「目標−落後」；藏著的影片註冊 rVFC（否則換手第一次上傳是舊畫面，e2e 抓到閃一格）；效能框多「起跑 ms、重對 n」。Z28——彎道停在最後畫面改成：S 形帶子滑出、一條固定長度的緞帶從左邊飛進來繞畫面一圈（有風的擺動）、最後拉平成正中間橫條；全程在畫面內、字不倒過來；收尾播放 60 步
   - 動了哪些檔：src/engine/{player,videoSync,handover,transitionFrames,compositor,debug}.ts（含測試）、src/engine/kinetic/{core,render}.ts、kinetic/fx/{flow,ribbon}.ts（+ribbon.test.ts）、src/app/editor/PerfOverlay.tsx、e2e/z27-no-repeat、e2e/z28-ribbon、tests/fixtures/ramp-a/b.webm、docs
