@@ -10,6 +10,7 @@ async function setup(page: Page) {
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
   await page.getByTestId('tool-edit.crop').tap();
   await page.getByTestId('crop-tool-lasso').tap();
+  await page.getByLabel('距離').fill('0'); // 自由裁切也有〔距離〕（預設 70）：這個測試要畫在手指位置
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;
   const cy = fr.y + fr.height / 2;
@@ -21,6 +22,7 @@ async function setup(page: Page) {
   }
   await page.mouse.up();
   await expect(page.getByTestId('crop-polygon')).toBeVisible();
+  await page.getByLabel('距離').fill('70'); // 距離是共用的：還給筆刷預設值
   await page.getByTestId('crop-tool-erase').tap();
   await expect(page.getByTestId('paint-bar')).toBeVisible();
 }
@@ -107,6 +109,7 @@ test('按下去先不畫：快速點一下不會留下一點；移動超過 4px 
   await expect.poll(() => erasedAt(page, 0.5, 0.5)).toBe(false);
   await expect(page.getByTestId('crop-polygon')).toHaveCount(0); // 筆刷、橡皮擦時不顯示粉紅框線（直接看結果）
   await page.getByTestId('crop-tool-lasso').tap();
+  await page.getByLabel('距離').fill('0'); // 自由裁切也有〔距離〕（預設 70）：這個測試要畫在手指位置
   await expect(page.getByTestId('crop-polygon')).toBeVisible(); // 圈選的形狀還在（切回自由才看得到）
   await page.getByTestId('crop-tool-erase').tap();
   await page.getByTestId('crop-redo').tap();

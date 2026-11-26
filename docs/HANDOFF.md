@@ -275,6 +275,8 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **Z14**：`videoUpload.ts` `shouldUpload`（單元測試好測）；`Compositor.frozen`。**Z15**：`--bar-pad`。
 - **格子裡的停格轉場**：`shiftFrom(d, tr, it, delta)` 認得格子軌（依序＝`rippleAfter`、同步＝`shiftCellTrack`）；改了 `d.tracks` 之後不要再碰挪之前的 draft 物件。
 - **動態字卡「停在最後畫面」的靜止（Z22）**：`Stage.settle`（0→1）只在 `kinetic.end==='hold'` 且快到停點時有值；新式子裡「閒著也在動」的部分要乘 `(1 - (s.settle ?? 0))`。對照圖：`Z22_SHEET=after npx playwright test e2e/z22-hold-sheet.spec.ts`。邊緣淡出寬度 `kinetic.fadeW`、預覽色帶 `KineticFadeGuide`。
+- **Z26 裁切**：筆刷／橡皮擦的顯示 tile（`shade`／`checkSoft`／`check`／`dim`，`lookFor`）；自由裁切跟筆刷共用 `showMarks`、`reach`；格子裁成形狀墊底色在 `scene.ts` `pushCellFill`。測試掛鉤 `__videoclip.patchItem(id, patch)`。
+- **Z25 轉場換手**：`handover.ts`（`inHandover`、`pickSource`）決定轉場前後一小段時間畫預解圖還是 `<video>`；`compositor.ts` `updateBitmap` 讓 `ImageBitmap` 直接當貼圖（不經 frameCanvas）。播放時字卡 30 步（`setKineticPlaying`）。
 - **Z20／Z21**：格子軌轉場的虛擬 A／B 也要過 `guardCell`（`scene.ts`）；測試用 `__videoclip.nudgeItem(id, dx)` 把素材位置挪偏（不進復原）。`setGroupStart` 跟 `setGroupDuration` 是一對（改版型開始／長度）；版型的時間 UI＝播放軸兩端把手＋〔時間〕。
 - **模擬 iPhone 晚到**：e2e 把 `HTMLMediaElement.prototype.readyState` 在一段時間內回 1（`z16-transition.spec.ts`）。
 

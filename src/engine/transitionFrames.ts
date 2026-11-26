@@ -2,6 +2,7 @@ import { ALL_FORMATS, BlobSource, CanvasSink, Input } from 'mediabunny';
 import type { Asset, Item, Project, VideoItem } from '../model/types';
 import { getMedia } from '../storage/media';
 import { proxyKey } from './assetUrls';
+import { HANDOVER_AFTER, HANDOVER_BEFORE } from './handover';
 import { canTransition } from './scene';
 import { sourceTimeClamped } from './timeline';
 import { activeTransition } from './transitions';
@@ -15,7 +16,7 @@ export const FRAME_FPS = 30;
 export const FRAME_SIDE = 640;
 export const FRAME_SIDE_SMOOTH = 480;
 /** 一個轉場最多解這麼多格（30 格／秒 × 5 秒；再長的只解頭尾，不會發生：轉場最長 3 秒） */
-const MAX_FRAMES = 150;
+const MAX_FRAMES = 240;
 /** 預先解好的畫面總共最多佔這麼多位元組（約 4 位元組 × 像素） */
 export const FRAME_BUDGET_BYTES = 160 * 1024 * 1024;
 
@@ -48,6 +49,8 @@ export function transitionNeeds(project: Project, side: number): FrameNeed[] {
       const lo = b.start - b.transitionIn.duration - 1;
       const hi = b.start + b.transitionIn.duration + 1;
       const range = new Map<string, { t0: number; t1: number }>();
+      const roleA = new Set<string>(); // 前一段用到的素材（前面多解一點）
+      const roleB = new Set<string>(); // 後一段用到的素材（後面多解一點）
       let any = false;
       for (let t = lo; t <= hi; t += 1 / FRAME_FPS) {
         const at = activeTransition(items, t);
@@ -57,6 +60,7 @@ export function transitionNeeds(project: Project, side: number): FrameNeed[] {
           if (!x || x.type !== 'video') continue;
           const asset = project.assets.find((a) => a.id === (x as VideoItem).assetId);
           if (!asset || asset.kind !== 'video') continue;
+          (x === at.a ? roleA : roleB).add(asset.id);
           const s = q(sourceTimeClamped(x as VideoItem, t, asset));
           const r = range.get(asset.id);
           if (r) {
@@ -67,6 +71,11 @@ export function transitionNeeds(project: Project, side: number): FrameNeed[] {
       }
       if (!any) continue;
       for (const [assetId, r] of range) {
+        // 轉場前後的換手範圍也要有預解圖：前一段多解轉場前 0.5 秒、後一段多解轉場後 1 秒（見 handover.ts）
+        const asset0 = project.assets.find((a) => a.id === assetId)!;
+        if (roleA.has(assetId)) r.t0 = Math.max(q(r.t0 - HANDOVER_BEFORE), 0);
+        if (roleB.has(assetId))
+          r.t1 = Math.min(q(r.t1 + HANDOVER_AFTER), Math.max(asset0.duration - 0.05, 0));
         const t1 = Math.min(r.t1, r.t0 + (MAX_FRAMES - 1) / FRAME_FPS);
         const asset = project.assets.find((a) => a.id === assetId)!;
         out.push({

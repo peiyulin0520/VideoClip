@@ -64,7 +64,8 @@ export function PerfOverlay({ player }: { player: Player | null }) {
           最近轉場 {s.transition.frames} 格｜卡頓 {s.transition.drops}｜硬跳 {s.transition.hardSeeks}
           {s.transition.lastSeek ? `｜${s.transition.lastSeek}` : ''}
           ｜預先解好 {s.transition.ready}/{s.transition.total}｜用預解 {s.transition.cached} 用影片{' '}
-          {s.transition.video}｜等了 {s.transition.waitMs} ms
+          {s.transition.video}｜等了 {s.transition.waitMs} ms｜換手 預解 {s.transition.handCached} 回影片{' '}
+          {s.transition.handBack} 差 {s.transition.handDiff} 秒
         </div>
       )}
       {s.video && <div>{s.video}</div>}

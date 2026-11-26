@@ -1,10 +1,12 @@
-import type { Asset, Project, Track, VideoItem } from '../model/types';
+import type { Asset, Item, Project, Track, VideoItem } from '../model/types';
 import { frameIndexAt, loadAnim, peekAnim } from './animImage';
 import { AudioOut, fadeGain, isIOSDevice } from './audio';
 import { Compositor } from './compositor';
 import { stageLayout } from './stage';
 import { VideoPool } from './mediaPool';
 import { expandThumbs, thumbCount, thumbIndex } from './thumbs';
+import { inHandover, pickSource } from './handover';
+import { setKineticPlaying } from './kinetic/render';
 import { activeTransition, earlyOf, transitionAudioGain, transitionSpan } from './transitions';
 import {
   FRAME_SIDE,
@@ -125,6 +127,8 @@ export class Player {
   private lastTickAt = 0;
   /** 最近一次轉場的畫面來源統計：預先解好的幾格、影片幾格、等了幾毫秒 */
   private transSrc = { cached: 0, video: 0, waitMs: 0 };
+  /** 轉場前後換手：用了預解圖幾格、換回影片幾次、換回影片時差多少秒（最大） */
+  private hand = { cached: 0, back: 0, diff: 0 };
   private transHeavyTold = false;
   private videoCount = 0;
   /** 效能框用：這一格正在解碼的每支影片（解碼後的大小、用預覽檔還是原檔）、播放中每秒格數的最低值 */
@@ -218,6 +222,7 @@ export class Player {
     if (this.t >= total - 0.01) this.t = 0;
     this.audio.unlock(); // 要在使用者點擊當下：解鎖聲音、設成「播放」類別（靜音模式也有聲音）
     this.playing = true;
+    setKineticPlaying(true);
     this.lastTickAt = 0;
     this.stalled = false;
     this.statSince = 0;
@@ -235,6 +240,7 @@ export class Player {
   pause() {
     if (!this.playing) return;
     this.playing = false;
+    setKineticPlaying(false);
     cancelAnimationFrame(this.raf);
     this.render(this.t);
     this.emit();
@@ -271,6 +277,7 @@ export class Player {
     if (t >= total) {
       this.t = total;
       this.playing = false;
+      setKineticPlaying(false);
       this.render(total);
       this.emit();
       return;
@@ -368,6 +375,10 @@ export class Player {
       waitMs: number;
       ready: number;
       total: number;
+      /** 轉場前後換手：用預解圖的格數、換回影片的次數、換回影片時兩邊差幾秒（最大，應 ≤ 0.04） */
+      handCached: number;
+      handBack: number;
+      handDiff: number;
     };
     /** 目前每支在解碼的影片：解碼大小＋預覽檔／原檔 */
     sources: string[];
@@ -410,6 +421,9 @@ export class Player {
         waitMs: Math.round(this.transSrc.waitMs),
         ready: this.frames.ready,
         total: this.frames.total,
+        handCached: this.hand.cached,
+        handBack: this.hand.back,
+        handDiff: Math.round(this.hand.diff * 1000) / 1000,
       },
       sources: this.sources,
       decoders: this.videoCount,
@@ -458,7 +472,12 @@ export class Player {
       const transitioning = this.transIds.has(item.id);
       // 後一段（B）：從暖機到轉場結束後 1 秒是保護期，不輕易硬 seek（seek 中的影片沒有畫面，轉場會黑掉）
       const span = orig.transitionIn ? transitionSpan(track.items, orig) : null;
-      const protect = !!span && t >= span.cut - span.before - WARM_S && t < span.cut + span.after + 1;
+      // 保護期（不輕易硬 seek）：只有「暖機」（轉場開始前）、以及轉場中「這一格沒有預解圖、真的要顯示 <video>」的時候。
+      // 轉場中有預解圖就不需要保護：<video> 沒人看，趁這時把時間追對，轉場結束換回 <video> 時才對得上
+      const cachedNow = this.predecode && !!this.frames.frameAt(asset.id, s);
+      const warm = !!span && t < span.cut - span.before;
+      const protect =
+        !!span && t >= span.cut - span.before - WARM_S && (warm || (t < span.cut + span.after && !cachedNow));
       const plan = videoSyncPlan({
         target: s,
         current: el.currentTime,
@@ -593,6 +612,7 @@ export class Player {
         this.trans = { frames: 0, drops: 0, hardSeeks: 0, lastAt: now, lastSeek: '' };
         this.stallLeft = STALL_S;
         this.transSrc = { cached: 0, video: 0, waitMs: 0 };
+        this.hand = { cached: 0, back: 0, diff: 0 };
       } else if (now - this.trans.lastAt > 50) this.trans.drops++;
       this.trans.lastAt = now;
       this.trans.frames++;
@@ -677,6 +697,26 @@ export class Player {
         if (track.kind === 'media' && el.videoWidth)
           this.videoInfo = `${el.videoWidth}×${el.videoHeight} ${asset.codec ?? ''}${asset.hdr ? ' HDR' : ''}｜預覽檔：${asset.proxy?.status ?? '無'}`;
         const ready = el.readyState >= 2 && !el.seeking && el.videoWidth > 0;
+        // 轉場前後的換手範圍：預解圖有畫面，就等 <video> 準備好、時間對上（差不到 1 格）才換回 <video>，不然繼續用預解圖
+        if (this.playing && this.predecode && !this.transIds.has(item.id)) {
+          const orig = track.items.find((x) => x.id === item.id);
+          if (orig && inHandover(track.items as Item[], orig as Item, t)) {
+            const s = sourceTimeClamped(item, t, asset);
+            const bm = this.frames.frameAt(asset.id, s);
+            const diff = Math.abs(el.currentTime - s);
+            if (
+              pickSource({ inHandover: true, haveCached: !!bm, videoReady: ready, diff }) === 'cached' &&
+              bm
+            ) {
+              this.hand.cached++;
+              return { source: bm, ready: true, srcW: bm.width, srcH: bm.height };
+            }
+            if (bm) {
+              this.hand.back++;
+              this.hand.diff = Math.max(this.hand.diff, diff);
+            }
+          }
+        }
         // 轉場中：先用背景預先解好的畫面（不用等 iPhone 的 <video> 啟動）；沒有才用影片
         if (this.playing && this.transIds.has(item.id) && this.predecode) {
           const bm = this.frames.frameAt(asset.id, sourceTimeClamped(item, t, asset));
@@ -870,6 +910,7 @@ export class Player {
     cancelAnimationFrame(this.renderRaf);
     this.offMask?.();
     this.playing = false;
+    setKineticPlaying(false);
     this.listeners.clear();
     this.pool.destroy();
     this.music.destroy();

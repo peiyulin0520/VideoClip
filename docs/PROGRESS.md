@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：1209 個單元測試、約 369 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：feedback-17 的 Z22（部分）、Z23 做完；分支上 Z20、Z21、版型格子停格轉場、Z22、Z23 都還沒進 PR（建 PR 被權限擋，請使用者自己開或允許）。Z22 還沒改的式子見下面日誌「還沒改」，等使用者看過 iPhone 再說
+- **下一步**：Z25（轉場卡頓、開頭重播）與彎道新收尾已在分支、還沒進 PR。使用者回報裁切三個問題 → **照 `docs/plans/2026-11-25-feedback-17.md` 的 Z26（筆刷第一筆看得到、自由裁切兩個圓圈、格子裁切後有底色）**，切 Sonnet 實作
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,24 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-26 Z26 裁切三個問題（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：①**筆刷、橡皮擦時被去掉的地方變暗**（不再是不透明棋盤格蓋住素材）：`CropEditor.tsx` 新 tile `'shade'`（半透明黑、沒斜線）、`'checkSoft'`（半透明棋盤格）；筆刷設定列新開關〔看棋盤格〕（`vc-crop-paint-look`，預設關）；〔檢查結果〕照舊不透明棋盤格；②**第一筆就看得到**：整張都留著、第一筆是「留下」時，`begin()` 馬上用 `baseKind` 換成「只留刷到的」重畫（其他地方變暗），不用等放開手指；③**自由裁切有兩個圓圈**：`showMarks` 抽成共用，`startLasso` 改用 `focusOf`（往上偏 `reach`）、按下去先只移動（4px 或 250ms 才開始畫）、設定列多〔距離〕滑桿（跟筆刷共用）；④**版型格子裡素材被裁成形狀（mask 或 maskBitmap）時墊格子底色**：`scene.ts` `pushCellFill`（跟空格子色塊同一套；顏色 `track.fill ?? 外框色 ?? 黑`；外框空檔〔透明〕`gapMode:'none'` 不墊；轉場中也墊）
+  - 注意：自由裁切現在也受〔距離〕影響（預設 70px，畫的線在手指上方）；原本在手指位置畫的測試都先把〔距離〕設 0
+  - 動了哪些檔：`src/app/editor/CropEditor.tsx`、`src/engine/{scene,debug}.ts`（`patchItem` 測試掛鉤）；單元測試 `sceneCell`（格子 mask 墊底色）；e2e `x3`（筆刷第一筆當下變暗、〔看棋盤格〕、檢查結果；自由裁切兩個圓圈）、`y5`（格子裁成形狀外面是格子底色、透明才露出主軌）、`i6`／`h7`／`crop`／`feedback14`（自由裁切先設〔距離〕0、筆刷看起來改成變暗）
+  - 驗證：✅ `npm run check`（1224 單元測試）；完整 e2e 369 過／5 跳過＋2 個（h3 修剪面板、x9 播放軸換順序）在 4 個 worker 同時跑時逾時、單獨跑都過
+- 2026-11-26 Z25 轉場不卡、不重播（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：①**預解圖直接當貼圖**（`compositor.ts` `updateBitmap`）：來源是 `ImageBitmap` 的圖層不再經過暫存畫布（2D `drawImage` 再整張上傳在 iPhone 上很慢），同樣大小只換 `ImageSource.resource` 再 `update()`，裁切改貼圖子矩形；遮罩、圓角、裁切照舊能用。沙盒量測（`Z13_BENCH=1 … -g Z25`，軟體 GL）：轉場中「合成：準備」中位數 **12.1 → 0.7 ms**；②**換手對時**（新檔 `handover.ts`：`inHandover`、`pickSource`）：前一段 A 在轉場開始前 0.5 秒、後一段 B 在轉場結束後 1.0 秒內，預解圖有畫面就等 `<video>` 準備好**而且**時間差 ≤ 0.04 秒才換回 `<video>`，不然繼續用預解圖（不再 `<video>` 落後就換過去造成往回跳＝「開頭重播」）；`transitionNeeds` 範圍跟著延長（A 往前 0.5、B 往後 1.0，`MAX_FRAMES` 240）；轉場中有預解圖時 B 不再有保護期（`<video>` 沒人看，趁機硬 seek 追對時間）；③**字卡預覽播放 30 步**（`setKineticPlaying`，播放中每秒最多重畫 30 次；暫停、拖時間軸、匯出照舊 60）；④效能框「最近轉場」多「換手 預解 n 回影片 n 差 x 秒」
+  - 動了哪些檔：`src/engine/{compositor,player,handover,transitionFrames}.ts`、`src/engine/kinetic/render.ts`、`src/app/editor/PerfOverlay.tsx`；單元測試 `handover`（換手範圍、pickSource 各情況）、`transitionFrames`；e2e `z25-handover`（疊化中間紅綠混色不黑、換手差 ≤ 0.045；轉場後 B 的影片沒準備好 0.8 秒也一直是綠色）、`z13-bench`（量測）
+  - 驗證：✅ `npm run check`（1222 單元測試）；✅ 完整 e2e 366 過／5 跳過＋2 個（h3 修剪面板、x3 裁切筆刷）在 4 個 worker 同時跑時逾時、單獨跑都過；🟡 iPhone 的實際效果要看效能框
+  - 下一步：使用者 iPhone 看轉場卡不卡、開頭有沒有重播；效能框「合成：準備」「換手差」截圖
+- 2026-11-26 彎道收尾：一條字句長的白帶沿 ∞ 路線跑（Opus，claude/zen-tesla-v3brj5）
+  - 做了什麼：使用者說是「一條白帶繞著路線走」，不是形成 ∞ 圖案，白帶長度＝字句長度、不會累加。改成：長的 S 形帶子兩端往中間收，縮成跟整句字一樣長的白帶（字跟著淡入）；白帶沿 ∞ 路線（從畫面中間往右下 → 右圈 → 交叉 → 左圈 → 回中間）跑一圈，最後轉平成畫面正中間的短橫條，整句字在上面。白帶粗細跟字的大小走；字太長自動縮小到放得進畫面
+  - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、`docs/screenshots/feedback-17/path-ending.png`
+  - 驗證：✅ 單元測試、`npm run check`；分鏡圖確認
+- 2026-11-26 彎道收尾改成「帶子沿 ∞ 路線繞行」（Opus，claude/zen-tesla-v3brj5）
+  - 做了什麼：使用者錄影畫了路線（左圈 → 中間交叉 → 右圈 → 交叉 → 最後橫線），說的是帶子「沿路線繞行」，不是帶子原地變成兩個圈、字繞著自己轉。改成：S 形帶子前半段不動，後半段從畫面中間（S 兩段的接點）轉進 ∞ 的路線，帶子的頭沿著 ∞ 繞右圈、交叉、繞左圈回到中間（像一筆畫畫出 ∞），字貼在帶子上不另外流動；最後整條往兩邊一拉、拉直成畫面中間的橫條，整句字淡入。`lemniscate()`（從中心往右下出發，方向接 S 的中段）、`along()`、`ribbonAt(q)`；收尾 2.4 秒（`settleLen`），停點 3.2 秒
+  - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、`docs/screenshots/feedback-17/path-ending.png`（橫式 12 格、直式 11 格的分鏡）
+  - 驗證：✅ 單元測試、`npm run check`；分鏡圖確認
 - 2026-11-26 彎道的 ∞ 改大、不縮小（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：使用者說不必是完整的 ∞ 圖案，是白帶繞一個大 ∞ 再往回一拉變橫條。把 ∞ 半寬固定 125、帶子與字不再縮小（`sc=1`），直式畫面只看得到中間一段、兩邊超出畫面
   - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`

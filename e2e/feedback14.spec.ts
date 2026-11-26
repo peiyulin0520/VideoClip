@@ -174,6 +174,7 @@ test('回報14 裁切：筆刷、橡皮擦時沒有粉紅框線（直接看結�
   await expect.poll(async () => isGreen(await samplePreview(page, 0.5, 0.5))).toBe(true);
   await page.getByTestId('tool-edit.crop').tap();
   await page.getByTestId('crop-tool-lasso').tap();
+  await page.getByLabel('距離').fill('0'); // 自由裁切也有〔距離〕（預設 70）：這個測試要畫在手指位置
   const fr = (await page.getByTestId('crop-frame').boundingBox())!;
   const cx = fr.x + fr.width / 2;
   const cy = fr.y + fr.height / 2;
@@ -185,7 +186,7 @@ test('回報14 裁切：筆刷、橡皮擦時沒有粉紅框線（直接看結�
   }
   await page.mouse.up();
   await expect(page.getByTestId('crop-polygon')).toBeVisible();
-  // 去掉的地方：自由工具是斜線、筆刷／橡皮擦是棋盤格（跟「檢查結果」一樣）
+  // 去掉的地方：自由工具是斜線、筆刷／橡皮擦是變暗的素材（Z26）
   const corner = () =>
     page.getByTestId('crop-tint').evaluate((c) => {
       const cv = c as HTMLCanvasElement;
@@ -196,8 +197,11 @@ test('回報14 裁切：筆刷、橡皮擦時沒有粉紅框線（直接看結�
   await page.getByTestId('crop-tool-brush').tap();
   await expect(page.getByTestId('crop-polygon')).toHaveCount(0);
   const checker = await corner();
-  expect(checker).not.toEqual(dim);
-  expect(checker[3]).toBeGreaterThan(200); // 棋盤格不透明
+  void dim; // 變暗跟斜線版的角落像素一樣（都是半透明黑），差別只在斜線，這裡不比對
+  // 筆刷、橡皮擦：去掉的地方只是把素材變暗（半透明的黑，看得到底下），不是不透明棋盤格（Z26）
+  expect(checker[3]).toBeGreaterThan(100);
+  expect(checker[3]).toBeLessThan(200);
+  expect(checker[0]).toBeLessThan(40);
   await page.screenshot({ path: `${SHOT}/crop-brush-view-390.png` });
   await page.getByTestId('crop-tool-erase').tap();
   await expect(page.getByTestId('crop-polygon')).toHaveCount(0);

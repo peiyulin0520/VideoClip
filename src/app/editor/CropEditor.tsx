@@ -2,7 +2,7 @@ import { Brush, Eraser, Minus, Pause, Play, Plus, Redo2, Undo2, X } from 'lucide
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { urlFor } from '../../engine/assetUrls';
 import { applyRatio, dragCrop, keepSize, smoothPolygon, type Handle } from '../../engine/crop';
-import { composeKeep, drawStroke } from '../../engine/cropCompose';
+import { baseKind, composeKeep, drawStroke } from '../../engine/cropCompose';
 import { findItem, isVideoItem } from '../../engine/timeline';
 import type { Crop, CropStroke, VideoItem } from '../../model/types';
 import {
@@ -62,7 +62,24 @@ function thin(pts: Pt[]): Pt[] {
 }
 
 /** 斜線＋變暗的花紋（被去掉的地方）／棋盤格（檢查結果時，透明的地方） */
-function tile(kind: 'dim' | 'check'): HTMLCanvasElement {
+type LookKind = 'dim' | 'check' | 'shade' | 'checkSoft';
+const SOFT_KEY = 'vc-crop-paint-look';
+const readSoftCheck = (): boolean => {
+  try {
+    return localStorage.getItem(SOFT_KEY) === 'check';
+  } catch {
+    return false;
+  }
+};
+const saveSoftCheck = (v: boolean) => {
+  try {
+    localStorage.setItem(SOFT_KEY, v ? 'check' : 'shade');
+  } catch {
+    /* ignore */
+  }
+};
+
+function tile(kind: LookKind): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = c.height = 48;
   const g = c.getContext('2d')!;
@@ -79,7 +96,12 @@ function tile(kind: 'dim' | 'check'): HTMLCanvasElement {
     g.moveTo(20, 76);
     g.lineTo(76, 20);
     g.stroke();
+  } else if (kind === 'shade') {
+    // 筆刷、橡皮擦：被去掉的地方只是把素材變暗（看得到底下要畫哪裡），沒有斜線
+    g.fillStyle = 'rgba(0,0,0,0.6)';
+    g.fillRect(0, 0, 48, 48);
   } else {
+    g.globalAlpha = kind === 'checkSoft' ? 0.45 : 1;
     g.fillStyle = '#e8e8e8';
     g.fillRect(0, 0, 48, 48);
     g.fillStyle = '#bdbdbd';
@@ -170,33 +192,48 @@ function Editor() {
     c.height = kh;
     return c;
   }, [kw, kh]);
-  const dimTile = useMemo(() => tile('dim'), []);
-  const checkTile = useMemo(() => tile('check'), []);
-
-  // 筆刷、橡皮擦時看到的就是「檢查結果」的樣子（去掉的地方是棋盤格、沒有粉紅框線），直接在上面刷
-  const checkLook = (st: { checking: boolean; tool: string }) =>
-    st.checking || st.tool === 'brush' || st.tool === 'erase';
-  const rebuild = (checking: boolean) => {
+  const tiles = useMemo(
+    () => ({ dim: tile('dim'), check: tile('check'), shade: tile('shade'), checkSoft: tile('checkSoft') }),
+    [],
+  );
+  // 去掉的地方怎麼顯示：一般＝變暗＋斜線；檢查結果＝不透明棋盤格；筆刷、橡皮擦＝只把素材變暗（看得到要畫哪裡），
+  // 打開〔看棋盤格〕改成半透明棋盤格。都沒有粉紅框線，直接在上面刷
+  const [softCheck, setSoftCheck] = useState(readSoftCheck);
+  const softRef = useRef(softCheck);
+  useEffect(() => {
+    softRef.current = softCheck;
+  }, [softCheck]);
+  const lookFor = (st: { checking: boolean; tool: string }, soft: boolean): LookKind =>
+    st.checking
+      ? 'check'
+      : st.tool === 'brush' || st.tool === 'erase'
+        ? soft
+          ? 'checkSoft'
+          : 'shade'
+        : 'dim';
+  // 事件處理裡用 ref（最新的值）；畫面上用 state
+  const lookOf = (st: { checking: boolean; tool: string }): LookKind => lookFor(st, softRef.current);
+  const rebuild = (look: LookKind, strokes?: CropStroke[]) => {
     const cur = useCrop.getState().s;
     const tint = tintRef.current;
     if (!cur || !tint) return;
-    composeKeep(keep.getContext('2d')!, kw, kh, cur.crop, cur.mask, cur.strokes, cur.base);
+    composeKeep(keep.getContext('2d')!, kw, kh, cur.crop, cur.mask, strokes ?? cur.strokes, cur.base);
     if (tint.width !== kw) tint.width = kw;
     if (tint.height !== kh) tint.height = kh;
     const g = tint.getContext('2d')!;
     g.globalCompositeOperation = 'source-over';
     g.clearRect(0, 0, kw, kh);
-    g.fillStyle = g.createPattern(checking ? checkTile : dimTile, 'repeat')!;
+    g.fillStyle = g.createPattern(tiles[look], 'repeat')!;
     g.fillRect(0, 0, kw, kh);
     g.globalCompositeOperation = 'destination-out';
     g.drawImage(keep, 0, 0);
     g.globalCompositeOperation = 'source-over';
   };
-  const looksChecked = checkLook(s);
+  const look = lookFor(s, softCheck);
   useEffect(() => {
-    rebuild(looksChecked);
+    rebuild(look);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s.crop, s.mask, s.strokes, s.base, looksChecked, keep]);
+  }, [s.crop, s.mask, s.strokes, s.base, look, keep]);
 
   /** 刷的時候：只畫這一小段（keep 和 tint 都增量更新，不重畫整張、不動 React 狀態） */
   const paintSeg = (a: Pt, b: Pt, mode: 'keep' | 'erase', w: number) => {
@@ -204,8 +241,8 @@ function Editor() {
     drawStroke(keep.getContext('2d')!, seg, kw, kh);
     const g = tintRef.current?.getContext('2d');
     if (!g) return;
-    // 留下＝tint 把這裡挖掉；去掉＝tint 把這裡蓋回斜線
-    const pat = g.createPattern(checkLook(useCrop.getState().s!) ? checkTile : dimTile, 'repeat')!;
+    // 留下＝tint 把這裡挖掉；去掉＝tint 把這裡蓋回去（變暗／棋盤格）
+    const pat = g.createPattern(tiles[lookOf(useCrop.getState().s!)], 'repeat')!;
     drawStroke(
       g,
       { ...seg, mode: mode === 'keep' ? 'erase' : 'keep' },
@@ -220,6 +257,25 @@ function Editor() {
   const rawPoint = (ev: { clientX: number; clientY: number }, dyPx = 0): Pt => {
     const r = rect();
     return [(ev.clientX - r.left) / r.width, (ev.clientY - dyPx - r.top) / r.height];
+  };
+
+  /** 手指圓（按著的地方）和焦點圓（實際畫的地方，往上偏 reach px）：筆刷、橡皮擦、自由裁切共用 */
+  const showMarks = (ev: { clientX: number; clientY: number }, focus: Pt | null) => {
+    const f = fingerRef.current;
+    const c = cursorRef.current;
+    const raw = rawPoint(ev);
+    if (f) {
+      f.style.display = focus ? 'block' : 'none';
+      f.style.left = `${raw[0] * 100}%`;
+      f.style.top = `${raw[1] * 100}%`;
+    }
+    if (c) {
+      c.style.display = focus ? 'block' : 'none';
+      if (focus) {
+        c.style.left = `${focus[0] * 100}%`;
+        c.style.top = `${focus[1] * 100}%`;
+      }
+    }
   };
 
   // ---- 拖四邊、四角、整塊 ----
@@ -263,28 +319,56 @@ function Editor() {
     el.addEventListener('pointercancel', up);
   };
 
-  // ---- 自由裁切：畫一圈 ----
+  // ---- 自由裁切：畫一圈（跟筆刷一樣有兩個圓圈：手指按的、實際畫的往上偏 reach px） ----
   const startLasso = (e: RPointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
     const el = e.currentTarget as HTMLElement;
     el.setPointerCapture(e.pointerId);
-    const clampPt = (p: Pt): Pt => [clamp(p[0], 0, 1), clamp(p[1], 0, 1)];
-    const pts: Pt[] = [clampPt(rawPoint(e))];
-    setLassoPts([...pts]);
+    const reach = useCrop.getState().s!.reach;
+    const focusOf = (ev: { clientX: number; clientY: number }): Pt => {
+      const q = rawPoint(ev, reach);
+      return [clamp(q[0], 0, 1), clamp(q[1], 0, 1)];
+    };
+    // 按下去先只移動、不畫：手指移動超過 4px、或按住 250ms 才開始畫（從焦點圓的位置畫起）
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let drawing = false;
+    let last = focusOf(e);
+    const pts: Pt[] = [];
+    showMarks(e, last);
+    const begin = (at: Pt) => {
+      if (drawing) return;
+      drawing = true;
+      pts.push(at);
+      setLassoPts([...pts]);
+    };
+    const timer = window.setTimeout(() => begin(last), 250);
     const move = (ev: PointerEvent) => {
-      pts.push(clampPt(rawPoint(ev)));
+      const p = focusOf(ev);
+      showMarks(ev, p);
+      if (!drawing) {
+        last = p;
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) <= 4) return;
+        begin(p);
+        return;
+      }
+      pts.push(p);
+      last = p;
       setLassoPts([...pts]);
     };
     const done = () => {
+      window.clearTimeout(timer);
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
       abortRef.current = null;
       setLassoPts(null);
+      showMarks(e, null);
     };
     const up = () => {
       done();
+      if (!drawing) return;
       const poly = smoothPolygon(pts);
       if (!poly) return toast('圈太小了，沿著要留下的範圍畫一整圈');
       setLassoMask(poly);
@@ -310,23 +394,6 @@ function Editor() {
       const q = rawPoint(ev, reach);
       return [clamp(q[0], 0, 1), clamp(q[1], 0, 1)];
     };
-    const showMarks = (ev: { clientX: number; clientY: number }, focus: Pt | null) => {
-      const f = fingerRef.current;
-      const c = cursorRef.current;
-      const raw = rawPoint(ev);
-      if (f) {
-        f.style.display = focus ? 'block' : 'none';
-        f.style.left = `${raw[0] * 100}%`;
-        f.style.top = `${raw[1] * 100}%`;
-      }
-      if (c) {
-        c.style.display = focus ? 'block' : 'none';
-        if (focus) {
-          c.style.left = `${focus[0] * 100}%`;
-          c.style.top = `${focus[1] * 100}%`;
-        }
-      }
-    };
     // 按下去先只移動、不畫（不會在錯的地方點一點）：手指移動超過 4px、或按住 250ms 才開始畫
     const x0 = e.clientX;
     const y0 = e.clientY;
@@ -338,7 +405,10 @@ function Editor() {
       if (drawing) return;
       drawing = true;
       pts.push(at);
-      paintSeg(at, at, mode, w);
+      if (mode === 'keep' && baseKind(st0.crop, st0.mask, st0.strokes, !!st0.base) === 'full') {
+        // 整張都留著、第一筆是「留下」：底馬上變成「只留刷到的」（其他地方變暗），刷到哪裡亮到哪裡；不用等放開手指
+        rebuild(lookOf(useCrop.getState().s!), [...st0.strokes, { mode, w, pts: [at] }]);
+      } else paintSeg(at, at, mode, w);
       last = at;
     };
     const timer = window.setTimeout(() => begin(last), 250);
@@ -368,7 +438,7 @@ function Editor() {
     };
     abortRef.current = () => {
       done();
-      if (drawing) rebuild(checkLook(useCrop.getState().s!)); // 這一筆不算：整張重畫回來
+      if (drawing) rebuild(lookOf(useCrop.getState().s!)); // 這一筆不算：整張重畫回來
     };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
@@ -572,7 +642,20 @@ function Editor() {
               </svg>
             )}
             {showTools && s.tool === 'lasso' && (
-              <div className="crop-lasso" data-testid="crop-lasso" onPointerDown={startLasso} />
+              <div className="crop-lasso" data-testid="crop-lasso" onPointerDown={startLasso}>
+                <i
+                  ref={fingerRef}
+                  className="brush-finger"
+                  data-testid="brush-finger"
+                  style={{ display: 'none' }}
+                />
+                <i
+                  ref={cursorRef}
+                  className="brush-cursor"
+                  data-testid="brush-cursor"
+                  style={{ display: 'none', width: 18, height: 18 }}
+                />
+              </div>
             )}
             {showTools && (s.tool === 'brush' || s.tool === 'erase') && (
               <div className="crop-paint" data-testid="crop-paint" onPointerDown={startPaint}>
@@ -710,7 +793,23 @@ function Editor() {
           )}
           {s.tool === 'lasso' && (
             <div className="ce-lasso">
-              <span className="hint">用手指沿著要留下的範圍畫一整圈，放開就裁好。</span>
+              <span className="hint">
+                用手指沿著要留下的範圍畫一整圈，放開就裁好。小圓圈是實際畫的位置，在手指上方。
+              </span>
+              <div className="paint-size">
+                <Slider
+                  label="距離"
+                  value={s.reach}
+                  min={0}
+                  max={MAX_REACH}
+                  step={5}
+                  format={(v) => `${v}px`}
+                  onChange={(v) => {
+                    saveReach(v);
+                    updateCrop({ reach: v });
+                  }}
+                />
+              </div>
               {s.mask && (
                 <button className="chip" onClick={() => setLassoMask(null)}>
                   清除形狀
@@ -720,6 +819,21 @@ function Editor() {
           )}
           {(s.tool === 'brush' || s.tool === 'erase') && (
             <div className="ce-paint" data-testid="paint-bar">
+              <div className="paint-size">
+                <button
+                  className={`chip${softCheck ? ' active' : ''}`}
+                  role="switch"
+                  aria-checked={softCheck}
+                  aria-label="看棋盤格"
+                  data-testid="paint-look"
+                  onClick={() => {
+                    saveSoftCheck(!softCheck);
+                    setSoftCheck(!softCheck);
+                  }}
+                >
+                  看棋盤格
+                </button>
+              </div>
               <div className="paint-size">
                 <Slider
                   label="粗細"

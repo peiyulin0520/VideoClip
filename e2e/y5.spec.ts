@@ -172,3 +172,62 @@ test('Z20 版型格子的轉場：素材位置偏掉，轉場中格子裡還是�
     })
     .toBe(true);
 });
+
+// feedback-17 Z26：版型格子裡的素材被裁成形狀（自由／筆刷）後，裁掉的地方是格子的底色，不是下面主軌的影片
+test('Z26 格子裡的影片裁成形狀：形狀外面是格子底色（不是主軌）；外框空檔設〔透明〕才露出主軌', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await createProjectWith(page, ['solid-blue.webm']); // 主軌藍色：露出來就是藍
+  await openTab(page, '版型');
+  await page.getByRole('button', { name: '版型 上下雙格', exact: true }).tap();
+  await finishLayout(page, [fixture('solid-red.webm'), fixture('solid-green.webm')]);
+  await closePanel(page);
+  const it = (await cells(page))[0]!.items[0]!;
+  const c0 = it.cell!;
+  const patch = (id: string, p: Record<string, unknown>) =>
+    page.evaluate(
+      ([i, pp]) =>
+        (
+          window as unknown as { __videoclip: { patchItem: (a: string, b: unknown) => void } }
+        ).__videoclip.patchItem(i as string, pp),
+      [id, p] as const,
+    );
+  // 一個小三角形（只留中間一小塊）
+  await patch(it.id, {
+    mask: [
+      [0.4, 0.4],
+      [0.6, 0.4],
+      [0.5, 0.6],
+    ],
+  });
+  await seekTo(page, 1);
+  const corner = async () =>
+    (await samplePreview(page, c0.x + c0.w * 0.1, c0.y + c0.h * 0.1)) ?? [0, 0, 0, 0];
+  await expect
+    .poll(async () => {
+      const [r, g, b] = await corner();
+      return b < 100 && r < 100 && g < 100; // 格子底色（預設黑），不是主軌的藍
+    })
+    .toBe(true);
+  // 形狀裡面還是紅色影片
+  await expect
+    .poll(async () => isRed(await samplePreview(page, c0.x + c0.w * 0.5, c0.y + c0.h * 0.47)))
+    .toBe(true);
+  // 外框空檔設〔透明〕：形狀外面露出下面的藍色
+  const frame = (
+    (await project(page)).tracks as unknown as {
+      items: { id: string; group?: string; cell?: unknown; type: string }[];
+    }[]
+  )
+    .flatMap((t) => t.items)
+    .find((i) => i.group && !i.cell && i.type !== 'text')!;
+  await patch(frame.id, { gapMode: 'none' });
+  await seekTo(page, 1.2);
+  await expect
+    .poll(async () => {
+      const [, , b] = await corner();
+      return b > 200;
+    })
+    .toBe(true);
+});

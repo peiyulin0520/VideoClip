@@ -75,3 +75,36 @@ test('Z13 合成各段花多少', async ({ page }) => {
   );
   await run('傾斜 8°');
 });
+
+// feedback-17 Z25：轉場畫面直接當貼圖前後，轉場那段每格「合成：準備」花多少（Z13_BENCH=1 才跑）
+test('Z25 轉場那段的準備時間', async ({ page }) => {
+  test.skip(!process.env.Z13_BENCH, '設 Z13_BENCH=1 才跑');
+  test.setTimeout(240_000);
+  await page.addInitScript(() => {
+    localStorage.setItem('vc-preview-quality', 'clear');
+    localStorage.setItem('vc-perf', '1');
+  });
+  await createProjectWith(page, ['big-1080p.webm', 'big-1080p.webm']);
+  await waitHook(page);
+  await page.evaluate(() =>
+    (window as unknown as { __videoclip: { setSeam: (d: number) => void } }).__videoclip.setSeam(1),
+  );
+  await page.waitForTimeout(8000); // 讓預先解碼做完
+  const cut = 2;
+  await seekTo(page, cut - 1.2);
+  await pressPlay(page);
+  const preps: number[] = [];
+  const t0 = Date.now();
+  while (Date.now() - t0 < 2500) {
+    const [time, s] = await Promise.all([
+      page.evaluate(() => (window as unknown as { __videoclip: { time: () => number } }).__videoclip.time()),
+      page.evaluate(() => (window as unknown as { __videoclip: { stats: () => Stats } }).__videoclip.stats()),
+    ]);
+    if (time > cut - 0.4 && time < cut + 0.4) preps.push(s.prepMs);
+    await page.waitForTimeout(60);
+  }
+  preps.sort((a, b) => a - b);
+  console.log(
+    `Z25 轉場中 準備 ms：樣本 ${preps.length}，中位數 ${preps[preps.length >> 1]?.toFixed(1)}，最大 ${preps[preps.length - 1]?.toFixed(1)}`,
+  );
+});

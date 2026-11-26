@@ -262,6 +262,20 @@ export function installDebugHook(player: Player) {
     },
     /** 測試用：轉場預先解碼的狀態，與開關（關掉＝一定走「等一下再轉」） */
     framesState: () => player.framesState(),
+    /** 測試用：把某個影像物件的欄位直接改掉（淺層合併，不進復原紀錄） */
+    patchItem: (id: string, patch: Record<string, unknown>) => {
+      const pr = useProjectStore.getState().project;
+      if (!pr) return;
+      useProjectStore.setState({
+        project: {
+          ...pr,
+          tracks: pr.tracks.map((t) => ({
+            ...t,
+            items: t.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+          })),
+        } as typeof pr,
+      });
+    },
     /** 測試用：把某個影像物件的位置往右挪 dx（0–1 的畫面寬度比例），不進復原紀錄 */
     nudgeItem: (id: string, dx: number) => {
       const pr = useProjectStore.getState().project;

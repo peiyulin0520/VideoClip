@@ -206,6 +206,52 @@ export function buildScene(
           frameSize(frame.item, ctx, canvasW, canvasH),
         )
       : { x: 0, y: 0 };
+    // 格子的底色層（跟「沒有素材」時的色塊同一套）：素材被裁成形狀（自由／筆刷）時，裁掉的地方墊上它，不要透出下面的影片
+    const pushCellFill = (color: string, cellBox: { x: number; y: number; w: number; h: number }) => {
+      const fr = frame!.item;
+      const gtf = group ? gts.get(group) : undefined;
+      const r = cellRect(cellBox, canvasW, canvasH);
+      const c = composeWith(
+        { x: (r.x + r.w / 2) / canvasW, y: (r.y + r.h / 2) / canvasH, scale: 1, rotation: 0, opacity: 1 },
+        fr.transform,
+        canvasW,
+        canvasH,
+      );
+      const fillLayer: SceneLayer = {
+        id: `fill-${track.id}`,
+        kind: 'text',
+        source: solidCanvas(FILL_COLORS[color as keyof typeof FILL_COLORS] ?? color),
+        ready: true,
+        srcW: 8,
+        srcH: 8,
+        textKey: `fill-${FILL_COLORS[color as keyof typeof FILL_COLORS] ?? color}`,
+        box: {
+          cx: c.x * canvasW + off.x * canvasW,
+          cy: c.y * canvasH + off.y * canvasH,
+          w: r.w * fr.transform.scale,
+          h: r.h * fr.transform.scale,
+          rotation: fr.transform.rotation,
+        },
+        opacity: fr.transform.opacity,
+        blend: 'normal',
+        cornerRadius: 0,
+      };
+      const fillFx = itemEffectAt(fr, t - fr.start);
+      if (fillFx)
+        applyGroupOrItemEffect(fillLayer, fillFx, group, fr, ctx, canvasW, canvasH, covers, covered, `${i}`);
+      if (gtf) applyGroupLook(fillLayer, gtf.look, canvasW, canvasH);
+      emit(group, fillLayer, true);
+    };
+    const maskedCell = (it: Item | null | undefined) =>
+      track.groupRole === 'cell' &&
+      !!frame &&
+      !!it &&
+      it.type !== 'text' &&
+      it.type !== 'audio' &&
+      !!it.cell &&
+      ((it.mask && it.mask.length >= 3) || !!it.maskBitmap) &&
+      frame.item.gapMode !== 'none';
+    const cellFillColor = () => track.fill ?? frame!.item.frameStyle?.color ?? '#000000';
     const at = canTransition(track) ? activeTransition(track.items, t) : null;
     if (at) {
       // 轉場期間：A、B 兩段同時畫（B 在上或 A 在上看轉場種類），各自套上位移、縮放、透明度、裁切、模糊
@@ -252,6 +298,8 @@ export function buildScene(
             [B, at.b],
             [A, at.a],
           ];
+      const mc = [at.a, at.b].find((x) => maskedCell(x));
+      if (mc && mc.type !== 'text' && mc.type !== 'audio' && mc.cell) pushCellFill(cellFillColor(), mc.cell);
       for (const [x, it] of pairs) {
         if (!x) continue;
         const g = it && isFrameItem(it) ? it.group! : undefined;
@@ -328,6 +376,8 @@ export function buildScene(
               : undefined,
           );
         if (gt) applyGroupLook(layer, gt.look, canvasW, canvasH);
+        if (maskedCell(l.item) && l.item.type !== 'text' && l.item.type !== 'audio' && l.item.cell)
+          pushCellFill(cellFillColor(), l.item.cell);
         emit(group, layer, track.groupRole === 'cell');
       }
     } else if (
@@ -347,39 +397,7 @@ export function buildScene(
       const cellBox =
         track.cell ?? (ref && ref.type !== 'text' && ref.type !== 'audio' ? ref.cell : undefined);
       if (!cellBox) return;
-      const r = cellRect(cellBox, canvasW, canvasH);
-      const c = composeWith(
-        { x: (r.x + r.w / 2) / canvasW, y: (r.y + r.h / 2) / canvasH, scale: 1, rotation: 0, opacity: 1 },
-        fr.transform,
-        canvasW,
-        canvasH,
-      );
-      const fillRaw = gapFillColor(track, frame.item)!;
-      const color = FILL_COLORS[fillRaw as keyof typeof FILL_COLORS] ?? fillRaw;
-      const fillLayer: SceneLayer = {
-        id: `fill-${track.id}`,
-        kind: 'text',
-        source: solidCanvas(color),
-        ready: true,
-        srcW: 8,
-        srcH: 8,
-        textKey: `fill-${color}`,
-        box: {
-          cx: c.x * canvasW + off.x * canvasW,
-          cy: c.y * canvasH + off.y * canvasH,
-          w: r.w * fr.transform.scale,
-          h: r.h * fr.transform.scale,
-          rotation: fr.transform.rotation,
-        },
-        opacity: fr.transform.opacity,
-        blend: 'normal',
-        cornerRadius: 0,
-      };
-      const fillFx = itemEffectAt(fr, t - fr.start);
-      if (fillFx)
-        applyGroupOrItemEffect(fillLayer, fillFx, group, fr, ctx, canvasW, canvasH, covers, covered, `${i}`);
-      if (gtf) applyGroupLook(fillLayer, gtf.look, canvasW, canvasH);
-      emit(group, fillLayer, true);
+      pushCellFill(gapFillColor(track, frame.item)!, cellBox);
     }
   });
   for (const list of deferred.values()) out.push(...list); // 外框不在轉場那一列的保險
