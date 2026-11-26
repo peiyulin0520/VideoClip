@@ -277,7 +277,9 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **動態字卡「停在最後畫面」的靜止（Z22）**：`Stage.settle`（0→1）只在 `kinetic.end==='hold'` 且快到停點時有值；新式子裡「閒著也在動」的部分要乘 `(1 - (s.settle ?? 0))`。對照圖：`Z22_SHEET=after npx playwright test e2e/z22-hold-sheet.spec.ts`。邊緣淡出寬度 `kinetic.fadeW`、預覽色帶 `KineticFadeGuide`。
 - **Z26 裁切**：筆刷／橡皮擦的顯示 tile（`shade`／`checkSoft`／`check`／`dim`，`lookFor`）；自由裁切跟筆刷共用 `showMarks`、`reach`；格子裁成形狀墊底色在 `scene.ts` `pushCellFill`。測試掛鉤 `__videoclip.patchItem(id, patch)`。
 - **Z27 轉場不重播**：`videoSync.ts` `hiddenSyncPlan`（藏著的後一段影片：暫停→seek 到目標＋起跑延遲＋提前量→時鐘走到再 play；入點不夠時提早 play）；`handover.ts` `rampShown`（換手範圍最後 0.6 秒預解圖慢慢靠到 `<video>` 那一格）、`HANDOVER_AFTER` 2 秒、A 的預解圖往前多留 `HANDOVER_A_LAG`；`Player.startPlay/probeLatency/noteALag`；測試掛鉤 `setPlayLatency(ms)`；藏著的影片也要註冊 rVFC（`videoFrameCount`），不然換手那一格會拿到舊畫面。
-- **Z28 彎道收尾**：`kinetic/fx/ribbon.ts`（路線、緞帶形狀、拉平、風；純函式）＋ `flow.ts` path 的 draw（q＜0.14 S 形帶子滑出、q＞0.07 新緞帶）；`KineticDef.smooth`＝收尾時預覽也 60 步。
+- **Z28→Z30 彎道**：`kinetic/fx/ribbon.ts`（`flowRoute` 平常滑的正弦 S、`settleRoute` 到一半後繞一圈進正中間、`flowHead`/`settleHead`、`ribbonShape` 蛇形身體＋風＋拉平、`readForward`）＋ `flow.ts` path 的 draw；整個特效只有一條只寫一遍字的緞帶；`KineticDef.smooth`＝用真正的時間畫（`render.ts` 鍵用毫秒）。
+- **Z29 轉場**：`Player.pauseVideo(el, why)`／`bStat`（效能框「B：」那行）、`videoSyncPlan` 的 `raw`、`hiddenSyncPlan` 的 `resync`；起跑延遲用 rVFC 量。
+- **Z31 裁切**：`CropEditor` 〔自由〕設定區兩行、〔清除形狀〕一直在。
 - **Z25 轉場換手**：`handover.ts`（`inHandover`、`pickSource`）決定轉場前後一小段時間畫預解圖還是 `<video>`；`compositor.ts` `updateBitmap` 讓 `ImageBitmap` 直接當貼圖（不經 frameCanvas）。播放時字卡 30 步（`setKineticPlaying`）。
 - **Z20／Z21**：格子軌轉場的虛擬 A／B 也要過 `guardCell`（`scene.ts`）；測試用 `__videoclip.nudgeItem(id, dx)` 把素材位置挪偏（不進復原）。`setGroupStart` 跟 `setGroupDuration` 是一對（改版型開始／長度）；版型的時間 UI＝播放軸兩端把手＋〔時間〕。
 - **模擬 iPhone 晚到**：e2e 把 `HTMLMediaElement.prototype.readyState` 在一段時間內回 1（`z16-transition.spec.ts`）。

@@ -1,67 +1,19 @@
 // 流動（09–16）。改寫自 claude-animated-text（MIT，© 2026 pound / POUND0423）。
-import { band, clamp, cs, drawWord, E, fontOf, marquee, pick, wlen, type KineticDef } from '../core';
+import { band, clamp, cs, drawWord, fontOf, marquee, pick, wlen, type KineticDef } from '../core';
 import {
-  Q_NEW,
-  Q_OLD_END,
+  FLOW_HOLD,
+  FLOW_P,
   flattenFactor,
-  headDist,
+  flowHead,
+  flowRoute,
   readForward,
-  ribbonRoute,
   ribbonShape,
+  settleHead,
+  settleRoute,
   shapeAt,
   windFactor,
   type Win,
 } from './ribbon';
-
-// 彎道（path）的帶子：原版 SVG 的路徑（座標系 320×180，S 形曲線），兩段三次貝茲曲線
-const RIB: [number, number, number, number, number, number, number, number][] = [
-  [-60, 128, 30, 20, 110, 30, 165, 92],
-  [165, 92, 220, 154, 300, 170, 390, 50],
-];
-type RibPt = { x: number; y: number; a: number; s: number };
-type Rib = number[][];
-let ribPts: RibPt[] | null = null;
-/** 把路徑取樣成一串點（含累計長度與切線角） */
-function sampleRib(rib: Rib): RibPt[] {
-  const out: RibPt[] = [];
-  let acc = 0;
-  for (const [x0, y0, x1, y1, x2, y2, x3, y3] of rib as number[][]) {
-    for (let i = 0; i <= 120; i++) {
-      const u = i / 120;
-      const m = 1 - u;
-      const x = m * m * m * x0! + 3 * m * m * u * x1! + 3 * m * u * u * x2! + u * u * u * x3!;
-      const y = m * m * m * y0! + 3 * m * m * u * y1! + 3 * m * u * u * y2! + u * u * u * y3!;
-      const dx = 3 * m * m * (x1! - x0!) + 6 * m * u * (x2! - x1!) + 3 * u * u * (x3! - x2!);
-      const dy = 3 * m * m * (y1! - y0!) + 6 * m * u * (y2! - y1!) + 3 * u * u * (y3! - y2!);
-      const prev = out[out.length - 1];
-      if (prev && i === 0) continue; // 兩段的接點只留一個
-      if (prev) acc += Math.hypot(x - prev.x, y - prev.y);
-      out.push({ x, y, a: Math.atan2(dy, dx), s: acc });
-    }
-  }
-  return out;
-}
-/** 原本的 S 形路徑取樣（算一次就好） */
-function ribSamples() {
-  return (ribPts ??= sampleRib(RIB));
-}
-/** 路徑上離起點 d 的位置（超出就停在兩端） */
-function ribAtIn(pts: RibPt[], d: number): RibPt {
-  if (d <= 0) return pts[0]!;
-  const last = pts[pts.length - 1]!;
-  if (d >= last.s) return last;
-  let lo = 0;
-  let hi = pts.length - 1;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (pts[mid]!.s <= d) lo = mid;
-    else hi = mid;
-  }
-  const a = pts[lo]!;
-  const b = pts[hi]!;
-  const f = (d - a.s) / Math.max(b.s - a.s, 1e-6);
-  return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, a: a.a + (b.a - a.a) * f, s: d };
-}
 
 export const FX_FLOW: KineticDef[] = [
   {
@@ -235,11 +187,11 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1,
     area: 'full',
     calm: false,
-    // 播放時收尾也每秒畫 60 次（緞帶在飛，30 次會一頓一頓）
+    // 整個特效只有一條緞帶，播放時流動和收尾都用真正的時間畫、每秒 60 次（不量化成步，才不會一格大一格小）
     smooth: true,
-    // 停在最後畫面：S 形帶子往前滑出畫面（0.4 秒）→ 一條緞帶飛進來、隨風飄、繞回正中間變橫條（共 2.8 秒，流動 0.8 秒之後開始）
-    settleLen: 2.8,
-    hold: () => 3.6,
+    // 停在最後畫面：緞帶滑到畫面正中間（第一輪的一半，0.9 秒）時開始收尾——照原方向原速度離開、繞一圈、停在中間拉直（2.3 秒）
+    settleLen: 2.3,
+    hold: () => FLOW_HOLD + 2.3,
     len: () => null,
     hit: [0, 0.2, 1, 0.6],
     draw(s, t) {
@@ -250,99 +202,66 @@ export const FX_FLOW: KineticDef[] = [
       const ox = (W - 320 * k) / 2;
       const oy = (H - 180 * k) / 2;
       const vw = W / k; // 畫面看得到的寬度（直式畫面只看得到 320 的一小段）
-      const win: Win = { x0: -ox / k, y0: -oy / k, x1: (W - ox) / k, y1: (H - oy) / k };
-      // 收尾的那條緞帶：整句字（每個詞空一格）＋左右留白；字太長就縮小，放得進畫面。粗細跟著字的大小，之後不再變
+      const vh = H / k;
+      // 緞帶活動的範圍：框的整個寬度；高度只用中間 60%（字卡的選取範圍，使用者會把它放在想看的地方）
+      const win: Win = { x0: -ox / k, y0: 90 - vh * 0.3, x1: (W - ox) / k, y1: 90 + vh * 0.3 };
+      // 緞帶：整句字（每個詞空一格）＋左右留白；字太長就縮小，放得進畫面。長度、粗細、字的大小從頭到尾不變
       const sentence = cs(s.words.join(' '));
       g.font = fontOf(s, 15, 900);
       const sw0 = g.measureText(sentence.join('')).width;
-      const size = Math.min(15, (15 * vw * 0.68) / Math.max(sw0, 1));
+      const size = Math.min(15, (15 * vw * 0.56) / Math.max(sw0, 1));
       const sw = (sw0 * size) / 15;
       const L = sw + size * 1.2;
       const thick = size * (26 / 15);
+      const seed = s.words.join('|');
+      const flow = flowRoute(win, L);
+      let route = flow;
+      let hs: number;
+      if (q > 0) {
+        const st = settleRoute(win, L, thick, seed);
+        route = st.route;
+        hs = settleHead(q, st.d0, st.route.total, flow.total / FLOW_P, 2.3);
+      } else hs = flowHead(t, flow);
+      const shape = ribbonShape(route, hs, L, thick * 0.3 * windFactor(q), t, {
+        cx: (win.x0 + win.x1) / 2,
+        cy: (win.y0 + win.y1) / 2,
+        e: flattenFactor(q),
+      });
       g.save();
       g.translate(ox, oy);
       g.scale(k, k);
       g.lineCap = 'butt';
       g.lineJoin = 'round';
       g.strokeStyle = s.hi;
-      // ---- 原本的 S 形帶子（字沿著帶子排，整串字以 24／秒的速度流過去）----
-      const sp = ribSamples();
-      const sTotal = sp[sp.length - 1]!.s;
-      // 收尾時它順著自己的路線往前滑出去：尾巴往前縮（帶子還在、字不動）
-      const slide = q > 0 ? sTotal * E.in(clamp(q / Q_OLD_END)) : 0;
-      if (q < Q_OLD_END) {
-        g.lineWidth = 26;
-        g.beginPath();
-        if (slide <= 0) {
-          g.moveTo(RIB[0]![0], RIB[0]![1]);
-          for (const [, , x1, y1, x2, y2, x3, y3] of RIB) g.bezierCurveTo(x1, y1, x2, y2, x3, y3);
-        } else {
-          const first = ribAtIn(sp, slide);
-          g.moveTo(first.x, first.y);
-          for (const pt of sp) if (pt.s > slide) g.lineTo(pt.x, pt.y);
-        }
-        g.stroke();
-        const unit = s.words.join('・') + '・';
-        g.font = fontOf(s, 15, 900);
-        g.fillStyle = s.hifg;
-        g.textAlign = 'center';
-        g.textBaseline = 'middle';
-        const unitLen = g.measureText(unit).width;
-        const chars = cs(unit.repeat(Math.ceil(64 / wlen(unit)) + 2));
-        let pos = -((t * 24) % unitLen);
-        for (const ch of chars) {
+      g.lineWidth = thick;
+      g.beginPath();
+      shape.p.forEach((pt, i) => (i === 0 ? g.moveTo(pt.x, pt.y) : g.lineTo(pt.x, pt.y)));
+      g.stroke();
+      g.font = fontOf(s, size, 900);
+      g.fillStyle = s.hifg;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      // 字排在緞帶正中間；緞帶偏向左走的時候整句反過來排（字不會倒過來）：兩種排法依方向淡入淡出
+      const fwd = readForward(shape, L);
+      const start = (shape.total - sw) / 2;
+      const lay = (rev: boolean, alpha: number) => {
+        if (alpha < 0.003) return;
+        let pos = 0;
+        for (const ch of sentence) {
           const w = g.measureText(ch).width;
-          if (pos > sTotal) break;
-          if (pos + w >= 0 && pos + w / 2 >= slide) {
-            const pt = ribAtIn(sp, pos + w / 2);
-            g.save();
-            g.translate(pt.x, pt.y);
-            g.rotate(pt.a);
-            g.fillText(ch, 0, 0);
-            g.restore();
-          }
+          const mid = start + pos + w / 2;
+          const pt = shapeAt(shape, rev ? shape.total - mid : mid);
+          g.save();
+          g.globalAlpha *= alpha;
+          g.translate(pt.x, pt.y);
+          g.rotate(pt.a + (rev ? Math.PI : 0));
+          g.fillText(ch, 0, 0);
+          g.restore();
           pos += w;
         }
-      }
-      // ---- 新的緞帶：飛進來、隨風飄、繞回正中間 ----
-      if (q > Q_NEW) {
-        const route = ribbonRoute(win, L, thick, s.words.join('|'));
-        const hs = headDist(q, route.total);
-        const shape = ribbonShape(route, hs, L, thick * 0.3 * windFactor(q), t, {
-          cx: (win.x0 + win.x1) / 2,
-          cy: (win.y0 + win.y1) / 2,
-          e: flattenFactor(q),
-        });
-        g.lineWidth = thick;
-        g.beginPath();
-        shape.p.forEach((pt, i) => (i === 0 ? g.moveTo(pt.x, pt.y) : g.lineTo(pt.x, pt.y)));
-        g.stroke();
-        g.font = fontOf(s, size, 900);
-        g.fillStyle = s.hifg;
-        g.textAlign = 'center';
-        g.textBaseline = 'middle';
-        // 字排在緞帶正中間；緞帶偏向左的時候整句反過來排（字不會倒過來）：兩種排法依方向淡入淡出
-        const fwd = readForward(shape, L);
-        const start = (shape.total - sw) / 2;
-        const lay = (rev: boolean, alpha: number) => {
-          if (alpha < 0.003) return;
-          let pos = 0;
-          for (const ch of sentence) {
-            const w = g.measureText(ch).width;
-            const mid = start + pos + w / 2;
-            const pt = shapeAt(shape, rev ? shape.total - mid : mid);
-            g.save();
-            g.globalAlpha *= alpha;
-            g.translate(pt.x, pt.y);
-            g.rotate(pt.a + (rev ? Math.PI : 0));
-            g.fillText(ch, 0, 0);
-            g.restore();
-            pos += w;
-          }
-        };
-        lay(false, fwd);
-        lay(true, 1 - fwd);
-      }
+      };
+      lay(false, fwd);
+      lay(true, 1 - fwd);
       g.restore();
     },
   },

@@ -1,4 +1,5 @@
-// 彎道〔停在最後畫面〕的收尾：一條長度固定的緞帶從畫面外飛進來、在畫面裡隨風亂飄，最後繞回正中間變成橫條。
+// 彎道：從頭到尾只有一條緞帶（長度＝整句字一遍＋留白、字黏在緞帶上、不重複）。平常沿著 S 形從左滑到右、一輪接一輪；
+// 〔停在最後畫面〕時從第一輪滑到一半開始，照原本的方向和速度離開 S、繞畫面一圈（有風的擺動），最後停在正中間拉直成橫條。
 // 這裡只放幾何（純函式，沒有畫布）：路線、緞帶的形狀、時間 → 位置。座標是 viewBox（320×180）的座標，
 // 「畫面看得到的範圍」win 由呼叫的人用蓋滿（slice）的倍率算出來——直式畫面只看得到中間一小段。
 import { clamp } from '../core';
@@ -8,10 +9,9 @@ export type Win = { x0: number; y0: number; x1: number; y1: number };
 export type Route = { pts: V[]; cum: number[]; total: number };
 export type Shape = { p: V[]; ang: number[]; len: number[]; total: number };
 
-/** 收尾各段在 q（0→1）上的位置 */
-export const Q_NEW = 0.07; // 新緞帶開始飛進來
-export const Q_FLY_END = 0.96; // 緞帶到達正中間
-export const Q_OLD_END = 0.14; // 原本的 S 形帶子完全離開
+/** 緞帶滑過畫面一輪的秒數；〔停在最後畫面〕從第一輪滑到一半（緞帶在畫面正中間）時開始 */
+export const FLOW_P = 1.8;
+export const FLOW_HOLD = FLOW_P / 2;
 
 const smooth = (a: number, b: number, x: number) => {
   const p = clamp((x - a) / (b - a));
@@ -57,67 +57,48 @@ function catmull(ctrl: V[], per = 28): V[] {
   return out;
 }
 
-/** 沿路線做高斯平滑（取樣成等距、兩端固定）：σ 是平滑的長度（沿線距離） */
-function smoothPath(pts: V[], sigma: number): V[] {
+/** 平常滑的路線：左邊畫面外 → 右邊畫面外的一條 S 形（正弦），頭在 x0−0.2L 進來、在 x1+1.2L 出去（整條緞帶完全離開才算一輪） */
+export function flowRoute(win: Win, L: number): Route {
+  const w = win.x1 - win.x0;
+  const h = win.y1 - win.y0;
+  const cy = (win.y0 + win.y1) / 2;
+  const A = h * 0.17;
+  const lam = w * 1.7;
+  const xa = win.x0 - 0.2 * L;
+  const xb = win.x1 + 1.2 * L;
+  const n = 160;
+  const pts: V[] = [];
+  for (let i = 0; i <= n; i++) {
+    const x = xa + ((xb - xa) * i) / n;
+    pts.push({ x, y: cy + A * Math.sin((2 * Math.PI * (x - (xa + xb) / 2)) / lam) });
+  }
+  return toRoute(pts);
+}
+
+function toRoute(pts: V[]): Route {
   const cum = [0];
   for (let i = 1; i < pts.length; i++)
     cum.push(cum[i - 1]! + Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y));
-  const total = cum[cum.length - 1]!;
-  const n = Math.max(Math.round(total / 2), 8);
-  const step = total / n;
-  const at = (d: number): V => {
-    let lo = 0;
-    let hi = pts.length - 1;
-    while (hi - lo > 1) {
-      const mid = (lo + hi) >> 1;
-      if (cum[mid]! <= d) lo = mid;
-      else hi = mid;
-    }
-    const f = (d - cum[lo]!) / Math.max(cum[hi]! - cum[lo]!, 1e-6);
-    return { x: pts[lo]!.x + (pts[hi]!.x - pts[lo]!.x) * f, y: pts[lo]!.y + (pts[hi]!.y - pts[lo]!.y) * f };
-  };
-  const even = Array.from({ length: n + 1 }, (_, i) => at(i * step));
-  const half = Math.ceil((sigma * 2.5) / step);
-  const out: V[] = [];
-  for (let i = 0; i <= n; i++) {
-    // 兩端用對稱的視窗（離端點多近就只往內看多遠），端點本身不動
-    const r = Math.min(half, i, n - i);
-    let sx = 0;
-    let sy = 0;
-    let sw = 0;
-    for (let j = -r; j <= r; j++) {
-      const w = Math.exp(-((j * step) ** 2) / (2 * sigma * sigma));
-      sx += even[i + j]!.x * w;
-      sy += even[i + j]!.y * w;
-      sw += w;
-    }
-    out.push({ x: sx / sw, y: sy / sw });
-  }
-  return out;
-}
-
-function bezier(a: V, c1: V, c2: V, b: V, n = 24): V[] {
-  const out: V[] = [];
-  for (let i = 1; i <= n; i++) {
-    const u = i / n;
-    const m = 1 - u;
-    out.push({
-      x: m * m * m * a.x + 3 * m * m * u * c1.x + 3 * m * u * u * c2.x + u * u * u * b.x,
-      y: m * m * m * a.y + 3 * m * m * u * c1.y + 3 * m * u * u * c2.y + u * u * u * b.y,
-    });
-  }
-  return out;
+  return { pts, cum, total: cum[cum.length - 1]! };
 }
 
 /**
- * 緞帶「頭」走的路線：從畫面左邊外面進來 → 在畫面裡左右上下飄（中間的點用 seed 稍微不同）→
- * 最後順順地進到終點（正中間偏右）：緞帶的頭到終點時，整條緞帶再慢慢拉平（見 ribbonShape 的 flat），躺在畫面正中間。
- * L＝緞帶長度、thick＝緞帶粗細；路線離畫面邊緣留 0.8 倍粗細（緞帶身體＋風的擺動不出界）。
+ * 〔停在最後畫面〕頭走的路線：前半＝平常的 S 形走到一半（d0＝緞帶在畫面正中間的位置，跟平常滑的完全一樣），
+ * 接著順著同一個方向繞畫面一圈（順時針：右 → 下 → 左 → 上），最後進到終點（正中間偏右：頭到終點時，整條緞帶再慢慢拉平，躺在畫面正中間）。
+ * 路線離畫面邊緣留 1.05 倍粗細（緞帶身體＋風的擺動不出界）；轉角用 seed 稍微不同（同一句字永遠同一條）。
  */
-export function ribbonRoute(win: Win, L: number, thick: number, seed: string): Route {
+export function settleRoute(
+  win: Win,
+  L: number,
+  thick: number,
+  seed: string,
+): { route: Route; d0: number; flow: Route } {
+  const flow = flowRoute(win, L);
+  const d0 = flow.total / 2;
+  const M = routeAt(flow, d0);
   const cx = (win.x0 + win.x1) / 2;
   const cy = (win.y0 + win.y1) / 2;
-  const m = thick * 0.8;
+  const m = thick * 1.05;
   const ix0 = win.x0 + m;
   const ix1 = win.x1 - m;
   const iy0 = win.y0 + m;
@@ -126,29 +107,42 @@ export function ribbonRoute(win: Win, L: number, thick: number, seed: string): R
   const r1 = seedOf(seed, 'a');
   const r2 = seedOf(seed, 'b');
   const r3 = seedOf(seed, 'c');
-  // 順時針繞畫面一圈、最後繞回正中間（不來回折返，緞帶才不會折起來）；中間的點用 seed 稍微不同
+  const R: V = { x: cx + L / 2, y: cy };
+  // 前一個點放在 M 往後一點（切線方向），這樣曲線在 M 順順地接下去
+  const back: V = { x: M.x - M.tx * 40, y: M.y - M.ty * 40 };
   const ctrl: V[] = [
-    { x: win.x0 - L * 0.6, y: at(0, 0.14 + 0.08 * r1).y }, // 從左邊外面進來
-    at(0.88 + 0.06 * r2, 0.1 + 0.05 * r3),
-    at(0.45 + 0.15 * r2, 0.4 + 0.06 * r1),
-    at(0.86 + 0.08 * r3, 0.8 + 0.04 * r2),
-    at(0.14 + 0.06 * r1, 0.88),
-    at(0.1 + 0.06 * r2, 0.5 + 0.06 * r3),
+    back,
+    { x: M.x, y: M.y },
+    at(0.95, 0.66 + 0.06 * r2), // 先往下（不是往右，頭本來就在右邊）
+    at(0.6 + 0.1 * r3, 0.98),
+    at(0.1 + 0.04 * r1, 0.84),
+    at(0.06 + 0.04 * r2, 0.4),
+    at(0.3 + 0.1 * r3, 0.1 + 0.04 * r1),
+    R,
   ];
-  // 緞帶有長度、不能急轉彎（會折起來、字疊在一起）：把路線磨圓，轉彎半徑跟緞帶長度成比例
-  const wander = smoothPath(catmull(ctrl, 36), L * 0.4);
-  const last = wander[wander.length - 1]!;
-  const prev = wander[wander.length - 6]!;
-  const R: V = { x: cx + L / 2, y: cy }; // 終點（緞帶的頭）：緞帶最後躺在正中間
-  const h = Math.hypot(R.x - last.x, R.y - last.y) * 0.45;
-  const dl = Math.hypot(last.x - prev.x, last.y - prev.y) || 1;
-  const c1: V = { x: last.x + ((last.x - prev.x) / dl) * h, y: last.y + ((last.y - prev.y) / dl) * h };
-  const c2: V = { x: R.x + (last.x - R.x) * 0.35, y: R.y + (last.y - R.y) * 0.35 }; // 順著來的方向直直進來（最後的樣子由拉平決定）
-  const pts = [...wander, ...bezier(last, c1, c2, R, 40)];
-  const cum = [0];
-  for (let i = 1; i < pts.length; i++)
-    cum.push(cum[i - 1]! + Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y));
-  return { pts, cum, total: cum[cum.length - 1]! };
+  const per = 30;
+  const loop = catmull(ctrl, per).slice(per); // 去掉 back → M 那一段
+  const head = flow.pts.filter((_, i) => flow.cum[i]! < d0 - 1e-6);
+  const route = toRoute([...head, { x: M.x, y: M.y }, ...loop.slice(1)]);
+  return { route, d0: route.cum[head.length]!, flow };
+}
+
+/** 平常（沒收尾）：頭走到 S 形的哪裡。t＝字卡自己的時間；一輪 FLOW_P 秒，接著下一輪 */
+export function flowHead(t: number, flow: Route): number {
+  const u = (((t / FLOW_P) % 1) + 1) % 1;
+  return flow.total * u;
+}
+
+/**
+ * 收尾（q 0→1）：頭從 d0 走到路線終點。三次 Hermite：起點速度＝平常滑的速度（不會突然變快變慢）、終點速度 0。
+ * v0＝平常的速度（距離／秒）、T＝收尾總秒數。
+ */
+export function settleHead(q: number, d0: number, total: number, v0: number, T: number): number {
+  const dl = Math.max(total - d0, 1e-6);
+  const s0 = Math.min((v0 * T) / dl, 3); // 起點斜率（超過 3 單調性會壞）
+  const x = clamp(q);
+  const h = s0 * x + (3 - 2 * s0) * x * x + (s0 - 2) * x * x * x; // Hermite：H(0)=0、H(1)=1、H'(0)=s0、H'(1)=0
+  return d0 + dl * h;
 }
 
 /** 路線上離起點 d 的位置與單位切線（起點之前、終點之後沿著端點的切線延伸） */
@@ -182,20 +176,14 @@ export function routeAt(r: Route, d: number): V & { tx: number; ty: number } {
   return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, ...seg(lo) };
 }
 
-/** 緞帶的頭走到路線的哪裡（距離）：飛進來很快、越靠近中間越慢，停下來時剛好到終點 */
-export function headDist(q: number, total: number): number {
-  const x = clamp((q - Q_NEW) / (Q_FLY_END - Q_NEW));
-  return total * (1 - (1 - x) * (1 - x));
-}
-
 /** 拉平的程度（0～1）：快到中間時，緞帶從彎彎的慢慢拉直成橫條 */
 export function flattenFactor(q: number): number {
-  return smooth(0.76, Q_FLY_END + 0.01, q);
+  return smooth(0.78, 0.98, q);
 }
 
-/** 風的擺動大小（0～1）：飛進來後慢慢起風、快到中間時風停 */
+/** 風的擺動大小（0～1）：平常滑的時候一直有（q＝0 時是 1，跟收尾接得上）、快到中間時風停 */
 export function windFactor(q: number): number {
-  return smooth(Q_NEW, 0.22, q) * (1 - smooth(0.7, 0.95, q));
+  return 1 - smooth(0.62, 0.92, q);
 }
 
 /**

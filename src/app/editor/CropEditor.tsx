@@ -792,29 +792,35 @@ function Editor() {
             </div>
           )}
           {s.tool === 'lasso' && (
-            <div className="ce-lasso">
+            <div className="ce-lasso" data-testid="lasso-bar">
               <span className="hint">
                 用手指沿著要留下的範圍畫一整圈，放開就裁好。小圓圈是實際畫的位置，在手指上方。
               </span>
-              <div className="paint-size">
-                <Slider
-                  label="距離"
-                  value={s.reach}
-                  min={0}
-                  max={MAX_REACH}
-                  step={5}
-                  format={(v) => `${v}px`}
-                  onChange={(v) => {
-                    saveReach(v);
-                    updateCrop({ reach: v });
-                  }}
-                />
-              </div>
-              {s.mask && (
-                <button className="chip" onClick={() => setLassoMask(null)}>
+              <div className="ce-lasso-row">
+                <div className="paint-size">
+                  <Slider
+                    label="距離"
+                    value={s.reach}
+                    min={0}
+                    max={MAX_REACH}
+                    step={5}
+                    format={(v) => `${v}px`}
+                    onChange={(v) => {
+                      saveReach(v);
+                      updateCrop({ reach: v });
+                    }}
+                  />
+                </div>
+                {/* 一直都在（沒有形狀時停用）：放開手指前後工具區的高度才不會變，預覽不會被壓扁 */}
+                <button
+                  className="chip"
+                  data-testid="lasso-clear"
+                  disabled={!s.mask}
+                  onClick={() => setLassoMask(null)}
+                >
                   清除形狀
                 </button>
-              )}
+              </div>
             </div>
           )}
           {(s.tool === 'brush' || s.tool === 'erase') && (
