@@ -3,12 +3,12 @@
 規則：每完成一個有意義的步驟，就在同一個 commit 裡 **覆寫「交接快照」** 並 **在「日誌」最上面新增一筆**（規則全文見 `AGENTS.md`「紀錄規則」，背景與架構見 `docs/HANDOFF.md`）。
 
 ## 交接快照（最新狀態，每次覆寫）
-- **日期**：2026-11-24
+- **日期**：2026-11-26
 - **分支**：PR #11（feedback-8 H1–H7）已由使用者合併進 `main`、CI run 90 成功並部署（11-13 23:24）；`claude/zen-tesla-v3brj5` 對齊 `main`
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：1209 個單元測試、約 369 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：Z25（轉場卡頓、開頭重播）與彎道新收尾已在分支、還沒進 PR。使用者回報裁切三個問題 → **照 `docs/plans/2026-11-25-feedback-17.md` 的 Z26（筆刷第一筆看得到、自由裁切兩個圓圈、格子裁切後有底色）**，切 Sonnet 實作
+- **下一步**：Z27（轉場不重播）、Z28（彎道緞帶收尾）已做完、在分支、還沒進 PR；等使用者說要不要開 PR（要先看的話說「只建立 PR，不要合併」）。iPhone 上看 PLAN §7 的 Z27／Z28 兩條
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,16 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-26 Z27 轉場不重播、Z28 彎道緞帶收尾（claude/zen-tesla-v3brj5）
+  - 做了什麼：Z27——後一段影片藏著時（暖機、轉場中、換手範圍）落後超過 0.25 秒就預約重對（暫停→seek 到目標＋起跑延遲→時鐘走到再 play；入點不夠時提早 play），起跑延遲量中位數；換手範圍延長到轉場後 2 秒、最後 0.6 秒預解圖慢慢靠到影片那一格；A 進換手範圍時記下落後、預解圖畫「目標−落後」；藏著的影片註冊 rVFC（否則換手第一次上傳是舊畫面，e2e 抓到閃一格）；效能框多「起跑 ms、重對 n」。Z28——彎道停在最後畫面改成：S 形帶子滑出、一條固定長度的緞帶從左邊飛進來繞畫面一圈（有風的擺動）、最後拉平成正中間橫條；全程在畫面內、字不倒過來；收尾播放 60 步
+  - 動了哪些檔：src/engine/{player,videoSync,handover,transitionFrames,compositor,debug}.ts（含測試）、src/engine/kinetic/{core,render}.ts、kinetic/fx/{flow,ribbon}.ts（+ribbon.test.ts）、src/app/editor/PerfOverlay.tsx、e2e/z27-no-repeat、e2e/z28-ribbon、tests/fixtures/ramp-a/b.webm、docs
+  - 驗證：✅ 單元測試 1250 個、lint、build、e2e z25／z16／z14／z27／z28／kinetic-hold／k0／k05／z22／z23（拿掉 Z27 修正時 z27 會失敗：亮度往回降 26；拿掉 rVFC 註冊會抓到閃一格舊畫面）；截圖 docs/screenshots/feedback-17/path-ribbon.png  🟡 只在 Chromium（起跑延遲用 setPlayLatency 模擬）  🔴 iPhone 真機還沒看（PLAN §7 Z27、Z28）
+  - 使用者的決定/回饋：彎道不一定要 ∞，要「緞帶飛進來隨風亂飄，最後繞回正中心，看得出字」；轉場還是卡、重播一秒
+- 2026-11-26 規劃 Z27（轉場不重播）、Z28（彎道收尾白帶滑過去）（claude/zen-tesla-v3brj5）
+  - 做了什麼：看 19:15 錄影的效能框：B 的 `<video>` 轉場過了 0.6 秒還在 0 秒、換手 1 秒內一次都沒對上、範圍一結束換回落後的 `<video>` → 往回跳＝重播；A 進轉場時落後 0.61 秒。彎道收尾逐格看：帶子被擠短、大部分跑在直式畫面外、30 次重畫一頓一頓。寫進 feedback-17 計畫
+  - 動了哪些檔：docs/plans/2026-11-25-feedback-17.md、docs/screenshots/feedback-17/path-before-z28.png、docs/PROGRESS.md
+  - 驗證：🔴 只有規劃，還沒實作
+  - 使用者的決定/回饋：彎道不一定要 ∞：「一個緞帶飛進來隨風亂飄，然後最後繞回正中心，可以看出是什麼字寫在緞帶上」（Z28 已改寫）；「影片轉場處還是有卡頓，並有重複播放某一秒的跡象，另外彎道特效看起來怪怪的，不是一條固定的白帶絲滑滑過去」
 - 2026-11-26 Z26 裁切三個問題（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：①**筆刷、橡皮擦時被去掉的地方變暗**（不再是不透明棋盤格蓋住素材）：`CropEditor.tsx` 新 tile `'shade'`（半透明黑、沒斜線）、`'checkSoft'`（半透明棋盤格）；筆刷設定列新開關〔看棋盤格〕（`vc-crop-paint-look`，預設關）；〔檢查結果〕照舊不透明棋盤格；②**第一筆就看得到**：整張都留著、第一筆是「留下」時，`begin()` 馬上用 `baseKind` 換成「只留刷到的」重畫（其他地方變暗），不用等放開手指；③**自由裁切有兩個圓圈**：`showMarks` 抽成共用，`startLasso` 改用 `focusOf`（往上偏 `reach`）、按下去先只移動（4px 或 250ms 才開始畫）、設定列多〔距離〕滑桿（跟筆刷共用）；④**版型格子裡素材被裁成形狀（mask 或 maskBitmap）時墊格子底色**：`scene.ts` `pushCellFill`（跟空格子色塊同一套；顏色 `track.fill ?? 外框色 ?? 黑`；外框空檔〔透明〕`gapMode:'none'` 不墊；轉場中也墊）
   - 注意：自由裁切現在也受〔距離〕影響（預設 70px，畫的線在手指上方）；原本在手指位置畫的測試都先把〔距離〕設 0

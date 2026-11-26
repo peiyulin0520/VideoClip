@@ -291,6 +291,9 @@ describe('動態字卡：換行與邊緣淡出', () => {
   it('彎道停在最後畫面：S 形帶子拉直成橫條、整句完整的字（一個字一次）排在帶子上', () => {
     const def = kineticById('path')!;
     expect(def.calm).toBe(false);
+    expect(def.smooth).toBe(true); // 收尾的緞帶在飛：播放時也每秒畫 60 次
+    expect(def.settleLen).toBe(2.8);
+    expect(def.hold!([])).toBeCloseTo(0.8 + 2.8, 6); // 流動 0.8 秒之後開始收尾
     const drawn = (settle: number) => {
       const { s, log } = stage(['順著河走', '就會到海'], 180, 320);
       def.draw({ ...s, settle }, 1);

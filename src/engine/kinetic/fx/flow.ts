@@ -1,5 +1,17 @@
 // 流動（09–16）。改寫自 claude-animated-text（MIT，© 2026 pound / POUND0423）。
 import { band, clamp, cs, drawWord, E, fontOf, marquee, pick, wlen, type KineticDef } from '../core';
+import {
+  Q_NEW,
+  Q_OLD_END,
+  flattenFactor,
+  headDist,
+  readForward,
+  ribbonRoute,
+  ribbonShape,
+  shapeAt,
+  windFactor,
+  type Win,
+} from './ribbon';
 
 // 彎道（path）的帶子：原版 SVG 的路徑（座標系 320×180，S 形曲線），兩段三次貝茲曲線
 const RIB: [number, number, number, number, number, number, number, number][] = [
@@ -49,70 +61,6 @@ function ribAtIn(pts: RibPt[], d: number): RibPt {
   const b = pts[hi]!;
   const f = (d - a.s) / Math.max(b.s - a.s, 1e-6);
   return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, a: a.a + (b.a - a.a) * f, s: d };
-}
-
-/** 一串 xy 點 → 帶有累計長度與切線角的路徑點 */
-function toRibPts(xy: { x: number; y: number }[]): RibPt[] {
-  let acc = 0;
-  return xy.map((p, i) => {
-    const prev = xy[i - 1];
-    if (prev) acc += Math.hypot(p.x - prev.x, p.y - prev.y);
-    const a = xy[Math.min(i + 1, xy.length - 1)]!;
-    const b = xy[Math.max(i - 1, 0)]!;
-    return { x: p.x, y: p.y, a: Math.atan2(a.y - b.y, a.x - b.x), s: acc };
-  });
-}
-const RIB_N = 240;
-/** 彎道收尾的 ∞ 半寬 */
-const INF_A = 135;
-let lemPts: RibPt[] | null = null;
-/** ∞ 路線：從中間的交叉點往右下出發（接著 S 形帶子中間的方向），繞右圈 → 回到中間交叉 → 繞左圈 → 回到中間 */
-function lemniscateXY(): { x: number; y: number }[] {
-  const xy: { x: number; y: number }[] = [];
-  const N = 720;
-  for (let i = 0; i <= N; i++) {
-    const th = Math.PI / 2 - (i / N) * Math.PI * 2;
-    const d = 1 + Math.sin(th) * Math.sin(th);
-    xy.push({
-      x: 160 + (INF_A * Math.cos(th)) / d,
-      y: 90 + (INF_A * 1.25 * Math.sin(th) * Math.cos(th)) / d,
-    });
-  }
-  return xy;
-}
-/** 彎道收尾的路線：S 形帶子的前半段（到畫面正中間）＋ ∞ 一圈；回傳路線與「畫面正中間」在路線上的位置 */
-function route(): { pts: RibPt[]; mid: number } {
-  if (!lemPts) {
-    const sp = ribSamples();
-    lemPts = toRibPts([...sp.slice(0, 121).map((p) => ({ x: p.x, y: p.y })), ...lemniscateXY().slice(1)]);
-  }
-  return { pts: lemPts, mid: ribSamples()[120]!.s };
-}
-/** 路線上 [a, b] 那一段，取 n 個點 */
-function along(pts: RibPt[], a: number, b: number, n = RIB_N): { x: number; y: number }[] {
-  return Array.from({ length: n }, (_, i) => {
-    const p = ribAtIn(pts, a + ((b - a) * i) / (n - 1));
-    return { x: p.x, y: p.y };
-  });
-}
-const mixXY = (a: { x: number; y: number }[], b: { x: number; y: number }[], f: number) =>
-  a.map((p, i) => ({ x: p.x + (b[i]!.x - p.x) * f, y: p.y + (b[i]!.y - p.y) * f }));
-/**
- * 停在最後畫面（q 0→1）：長長的 S 形帶子兩端往中間收，縮成跟字句一樣長的一條白帶；
- * 這條白帶沿著 ∞ 的路線跑一圈（繞右圈、交叉、繞左圈）回到中間，最後轉平成畫面正中間的橫條。
- * L＝白帶長度（字句長度＋左右留白）
- */
-function ribbonAt(q: number, L: number): RibPt[] {
-  const sp = ribSamples();
-  const sTotal = sp[sp.length - 1]!.s;
-  const { pts, mid } = route();
-  const lemLen = pts[pts.length - 1]!.s - mid;
-  const shrink = E.io(clamp(q / 0.15));
-  if (shrink < 1) return toRibPts(along(sp, (mid - L) * shrink, sTotal + (mid - sTotal) * shrink));
-  const head = mid + lemLen * E.io(clamp((q - 0.15) / 0.68));
-  const snake = along(pts, head - L, head);
-  const flat = Array.from({ length: RIB_N }, (_, i) => ({ x: 160 - L / 2 + (L * i) / (RIB_N - 1), y: 90 }));
-  return toRibPts(mixXY(snake, flat, E.io(clamp((q - 0.85) / 0.15))));
 }
 
 export const FX_FLOW: KineticDef[] = [
@@ -287,9 +235,11 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1,
     area: 'full',
     calm: false,
-    // 停在最後畫面：帶子繞一大圈 ∞ 再往外一拉成橫條要 2.4 秒（流動 0.8 秒之後開始）
-    settleLen: 2.4,
-    hold: () => 3.2,
+    // 播放時收尾也每秒畫 60 次（緞帶在飛，30 次會一頓一頓）
+    smooth: true,
+    // 停在最後畫面：S 形帶子往前滑出畫面（0.4 秒）→ 一條緞帶飛進來、隨風飄、繞回正中間變橫條（共 2.8 秒，流動 0.8 秒之後開始）
+    settleLen: 2.8,
+    hold: () => 3.6,
     len: () => null,
     hit: [0, 0.2, 1, 0.6],
     draw(s, t) {
@@ -300,64 +250,99 @@ export const FX_FLOW: KineticDef[] = [
       const ox = (W - 320 * k) / 2;
       const oy = (H - 180 * k) / 2;
       const vw = W / k; // 畫面看得到的寬度（直式畫面只看得到 320 的一小段）
-      // 收尾的那條白帶：整句字（每個詞空一格）＋左右留白；字太長就縮小，最後要放得進畫面
+      const win: Win = { x0: -ox / k, y0: -oy / k, x1: (W - ox) / k, y1: (H - oy) / k };
+      // 收尾的那條緞帶：整句字（每個詞空一格）＋左右留白；字太長就縮小，放得進畫面。粗細跟著字的大小，之後不再變
       const sentence = cs(s.words.join(' '));
       g.font = fontOf(s, 15, 900);
       const sw0 = g.measureText(sentence.join('')).width;
-      const size = Math.min(15, (15 * vw * 0.8) / Math.max(sw0, 1));
+      const size = Math.min(15, (15 * vw * 0.68) / Math.max(sw0, 1));
       const sw = (sw0 * size) / 15;
       const L = sw + size * 1.2;
-      const pts = q > 0 ? ribbonAt(q, L) : ribSamples();
-      // 白帶粗細：平常 26；縮成字句長的白帶後跟著字的大小
-      const thick = 26 + (size * (26 / 15) - 26) * clamp(q / 0.15);
+      const thick = size * (26 / 15);
       g.save();
       g.translate(ox, oy);
       g.scale(k, k);
-      g.strokeStyle = s.hi;
-      g.lineWidth = thick;
       g.lineCap = 'butt';
       g.lineJoin = 'round';
-      g.beginPath();
-      if (q > 0) {
-        g.moveTo(pts[0]!.x, pts[0]!.y);
-        for (const p of pts) g.lineTo(p.x, p.y);
-      } else {
-        g.moveTo(RIB[0]![0], RIB[0]![1]);
-        for (const [, , x1, y1, x2, y2, x3, y3] of RIB) g.bezierCurveTo(x1, y1, x2, y2, x3, y3);
-      }
-      g.stroke();
-      // 字沿著帶子排（字高 15、粗體），整串字以 24／秒的速度流過去
-      const unit = s.words.join('・') + '・';
-      g.font = fontOf(s, 15, 900);
-      g.fillStyle = s.hifg;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      const unitLen = g.measureText(unit).width;
-      const reps = Math.ceil(64 / wlen(unit)) + 2;
-      const chars = cs(unit.repeat(reps));
-      const total = pts[pts.length - 1]!.s;
-      const place = (str: string[], start: number, alpha: number, px: number) => {
-        g.font = fontOf(s, px, 900);
-        let pos = start;
-        for (const ch of str) {
+      g.strokeStyle = s.hi;
+      // ---- 原本的 S 形帶子（字沿著帶子排，整串字以 24／秒的速度流過去）----
+      const sp = ribSamples();
+      const sTotal = sp[sp.length - 1]!.s;
+      // 收尾時它順著自己的路線往前滑出去：尾巴往前縮（帶子還在、字不動）
+      const slide = q > 0 ? sTotal * E.in(clamp(q / Q_OLD_END)) : 0;
+      if (q < Q_OLD_END) {
+        g.lineWidth = 26;
+        g.beginPath();
+        if (slide <= 0) {
+          g.moveTo(RIB[0]![0], RIB[0]![1]);
+          for (const [, , x1, y1, x2, y2, x3, y3] of RIB) g.bezierCurveTo(x1, y1, x2, y2, x3, y3);
+        } else {
+          const first = ribAtIn(sp, slide);
+          g.moveTo(first.x, first.y);
+          for (const pt of sp) if (pt.s > slide) g.lineTo(pt.x, pt.y);
+        }
+        g.stroke();
+        const unit = s.words.join('・') + '・';
+        g.font = fontOf(s, 15, 900);
+        g.fillStyle = s.hifg;
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        const unitLen = g.measureText(unit).width;
+        const chars = cs(unit.repeat(Math.ceil(64 / wlen(unit)) + 2));
+        let pos = -((t * 24) % unitLen);
+        for (const ch of chars) {
           const w = g.measureText(ch).width;
-          if (pos > total) break;
-          if (pos + w >= 0) {
-            const p = ribAtIn(pts, pos + w / 2);
+          if (pos > sTotal) break;
+          if (pos + w >= 0 && pos + w / 2 >= slide) {
+            const pt = ribAtIn(sp, pos + w / 2);
             g.save();
-            g.globalAlpha *= alpha;
-            g.translate(p.x, p.y);
-            g.rotate(p.a);
+            g.translate(pt.x, pt.y);
+            g.rotate(pt.a);
             g.fillText(ch, 0, 0);
             g.restore();
           }
           pos += w;
         }
-      };
-      // 帶子縮短的時候（q 0～0.15）流動的字淡出、整句字淡入；之後整句字貼在白帶正中間跟著跑
-      const fin = clamp(q / 0.15);
-      if (fin < 1) place(chars, -((t * 24) % unitLen), 1 - fin, 15);
-      if (fin > 0) place(sentence, (total - sw) / 2, fin, size);
+      }
+      // ---- 新的緞帶：飛進來、隨風飄、繞回正中間 ----
+      if (q > Q_NEW) {
+        const route = ribbonRoute(win, L, thick, s.words.join('|'));
+        const hs = headDist(q, route.total);
+        const shape = ribbonShape(route, hs, L, thick * 0.3 * windFactor(q), t, {
+          cx: (win.x0 + win.x1) / 2,
+          cy: (win.y0 + win.y1) / 2,
+          e: flattenFactor(q),
+        });
+        g.lineWidth = thick;
+        g.beginPath();
+        shape.p.forEach((pt, i) => (i === 0 ? g.moveTo(pt.x, pt.y) : g.lineTo(pt.x, pt.y)));
+        g.stroke();
+        g.font = fontOf(s, size, 900);
+        g.fillStyle = s.hifg;
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        // 字排在緞帶正中間；緞帶偏向左的時候整句反過來排（字不會倒過來）：兩種排法依方向淡入淡出
+        const fwd = readForward(shape, L);
+        const start = (shape.total - sw) / 2;
+        const lay = (rev: boolean, alpha: number) => {
+          if (alpha < 0.003) return;
+          let pos = 0;
+          for (const ch of sentence) {
+            const w = g.measureText(ch).width;
+            const mid = start + pos + w / 2;
+            const pt = shapeAt(shape, rev ? shape.total - mid : mid);
+            g.save();
+            g.globalAlpha *= alpha;
+            g.translate(pt.x, pt.y);
+            g.rotate(pt.a + (rev ? Math.PI : 0));
+            g.fillText(ch, 0, 0);
+            g.restore();
+            pos += w;
+          }
+        };
+        lay(false, fwd);
+        lay(true, 1 - fwd);
+      }
       g.restore();
     },
   },

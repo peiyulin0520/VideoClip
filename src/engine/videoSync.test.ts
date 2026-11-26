@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { HARD_DRIFT_PROTECT, driftPlan, videoSyncPlan } from './videoSync';
+import {
+  HARD_DRIFT_PROTECT,
+  HIDDEN_LEAD,
+  HIDDEN_MAX_TRIES,
+  driftPlan,
+  hiddenSyncPlan,
+  videoSyncPlan,
+} from './videoSync';
 
 const base = {
   target: 2,
@@ -73,5 +80,61 @@ describe('driftPlan（沿用）', () => {
     expect(driftPlan(0.55, 1, true, { hard: 0.6 }).seek).toBe(false);
     expect(driftPlan(0.55, 1, true).seek).toBe(true);
     expect(driftPlan(0.3, 1, true, { maxAdj: 0.05 }).rate).toBeCloseTo(1.05, 6);
+  });
+});
+
+describe('hiddenSyncPlan：藏起來的影片預約對時', () => {
+  const h = {
+    t: 10,
+    raw: 2,
+    target: 2,
+    current: 2,
+    speed: 1,
+    duration: 8,
+    lat: 0.4,
+    seeking: false,
+    paused: false,
+    playAt: null as number | null,
+    tries: 0,
+  };
+  it('差不多對上（≤0.25 秒）：不動，交給一般對時', () => {
+    expect(hiddenSyncPlan({ ...h, current: 1.8 })).toEqual({ kind: 'none' });
+    expect(hiddenSyncPlan({ ...h, current: 2.2 })).toEqual({ kind: 'none' });
+  });
+  it('落後很多：seek 到 目標＋起跑延遲＋提前量，等 0.25 秒再 play', () => {
+    const p = hiddenSyncPlan({ ...h, current: 0 });
+    expect(p).toMatchObject({ kind: 'resync' });
+    if (p.kind === 'resync') {
+      expect(p.seekTo).toBeCloseTo(2 + 0.4 + HIDDEN_LEAD, 6);
+      expect(p.playAt).toBeCloseTo(10 + HIDDEN_LEAD, 6);
+    }
+  });
+  it('超前很多也重對；有速度時提前量跟著速度', () => {
+    const p = hiddenSyncPlan({ ...h, current: 3, speed: 2 });
+    expect(p.kind).toBe('resync');
+    if (p.kind === 'resync') expect(p.seekTo).toBeCloseTo(2 + (0.4 + HIDDEN_LEAD) * 2, 6);
+  });
+  it('正在 seek、或已預約等待中：不重複下指令；時間到了才 play', () => {
+    expect(hiddenSyncPlan({ ...h, current: 0, seeking: true })).toEqual({ kind: 'keep' });
+    expect(hiddenSyncPlan({ ...h, playAt: 10.2 })).toEqual({ kind: 'keep' });
+    expect(hiddenSyncPlan({ ...h, playAt: 10, seeking: true })).toEqual({ kind: 'keep' });
+    expect(hiddenSyncPlan({ ...h, playAt: 10 })).toEqual({ kind: 'play' });
+  });
+  it('試了 3 次還對不上：放棄預約，交給一般對時', () => {
+    expect(hiddenSyncPlan({ ...h, current: 0, tries: HIDDEN_MAX_TRIES })).toEqual({ kind: 'none' });
+  });
+  it('目標快到素材結尾：不預約（seek 不到）', () => {
+    expect(hiddenSyncPlan({ ...h, target: 7.5, raw: 7.5, current: 5 })).toEqual({ kind: 'none' });
+  });
+  it('入點不夠（raw＜0）：離開頭還有 起跑延遲 以內，就先從第一格 play；已經在動就不要碰', () => {
+    expect(hiddenSyncPlan({ ...h, raw: -0.3, target: 0, current: 0, paused: true })).toEqual({
+      kind: 'early-play',
+    });
+    expect(hiddenSyncPlan({ ...h, raw: -0.3, target: 0, current: 0.1, paused: false })).toEqual({
+      kind: 'keep',
+    });
+    expect(hiddenSyncPlan({ ...h, raw: -0.9, target: 0, current: 0, paused: true })).toEqual({
+      kind: 'none',
+    });
   });
 });

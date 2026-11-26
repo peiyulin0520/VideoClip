@@ -1,11 +1,18 @@
 import type { Asset, Item, Project, Track, VideoItem } from '../model/types';
 import { frameIndexAt, loadAnim, peekAnim } from './animImage';
 import { AudioOut, fadeGain, isIOSDevice } from './audio';
-import { Compositor } from './compositor';
+import { Compositor, videoFrameCount } from './compositor';
 import { stageLayout } from './stage';
 import { VideoPool } from './mediaPool';
 import { expandThumbs, thumbCount, thumbIndex } from './thumbs';
-import { inHandover, pickSource } from './handover';
+import {
+  HANDOVER_A_LAG,
+  HANDOVER_AFTER,
+  handoverRemain,
+  inHandover,
+  pickSource,
+  rampShown,
+} from './handover';
 import { setKineticPlaying } from './kinetic/render';
 import { activeTransition, earlyOf, transitionAudioGain, transitionSpan } from './transitions';
 import {
@@ -16,7 +23,7 @@ import {
   type FrameNeed,
 } from './transitionFrames';
 import { showPlaceholders } from './placeholder';
-import { driftPlan, videoSyncPlan } from './videoSync';
+import { driftPlan, hiddenSyncPlan, videoSyncPlan } from './videoSync';
 import { captureThumb } from './probe';
 import { buildScene, canTransition } from './scene';
 import { previewSizeFor } from './previewQuality';
@@ -129,6 +136,20 @@ export class Player {
   private transSrc = { cached: 0, video: 0, waitMs: 0 };
   /** 轉場前後換手：用了預解圖幾格、換回影片幾次、換回影片時差多少秒（最大） */
   private hand = { cached: 0, back: 0, diff: 0 };
+  /** 這一刻正在轉場的片段是前一段（a）還是後一段（b） */
+  private transRole = new Map<string, 'a' | 'b'>();
+  /** 前一段 A 進換手範圍時 <video> 落後時鐘多少秒（轉場中預解圖畫「目標 − 落後」那一格，跟 A 的聲音、之前看到的畫面接得上） */
+  private aLag = new Map<string, { lag: number; at: number }>();
+  /** 藏起來的影片的預約對時：什麼時候 play()、已經重對幾次 */
+  private hid = new WeakMap<HTMLVideoElement, { playAt: number | null; tries: number }>();
+  /** play() 起跑延遲量測：呼叫 play() 的時間與當時的 currentTime；最近幾次的毫秒數 */
+  private probes = new WeakMap<HTMLVideoElement, { at: number; from: number }>();
+  private lats: number[] = [];
+  private playTimers = new WeakMap<HTMLVideoElement, number>();
+  /** 這次播放中，為了對時重新 seek 預約的次數（效能框用） */
+  private resyncs = 0;
+  /** 測試用：讓 <video> 的 play() 晚這麼多毫秒才呼叫（模擬 iPhone 的起跑延遲） */
+  playDelayMs = 0;
   private transHeavyTold = false;
   private videoCount = 0;
   /** 效能框用：這一格正在解碼的每支影片（解碼後的大小、用預覽檔還是原檔）、播放中每秒格數的最低值 */
@@ -228,6 +249,7 @@ export class Player {
     this.statSince = 0;
     this.statFrames = 0;
     this.statMs = 0;
+    this.resyncs = 0;
     this.wallStart = performance.now();
     this.tStart = this.t;
     this.render(this.t); // 目前要播的影片在這裡同步 play()（還在點擊裡）
@@ -379,6 +401,9 @@ export class Player {
       handCached: number;
       handBack: number;
       handDiff: number;
+      /** play() 到真的開始動的中位數（毫秒）、這次播放為了對時重新 seek 預約的次數 */
+      lat: number;
+      resync: number;
     };
     /** 目前每支在解碼的影片：解碼大小＋預覽檔／原檔 */
     sources: string[];
@@ -424,6 +449,8 @@ export class Player {
         handCached: this.hand.cached,
         handBack: this.hand.back,
         handDiff: Math.round(this.hand.diff * 1000) / 1000,
+        lat: Math.round(this.latency() * 1000),
+        resync: this.resyncs,
       },
       sources: this.sources,
       decoders: this.videoCount,
@@ -445,6 +472,61 @@ export class Player {
       this.images.set(assetId, img);
     }
     return img;
+  }
+
+  /** 前一段 A 進換手範圍（第一格）時記下 <video> 落後時鐘多少秒（0～HANDOVER_A_LAG），回傳這個落後 */
+  private noteALag(id: string, t: number, d: number): number {
+    let e = this.aLag.get(id);
+    if (!e || t < e.at || t - e.at > 3) {
+      e = { lag: d > 0.04 ? Math.min(d, HANDOVER_A_LAG) : 0, at: t };
+      this.aLag.set(id, e);
+    }
+    return e.lag;
+  }
+
+  /** play() 到真的開始動的時間（秒）：最近幾次的中位數，預設 0.35，夾在 0.1～0.8 */
+  private latency(): number {
+    if (this.lats.length === 0) return 0.35;
+    const a = [...this.lats].sort((x, y) => x - y);
+    return Math.min(Math.max(a[a.length >> 1]! / 1000, 0.1), 0.8);
+  }
+
+  private probeLatency(el: HTMLVideoElement) {
+    const pr = this.probes.get(el);
+    if (!pr) return;
+    if (el.seeking) {
+      this.probes.delete(el);
+      return;
+    }
+    if (!el.paused && el.currentTime !== pr.from) {
+      this.probes.delete(el);
+      const ms = performance.now() - pr.at;
+      if (ms < 2000) this.lats = [...this.lats.slice(-4), ms];
+    }
+  }
+
+  private startPlay(el: HTMLVideoElement) {
+    if (this.playTimers.has(el)) return;
+    const asked = performance.now();
+    const go = () => {
+      this.playTimers.delete(el);
+      if (!this.playing) return;
+      this.probes.set(el, { at: asked, from: el.currentTime });
+      el.play().catch((e: unknown) => {
+        // 沒有出聲播放的許可（iPhone）：停下來請使用者再按一次播放（那一下點擊就能解鎖）
+        if (e instanceof DOMException && e.name === 'NotAllowedError' && !el.muted) this.blocked();
+      });
+    };
+    if (this.playDelayMs > 0) this.playTimers.set(el, window.setTimeout(go, this.playDelayMs));
+    else go();
+  }
+
+  private cancelPlay(el: HTMLVideoElement) {
+    const id = this.playTimers.get(el);
+    if (id !== undefined) {
+      clearTimeout(id);
+      this.playTimers.delete(el);
+    }
   }
 
   private syncVideo(el: HTMLVideoElement, item: VideoItem, asset: Asset, track: Track, t: number) {
@@ -476,6 +558,49 @@ export class Player {
       // 轉場中有預解圖就不需要保護：<video> 沒人看，趁這時把時間追對，轉場結束換回 <video> 時才對得上
       const cachedNow = this.predecode && !!this.frames.frameAt(asset.id, s);
       const warm = !!span && t < span.cut - span.before;
+      this.probeLatency(el);
+      videoFrameCount(el); // 藏著的時候也讓瀏覽器一直呈現新畫面，換手那一刻第一次上傳才不會是舊畫面
+      // 藏起來（沒人看）的後一段：暖機中、轉場中和換手範圍裡畫的是預解圖。這時 <video> 落後太多就預約重對：
+      // 暫停 → seek 到「目標＋起跑延遲＋一點」→ 等時鐘走到再 play()，一次對準（iPhone 不用速度追，也追不上）
+      const hidden =
+        !!span && this.predecode && (warm || (t < span.cut + span.after + HANDOVER_AFTER && cachedNow));
+      const hid = this.hid.get(el) ?? { playAt: null, tries: 0 };
+      if (hidden && tg <= 0.3) {
+        if (hid.tries > 0 && Math.abs(s - el.currentTime) <= 0.1) hid.tries = 0;
+        const hp = hiddenSyncPlan({
+          t,
+          raw: item.trimIn + (t - item.start) * item.speed,
+          target: s,
+          current: el.currentTime,
+          speed: item.speed,
+          duration: asset.duration,
+          lat: this.latency(),
+          seeking: el.seeking,
+          paused: el.paused,
+          playAt: hid.playAt,
+          tries: hid.tries,
+        });
+        if (hp.kind === 'early-play') {
+          this.startPlay(el);
+          return;
+        }
+        if (hp.kind === 'keep') return;
+        if (hp.kind === 'play') {
+          this.hid.set(el, { playAt: null, tries: hid.tries });
+          this.startPlay(el);
+          return;
+        }
+        if (hp.kind === 'resync') {
+          this.cancelPlay(el);
+          if (!el.paused) el.pause();
+          el.currentTime = hp.seekTo;
+          this.hid.set(el, { playAt: hp.playAt, tries: hid.tries + 1 });
+          this.resyncs++;
+          return;
+        }
+      } else if (hid.playAt !== null) {
+        this.hid.set(el, { playAt: null, tries: hid.tries }); // 不能藏著對了：預約作廢，下面一般流程會 play()
+      }
       const protect =
         !!span && t >= span.cut - span.before - WARM_S && (warm || (t < span.cut + span.after && !cachedNow));
       const plan = videoSyncPlan({
@@ -485,7 +610,7 @@ export class Player {
         speed: item.speed,
         ended: el.ended,
         seeking: el.seeking,
-        soft: !IOS,
+        soft: !IOS || hidden,
         transitioning,
         protect,
       });
@@ -502,11 +627,7 @@ export class Player {
         return;
       }
       if (el.playbackRate !== plan.rate) el.playbackRate = plan.rate;
-      if (el.paused)
-        el.play().catch((e: unknown) => {
-          // 沒有出聲播放的許可（iPhone）：停下來請使用者再按一次播放（那一下點擊就能解鎖）
-          if (e instanceof DOMException && e.name === 'NotAllowedError' && !el.muted) this.blocked();
-        });
+      if (el.paused) this.startPlay(el);
     } else {
       if (el.playbackRate !== item.speed) el.playbackRate = item.speed;
       if (!el.paused) el.pause();
@@ -588,6 +709,7 @@ export class Player {
    */
   private trackTransitions(p: Project, t: number) {
     const ids = new Set<string>();
+    const roles = new Map<string, 'a' | 'b'>();
     const heavy: Asset[] = [];
     for (const tr of p.tracks) {
       if (!canTransition(tr)) continue;
@@ -596,6 +718,7 @@ export class Player {
       for (const x of [at.a, at.b]) {
         if (!x || x.type === 'text') continue;
         ids.add(x.id);
+        roles.set(x.id, x === at.a ? 'a' : 'b');
         const a = p.assets.find((y) => y.id === x.assetId);
         if (
           a &&
@@ -622,6 +745,7 @@ export class Player {
       }
     }
     this.transIds = ids;
+    this.transRole = roles;
   }
 
   /** 預先解碼：專案變了重算要解的轉場；播放線移動超過 0.5 秒重新照距離排序 */
@@ -701,7 +825,14 @@ export class Player {
         if (this.playing && this.predecode && !this.transIds.has(item.id)) {
           const orig = track.items.find((x) => x.id === item.id);
           if (orig && inHandover(track.items as Item[], orig as Item, t)) {
-            const s = sourceTimeClamped(item, t, asset);
+            const s0 = sourceTimeClamped(item, t, asset);
+            // 後一段 B：換手範圍快結束、<video> 還落後一點，預解圖慢慢靠到 <video> 的那一格（換過去不往回跳）
+            // 前一段 A：記下進換手範圍時 <video> 落後多少，之後（含轉場中）預解圖畫「目標 − 落後」那一格
+            const remain = handoverRemain(track.items as Item[], orig as Item, t);
+            let s = s0;
+            if (remain !== null) {
+              if (ready) s = rampShown(s0, el.currentTime, remain);
+            } else s = s0 - this.noteALag(item.id, t, ready ? s0 - el.currentTime : 0);
             const bm = this.frames.frameAt(asset.id, s);
             const diff = Math.abs(el.currentTime - s);
             if (
@@ -719,7 +850,12 @@ export class Player {
         }
         // 轉場中：先用背景預先解好的畫面（不用等 iPhone 的 <video> 啟動）；沒有才用影片
         if (this.playing && this.transIds.has(item.id) && this.predecode) {
-          const bm = this.frames.frameAt(asset.id, sourceTimeClamped(item, t, asset));
+          let sT = sourceTimeClamped(item, t, asset);
+          if (this.transRole.get(item.id) === 'a') {
+            const e = this.aLag.get(item.id);
+            if (e && t >= e.at && t - e.at < 3) sT -= e.lag;
+          }
+          const bm = this.frames.frameAt(asset.id, sT);
           if (bm) {
             this.transSrc.cached++;
             return { source: bm, ready: true, srcW: bm.width, srcH: bm.height };

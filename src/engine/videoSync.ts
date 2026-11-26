@@ -80,3 +80,55 @@ export function videoSyncPlan(o: {
     hardSeek: plan.seek,
   };
 }
+
+// ---------- 藏起來的影片：先預約對時 ----------
+// iPhone 的 play()（暫停或 seek 之後）要 0.3～0.6 秒才真的動，而且不用 playbackRate 追（會卡）。
+// 後一段 B 在轉場前暖機、轉場中（畫面用預解圖）、轉場後換手範圍裡，<video> 都沒人看：
+// 落後太多時，不要讓它自己慢慢追，而是「暫停 → seek 到 目標＋起跑延遲＋一點 → 等時鐘走到再 play()」，一次對準。
+
+/** 落後／超前超過這個秒數才預約重對；以內交給一般的對時（可以微調速度） */
+export const HIDDEN_RESYNC = 0.25;
+/** 預約重對時多抓的提前量（秒） */
+export const HIDDEN_LEAD = 0.25;
+export const HIDDEN_MAX_TRIES = 3;
+
+export type HiddenPlan =
+  | { kind: 'none' }
+  | { kind: 'keep' }
+  | { kind: 'early-play' }
+  | { kind: 'play' }
+  | { kind: 'resync'; seekTo: number; playAt: number };
+
+export function hiddenSyncPlan(o: {
+  /** 時間軸現在的秒數 */
+  t: number;
+  /** 沒夾過的素材秒數（入點不夠時是負的） */
+  raw: number;
+  target: number;
+  current: number;
+  speed: number;
+  duration: number;
+  /** 起跑延遲（秒） */
+  lat: number;
+  seeking: boolean;
+  paused: boolean;
+  /** 已預約：什麼時候（時間軸秒數）要 play()；沒預約＝null */
+  playAt: number | null;
+  tries: number;
+}): HiddenPlan {
+  if (o.playAt !== null) {
+    if (o.seeking) return { kind: 'keep' };
+    return o.t >= o.playAt ? { kind: 'play' } : { kind: 'keep' };
+  }
+  // 素材開頭之前（入點不夠）：停在第一格，但要在「差起跑延遲」的時候就先 play()，時間到了它剛好開始動
+  if (o.raw < 0) {
+    if (o.raw >= -(o.lat * o.speed + 0.05)) return o.paused ? { kind: 'early-play' } : { kind: 'keep' };
+    return { kind: 'none' };
+  }
+  if (o.seeking) return { kind: 'keep' };
+  const diff = o.target - o.current;
+  if (Math.abs(diff) <= HIDDEN_RESYNC || o.tries >= HIDDEN_MAX_TRIES) return { kind: 'none' };
+  const seekTo = o.target + (o.lat + HIDDEN_LEAD) * o.speed;
+  if (o.duration > 0.1 && seekTo >= o.duration - END_HOLD * 2) return { kind: 'none' };
+  return { kind: 'resync', seekTo, playAt: o.t + HIDDEN_LEAD };
+}

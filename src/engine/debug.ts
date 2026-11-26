@@ -297,6 +297,10 @@ export function installDebugHook(player: Player) {
     setPredecode: (on: boolean) => {
       player.predecode = on;
     },
+    /** 測試用：讓 <video> 的 play() 晚 ms 毫秒才呼叫，模擬 iPhone 的起跑延遲（0＝關） */
+    setPlayLatency: (ms: number) => {
+      player.playDelayMs = ms;
+    },
     kineticList: () => KINETIC.map((f) => ({ id: f.id, zh: f.zh, group: f.group, poster: f.poster })),
     project: () => JSON.parse(JSON.stringify(useProjectStore.getState().project)),
     time: () => player.time,
