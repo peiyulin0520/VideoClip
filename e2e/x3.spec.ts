@@ -424,3 +424,43 @@ test('Z26 自由裁切：有兩個圓圈（手指圓、往上偏的焦點圓）�
   expect(maxY * fr.height + fr.y, '形狀在手指上方').toBeLessThan(y - 10);
   expect(maxY - minY).toBeGreaterThan(0.05);
 });
+
+// feedback-17 Z31：自由裁切畫完放開手指後，預覽和下面的工具區都不能變大變小（以前〔清除形狀〕擠進來，說明文字變一字一行、預覽被壓扁）
+test('Z31 自由裁切畫完：預覽和工具區的高度不變、說明文字不擠成一字一行；〔清除形狀〕一直都在', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await setup(page);
+  await page.getByTestId('crop-tool-lasso').tap();
+  const stage = () => page.locator('.ce-stage').boundingBox();
+  const ctx = () => page.getByTestId('crop-options').boundingBox();
+  const hint = () => page.locator('.ce-lasso .hint').boundingBox();
+  const clear = page.getByTestId('lasso-clear');
+  await expect(clear).toBeVisible();
+  await expect(clear).toBeDisabled();
+  const s0 = (await stage())!;
+  const c0 = (await ctx())!;
+  const h0 = (await hint())!;
+  expect(h0.width, '說明文字佔整行').toBeGreaterThan(c0.width * 0.8);
+  const fr = await frame(page);
+  const y = fr.y + fr.height * 0.7;
+  await page.mouse.move(fr.x + fr.width * 0.3, y);
+  await page.mouse.down();
+  await page.mouse.move(fr.x + fr.width * 0.7, y, { steps: 6 });
+  await page.mouse.move(fr.x + fr.width * 0.7, y + 50, { steps: 4 });
+  await page.mouse.move(fr.x + fr.width * 0.3, y + 50, { steps: 6 });
+  await page.mouse.move(fr.x + fr.width * 0.3, y, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.getByTestId('crop-polygon')).toBeAttached();
+  await expect(clear).toBeEnabled();
+  const s1 = (await stage())!;
+  const c1 = (await ctx())!;
+  const h1 = (await hint())!;
+  expect(Math.abs(s1.height - s0.height), '預覽高度不變').toBeLessThanOrEqual(2);
+  expect(Math.abs(c1.height - c0.height), '工具區高度不變').toBeLessThanOrEqual(2);
+  expect(h1.width, '說明文字還是佔整行').toBeGreaterThan(c1.width * 0.8);
+  await page.screenshot({ path: 'docs/screenshots/feedback-17/z31-crop-panel-after.png' });
+  await clear.tap();
+  await expect(page.getByTestId('crop-polygon')).toHaveCount(0);
+  await expect(clear).toBeDisabled();
+});

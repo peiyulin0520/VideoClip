@@ -3668,13 +3668,28 @@ button:not(:disabled):active,
 }
 .ce-lasso {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   width: 100%;
 }
 .ce-lasso .hint {
-  flex: 1;
   margin: 0;
+}
+.ce-lasso-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ce-lasso-row .paint-size {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.ce-lasso-row .chip {
+  flex: none;
+  white-space: nowrap;
+}
+.ce-lasso-row .chip:disabled {
+  opacity: 0.4;
 }
 .ce-paint {
   display: flex;
