@@ -89,6 +89,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-26 Z26 裁切三個問題（Sonnet，claude/zen-tesla-v3brj5）
+  - 做了什麼：①**筆刷、橡皮擦時被去掉的地方變暗**（不再是不透明棋盤格蓋住素材）：`CropEditor.tsx` 新 tile `'shade'`（半透明黑、沒斜線）、`'checkSoft'`（半透明棋盤格）；筆刷設定列新開關〔看棋盤格〕（`vc-crop-paint-look`，預設關）；〔檢查結果〕照舊不透明棋盤格；②**第一筆就看得到**：整張都留著、第一筆是「留下」時，`begin()` 馬上用 `baseKind` 換成「只留刷到的」重畫（其他地方變暗），不用等放開手指；③**自由裁切有兩個圓圈**：`showMarks` 抽成共用，`startLasso` 改用 `focusOf`（往上偏 `reach`）、按下去先只移動（4px 或 250ms 才開始畫）、設定列多〔距離〕滑桿（跟筆刷共用）；④**版型格子裡素材被裁成形狀（mask 或 maskBitmap）時墊格子底色**：`scene.ts` `pushCellFill`（跟空格子色塊同一套；顏色 `track.fill ?? 外框色 ?? 黑`；外框空檔〔透明〕`gapMode:'none'` 不墊；轉場中也墊）
+  - 注意：自由裁切現在也受〔距離〕影響（預設 70px，畫的線在手指上方）；原本在手指位置畫的測試都先把〔距離〕設 0
+  - 動了哪些檔：`src/app/editor/CropEditor.tsx`、`src/engine/{scene,debug}.ts`（`patchItem` 測試掛鉤）；單元測試 `sceneCell`（格子 mask 墊底色）；e2e `x3`（筆刷第一筆當下變暗、〔看棋盤格〕、檢查結果；自由裁切兩個圓圈）、`y5`（格子裁成形狀外面是格子底色、透明才露出主軌）、`i6`／`h7`／`crop`／`feedback14`（自由裁切先設〔距離〕0、筆刷看起來改成變暗）
+  - 驗證：✅ `npm run check`（1224 單元測試）；完整 e2e 369 過／5 跳過＋2 個（h3 修剪面板、x9 播放軸換順序）在 4 個 worker 同時跑時逾時、單獨跑都過
 - 2026-11-26 Z25 轉場不卡、不重播（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：①**預解圖直接當貼圖**（`compositor.ts` `updateBitmap`）：來源是 `ImageBitmap` 的圖層不再經過暫存畫布（2D `drawImage` 再整張上傳在 iPhone 上很慢），同樣大小只換 `ImageSource.resource` 再 `update()`，裁切改貼圖子矩形；遮罩、圓角、裁切照舊能用。沙盒量測（`Z13_BENCH=1 … -g Z25`，軟體 GL）：轉場中「合成：準備」中位數 **12.1 → 0.7 ms**；②**換手對時**（新檔 `handover.ts`：`inHandover`、`pickSource`）：前一段 A 在轉場開始前 0.5 秒、後一段 B 在轉場結束後 1.0 秒內，預解圖有畫面就等 `<video>` 準備好**而且**時間差 ≤ 0.04 秒才換回 `<video>`，不然繼續用預解圖（不再 `<video>` 落後就換過去造成往回跳＝「開頭重播」）；`transitionNeeds` 範圍跟著延長（A 往前 0.5、B 往後 1.0，`MAX_FRAMES` 240）；轉場中有預解圖時 B 不再有保護期（`<video>` 沒人看，趁機硬 seek 追對時間）；③**字卡預覽播放 30 步**（`setKineticPlaying`，播放中每秒最多重畫 30 次；暫停、拖時間軸、匯出照舊 60）；④效能框「最近轉場」多「換手 預解 n 回影片 n 差 x 秒」
   - 動了哪些檔：`src/engine/{compositor,player,handover,transitionFrames}.ts`、`src/engine/kinetic/render.ts`、`src/app/editor/PerfOverlay.tsx`；單元測試 `handover`（換手範圍、pickSource 各情況）、`transitionFrames`；e2e `z25-handover`（疊化中間紅綠混色不黑、換手差 ≤ 0.045；轉場後 B 的影片沒準備好 0.8 秒也一直是綠色）、`z13-bench`（量測）

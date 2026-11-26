@@ -22,6 +22,7 @@ async function setup(page: Page) {
   }
   await page.mouse.up();
   await expect(page.getByTestId('crop-polygon')).toBeVisible();
+  await page.getByLabel('距離').fill('70'); // 距離是共用的：還給筆刷預設值
   await page.getByTestId('crop-tool-erase').tap();
   await expect(page.getByTestId('paint-bar')).toBeVisible();
 }
