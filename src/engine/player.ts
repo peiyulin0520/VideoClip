@@ -143,11 +143,18 @@ export class Player {
   /** 藏起來的影片的預約對時：什麼時候 play()、已經重對幾次 */
   private hid = new WeakMap<HTMLVideoElement, { playAt: number | null; tries: number }>();
   /** play() 起跑延遲量測：呼叫 play() 的時間與當時的 currentTime；最近幾次的毫秒數 */
-  private probes = new WeakMap<HTMLVideoElement, { at: number; from: number }>();
+  private probes = new WeakMap<HTMLVideoElement, { at: number; from: number; viaFrame?: boolean }>();
   private lats: number[] = [];
   private playTimers = new WeakMap<HTMLVideoElement, number>();
   /** 這次播放中，為了對時重新 seek 預約的次數（效能框用） */
   private resyncs = 0;
+  /** 後一段 B 的 <video> 狀態（效能框「B：」那行）：接縫那一刻的狀態、play() 被拒絕、各種原因的 pause() 次數 */
+  private bStat: {
+    seam: string;
+    rejects: number;
+    rejName: string;
+    pauses: Record<string, number>;
+  } = { seam: '', rejects: 0, rejName: '', pauses: {} };
   /** 測試用：讓 <video> 的 play() 晚這麼多毫秒才呼叫（模擬 iPhone 的起跑延遲） */
   playDelayMs = 0;
   private transHeavyTold = false;
@@ -250,6 +257,7 @@ export class Player {
     this.statFrames = 0;
     this.statMs = 0;
     this.resyncs = 0;
+    this.bStat = { seam: '', rejects: 0, rejName: '', pauses: {} };
     this.wallStart = performance.now();
     this.tStart = this.t;
     this.render(this.t); // 目前要播的影片在這裡同步 play()（還在點擊裡）
@@ -404,6 +412,10 @@ export class Player {
       /** play() 到真的開始動的中位數（毫秒）、這次播放為了對時重新 seek 預約的次數 */
       lat: number;
       resync: number;
+      /** 後一段 B 的 <video>：接縫那一刻的狀態、play() 被拒絕、各原因的 pause() 次數 */
+      bSeam: string;
+      bRejects: string;
+      bPauses: string;
     };
     /** 目前每支在解碼的影片：解碼大小＋預覽檔／原檔 */
     sources: string[];
@@ -451,6 +463,11 @@ export class Player {
         handDiff: Math.round(this.hand.diff * 1000) / 1000,
         lat: Math.round(this.latency() * 1000),
         resync: this.resyncs,
+        bSeam: this.bStat.seam,
+        bRejects: `${this.bStat.rejects}${this.bStat.rejName ? ` ${this.bStat.rejName}` : ''}`,
+        bPauses: Object.entries(this.bStat.pauses)
+          .map(([k, v]) => `${k} ${v}`)
+          .join(' '),
       },
       sources: this.sources,
       decoders: this.videoCount,
@@ -493,16 +510,26 @@ export class Player {
 
   private probeLatency(el: HTMLVideoElement) {
     const pr = this.probes.get(el);
-    if (!pr) return;
+    if (!pr || pr.viaFrame) return; // 有 requestVideoFrameCallback 的瀏覽器改用它量（見 startPlay）
     if (el.seeking) {
       this.probes.delete(el);
       return;
     }
     if (!el.paused && el.currentTime !== pr.from) {
       this.probes.delete(el);
-      const ms = performance.now() - pr.at;
-      if (ms < 2000) this.lats = [...this.lats.slice(-4), ms];
+      this.noteLatency(performance.now() - pr.at);
     }
+  }
+
+  private noteLatency(ms: number) {
+    if (ms < 2000) this.lats = [...this.lats.slice(-4), ms];
+  }
+
+  /** 暫停一支影片，記下原因（效能框「B：」那行：看是誰把後一段的影片停掉的） */
+  private pauseVideo(el: HTMLVideoElement, why: string, isB = false) {
+    if (el.paused) return;
+    el.pause();
+    if (isB) this.bStat.pauses[why] = (this.bStat.pauses[why] ?? 0) + 1;
   }
 
   private startPlay(el: HTMLVideoElement) {
@@ -511,8 +538,24 @@ export class Player {
     const go = () => {
       this.playTimers.delete(el);
       if (!this.playing) return;
-      this.probes.set(el, { at: asked, from: el.currentTime });
+      const from = el.currentTime;
+      const viaFrame = typeof el.requestVideoFrameCallback === 'function';
+      this.probes.set(el, { at: asked, from, viaFrame });
+      // 起跑延遲＝要求 play() 到「第一個比 play() 當時更後面的新畫面」真的呈現（iPhone 上 currentTime 一下就動，不代表畫面出來了）
+      if (viaFrame) {
+        const tick = (_now: number, meta: { mediaTime: number }) => {
+          if (this.probes.get(el)?.at !== asked) return;
+          if (meta.mediaTime > from + 0.02) {
+            this.probes.delete(el);
+            this.noteLatency(performance.now() - asked);
+          } else if (performance.now() - asked < 2000) el.requestVideoFrameCallback(tick);
+          else this.probes.delete(el);
+        };
+        el.requestVideoFrameCallback(tick);
+      }
       el.play().catch((e: unknown) => {
+        this.bStat.rejects++;
+        if (e instanceof DOMException) this.bStat.rejName = e.name;
         // 沒有出聲播放的許可（iPhone）：停下來請使用者再按一次播放（那一下點擊就能解鎖）
         if (e instanceof DOMException && e.name === 'NotAllowedError' && !el.muted) this.blocked();
       });
@@ -546,7 +589,7 @@ export class Player {
     this.gains.set(item.id, vol2);
     this.audio.apply(el, vol2, !!track.muted || !asset.hasAudio);
     if (held) {
-      if (!el.paused) el.pause();
+      this.pauseVideo(el, 'held');
       if (!el.seeking && Math.abs(el.currentTime - s) > 0.05) el.currentTime = s;
       return;
     }
@@ -564,8 +607,16 @@ export class Player {
       // 暫停 → seek 到「目標＋起跑延遲＋一點」→ 等時鐘走到再 play()，一次對準（iPhone 不用速度追，也追不上）
       const hidden =
         !!span && this.predecode && (warm || (t < span.cut + span.after + HANDOVER_AFTER && cachedNow));
+      if (span && t >= span.cut && el.dataset.seamT !== String(span.cut)) {
+        // 接縫那一刻（B 開始正式播的時間）B 的 <video> 是什麼狀態
+        el.dataset.seamT = String(span.cut);
+        this.bStat.seam = `paused=${el.paused} rs=${el.readyState} 時間 ${el.currentTime.toFixed(2)} 目標 ${s.toFixed(2)}`;
+      }
+      el.dataset.isB = span ? '1' : '0';
       const hid = this.hid.get(el) ?? { playAt: null, tries: 0 };
-      if (hidden && tg <= 0.3) {
+      // 轉場前、轉場中：不管聲音多大都重對（前一段的聲音還在，後一段斷一下聽不太出來）；轉場結束後聲音已經是 1，只有落後 0.4 秒以上才做
+      const post = !!span && t >= span.cut + span.after;
+      if (hidden && (tg <= 0.3 || !post)) {
         if (hid.tries > 0 && Math.abs(s - el.currentTime) <= 0.1) hid.tries = 0;
         const hp = hiddenSyncPlan({
           t,
@@ -579,6 +630,7 @@ export class Player {
           paused: el.paused,
           playAt: hid.playAt,
           tries: hid.tries,
+          resync: post ? 0.4 : undefined,
         });
         if (hp.kind === 'early-play') {
           this.startPlay(el);
@@ -592,7 +644,7 @@ export class Player {
         }
         if (hp.kind === 'resync') {
           this.cancelPlay(el);
-          if (!el.paused) el.pause();
+          this.pauseVideo(el, 'resync', !!orig.transitionIn);
           el.currentTime = hp.seekTo;
           this.hid.set(el, { playAt: hp.playAt, tries: hid.tries + 1 });
           this.resyncs++;
@@ -613,6 +665,7 @@ export class Player {
         soft: !IOS || hidden,
         transitioning,
         protect,
+        raw: item.trimIn + (t - item.start) * item.speed,
       });
       if (plan.seekTo !== undefined) {
         if (plan.hardSeek && transitioning) {
@@ -623,14 +676,14 @@ export class Player {
       }
       // 素材放完了／還沒到開頭：停在那一格，不要呼叫 play()（ended 的影片 play() 會從頭播）
       if (plan.hold) {
-        if (!el.paused) el.pause();
+        this.pauseVideo(el, 'hold', !!orig.transitionIn);
         return;
       }
       if (el.playbackRate !== plan.rate) el.playbackRate = plan.rate;
       if (el.paused) this.startPlay(el);
     } else {
       if (el.playbackRate !== item.speed) el.playbackRate = item.speed;
-      if (!el.paused) el.pause();
+      this.pauseVideo(el, 'idle');
       // 還在 seek 的時候不要再設新的時間：iPhone 上往回拖很慢，前一個 seek 還沒完成就又設新的，
       // 會一直在 seeking、畫面一直沒準備好（預覽上只剩白框）。seeked 後重畫時會再對一次最新的時間。
       if (Math.abs(el.currentTime - s) > 0.02 && !el.seeking) el.currentTime = s;
@@ -912,9 +965,12 @@ export class Player {
         el.currentTime = Math.max(early.trimIn, 0);
         el.dataset.primed = '1';
       }
-      if (!el.paused) el.pause();
+      this.pauseVideo(el, 'primed', !!tr);
     }
-    this.pool.pauseAllExcept(used);
+    this.pool.pauseAllExcept(used, (v) => {
+      if (this.bStat)
+        this.bStat.pauses.pool = (this.bStat.pauses.pool ?? 0) + (v.dataset.isB === '1' ? 1 : 0);
+    });
     this.syncMusic(p, t);
     if (this.playing) this.audio.keepAlive();
     const t1 = performance.now();

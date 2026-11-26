@@ -88,4 +88,10 @@ test('Z27 起跑延遲 400ms：轉場後 2 秒內，B 的畫面亮度不會往�
   ).toEqual([]);
   const s = await hook(page, (h) => h.stats().transition);
   expect(s.lat, '量到起跑延遲').toBeGreaterThan(100);
+  // Z29：接縫那一刻後一段的 <video> 已經在播、時間差不多對上；沒有被「停在第一格」暫停
+  const m = /paused=(\w+).*時間 ([\d.]+) 目標 ([\d.]+)/.exec(s.bSeam);
+  expect(m, `接縫狀態：${s.bSeam}`).not.toBeNull();
+  expect(m![1], '接縫那一刻後一段的影片在播').toBe('false');
+  expect(Math.abs(Number(m![2]) - Number(m![3])), '接縫時影片時間跟目標差不到 0.25 秒').toBeLessThan(0.25);
+  expect(s.bPauses, '後一段影片沒有被 hold 暫停').not.toMatch(/hold/);
 });

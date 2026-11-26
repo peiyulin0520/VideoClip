@@ -138,3 +138,41 @@ describe('hiddenSyncPlan：藏起來的影片預約對時', () => {
     });
   });
 });
+
+describe('Z29：入點 0 秒的後一段，起跑後不能又被「停在第一格」暫停', () => {
+  it('raw 沒給＝舊行為：target ≤ 0.02 停在第一格', () => {
+    expect(videoSyncPlan({ ...base, target: 0.01, current: 0 }).hold).toBe(true);
+  });
+  it('raw＜0（真的還沒到開頭）：停在第一格；現在不在 0 就 seek 回 0', () => {
+    expect(videoSyncPlan({ ...base, target: 0, current: 0.1, raw: -0.3 })).toMatchObject({
+      hold: true,
+      seekTo: 0,
+    });
+  });
+  it('raw 剛過 0（0～0.02）：已經起跑的影片照常播，不暫停、不倒回 0', () => {
+    const p = videoSyncPlan({ ...base, target: 0.01, current: 0.12, raw: 0.01 });
+    expect(p.hold).toBe(false);
+    expect(p.seekTo).toBeUndefined();
+  });
+});
+
+describe('Z29：hiddenSyncPlan 的重對門檻', () => {
+  const h = {
+    t: 10,
+    raw: 2,
+    target: 2,
+    current: 1.7,
+    speed: 1,
+    duration: 8,
+    lat: 0.4,
+    seeking: false,
+    paused: false,
+    playAt: null as number | null,
+    tries: 0,
+  };
+  it('預設落後 0.3 秒就重對；轉場結束後（resync 0.4）落後 0.3 秒不重對、落後 0.5 秒才重對', () => {
+    expect(hiddenSyncPlan(h).kind).toBe('resync');
+    expect(hiddenSyncPlan({ ...h, resync: 0.4 }).kind).toBe('none');
+    expect(hiddenSyncPlan({ ...h, current: 1.5, resync: 0.4 }).kind).toBe('resync');
+  });
+});

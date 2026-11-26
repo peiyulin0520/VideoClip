@@ -63,8 +63,12 @@ export class VideoPool {
     return el;
   }
 
-  pauseAllExcept(keep: Set<HTMLVideoElement>) {
-    for (const v of this.els) if (!keep.has(v) && !v.paused) v.pause();
+  pauseAllExcept(keep: Set<HTMLVideoElement>, onPause?: (v: HTMLVideoElement) => void) {
+    for (const v of this.els)
+      if (!keep.has(v) && !v.paused) {
+        v.pause();
+        onPause?.(v);
+      }
   }
 
   /**

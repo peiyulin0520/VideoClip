@@ -69,6 +69,12 @@ export function PerfOverlay({ player }: { player: Player | null }) {
           {s.transition.resync}
         </div>
       )}
+      {s.transition.frames > 0 && (
+        <div>
+          B：接縫 {s.transition.bSeam || '—'}｜play 被拒 {s.transition.bRejects}｜pause{' '}
+          {s.transition.bPauses || '0'}
+        </div>
+      )}
       {s.video && <div>{s.video}</div>}
     </div>
   );

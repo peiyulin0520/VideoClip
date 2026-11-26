@@ -56,6 +56,8 @@ export function videoSyncPlan(o: {
   transitioning: boolean;
   /** 轉場前後的保護期（後一段的暖機到轉場結束後 1 秒）：硬 seek 的門檻放到 HARD_DRIFT_PROTECT */
   protect?: boolean;
+  /** 沒夾過的素材秒數（入點不夠時是負的）。有給：只有「真的還沒到素材開頭（raw＜0）」才停在第一格；到了開頭（raw≥0）就正常播，不要把已經起跑的影片又暫停、倒回 0 */
+  raw?: number;
 }): SyncPlan {
   const { target, current, duration, speed } = o;
   // 素材放完了：停在最後一格
@@ -65,7 +67,7 @@ export function videoSyncPlan(o: {
     return { hold: true, seekTo: need ? last : undefined, rate: speed, hardSeek: false };
   }
   // 還沒到素材開頭（轉場提前出現、入點不夠）：停在第一格
-  if (target <= 0.02) {
+  if (o.raw === undefined ? target <= 0.02 : o.raw < 0) {
     const need = !o.seeking && current > 0.05;
     return { hold: true, seekTo: need ? 0 : undefined, rate: speed, hardSeek: false };
   }
@@ -115,6 +117,8 @@ export function hiddenSyncPlan(o: {
   /** 已預約：什麼時候（時間軸秒數）要 play()；沒預約＝null */
   playAt: number | null;
   tries: number;
+  /** 落後／超前超過這個秒數才預約重對（預設 HIDDEN_RESYNC；轉場結束後聲音已經是 1，只在落後很多時才做） */
+  resync?: number;
 }): HiddenPlan {
   if (o.playAt !== null) {
     if (o.seeking) return { kind: 'keep' };
@@ -127,7 +131,7 @@ export function hiddenSyncPlan(o: {
   }
   if (o.seeking) return { kind: 'keep' };
   const diff = o.target - o.current;
-  if (Math.abs(diff) <= HIDDEN_RESYNC || o.tries >= HIDDEN_MAX_TRIES) return { kind: 'none' };
+  if (Math.abs(diff) <= (o.resync ?? HIDDEN_RESYNC) || o.tries >= HIDDEN_MAX_TRIES) return { kind: 'none' };
   const seekTo = o.target + (o.lat + HIDDEN_LEAD) * o.speed;
   if (o.duration > 0.1 && seekTo >= o.duration - END_HOLD * 2) return { kind: 'none' };
   return { kind: 'resync', seekTo, playAt: o.t + HIDDEN_LEAD };
