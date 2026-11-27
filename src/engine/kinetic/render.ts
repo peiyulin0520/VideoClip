@@ -105,12 +105,57 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   paintKinetic(
     canvas,
     def,
-    { words, sub, fg, paper: sch.bg, hi, hifg, bg, family: canvasFamily(fontId), settle, lines, wrap },
+    {
+      words,
+      sub,
+      fg,
+      paper: sch.bg,
+      hi,
+      hifg,
+      bg,
+      family: canvasFamily(fontId),
+      settle,
+      lines,
+      wrap,
+      letterEm: run?.letterSpacing,
+      lineK: (run?.lineHeight ?? DEFAULT_LINE_H) / DEFAULT_LINE_H,
+    },
     def.smooth ? tt : step / rate,
     fade,
     fadeW,
   );
   return { canvas, w: fr.w, h: fr.h, key, content: kineticContent(item, W, H) };
+}
+
+/** 字卡預設行距（`defaults.ts`）：動態字卡的「行距倍數」以它為 1 */
+export const DEFAULT_LINE_H = 1.25;
+
+/** 這個瀏覽器的 canvas 支援 letterSpacing（Safari 17.4 以前沒有） */
+export const canvasSpacing = (): boolean =>
+  typeof CanvasRenderingContext2D !== 'undefined' && 'letterSpacing' in CanvasRenderingContext2D.prototype;
+
+/**
+ * 字距：每次設 `font`（所有式子都這樣設字型）就跟著把 `letterSpacing` 設成「字距 em × 字的像素」。
+ * 用代理包起來，65 式不用一式一式改。字距 0 或瀏覽器不支援就原樣回傳。
+ */
+export function withSpacing(ctx: CanvasRenderingContext2D, em: number): CanvasRenderingContext2D {
+  if (!em || !('letterSpacing' in ctx)) return ctx;
+  return new Proxy(ctx, {
+    get(t, k) {
+      const v = Reflect.get(t, k, t) as unknown;
+      return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(t) : v;
+    },
+    set(t, k, v) {
+      Reflect.set(t, k, v, t);
+      if (k === 'font') {
+        const m = /(\d+(?:\.\d+)?)px/.exec(String(v));
+        (t as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = m
+          ? `${em * parseFloat(m[1]!)}px`
+          : '0px';
+      }
+      return true;
+    },
+  });
 }
 
 /** 邊緣淡出寬度的預設值（佔框的比例） */
@@ -135,9 +180,10 @@ function scratchOf(canvas: HTMLCanvasElement): HTMLCanvasElement {
 function drawRest(s: Stage, alpha: number) {
   const rows = s.words.slice(0, 8);
   const widest = rows.reduce((a, w) => (wlen(w) > wlen(a) ? w : a), rows[0] ?? '');
-  const px = Math.min(fit(s, widest, 34, 84), ((78 / rows.length) * s.cqh) / 1.25);
+  const lk = 1.25 * (s.lineK ?? 1);
+  const px = Math.min(fit(s, widest, 34, 84), ((78 / rows.length) * s.cqh) / lk);
   rows.forEach((w, i) =>
-    drawWord(s, w, s.W / 2, s.H / 2 + (i - (rows.length - 1) / 2) * px * 1.25, px, { alpha }),
+    drawWord(s, w, s.W / 2, s.H / 2 + (i - (rows.length - 1) / 2) * px * lk, px, { alpha }),
   );
 }
 
@@ -145,7 +191,7 @@ function drawRest(s: Stage, alpha: number) {
 export function paintKinetic(
   canvas: HTMLCanvasElement,
   def: KineticDef,
-  p: Pick<Stage, 'words' | 'fg' | 'paper' | 'hi' | 'hifg' | 'bg' | 'family'> & {
+  p: Pick<Stage, 'words' | 'fg' | 'paper' | 'hi' | 'hifg' | 'bg' | 'family' | 'letterEm' | 'lineK'> & {
     sub?: string;
     settle?: number;
     lines?: string[];
@@ -166,7 +212,7 @@ export function paintKinetic(
     g.fillRect(0, 0, W, H);
   }
   const stage = (c: CanvasRenderingContext2D): Stage => ({
-    g: c,
+    g: withSpacing(c, p.letterEm ?? 0),
     W,
     H,
     cqmin: Math.min(W, H) / 100,

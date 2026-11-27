@@ -138,7 +138,11 @@ export const FX_IN: KineticDef[] = [
       const sizes = lineSizes(n, s.lines, s.wrap === 'auto');
       const rows = sizes.length;
       const widest = Math.max(...sizes);
-      const px = Math.min(30 * cqmin, ((84 / widest) * s.cqw) / 1.08, ((78 / rows) * s.cqh) / 1.25);
+      const px = Math.min(
+        30 * cqmin,
+        ((84 / widest) * s.cqw) / (1.08 + (s.letterEm ?? 0)),
+        ((78 / rows) * s.cqh) / (1.25 * (s.lineK ?? 1)),
+      );
       const out = 1 - seg(tt, total - 0.2, total);
       const starts = sizes.map((_, r) => sizes.slice(0, r).reduce((a, b) => a + b, 0));
       S.forEach((ch, i) => {
@@ -152,8 +156,8 @@ export const FX_IN: KineticDef[] = [
         drawWord(
           s,
           ch,
-          W / 2 + (col - (sizes[row]! - 1) / 2) * px * 1.08,
-          H / 2 + (row - (rows - 1) / 2) * px * 1.25,
+          W / 2 + (col - (sizes[row]! - 1) / 2) * px * (1.08 + (s.letterEm ?? 0)),
+          H / 2 + (row - (rows - 1) / 2) * px * 1.25 * (s.lineK ?? 1),
           px,
           { sx: sc, sy: sc, rot: (i % 2 ? 1 : -1) * lerp(7, 0, p), alpha: out },
         );
@@ -300,7 +304,7 @@ export const FX_IN: KineticDef[] = [
         return { word, px: fit(s, word, 25, 74) };
       });
       const gap = 0.6 * cqmin;
-      const hs = lines.map((l) => l.px * 1.1);
+      const hs = lines.map((l) => l.px * 1.1 * (s.lineK ?? 1));
       let y = (H - (hs.reduce((a, b) => a + b, 0) + gap * 2)) / 2;
       lines.forEach((l, i) => {
         const st = 0.2 + i * 0.55;

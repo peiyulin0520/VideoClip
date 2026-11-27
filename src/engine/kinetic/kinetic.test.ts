@@ -508,3 +508,35 @@ describe('動態字卡：副標、停在最後畫面', () => {
       }
   });
 });
+
+describe('動態字卡：字距（withSpacing）與行距', () => {
+  it('withSpacing：每次設 font 就把 letterSpacing 設成「字距 em × 字的像素」；其他屬性、方法照常', async () => {
+    const { withSpacing } = await import('./render');
+    const calls: string[] = [];
+    const raw = {
+      font: '',
+      letterSpacing: '0px',
+      fillText(this: { letterSpacing: string; font: string }, s: string) {
+        calls.push(`${this.letterSpacing}|${this.font}|${s}`);
+      },
+    } as unknown as CanvasRenderingContext2D;
+    const g = withSpacing(raw, 0.25);
+    g.font = '900 40px Foo, sans-serif';
+    expect(raw.letterSpacing).toBe('10px');
+    g.fillText('字', 0, 0);
+    expect(calls).toEqual(['10px|900 40px Foo, sans-serif|字']);
+    g.font = '700 12.5px Bar';
+    expect(raw.letterSpacing).toBe('3.125px');
+    // 負的字距（比預設更擠）
+    const g2 = withSpacing(raw, -0.1);
+    g2.font = '900 20px X';
+    expect(raw.letterSpacing).toBe('-2px');
+  });
+  it('withSpacing：字距 0、或這個 context 沒有 letterSpacing（舊版 Safari）→ 原樣回傳', async () => {
+    const { withSpacing } = await import('./render');
+    const raw = { font: '' } as unknown as CanvasRenderingContext2D;
+    expect(withSpacing(raw, 0.3)).toBe(raw);
+    const raw2 = { font: '', letterSpacing: '0px' } as unknown as CanvasRenderingContext2D;
+    expect(withSpacing(raw2, 0)).toBe(raw2);
+  });
+});
