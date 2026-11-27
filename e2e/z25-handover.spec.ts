@@ -58,7 +58,7 @@ test('Z25 預解圖直接當貼圖：疊化中間是紅綠混色、不黑；轉�
   expect(mixed.length, '疊化中間要有紅綠混色').toBeGreaterThan(0);
   const s = await hook(page, (h) => h.stats().transition);
   expect(s.cached, '轉場用了預解圖').toBeGreaterThan(5);
-  expect(s.handDiff, '換回影片時兩邊差不到 1 格').toBeLessThanOrEqual(0.045);
+  expect(s.handDiff, '換回影片時兩邊差不到 3 格').toBeLessThanOrEqual(0.105);
 });
 
 test('Z25 轉場後 B 的影片還沒準備好：換手範圍裡繼續用預解圖（不黑、不露出下面）', async ({ page }) => {

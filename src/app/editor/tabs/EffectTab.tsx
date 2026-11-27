@@ -18,6 +18,7 @@ import {
   patchKinetic,
   resetKineticArea,
   setKinetic,
+  setKineticFitSpeed,
   setKineticTextColor,
   setTextFx,
   setTransition,
@@ -28,6 +29,7 @@ import {
 import { KINETIC, KINETIC_GROUPS, kineticById, resolveBg, schemeOf } from '../../../engine/kinetic';
 import { kineticFrame } from '../../../engine/kinetic/hit';
 import { holdTime } from '../../../engine/kinetic/hold';
+import { SLIDER_MAX, SLIDER_MIN, fitDuration, kineticSpeed } from '../../../engine/kinetic/speed';
 import type { KineticDef, KineticGroup } from '../../../engine/kinetic/core';
 import { DEFAULT_FADE_W, kineticWords } from '../../../engine/kinetic/render';
 import { TEXT_FXS } from '../../../engine/textFx';
@@ -224,7 +226,9 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
   const k = item.kinetic!;
   const sch = schemeOf(def);
   const len = def.len(words);
-  const speed = k.speed ?? 1;
+  const holdAt = holdTime(def, words);
+  const hold = k.end === 'hold';
+  const speed = kineticSpeed(k, item.duration, holdAt);
   const fade = k.fade ?? def.fade ?? 'none';
   const bg = resolveBg(k.bg);
   const player = useUI((s) => s.player);
@@ -366,7 +370,32 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
       )}
       <div className="zone-soft" data-testid="kn-speed">
         <div className="zone-title">速度與播放</div>
-        <div className="chips" role="radiogroup" aria-label="動態字卡速度">
+        {hold && (
+          <div data-testid="kn-fit">
+            <Slider
+              label="速度"
+              value={Math.min(Math.max(speed, SLIDER_MIN), SLIDER_MAX)}
+              min={SLIDER_MIN}
+              max={SLIDER_MAX}
+              step={0.05}
+              format={(v) => `${v.toFixed(2)}×`}
+              onChange={(v) => {
+                const got = setKineticFitSpeed(item.id, v, holdAt);
+                if (got !== null && got + 1e-6 < fitDuration(holdAt, v))
+                  toast('後面還有別的東西，字卡不能再拉長了');
+              }}
+            />
+            <p className="hint">
+              字卡在播放軸上多長，特效就在這段時間內播完所有字（最後停住一小段）。拖速度＝改字卡的長度；在播放軸上拉長拉短，速度也跟著變。
+            </p>
+          </div>
+        )}
+        <div
+          className={hold ? 'chips hidden' : 'chips'}
+          role="radiogroup"
+          aria-label="動態字卡速度"
+          hidden={hold}
+        >
           {KINETIC_SPEEDS.map((v) => (
             <button
               key={v}
@@ -380,7 +409,7 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
             </button>
           ))}
         </div>
-        {len !== null && <div className="slider-label">一輪 {(len / speed).toFixed(1)} 秒</div>}
+        {len !== null && !hold && <div className="slider-label">一輪 {(len / speed).toFixed(1)} 秒</div>}
         <>
           <div className="slider-label">字卡比一輪長時</div>
           <div className="chips" role="radiogroup" aria-label="字卡比一輪長時">
@@ -397,7 +426,16 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
                 aria-label={name}
                 data-testid={`kn-end-${id}`}
                 className={`chip${(k.end ?? 'loop') === id ? ' active' : ''}`}
-                onClick={() => patchKinetic(item.id, { end: id === 'loop' ? undefined : id })}
+                onClick={() => {
+                  if (id === 'hold') patchKinetic(item.id, { end: 'hold', fit: true });
+                  // 切回重複播放：把現在實際的速度存成自己的速度（看起來不變）
+                  else
+                    patchKinetic(item.id, {
+                      end: undefined,
+                      fit: undefined,
+                      speed: Math.abs(speed - 1) < 0.01 ? undefined : Math.round(speed * 100) / 100,
+                    });
+                }}
               >
                 {name}
               </button>
@@ -405,7 +443,9 @@ function KineticSettings({ item, def, words }: { item: TextItem; def: KineticDef
           </div>
           {k.end === 'hold' && (
             <div className="slider-label" data-testid="kn-hold-at">
-              停在 {(holdTime(def, words) / speed).toFixed(1)} 秒
+              {k.fit
+                ? `字卡 ${item.duration.toFixed(1)} 秒內播完（${(holdAt / speed).toFixed(1)} 秒出齊）`
+                : `停在 ${(holdAt / speed).toFixed(1)} 秒`}
             </div>
           )}
         </>

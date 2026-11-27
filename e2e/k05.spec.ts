@@ -134,3 +134,34 @@ test('K0.5 顯示範圍：預設是畫面中間一條 16:9；調整範圍（拖�
   await page.getByRole('radio', { name: '邊緣淡出 無' }).tap();
   expect((await textItem(page)).kinetic?.fade).toBe('none');
 });
+
+test('Z33 顯示範圍可以往外拉：高度拉到比畫面還高（以前上限 150%），特效就能在畫面外動', async ({ page }) => {
+  test.setTimeout(180_000);
+  await setup(page, '爆出');
+  // 字卡縮小到 0.4：框在畫面上變小，把手拉得動；框的大小（佔畫面的比例）可以拉得更大
+  const it0 = await textItem(page);
+  await page.evaluate(
+    ([id, tr]) =>
+      (
+        window as unknown as { __videoclip: { patchItem: (i: string, p: object) => void } }
+      ).__videoclip.patchItem(id as string, { transform: { ...(tr as object), scale: 0.4 } }),
+    [it0.id, it0.transform] as const,
+  );
+  await page.evaluate(() => window.scrollTo(0, 0));
+  for (let i = 0; i < 2; i++) {
+    await openTool(page, 'fx.textfx');
+    await page.getByTestId('kn-area-edit').tap();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const h = (await page.getByTestId('ka-h-b').boundingBox())!;
+    const x = h.x + h.width / 2;
+    const y = h.y + h.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 380, { steps: 8 });
+    await page.mouse.up();
+    await page.getByTestId('ka-apply').tap();
+  }
+  const size = (await textItem(page)).kinetic!.size!;
+  expect(size.h, '高度超過以前的上限 1.5').toBeGreaterThan(1.6);
+  expect(size.w * size.h, '面積不超過畫面的 6 倍').toBeLessThanOrEqual(6.001);
+});

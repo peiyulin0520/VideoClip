@@ -7,7 +7,7 @@ test('Z10 文字類別〔特效〕＝同一個文字特效視窗；基本＋動�
   await createProjectWith(page, ['solid-blue.webm']);
   await openCat(page, '文字');
   await page.getByTestId('tool-text.add').tap();
-  await page.getByLabel('文字內容').fill('蔡氏家族聚餐');
+  await page.getByLabel('文字內容').fill('週末一起出遊');
   await closePanel(page);
   const item = async () =>
     (await project(page)).tracks.flatMap((t) => t.items).find((i) => i.type === 'text') as unknown as {

@@ -432,6 +432,8 @@ export type TextItem = ItemBase & {
     sub?: string;
     /** 字卡比一輪長的時候：loop 重複播放（預設）、hold 播到字完整呈現就停在那一格（不消失） */
     end?: 'loop' | 'hold';
+    /** hold 時速度由字卡的長度算（字卡多長，特效就在那段時間內播完，見 engine/kinetic/speed.ts）；沒有＝照 speed（舊專案） */
+    fit?: boolean;
   };
 };
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { CardBox, Stroke, TextItem } from '../../model/types';
 import { applyTextStyleToAll, editText, patchKinetic, removeAnyItem } from '../../store/actions';
 import { kineticById } from '../../engine/kinetic';
+import { canvasSpacing } from '../../engine/kinetic/render';
 import { toast } from '../../store/uiStore';
 import { useProjectStore } from '../../store/projectStore';
 import { SHAPE_LINE } from '../../model/defaults';
@@ -186,6 +187,11 @@ export function TextPanel({
             format={(v) => v.toFixed(2)}
             onChange={(v) => edit((c) => void (c.runs[0]!.letterSpacing = v), 'ls')}
           />
+          {item.kinetic && !canvasSpacing() && (
+            <p className="ao-hint" data-testid="kn-spacing-na">
+              這台手機的瀏覽器還不支援動態字卡的字距（行距可以調）
+            </p>
+          )}
           <Slider
             label="行距"
             value={run.lineHeight}

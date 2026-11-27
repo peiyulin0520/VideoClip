@@ -73,6 +73,7 @@ import {
 import { cellItems } from '../engine/cellGap';
 import { kineticById } from '../engine/kinetic';
 import { areaCenter } from '../engine/kinetic/hit';
+import { fitDuration } from '../engine/kinetic/speed';
 import {
   cellNoOf,
   cellTracksOf,
@@ -1442,6 +1443,7 @@ export function patchKinetic(
     wrap?: 'auto' | undefined;
     sub?: string | undefined;
     end?: 'loop' | 'hold' | undefined;
+    fit?: boolean | undefined;
   },
 ): void {
   editItem(
@@ -1457,6 +1459,31 @@ export function patchKinetic(
     },
     { coalesce: `kinetic:${id}` },
   );
+}
+
+/**
+ * 動態字卡〔停在最後畫面〕：拖速度＝改字卡在播放軸上的長度（特效在字卡時間內剛好播完，見 engine/kinetic/speed.ts）。
+ * hold＝這一式播到所有字都出現要幾秒（速度 1 時）。字卡後面緊接著別的東西時最長只能到它的開頭（跟拖播放軸一樣）。
+ * 回傳實際的字卡長度（被擋住時比想要的短）。一步復原（連續拖合併）。
+ */
+export function setKineticFitSpeed(id: string, speed: number, hold: number): number | null {
+  const p = store().project;
+  const f = p && findItem(p, id);
+  if (!p || !f || f.item.type !== 'text' || !f.item.kinetic) return null;
+  const items = p.tracks[f.trackIndex]!.items as Item[];
+  const want = fitDuration(hold, speed);
+  const dur = trimEndFree(items, id, want, undefined).find((x) => x.id === id)!.duration;
+  editItem(
+    id,
+    (it) => {
+      if (it.type !== 'text' || !it.kinetic) return;
+      it.kinetic.end = 'hold';
+      it.kinetic.fit = true;
+      it.duration = dur;
+    },
+    { coalesce: `kinetic-speed:${id}` },
+  );
+  return dur;
 }
 
 /** 動態字卡的字色：改字卡所有文字段的顏色（文字分頁看到的也一起變）。連續調整合併成一步復原 */

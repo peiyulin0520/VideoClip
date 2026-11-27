@@ -14,7 +14,7 @@ test('Z22 停在最後畫面的對照圖', async ({ page }) => {
       (
         window as unknown as { __videoclip: { kineticHoldSheet: (t: string) => string } }
       ).__videoclip.kineticHoldSheet(t),
-    '蔡氏家族聚餐',
+    '週末一起出遊',
   );
   mkdirSync('docs/screenshots/feedback-17', { recursive: true });
   writeFileSync(

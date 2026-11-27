@@ -30,6 +30,10 @@ export type Stage = {
    * 把「閒著也在動」的部分乘上 (1 − settle)，停下來時每個字都乖乖待在自己的位置。沒給＝0（照常動）。
    */
   settle?: number;
+  /** 字距（em，字卡〔版面〕的〔字距〕）：畫布支援 letterSpacing 時由 paintKinetic 套在每一次設字型上；寫死字間距的式子乘上 (1 + letterEm) */
+  letterEm?: number;
+  /** 行距倍數（字卡〔版面〕的〔行距〕÷ 預設 1.25；預設＝1）：多行的式子行與行的距離乘上它 */
+  lineK?: number;
   /** 使用者在文字內容按 Enter 換的行（每行的字，已去掉空白、逗號、頓號）；重擊排字照它換行。沒給＝沒有手動換行 */
   lines?: string[];
   /** 重擊排字沒有手動換行時：'auto' 超過 8 個字自動換行；沒有＝全部排成一行（字太多就縮小） */
@@ -80,6 +84,11 @@ export type KineticDef = {
    * false＝這一式本來就是整句都看得到的（環繞、歌詞捲動），不用這樣處理。
    */
   calm?: false;
+  /**
+   * 一直流動的式子〔停在最後畫面〕時「特效自己的停止畫面」：同樣的字型粗細、顏色、裝飾、版面，只是靜止、整句字都看得到
+   * （放不下就縮小）。流動內容減速（時間慢慢停住）並淡出，這個畫面淡入。沒給＝淡入通用的整句字（drawRest）。
+   */
+  rest?: (s: Stage) => void;
   /** 一直在移動的式子：用真正的時間畫、不量化成步（預覽播放時每格都重畫，每格移動量才平順）；其他式子播放時 30 步 */
   smooth?: true;
   draw: (s: Stage, t: number) => void;
@@ -131,6 +140,43 @@ export function splitWords(text: string): string[] {
 }
 
 // ---------- 畫字 ----------
+/** 整句字排一行，放得進 maxW 的字高（px，最大 maxPx） */
+export function fitLine(s: Stage, text: string, maxPx: number, maxW: number, weight = 900): number {
+  s.g.font = fontOf(s, 100, weight);
+  const w = s.g.measureText(text).width;
+  return Math.max(Math.min(maxPx, (100 * maxW) / Math.max(w, 1)), 1);
+}
+
+/**
+ * 整句字「一個詞一行」往上下疊（詞多就少放幾行、最多 4 行）：每一行的字高一樣，放得進 maxW × maxH（不超過 maxPx）。
+ * 回傳字高、行與行的距離倍數（含〔行距〕）與每一行（給 centerText 用）。大字的式子停下來用它（巨字橫移、點陣看板），才不會整句擠成一行變成小字。
+ */
+export function stackWords(s: Stage, maxPx: number, maxW: number, maxH: number, weight = 900) {
+  const rows = s.words.slice(0, 4);
+  const widest = rows.reduce((a, w) => (wlen(w) > wlen(a) ? w : a), rows[0] ?? '');
+  const step = 1.12 * (s.lineK ?? 1); // 行距：字卡〔版面〕的〔行距〕
+  const px = Math.min(fitLine(s, widest, maxPx, maxW, weight), maxH / (rows.length * step));
+  return { rows, px, step };
+}
+
+/** 在 (cx, cy) 置中畫一行字（字高 px） */
+export function centerText(
+  s: Stage,
+  text: string,
+  cx: number,
+  cy: number,
+  px: number,
+  color: string,
+  weight = 900,
+) {
+  const { g } = s;
+  g.font = fontOf(s, px, weight);
+  g.fillStyle = color;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, cx, cy);
+}
+
 export const fontOf = (s: Stage, px: number, weight = 900) => `${weight} ${Math.max(px, 1)}px ${s.family}`;
 
 /** 在 (x, y) 置中畫一個詞（y＝這一行的垂直中心）；scaleX／scaleY／rotate（度）以詞的中心為基準 */

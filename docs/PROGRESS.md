@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：1209 個單元測試、約 369 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：Z29（轉場跳格）、Z30（彎道全程一條緞帶）、Z31（自由裁切版面）已做完、在分支、還沒進 PR；等使用者說要不要開 PR（要先看的話說「只建立 PR，不要合併」）。iPhone 上看 PLAN §7 的 Z29／Z30／Z31；轉場如果還跳，請把效能框（新的「B：」那行）截圖給 Opus
+- **下一步**：feedback-18 的 Z32–Z36 已做完、在分支、還沒進 PR；等使用者說要不要開 PR（要先看的話說「只建立 PR，不要合併」）。iPhone 上看 PLAN §7 的 Z32–Z36；轉場如果還跳，把效能框（含「B：」那行）截圖給 Opus
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,24 +89,34 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-27 feedback-18 Z32–Z36 實作（claude/zen-tesla-v3brj5）
+  - 做了什麼：Z33 顯示範圍可往外拉（每邊 min(3÷縮放,4)、面積 6）；Z34 動態字卡吃字距行距（代理 context 設 font 時帶 letterSpacing、Stage.lineK）；Z36 〔停在最後畫面〕時速度由字卡長度算（fit）、細調面板速度滑桿改字卡長度；Z35 流動 8 式停在特效自己的樣子（rest：減速淡出＋各式靜止整句）；Z32 轉場：起跑延遲記在手機、換手門檻 0.1、處理超前、A 轉場中不硬跳、B 接縫狀態每次播放都記
+  - 動了哪些檔：src/app/editor/{KineticAreaEdit,TextPanel}.tsx、src/app/editor/tabs/EffectTab.tsx、src/engine/{handover,player}.ts、src/engine/kinetic/{core,render,speed,hold}.ts、kinetic/fx/{flow,swap,in,sp}.ts、src/store/actions.ts、src/model/types.ts、e2e/{k05,z34-spacing,z35-rest,z36-fit,feedback14,z25-handover}.spec.ts、docs
+  - 驗證：✅ 單元測試 1271 個、lint、build、e2e（k05／z34／z35／z36／feedback14／z22／z23／x3／kinetic-hold／k0／z25／z27／z16／z14）；截圖 docs/screenshots/feedback-18/z35-rest-sheet.png（自編的字）  🟡 只在 Chromium  🔴 iPhone 真機還沒看（PLAN §7 Z32–Z36）；轉場在 iPhone 上能不能再順一點沒辦法在沙盒驗證
+  - 使用者的決定/回饋：選 A 全部照順序做；測試和文件改用自編的字、不放使用者的錄影／截圖（已寫進 AGENTS.md）
+- 2026-11-27 規劃 feedback-18（Z32–Z36）（claude/zen-tesla-v3brj5）
+  - 做了什麼：看 08:02 兩段錄影＋08:14 錄影＋截圖：轉場後一段不再卡 0 秒，但起跑延遲實際 0.59 秒、重對 3 次用完、轉場後 2 秒一次都沒換回影片（門檻 1 格太嚴、超前沒處理），前一段落後 0.64 秒硬跳；顯示範圍 MAX 1.5×字卡縮放；字距行距沒套到動態字卡；流動 8 式停住時變一般字；速度跟字卡長度無關
+  - 動了哪些檔：docs/plans/2026-11-27-feedback-18.md、docs/screenshots/feedback-18/、docs/PROGRESS.md
+  - 驗證：🔴 只有規劃
+  - 使用者的決定/回饋：彎道「還可以～」；轉場「下載下來播是正常的，再精進看看，不然只能先這樣」；範圍要能往外拉；字距行距；停在最後要是特效自己的樣子；特效要在字卡時段內播完、速度與長度連動
 - 2026-11-27 Z29 轉場跳格、Z30 彎道全程一條緞帶、Z31 自由裁切版面（claude/zen-tesla-v3brj5）
   - 做了什麼：Z29——入點 0 秒的後一段起跑後不再被「停在第一格」規則暫停（Z27 在 iPhone 沒生效的原因）、轉場中不看聲音倍數照常預約重對、轉場後落後 0.4 秒以上才重對；效能框加「B：接縫狀態／play 被拒／各原因 pause 次數」、起跑延遲用 rVFC 量。Z30——彎道從頭到尾只有一條只寫一遍字的緞帶：平常沿正弦 S 從左滑到右一輪 1.8 秒，〔停在最後畫面〕時從畫面正中間照原方向原速度離開、順時針繞一圈、停在中間拉直；用真正的時間畫（不量化）、活動範圍＝框中間 60%。Z31——〔自由〕設定區兩行、〔清除形狀〕一直在
   - 動了哪些檔：src/engine/{player,videoSync,mediaPool}.ts、src/app/editor/{PerfOverlay,CropEditor}.tsx、src/app/styles.css、src/engine/kinetic/{core,render}.ts、kinetic/fx/{flow,ribbon}.ts（+test）、e2e/{z27-no-repeat,z28-ribbon,x3}.spec.ts、docs
-  - 驗證：✅ 單元測試 1259 個、lint、build、e2e（kinetic-hold／k0／k05／z14／z16／z22／z23／z25／z27／z28／x3／crop）；拿掉 `raw` 時 z27 會失敗（pause hold 1）；截圖 docs/screenshots/feedback-17/{path-ribbon-z30,z31-crop-panel-after}.png  🟡 只在 Chromium（起跑延遲用 setPlayLatency 模擬）  🔴 iPhone 真機還沒看（PLAN §7 Z29／Z30／Z31）
+  - 驗證：✅ 單元測試 1259 個、lint、build、e2e（kinetic-hold／k0／k05／z14／z16／z22／z23／z25／z27／z28／x3／crop）；拿掉 `raw` 時 z27 會失敗（pause hold 1）；截圖 docs/screenshots/feedback-17/z31-crop-panel-after.png（彎道對照圖已刪除：畫的是使用者的字）  🟡 只在 Chromium（起跑延遲用 setPlayLatency 模擬）  🔴 iPhone 真機還沒看（PLAN §7 Z29／Z30／Z31）
   - 使用者的決定/回饋：彎道「前面的流動跟後面的飄移沒有相關」「緞帶的字也不一樣，一個重複、一個固定在繞圈」→ 全程一條；「裁切後下方工具版面會突然跑掉」→ Z31；轉場銜接跳格 → Z29
 - 2026-11-26 規劃 Z29（轉場跳格）、Z30（彎道跳格）（claude/zen-tesla-v3brj5）
   - 做了什麼：看 21:53 兩段錄影：效能框「硬跳 3、後段 目標 0.60 實際 0.00、回影片 0、重對 0」→ Z27 有 bug（入點 0 秒的 B 剛起跑就被「停在第一格」規則暫停）、預約重對被「聲音 ≤ 0.3」條件擋掉；彎道逐格看：流動 30 步、收尾 60 步量化造成每格移動量 3/5 交替，緞帶繞整個框、大半被影片蓋住或出畫面
-  - 動了哪些檔：docs/plans/2026-11-25-feedback-17.md、docs/screenshots/feedback-17/{z29-overlay,z30-ribbon-60fps}.png、docs/PROGRESS.md
+  - 動了哪些檔：docs/plans/2026-11-25-feedback-17.md、（使用者的錄影截圖，不放進 repo）、docs/PROGRESS.md
   - 驗證：🔴 只有規劃
   - 使用者的決定/回饋：彎道「前面的流動跟後面的飄移沒有相關的感覺，很突兀」；兩張截圖指出流動時字重複、收尾時字只一遍（Z30 改成全程一條只寫一遍的緞帶）；「彎道特效還是怪怪的，會跳格的感覺」「影片轉場銜接也是會跳格」
 - 2026-11-26 Z27 轉場不重播、Z28 彎道緞帶收尾（claude/zen-tesla-v3brj5）
   - 做了什麼：Z27——後一段影片藏著時（暖機、轉場中、換手範圍）落後超過 0.25 秒就預約重對（暫停→seek 到目標＋起跑延遲→時鐘走到再 play；入點不夠時提早 play），起跑延遲量中位數；換手範圍延長到轉場後 2 秒、最後 0.6 秒預解圖慢慢靠到影片那一格；A 進換手範圍時記下落後、預解圖畫「目標−落後」；藏著的影片註冊 rVFC（否則換手第一次上傳是舊畫面，e2e 抓到閃一格）；效能框多「起跑 ms、重對 n」。Z28——彎道停在最後畫面改成：S 形帶子滑出、一條固定長度的緞帶從左邊飛進來繞畫面一圈（有風的擺動）、最後拉平成正中間橫條；全程在畫面內、字不倒過來；收尾播放 60 步
   - 動了哪些檔：src/engine/{player,videoSync,handover,transitionFrames,compositor,debug}.ts（含測試）、src/engine/kinetic/{core,render}.ts、kinetic/fx/{flow,ribbon}.ts（+ribbon.test.ts）、src/app/editor/PerfOverlay.tsx、e2e/z27-no-repeat、e2e/z28-ribbon、tests/fixtures/ramp-a/b.webm、docs
-  - 驗證：✅ 單元測試 1250 個、lint、build、e2e z25／z16／z14／z27／z28／kinetic-hold／k0／k05／z22／z23（拿掉 Z27 修正時 z27 會失敗：亮度往回降 26；拿掉 rVFC 註冊會抓到閃一格舊畫面）；截圖 docs/screenshots/feedback-17/path-ribbon.png  🟡 只在 Chromium（起跑延遲用 setPlayLatency 模擬）  🔴 iPhone 真機還沒看（PLAN §7 Z27、Z28）
+  - 驗證：✅ 單元測試 1250 個、lint、build、e2e z25／z16／z14／z27／z28／kinetic-hold／k0／k05／z22／z23（拿掉 Z27 修正時 z27 會失敗：亮度往回降 26；拿掉 rVFC 註冊會抓到閃一格舊畫面）；截圖 （截圖已刪除：畫的是使用者的字）  🟡 只在 Chromium（起跑延遲用 setPlayLatency 模擬）  🔴 iPhone 真機還沒看（PLAN §7 Z27、Z28）
   - 使用者的決定/回饋：彎道不一定要 ∞，要「緞帶飛進來隨風亂飄，最後繞回正中心，看得出字」；轉場還是卡、重播一秒
 - 2026-11-26 規劃 Z27（轉場不重播）、Z28（彎道收尾白帶滑過去）（claude/zen-tesla-v3brj5）
   - 做了什麼：看 19:15 錄影的效能框：B 的 `<video>` 轉場過了 0.6 秒還在 0 秒、換手 1 秒內一次都沒對上、範圍一結束換回落後的 `<video>` → 往回跳＝重播；A 進轉場時落後 0.61 秒。彎道收尾逐格看：帶子被擠短、大部分跑在直式畫面外、30 次重畫一頓一頓。寫進 feedback-17 計畫
-  - 動了哪些檔：docs/plans/2026-11-25-feedback-17.md、docs/screenshots/feedback-17/path-before-z28.png、docs/PROGRESS.md
+  - 動了哪些檔：docs/plans/2026-11-25-feedback-17.md、（使用者的錄影截圖，不放進 repo）、docs/PROGRESS.md
   - 驗證：🔴 只有規劃，還沒實作
   - 使用者的決定/回饋：彎道不一定要 ∞：「一個緞帶飛進來隨風亂飄，然後最後繞回正中心，可以看出是什麼字寫在緞帶上」（Z28 已改寫）；「影片轉場處還是有卡頓，並有重複播放某一秒的跡象，另外彎道特效看起來怪怪的，不是一條固定的白帶絲滑滑過去」
 - 2026-11-26 Z26 裁切三個問題（Sonnet，claude/zen-tesla-v3brj5）
@@ -121,11 +131,11 @@
   - 下一步：使用者 iPhone 看轉場卡不卡、開頭有沒有重播；效能框「合成：準備」「換手差」截圖
 - 2026-11-26 彎道收尾：一條字句長的白帶沿 ∞ 路線跑（Opus，claude/zen-tesla-v3brj5）
   - 做了什麼：使用者說是「一條白帶繞著路線走」，不是形成 ∞ 圖案，白帶長度＝字句長度、不會累加。改成：長的 S 形帶子兩端往中間收，縮成跟整句字一樣長的白帶（字跟著淡入）；白帶沿 ∞ 路線（從畫面中間往右下 → 右圈 → 交叉 → 左圈 → 回中間）跑一圈，最後轉平成畫面正中間的短橫條，整句字在上面。白帶粗細跟字的大小走；字太長自動縮小到放得進畫面
-  - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、`docs/screenshots/feedback-17/path-ending.png`
+  - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、（截圖已刪除：畫的是使用者的字）
   - 驗證：✅ 單元測試、`npm run check`；分鏡圖確認
 - 2026-11-26 彎道收尾改成「帶子沿 ∞ 路線繞行」（Opus，claude/zen-tesla-v3brj5）
   - 做了什麼：使用者錄影畫了路線（左圈 → 中間交叉 → 右圈 → 交叉 → 最後橫線），說的是帶子「沿路線繞行」，不是帶子原地變成兩個圈、字繞著自己轉。改成：S 形帶子前半段不動，後半段從畫面中間（S 兩段的接點）轉進 ∞ 的路線，帶子的頭沿著 ∞ 繞右圈、交叉、繞左圈回到中間（像一筆畫畫出 ∞），字貼在帶子上不另外流動；最後整條往兩邊一拉、拉直成畫面中間的橫條，整句字淡入。`lemniscate()`（從中心往右下出發，方向接 S 的中段）、`along()`、`ribbonAt(q)`；收尾 2.4 秒（`settleLen`），停點 3.2 秒
-  - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、`docs/screenshots/feedback-17/path-ending.png`（橫式 12 格、直式 11 格的分鏡）
+  - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、（截圖已刪除：畫的是使用者的字）（橫式 12 格、直式 11 格的分鏡）
   - 驗證：✅ 單元測試、`npm run check`；分鏡圖確認
 - 2026-11-26 彎道的 ∞ 改大、不縮小（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：使用者說不必是完整的 ∞ 圖案，是白帶繞一個大 ∞ 再往回一拉變橫條。把 ∞ 半寬固定 125、帶子與字不再縮小（`sc=1`），直式畫面只看得到中間一段、兩邊超出畫面
@@ -140,11 +150,11 @@
   - 動了哪些檔：`src/engine/kinetic/fx/flow.ts`、`src/engine/debug.ts`；單元測試 `kinetic.test`（彎道停格：整句一遍、帶子拉直）
   - 驗證：✅ `npm run check`；kinetic 相關 e2e 過；用 180×320、320×180 兩種框畫了 0／0.6／1 的圖確認
 - 2026-11-26 一直流動的式子停在最後畫面（Sonnet，claude/zen-tesla-v3brj5）
-  - 做了什麼：`len` 回傳 null 的式子（巨字橫移、直排對流、重複波浪、斜帶、彎道、多層跑馬燈、遠近直書、交叉封條、透視字幕、點陣看板）選〔停在最後畫面〕時，`paintKinetic` 把流動的內容畫到暫存畫布、用 `1 − settle` 的透明度疊上去，再把整句完整的字（每個詞一行、置中、一樣大，`drawRest`）用 `settle` 的透明度淡入；環繞、歌詞捲動本來整句都看得到，`calm:false` 不處理。對照圖 `hold-sheet-after.png` 更新
+  - 做了什麼：`len` 回傳 null 的式子（巨字橫移、直排對流、重複波浪、斜帶、彎道、多層跑馬燈、遠近直書、交叉封條、透視字幕、點陣看板）選〔停在最後畫面〕時，`paintKinetic` 把流動的內容畫到暫存畫布、用 `1 − settle` 的透明度疊上去，再把整句完整的字（每個詞一行、置中、一樣大，`drawRest`）用 `settle` 的透明度淡入；環繞、歌詞捲動本來整句都看得到，`calm:false` 不處理。對照圖 （截圖已刪除：畫的是使用者的字） 更新
   - 動了哪些檔：`src/engine/kinetic/{core,render,fx/sp,fx/mv}.ts`；單元測試 `kinetic.test`（八式 settle 後有整句字）
   - 驗證：✅ `npm run check`（1213 單元測試）、kinetic 相關 e2e 過
 - 2026-11-26 殘影類停在最後畫面（Sonnet，claude/zen-tesla-v3brj5）
-  - 做了什麼：用 `settle` 讓〔重拍殘影〕停下來時殘影收合（只剩主字、不再放大）；〔隧道〕停下來時飛來的層淡掉、一個正常大小的字淡入；〔上下裂開〕的 `hold` 改成最後一個詞還沒開始裂開的那一刻（不用 settle）；重拍殘影透明的層不畫。對照圖 `hold-sheet-after.png` 更新
+  - 做了什麼：用 `settle` 讓〔重拍殘影〕停下來時殘影收合（只剩主字、不再放大）；〔隧道〕停下來時飛來的層淡掉、一個正常大小的字淡入；〔上下裂開〕的 `hold` 改成最後一個詞還沒開始裂開的那一刻（不用 settle）；重拍殘影透明的層不畫。對照圖 （截圖已刪除：畫的是使用者的字） 更新
   - 還沒改：一直流動的式子（跑馬燈、透視字幕、環繞、點陣看板…）照 poster 停；鏡中倒影的倒影本來就是那一式的樣子沒動
   - 驗證：✅ `npm run check`、kinetic 相關 e2e 過
 - 2026-11-25 重擊排字的換行（Sonnet，claude/zen-tesla-v3brj5）
@@ -153,7 +163,7 @@
   - 驗證：✅ `npm run check`；k0、kinetic-hold、z22-hitline 的 e2e 過；截圖確認 Enter 分成兩行（4＋3 字）
 - 2026-11-25 feedback-17 Z22（部分）＋Z23（Sonnet，claude/zen-tesla-v3brj5）
   - 做了什麼：①**〔重擊排字〕**（`hitline`，第 65 式，登場組，在逐字重擊後面）：整句先排好位置（超過 8 字兩行），第 n 個字放大 2.4 倍＋旋轉砸到自己的位置後留著，最後一整句；〔逐字重擊〕維持原樣；②**「快到停點慢慢靜下來」機制**：`Stage.settle`（0→1，停點前 0.5 秒起，只有〔停在最後畫面〕才有，`render.ts` 算），一直在動的式子把閒著也在動的部分乘 `(1 − settle)`：拉長、波浪起伏、抖動、訊號故障（不再閃）、霓虹燈管（不再閃一個字）、重影抽搐（不抽、重影靜止）；③逐字蹦跳 `hold` 改成整句跳完、還沒退場的那一刻；④**Z23**：`kinetic.fadeW`（0.05～0.45，沒有＝0.25，`DEFAULT_FADE_W`）、`fadeEdges(…, fadeW)`、設定視窗〔淡出寬度〕滑桿＋提示字、設定視窗開著且有淡出時預覽上有色帶（`KineticFadeGuide`，`ui.kineticFadeGuide`，`data-testid="kn-fade-guide"`）
-  - **還沒改**（對照圖 `docs/screenshots/feedback-17/hold-sheet-after.png`，用「蔡氏家族聚餐」看停下來那格）：上下裂開（split，字還在變形）、重拍殘影（trail，有殘影拖尾）、隧道（tunnel，很大）、點陣看板／透視字幕等一直流動的式子照 poster 停；翻牌、翻卡、跟唱、逐字踩拍、打字機、拉霸停下來那一格本來就是每個字都完整乖乖待著，沒動
+  - **還沒改**（對照圖 （截圖已刪除：畫的是使用者的字），用「週末一起出遊」看停下來那格）：上下裂開（split，字還在變形）、重拍殘影（trail，有殘影拖尾）、隧道（tunnel，很大）、點陣看板／透視字幕等一直流動的式子照 poster 停；翻牌、翻卡、跟唱、逐字踩拍、打字機、拉霸停下來那一格本來就是每個字都完整乖乖待著，沒動
   - 動了哪些檔：`src/engine/kinetic/{core,render,fx/in,fx/em,fx/hr,fx/tv}.ts`、`src/engine/debug.ts`（`kineticHoldSheet`）、`src/model/types.ts`、`src/store/{actions,uiStore}.ts`、`src/app/editor/{Preview,KineticFadeGuide}.tsx`、`src/app/editor/tabs/EffectTab.tsx`、`src/app/styles.css`；單元測試 `kinetic.test`（重擊排字、拉長 settle、fadeEdges）；e2e `z23-fade`、`z22-hold-sheet`（`Z22_SHEET=before|after` 才跑，產生對照圖）、`k0`／`kinetic-hold`（65 式）
   - 驗證：✅ `npm run check`（1209 單元測試）；✅ 完整 e2e 364 過／4 跳過＋1 個（layout 拍貼機）在 4 個 worker 同時跑時逾時、單獨跑都過
   - 下一步：開 PR（等使用者說）；使用者 iPhone 看拉長、重擊排字、邊緣淡出
@@ -218,7 +228,7 @@
   - 使用者的決定/回饋：（Z2）使用者原話「格子框線粗細調整，分隔線的粗細如圖十一樣沒動，只有動邊框」——我量到引擎兩者同比例變，所以改成加獨立滑桿，請使用者在手機上確認
   - 下一步：第 2 批 Z6–Z12
 - 2026-11-24 規劃 feedback-15（Opus，claude/zen-tesla-v3brj5）
-  - 做了什麼：使用者 iPhone 回饋（錄影 2 段、截圖 10 張）討論後寫成 `docs/plans/2026-11-24-feedback-15.md`（Z1–Z13，分三批）；查到「停在最後」不準的原因：停點是範例字量出的固定比例，「蔡氏家族聚餐」沒空格＝一個 6 字詞，`hit` 停在 0.6×3.02 秒＝第 5 字「聚」
+  - 做了什麼：使用者 iPhone 回饋（錄影 2 段、截圖 10 張）討論後寫成 `docs/plans/2026-11-24-feedback-15.md`（Z1–Z13，分三批）；查到「停在最後」不準的原因：停點是範例字量出的固定比例，「週末一起出遊」沒空格＝一個 6 字詞，`hit` 停在 0.6×3.02 秒＝第 5 字「聚」
   - 動了哪些檔：`docs/plans/2026-11-24-feedback-15.md`（新）、`docs/PROGRESS.md`
   - 驗證：🔴 只有規劃，沒改程式；量過 390 寬字級：第一層 12.04px、第二層 14px
   - 使用者的決定/回饋：文字特效與動態字卡合一、文字類別加〔特效〕（同一個視窗不跳類別）、基本特效要示意圖、副標移到〔內容〕；刪除要在任何類別都能刪、空軌道要消失；〔加進版型〕〔各格〕要有實際作用；畫面別留白、字級一致；卡頓與聲音斷排第 3 批

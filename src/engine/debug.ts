@@ -34,7 +34,15 @@ export function installDebugHook(player: Player) {
   if (!on) return;
   const hook = {
     /** 測試／比對用：動態字卡某一式在 t 秒、W×H 畫布、指定的詞（沒給＝範例字）畫出來的圖（PNG dataURL，用原版配色、不淡出） */
-    kineticPaint: (id: string, t: number, W: number, H: number, words?: string[], settle?: number) => {
+    kineticPaint: (
+      id: string,
+      t: number,
+      W: number,
+      H: number,
+      words?: string[],
+      settle?: number,
+      opts?: { letterEm?: number; lineK?: number },
+    ) => {
       const def = kineticById(id);
       if (!def) return null;
       const c = document.createElement('canvas');
@@ -53,6 +61,8 @@ export function installDebugHook(player: Player) {
           bg: sch.bg,
           family: canvasFamily(''),
           settle,
+          letterEm: opts?.letterEm,
+          lineK: opts?.lineK,
         },
         t,
       );

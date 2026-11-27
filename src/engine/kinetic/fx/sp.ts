@@ -83,7 +83,7 @@ export const FX_SP: KineticDef[] = [
       while (lines.length < 16);
       const n = lines.length;
       const px = fitN(s, Math.max(...s.words.map(wlen)), 15, 78);
-      const lineH = 21.75 * cqmin;
+      const lineH = 21.75 * cqmin * (s.lineK ?? 1);
       const P = 70 * cqmin;
       const O = { x: W / 2, y: 0.25 * H }; // perspective-origin
       const rot = (56 * Math.PI) / 180;

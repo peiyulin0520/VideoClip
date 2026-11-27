@@ -186,6 +186,28 @@ describe('動態字卡：顯示範圍（框）', () => {
     expect(r.h).toBeCloseTo(0.5, 5);
     expect(r.x).toBeCloseTo(0.5 - 100 / W, 5);
   });
+  it('dragArea：可以往外拉到比畫面大（上限：畫面的 3 倍、面積 6 倍）；字卡縮小時框可以更大', async () => {
+    const { dragArea } = await import('../../app/editor/KineticAreaEdit');
+    const W = 1000;
+    const H = 2000;
+    const d = { id: 'a', x: 0.5, y: 0.5, w: 1.5, h: 0.4 };
+    // 以前上限 1.5：右邊再往外拉 1000px（寬 +1.0）→ 2.5
+    expect(dragArea(d, 'r', 1000, 0, W, H, 1, 0).w).toBeCloseTo(2.5, 5);
+    // 一路拉：寬最多 3 倍畫面（沒有碰到面積上限：3 × 0.4）
+    expect(dragArea(d, 'r', 9000, 0, W, H, 1, 0).w).toBeCloseTo(3, 5);
+    // 字卡縮到 0.4：在畫面上最多 3 倍＝框的寬 7.5，但畫布上限 4
+    const small = dragArea({ ...d, w: 1 }, 'r', 99999, 0, W, H, 0.4, 0);
+    expect(small.w).toBeCloseTo(4, 5);
+    // 面積上限 6：寬 3 × 高拉到 3 → 高被擋在 2（動到的那一邊停住，對邊不動）
+    const big = dragArea({ ...d, w: 3, h: 1 }, 'b', 0, 99999, W, H, 1, 0);
+    expect(big.w * big.h).toBeLessThanOrEqual(6 + 1e-6);
+    expect(big.h).toBeCloseTo(2, 5);
+    expect(big.y - big.h / 2).toBeCloseTo(0.5 - 0.5, 5); // 上邊不動
+    // 角落：兩邊一起等比例縮到面積上限
+    const corner = dragArea({ ...d, w: 2, h: 2 }, 'br', 99999, 99999, W, H, 1, 0);
+    expect(corner.w * corner.h).toBeLessThanOrEqual(6 + 1e-6);
+    expect(corner.w / corner.h).toBeCloseTo(1, 1);
+  });
 });
 
 describe('動態字卡：換行與邊緣淡出', () => {
@@ -207,9 +229,9 @@ describe('動態字卡：換行與邊緣淡出', () => {
     expect(lineSizes(24, undefined, false)).toEqual([24]);
     expect(lineSizes(10, undefined, true)).toEqual([5, 5]);
     expect(lineSizes(8, undefined, true)).toEqual([8]);
-    expect(lineSizes(6, ['蔡氏家', '族聚餐'], false)).toEqual([3, 3]);
-    expect(lineSizes(6, ['蔡氏', '家', '族聚餐'], true)).toEqual([2, 1, 3]);
-    expect(lineSizes(6, ['蔡氏家族聚餐'], true)).toEqual([6]); // 只有一行：不手動換
+    expect(lineSizes(6, ['週末一', '起出遊'], false)).toEqual([3, 3]);
+    expect(lineSizes(6, ['週末', '一', '起出遊'], true)).toEqual([2, 1, 3]);
+    expect(lineSizes(6, ['週末一起出遊'], true)).toEqual([6]); // 只有一行：不手動換
   });
   it('重擊排字：字再多也縮小排在同一行；按 Enter（lines）真的分成多行', () => {
     const def = kineticById('hitline')!;
@@ -264,7 +286,7 @@ describe('動態字卡：換行與邊緣淡出', () => {
         c,
         def,
         {
-          words: ['蔡氏家族聚餐'],
+          words: ['週末一起出遊'],
           fg: '#fff',
           paper: '#000',
           hi: '#f00',
@@ -278,10 +300,10 @@ describe('動態字卡：換行與邊緣淡出', () => {
       return log.filter((l) => l.startsWith('fillText(')).map((l) => l.split(',')[0]);
     };
     for (const id of ['crawl', 'drift', 'slant', 'ticker', 'tape', 'led', 'depth', 'echo']) {
-      expect(kineticById(id)!.len(['蔡氏家族聚餐']), id).toBeNull();
+      expect(kineticById(id)!.len(['週末一起出遊']), id).toBeNull();
       // 淡入的整句字（alpha 要 settle 才看得到）：settle=1 時畫了整句字，settle=0 沒有這一筆
-      expect(texts(id, 1).filter((x) => x === 'fillText(蔡氏家族聚餐').length, id).toBeGreaterThan(
-        texts(id, 0).filter((x) => x === 'fillText(蔡氏家族聚餐').length - 1,
+      expect(texts(id, 1).filter((x) => x === 'fillText(週末一起出遊').length, id).toBeGreaterThan(
+        texts(id, 0).filter((x) => x === 'fillText(週末一起出遊').length - 1,
       );
     }
     // 環繞、歌詞捲動本來整句都看得到：不處理
@@ -411,7 +433,7 @@ describe('動態字卡：副標、停在最後畫面', () => {
   it('重擊排字：停在最後時 6 個字都在自己的位置（由左到右）、沒放大沒轉；播放中途前面的字已經留在原位', async () => {
     const { holdTime } = await import('./hold');
     const def = kineticById('hitline')!;
-    const words = ['蔡氏家族聚餐'];
+    const words = ['週末一起出遊'];
     const at = (t: number) => {
       const { s, log } = stage(words);
       def.draw(s, t);
@@ -442,7 +464,7 @@ describe('動態字卡：副標、停在最後畫面', () => {
   });
   it('停在最後畫面（settle）：拉長每個字都回到原樣；沒 settle 時有字在被拉', () => {
     const def = kineticById('stretch')!;
-    const words = ['蔡氏家族聚餐'];
+    const words = ['週末一起出遊'];
     const scales = (settle: number) => {
       const { s, log } = stage(words);
       def.draw({ ...s, settle }, 2.35);
@@ -459,7 +481,7 @@ describe('動態字卡：副標、停在最後畫面', () => {
   });
   it('holdTime：時間跟字數有關的式子（逐字重擊、翻牌、翻卡、拉霸…）停在最後一個詞完整的那一刻，字多也一樣', async () => {
     const { holdTime } = await import('./hold');
-    const six = ['蔡氏家族聚餐'];
+    const six = ['週末一起出遊'];
     // 逐字重擊：6 個字一個一個砸，停在第 6 個字砸完（不是第 5 個「聚」）
     const hit = kineticById('hit')!;
     expect(holdTime(hit, six)).toBeCloseTo(5 * 0.42 + 0.3, 6);
@@ -484,5 +506,71 @@ describe('動態字卡：副標、停在最後畫面', () => {
         if (total === null) continue;
         expect(holdTime(f, w), `${f.id} ${w.join('/')}`).toBeLessThanOrEqual(total + 1e-6);
       }
+  });
+});
+
+describe('動態字卡：字距（withSpacing）與行距', () => {
+  it('withSpacing：每次設 font 就把 letterSpacing 設成「字距 em × 字的像素」；其他屬性、方法照常', async () => {
+    const { withSpacing } = await import('./render');
+    const calls: string[] = [];
+    const raw = {
+      font: '',
+      letterSpacing: '0px',
+      fillText(this: { letterSpacing: string; font: string }, s: string) {
+        calls.push(`${this.letterSpacing}|${this.font}|${s}`);
+      },
+    } as unknown as CanvasRenderingContext2D;
+    const g = withSpacing(raw, 0.25);
+    g.font = '900 40px Foo, sans-serif';
+    expect(raw.letterSpacing).toBe('10px');
+    g.fillText('字', 0, 0);
+    expect(calls).toEqual(['10px|900 40px Foo, sans-serif|字']);
+    g.font = '700 12.5px Bar';
+    expect(raw.letterSpacing).toBe('3.125px');
+    // 負的字距（比預設更擠）
+    const g2 = withSpacing(raw, -0.1);
+    g2.font = '900 20px X';
+    expect(raw.letterSpacing).toBe('-2px');
+  });
+  it('withSpacing：字距 0、或這個 context 沒有 letterSpacing（舊版 Safari）→ 原樣回傳', async () => {
+    const { withSpacing } = await import('./render');
+    const raw = { font: '' } as unknown as CanvasRenderingContext2D;
+    expect(withSpacing(raw, 0.3)).toBe(raw);
+    const raw2 = { font: '', letterSpacing: '0px' } as unknown as CanvasRenderingContext2D;
+    expect(withSpacing(raw2, 0)).toBe(raw2);
+  });
+});
+
+describe('流動的 8 式：停在最後畫面是特效自己的樣子（rest）', () => {
+  const IDS = ['crawl', 'drift', 'slant', 'ticker', 'tape', 'led', 'depth', 'echo'];
+  it('這 8 式都有自己的 rest；流動中的畫面跟停止畫面不一樣', () => {
+    for (const id of IDS) expect(typeof kineticById(id)!.rest, id).toBe('function');
+  });
+  it('rest 畫出整句字（每個詞都出現）、字型粗細與原本流動時一樣（900 或該式自己的粗細）', () => {
+    for (const id of IDS) {
+      const { s, log } = stage(['環島公路', '一路向南'], 360, 640);
+      kineticById(id)!.rest!(s);
+      // 畫出的字（橫排是整串、直排是一個字一個字）合起來，每個詞的每個字都在
+      const drawn = log
+        .filter((l) => l.startsWith('fillText('))
+        .map((l) => l.slice(9).split(',')[0])
+        .join('');
+      for (const ch of Array.from('環島公路一路向南')) expect(drawn, `${id} 缺 ${ch}`).toContain(ch);
+      // 沒有畫出畫布外面很遠的東西（靜止、放得進畫面）
+      // （假的 context 沒有 globalAlpha 初始值，`*=` 會變 NaN，不算）
+      expect(
+        log.filter((l) => /NaN|Infinity/.test(l) && !l.startsWith('set globalAlpha=')).slice(0, 3),
+        id,
+      ).toEqual([]);
+    }
+  });
+  it('巨字橫移的停止畫面有底部強調色窄帶＋小字，主字很大（不是通用的一般小字）', () => {
+    const { s, log } = stage(['週末出遊'], 360, 640);
+    kineticById('crawl')!.rest!(s);
+    expect(log.some((l) => l.startsWith('fillRect(0.00,'))).toBe(true);
+    const big = log
+      .filter((l) => /^set font=/.test(l))
+      .map((l) => parseFloat(/(\d+(?:\.\d+)?)px/.exec(l)?.[1] ?? '0'));
+    expect(Math.max(...big)).toBeGreaterThan(60);
   });
 });

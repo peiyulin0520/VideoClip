@@ -16,7 +16,7 @@ test('重擊排字：換行方式只在重擊排字出現；排成一行／自�
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
-  await page.getByLabel('文字內容').fill('蔡氏家族\n聚餐去');
+  await page.getByLabel('文字內容').fill('週末一起\n出遊去');
   await openTab(page, '特效');
   await openTool(page, 'fx.textfx');
   await page.getByTestId('kn-group-in').tap();
