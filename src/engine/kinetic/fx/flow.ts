@@ -1,5 +1,18 @@
 // 流動（09–16）。改寫自 claude-animated-text（MIT，© 2026 pound / POUND0423）。
-import { band, clamp, cs, drawWord, fontOf, marquee, pick, wlen, type KineticDef } from '../core';
+import {
+  band,
+  centerText,
+  clamp,
+  cs,
+  drawWord,
+  fitLine,
+  fontOf,
+  marquee,
+  pick,
+  stackWords,
+  wlen,
+  type KineticDef,
+} from '../core';
 import {
   FLOW_HOLD,
   FLOW_P,
@@ -29,6 +42,20 @@ export const FX_FLOW: KineticDef[] = [
     sub: '同主標',
     subLabel: '底部小字',
     len: () => null,
+    // 停下來：巨字一行置中（縮到整句放得下）＋底部強調色窄帶上的小字
+    rest(s) {
+      const { g, W, H, cqmin } = s;
+      const area = H - 10 * cqmin;
+      const { rows, px } = stackWords(s, 58 * cqmin, W * 0.94, area * 0.92);
+      rows.forEach((w, i) =>
+        centerText(s, w, W / 2, area / 2 + (i - (rows.length - 1) / 2) * px * 1.12, px, s.fg),
+      );
+      const sh = 5.6 * cqmin * 1.2 + 3.2 * cqmin;
+      g.fillStyle = s.hi;
+      g.fillRect(0, H - sh, W, sh);
+      const sub = s.sub ?? s.words.join('・');
+      centerText(s, sub, W / 2, H - sh / 2, fitLine(s, sub, 5.6 * cqmin, W * 0.94, 700), s.hifg, 700);
+    },
     hit: [0, 0.2, 1, 0.6],
     draw(s, t) {
       const { g, W, H, cqmin } = s;
@@ -67,6 +94,20 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1,
     area: 'full',
     len: () => null,
+    // 停下來：五欄靜止，每欄一個詞（直排置中）
+    rest(s) {
+      const { W, H, cqmin } = s;
+      const cw = 15 * cqmin;
+      const gap = (W - 5 * cw) / 6;
+      for (let i = 0; i < 5; i++) {
+        const cx = gap * (i + 1) + cw * i + cw / 2;
+        const chars = cs(pick(s.words, i));
+        const px = Math.min(cw, (H * 0.8) / chars.length);
+        chars.forEach((ch, j) =>
+          centerText(s, ch, cx, H / 2 + (j - (chars.length - 1) / 2) * px, px, i % 2 ? s.hi : s.fg),
+        );
+      }
+    },
     hit: [0, 0.1, 1, 0.8],
     draw(s, t) {
       const { W, H, cqmin } = s;
@@ -96,6 +137,28 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1,
     area: 'full',
     len: () => null,
+    // 停下來：6 列都亮著（中間兩列強調色），每一列一個詞（把整句的詞都排進去）
+    rest(s) {
+      const { W, H, cqmin, cqw } = s;
+      const rows = 6;
+      const rowH = 11 * cqmin * 1.15;
+      const gapY = 1.4 * cqmin;
+      const top = (H - (rows * rowH + (rows - 1) * gapY)) / 2;
+      for (let y = 0; y < rows; y++) {
+        const word = pick(s.words, y);
+        const n = wlen(word);
+        const cols = clamp(Math.round(13 / n), 2, 8);
+        const px = Math.min(11 * cqmin, (84 / cols / n) * cqw);
+        const colW = (W - 6 * cqw) / cols;
+        const a = 0.35 + 0.65 * (1 - Math.abs(y - (rows - 1) / 2) / ((rows - 1) / 2));
+        for (let x = 0; x < cols; x++)
+          drawWord(s, word, 3 * cqw + colW * (x + 0.5), top + rowH * (y + 0.5), px, {
+            weight: 700,
+            alpha: a,
+            color: y === 2 || y === 3 ? s.hi : s.fg,
+          });
+      }
+    },
     hit: [0, 0.15, 1, 0.7],
     draw(s, t) {
       const { g, W, H, cqmin, cqw } = s;
@@ -132,6 +195,28 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1,
     area: 'full',
     len: () => null,
+    // 停下來：兩條斜帶靜止，每條帶上一整句（縮到放得進畫面）
+    rest(s) {
+      const { g, W, H, cqmin } = s;
+      const bw = W * 1.6;
+      const bh = 13 * cqmin * 1.1 + 3.4 * cqmin;
+      const gap = 3.4 * cqmin;
+      const rad = (-9 * Math.PI) / 180;
+      const text = s.words.join(' ');
+      const px = fitLine(s, text, 13 * cqmin, W * 0.82);
+      [
+        { dy: -(bh + gap) / 2, bg: s.hi, fg: s.hifg },
+        { dy: (bh + gap) / 2, bg: s.fg, fg: s.paper },
+      ].forEach((b) => {
+        g.save();
+        g.translate(W / 2 - b.dy * Math.sin(rad), H / 2 + b.dy * Math.cos(rad));
+        g.rotate(rad);
+        g.fillStyle = b.bg;
+        g.fillRect(-bw / 2, -bh / 2, bw, bh);
+        centerText(s, text, 0, 0, px, b.fg);
+        g.restore();
+      });
+    },
     hit: [0, 0.25, 1, 0.5],
     draw(s, t) {
       const { W, H, cqmin } = s;
@@ -275,6 +360,41 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1,
     area: 'full',
     len: () => null,
+    // 停下來：四排靜止，每排一整句置中
+    rest(s) {
+      const { g, H, W, cqmin } = s;
+      const rows = [
+        {
+          px: 6.2 * cqmin,
+          h: 6.2 * cqmin * 1.15,
+          weight: 500,
+          color: s.fg,
+          bg: undefined as string | undefined,
+        },
+        { px: 27 * cqmin, h: 27 * cqmin * 1.05, weight: 900, color: s.hi, bg: undefined },
+        { px: 6.2 * cqmin, h: 6.2 * cqmin * 1.15 + 2 * cqmin, weight: 700, color: s.paper, bg: s.fg },
+        { px: 13 * cqmin, h: 13 * cqmin * 1.1, weight: 900, color: s.fg, bg: undefined },
+      ];
+      const gap = 1.6 * cqmin;
+      const text = s.words.join(' ');
+      let y = (H - (rows.reduce((a, r) => a + r.h, 0) + gap * 3)) / 2;
+      for (const r of rows) {
+        if (r.bg) {
+          g.fillStyle = r.bg;
+          g.fillRect(0, y, W, r.h);
+        }
+        centerText(
+          s,
+          text,
+          W / 2,
+          y + r.h / 2,
+          fitLine(s, text, r.px, W * 0.94, r.weight),
+          r.color,
+          r.weight,
+        );
+        y += r.h + gap;
+      }
+    },
     hit: [0, 0.15, 1, 0.7],
     draw(s, t) {
       const { H, W, cqmin } = s;
@@ -329,6 +449,43 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1,
     area: 'wide',
     len: () => null,
+    // 停下來：七欄靜止；兩旁、外側各欄一個詞，中間大字（強調色）把整句直排放進去
+    rest(s) {
+      const { g, W, H, cqmin } = s;
+      const cfg: [string, number][] = [
+        ['far', 2],
+        ['far', 1],
+        ['side', 2],
+        ['mid', 0],
+        ['side', 1],
+        ['far', 0],
+        ['far', 2],
+      ];
+      const size = { far: 7, side: 13, mid: 30 } as const;
+      const gap = 5 * cqmin;
+      const widths = cfg.map((c) => size[c[0] as keyof typeof size] * cqmin);
+      const total = widths.reduce((a, b) => a + b, 0) + gap * (cfg.length - 1);
+      let x = (W - total) / 2;
+      cfg.forEach(([kind, wi], i) => {
+        const w = widths[i]!;
+        const chars = cs(kind === 'mid' ? s.words.join('') : pick(s.words, wi));
+        const px = Math.min(w, (H * 0.86) / chars.length);
+        g.save();
+        g.globalAlpha *= kind === 'far' ? 0.28 : kind === 'side' ? 0.55 : 1;
+        chars.forEach((ch, j) =>
+          centerText(
+            s,
+            ch,
+            x + w / 2,
+            H / 2 + (j - (chars.length - 1) / 2) * px,
+            px,
+            kind === 'mid' ? s.hi : s.fg,
+          ),
+        );
+        g.restore();
+        x += w + gap;
+      });
+    },
     draw(s, t) {
       const { g, W, H, cqmin } = s;
       // 七欄直排置中並排，做出景深：中間大字（強調色）、兩旁中等（55% 透明）、外側小字（28% 透明）
@@ -373,6 +530,26 @@ export const FX_FLOW: KineticDef[] = [
     poster: 1,
     area: 'full',
     len: () => null,
+    // 停下來：兩條交叉封條靜止，每條上一整句（縮到放得進畫面）
+    rest(s) {
+      const { g, W, H, cqmin } = s;
+      const bw = W * 1.5;
+      const bh = 11 * cqmin * 1.1 + 3 * cqmin;
+      const text = s.words.join(' ');
+      const px = fitLine(s, text, 11 * cqmin, W * 0.8);
+      [
+        { rot: -10, bg: s.fg, fg: s.paper },
+        { rot: 12, bg: s.hi, fg: s.hifg },
+      ].forEach((b) => {
+        g.save();
+        g.translate(W / 2, H / 2);
+        g.rotate((b.rot * Math.PI) / 180);
+        g.fillStyle = b.bg;
+        g.fillRect(-bw / 2, -bh / 2, bw, bh);
+        centerText(s, text, 0, 0, px, b.fg);
+        g.restore();
+      });
+    },
     hit: [0, 0.2, 1, 0.6],
     draw(s, t) {
       const { W, H, cqmin } = s;

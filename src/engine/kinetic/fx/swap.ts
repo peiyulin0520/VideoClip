@@ -1,5 +1,6 @@
 // 切換（17–24）。改寫自 claude-animated-text（MIT，© 2026 pound / POUND0423）。
 import {
+  centerText,
   clamp,
   cs,
   drawRotY,
@@ -14,6 +15,7 @@ import {
   rnd,
   scratch,
   seg,
+  stackWords,
   wlen,
   wrapLines,
   type KineticDef,
@@ -50,6 +52,45 @@ function tileChar(s: Stage, ch: string, px: number, color: string, dy = 0, sy = 
   g.fillStyle = color;
   g.fillText(ch, 0, 0);
   g.restore();
+}
+
+/** 點陣看板：燈點（沒亮的 16%）＋字只透過燈點的洞露出來。paint 把字畫到給它的暫存 Stage 上 */
+function ledBoard(s: Stage, paint: (sub: Stage) => void) {
+  const { g, W, H, cqmin } = s;
+  const d = 2.7 * cqmin; // 燈點的間距
+  // 一顆燈點的遮罩（中間實心、邊緣很快淡掉）：原版 radial-gradient(circle, #000 0 44%, transparent 50%)
+  const dot = Math.max(Math.round(d), 2);
+  const tile = document.createElement('canvas');
+  tile.width = tile.height = dot;
+  const tg = tile.getContext('2d')!;
+  const r = (dot * Math.SQRT2) / 2;
+  const gr = tg.createRadialGradient(dot / 2, dot / 2, 0, dot / 2, dot / 2, r);
+  gr.addColorStop(0.44, 'rgba(0,0,0,1)');
+  gr.addColorStop(0.5, 'rgba(0,0,0,0)');
+  tg.fillStyle = gr;
+  tg.fillRect(0, 0, dot, dot);
+  const pat = g.createPattern(tile, 'repeat')!;
+  // 沒亮的燈點：強調色 16%
+  const bgc = scratch(W, H);
+  const bg = bgc.getContext('2d')!;
+  bg.fillStyle = s.hi;
+  bg.fillRect(0, 0, W, H);
+  bg.globalCompositeOperation = 'destination-in';
+  bg.fillStyle = pat;
+  bg.fillRect(0, 0, W, H);
+  g.save();
+  g.globalAlpha *= 0.16;
+  g.drawImage(bgc, 0, 0);
+  g.restore();
+  // 亮的燈點：字（強調色、字高 46cqmin）只透過燈點的洞露出來，橫向一格一格跑
+  const txt = scratch(W, H);
+  const tc = txt.getContext('2d')!;
+  const sub = { ...s, g: tc } as Stage;
+  paint(sub);
+  tc.globalCompositeOperation = 'destination-in';
+  tc.fillStyle = pat;
+  tc.fillRect(0, 0, W, H);
+  g.drawImage(txt, 0, 0);
 }
 
 export const FX_SWAP: KineticDef[] = [
@@ -416,49 +457,28 @@ export const FX_SWAP: KineticDef[] = [
     len: () => null,
     hit: [0, 0.25, 1, 0.5],
     draw(s, t) {
-      const { g, W, H, cqmin } = s;
-      const d = 2.7 * cqmin; // 燈點的間距
-      // 一顆燈點的遮罩（中間實心、邊緣很快淡掉）：原版 radial-gradient(circle, #000 0 44%, transparent 50%)
-      const dot = Math.max(Math.round(d), 2);
-      const tile = document.createElement('canvas');
-      tile.width = tile.height = dot;
-      const tg = tile.getContext('2d')!;
-      const r = (dot * Math.SQRT2) / 2;
-      const gr = tg.createRadialGradient(dot / 2, dot / 2, 0, dot / 2, dot / 2, r);
-      gr.addColorStop(0.44, 'rgba(0,0,0,1)');
-      gr.addColorStop(0.5, 'rgba(0,0,0,0)');
-      tg.fillStyle = gr;
-      tg.fillRect(0, 0, dot, dot);
-      const pat = g.createPattern(tile, 'repeat')!;
-      // 沒亮的燈點：強調色 16%
-      const bgc = scratch(W, H);
-      const bg = bgc.getContext('2d')!;
-      bg.fillStyle = s.hi;
-      bg.fillRect(0, 0, W, H);
-      bg.globalCompositeOperation = 'destination-in';
-      bg.fillStyle = pat;
-      bg.fillRect(0, 0, W, H);
-      g.save();
-      g.globalAlpha *= 0.16;
-      g.drawImage(bgc, 0, 0);
-      g.restore();
-      // 亮的燈點：字（強調色、字高 46cqmin）只透過燈點的洞露出來，橫向一格一格跑
-      const txt = scratch(W, H);
-      const tc = txt.getContext('2d')!;
-      const sub = { ...s, g: tc } as Stage;
+      const { W, H, cqmin } = s;
       const step = 2.7 / 46;
-      marquee(
-        sub,
-        s.words.join('　') + '　　',
-        Math.round((t * 1.25) / step) * step,
-        46 * cqmin,
-        { x: 0, y: 0, w: W, h: H },
-        { min: 12, color: s.hi, weight: 900 },
+      ledBoard(s, (sub) =>
+        marquee(
+          sub,
+          s.words.join('　') + '　　',
+          Math.round((t * 1.25) / step) * step,
+          46 * cqmin,
+          { x: 0, y: 0, w: W, h: H },
+          { min: 12, color: s.hi, weight: 900 },
+        ),
       );
-      tc.globalCompositeOperation = 'destination-in';
-      tc.fillStyle = pat;
-      tc.fillRect(0, 0, W, H);
-      g.drawImage(txt, 0, 0);
+    },
+    // 停下來：點陣字靜止，整句（縮到放得進畫面）置中
+    rest(s) {
+      const { W, H, cqmin } = s;
+      ledBoard(s, (sub) => {
+        const { rows, px } = stackWords(sub, 46 * cqmin, W * 0.92, H * 0.8);
+        rows.forEach((w, i) =>
+          centerText(sub, w, W / 2, H / 2 + (i - (rows.length - 1) / 2) * px * 1.12, px, s.hi),
+        );
+      });
     },
   },
   {

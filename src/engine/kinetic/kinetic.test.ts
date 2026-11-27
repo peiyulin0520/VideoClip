@@ -540,3 +540,37 @@ describe('動態字卡：字距（withSpacing）與行距', () => {
     expect(withSpacing(raw2, 0)).toBe(raw2);
   });
 });
+
+describe('流動的 8 式：停在最後畫面是特效自己的樣子（rest）', () => {
+  const IDS = ['crawl', 'drift', 'slant', 'ticker', 'tape', 'led', 'depth', 'echo'];
+  it('這 8 式都有自己的 rest；流動中的畫面跟停止畫面不一樣', () => {
+    for (const id of IDS) expect(typeof kineticById(id)!.rest, id).toBe('function');
+  });
+  it('rest 畫出整句字（每個詞都出現）、字型粗細與原本流動時一樣（900 或該式自己的粗細）', () => {
+    for (const id of IDS) {
+      const { s, log } = stage(['環島公路', '一路向南'], 360, 640);
+      kineticById(id)!.rest!(s);
+      // 畫出的字（橫排是整串、直排是一個字一個字）合起來，每個詞的每個字都在
+      const drawn = log
+        .filter((l) => l.startsWith('fillText('))
+        .map((l) => l.slice(9).split(',')[0])
+        .join('');
+      for (const ch of Array.from('環島公路一路向南')) expect(drawn, `${id} 缺 ${ch}`).toContain(ch);
+      // 沒有畫出畫布外面很遠的東西（靜止、放得進畫面）
+      // （假的 context 沒有 globalAlpha 初始值，`*=` 會變 NaN，不算）
+      expect(
+        log.filter((l) => /NaN|Infinity/.test(l) && !l.startsWith('set globalAlpha=')).slice(0, 3),
+        id,
+      ).toEqual([]);
+    }
+  });
+  it('巨字橫移的停止畫面有底部強調色窄帶＋小字，主字很大（不是通用的一般小字）', () => {
+    const { s, log } = stage(['週末出遊'], 360, 640);
+    kineticById('crawl')!.rest!(s);
+    expect(log.some((l) => l.startsWith('fillRect(0.00,'))).toBe(true);
+    const big = log
+      .filter((l) => /^set font=/.test(l))
+      .map((l) => parseFloat(/(\d+(?:\.\d+)?)px/.exec(l)?.[1] ?? '0'));
+    expect(Math.max(...big)).toBeGreaterThan(60);
+  });
+});

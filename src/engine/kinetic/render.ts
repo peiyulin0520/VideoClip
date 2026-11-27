@@ -230,7 +230,14 @@ export function paintKinetic(
     sg.clearRect(0, 0, W, H);
     sg.globalAlpha = 1;
     sg.save();
-    def.draw(stage(sg), t);
+    // 有自己的停止畫面的式子：流動的內容時間慢慢減速（τ − τ²/2T），像剎車一樣停住，同時淡出
+    let tt = t;
+    if (def.rest) {
+      const T = def.settleLen ?? 0.5;
+      const tau = rest * T;
+      tt = t - tau + (tau - (tau * tau) / (2 * T));
+    }
+    def.draw(stage(sg), tt);
     sg.restore();
     g.save();
     g.globalAlpha = 1 - rest;
@@ -238,7 +245,11 @@ export function paintKinetic(
     g.globalAlpha = 1;
     g.restore();
     g.save();
-    drawRest(stage(g), rest);
+    if (def.rest) {
+      // 特效自己的停止畫面：同樣的字型、顏色、裝飾，只是靜止、整句字都看得到
+      g.globalAlpha = rest;
+      def.rest(stage(g));
+    } else drawRest(stage(g), rest);
     g.restore();
   } else {
     g.save();
