@@ -186,6 +186,28 @@ describe('動態字卡：顯示範圍（框）', () => {
     expect(r.h).toBeCloseTo(0.5, 5);
     expect(r.x).toBeCloseTo(0.5 - 100 / W, 5);
   });
+  it('dragArea：可以往外拉到比畫面大（上限：畫面的 3 倍、面積 6 倍）；字卡縮小時框可以更大', async () => {
+    const { dragArea } = await import('../../app/editor/KineticAreaEdit');
+    const W = 1000;
+    const H = 2000;
+    const d = { id: 'a', x: 0.5, y: 0.5, w: 1.5, h: 0.4 };
+    // 以前上限 1.5：右邊再往外拉 1000px（寬 +1.0）→ 2.5
+    expect(dragArea(d, 'r', 1000, 0, W, H, 1, 0).w).toBeCloseTo(2.5, 5);
+    // 一路拉：寬最多 3 倍畫面（沒有碰到面積上限：3 × 0.4）
+    expect(dragArea(d, 'r', 9000, 0, W, H, 1, 0).w).toBeCloseTo(3, 5);
+    // 字卡縮到 0.4：在畫面上最多 3 倍＝框的寬 7.5，但畫布上限 4
+    const small = dragArea({ ...d, w: 1 }, 'r', 99999, 0, W, H, 0.4, 0);
+    expect(small.w).toBeCloseTo(4, 5);
+    // 面積上限 6：寬 3 × 高拉到 3 → 高被擋在 2（動到的那一邊停住，對邊不動）
+    const big = dragArea({ ...d, w: 3, h: 1 }, 'b', 0, 99999, W, H, 1, 0);
+    expect(big.w * big.h).toBeLessThanOrEqual(6 + 1e-6);
+    expect(big.h).toBeCloseTo(2, 5);
+    expect(big.y - big.h / 2).toBeCloseTo(0.5 - 0.5, 5); // 上邊不動
+    // 角落：兩邊一起等比例縮到面積上限
+    const corner = dragArea({ ...d, w: 2, h: 2 }, 'br', 99999, 99999, W, H, 1, 0);
+    expect(corner.w * corner.h).toBeLessThanOrEqual(6 + 1e-6);
+    expect(corner.w / corner.h).toBeCloseTo(1, 1);
+  });
 });
 
 describe('動態字卡：換行與邊緣淡出', () => {
