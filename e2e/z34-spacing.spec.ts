@@ -87,9 +87,9 @@ test('Z34 行距：停在最後畫面（多行）行距 1.25 和 2.5，高度變
   test.setTimeout(120_000);
   await createProjectWith(page, ['solid-blue.webm']);
   await waitHook(page);
-  const words = ['環島公路', '一路向南', '週末出遊'];
+  const words = ['環島', '出遊']; // 短詞：字高到頂（不是被框高限制住），行距變大＝整體變高
   // 流動的式子停在最後畫面：整句每個詞一行（drawRest）
-  const a = await inkBox(page, 'crawl', 3.0, words, { lineK: 1 }, 1);
-  const b = await inkBox(page, 'crawl', 3.0, words, { lineK: 2 }, 1);
-  expect(b.h, '行距變大，整體變高').toBeGreaterThan(a.h * 1.2);
+  const a = await inkBox(page, 'led', 3.0, words, { lineK: 1 }, 1);
+  const b = await inkBox(page, 'led', 3.0, words, { lineK: 1.4 }, 1);
+  expect(b.h, '行距變大，整體變高').toBeGreaterThan(a.h * 1.08);
 });

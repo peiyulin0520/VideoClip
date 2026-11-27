@@ -51,7 +51,7 @@ describe('inHandover：轉場前後換手的範圍', () => {
   });
   it('常數合理', () => {
     expect(HANDOVER_BEFORE).toBeGreaterThan(0);
-    expect(HANDOVER_TOL).toBeLessThan(0.05);
+    expect(HANDOVER_TOL).toBeLessThan(0.15); // 約 3 格
   });
 });
 
@@ -86,10 +86,22 @@ describe('handoverRemain／rampShown：交棒不往回跳', () => {
     expect(rampShown(5, 4.8, HANDOVER_RAMP / 2)).toBeCloseTo(4.9, 6);
     expect(rampShown(5, 4.8, 0)).toBeCloseTo(4.8, 6);
   });
-  it('對上了、落後太多、<video> 超前：不調整', () => {
+  it('對上了、落後太多、超前太多：不調整', () => {
     expect(rampShown(5, 5, 0.1)).toBe(5);
     expect(rampShown(5, 3, 0.1)).toBe(5);
-    expect(rampShown(5, 5.3, 0.1)).toBe(5);
+    expect(rampShown(5, 5.9, 0.1)).toBe(5);
+  });
+  it('<video> 超前：預解圖在最後慢慢加速追上去，結束時剛好同一格；單調不倒退', () => {
+    expect(rampShown(5, 5.3, HANDOVER_RAMP + 0.2)).toBe(5);
+    expect(rampShown(5, 5.3, HANDOVER_RAMP / 2)).toBeCloseTo(5.15, 6);
+    expect(rampShown(5, 5.3, 0)).toBeCloseTo(5.3, 6);
+    let prev = -Infinity;
+    for (let r = HANDOVER_AFTER; r >= 0; r -= 1 / 60) {
+      const target = 10 + (HANDOVER_AFTER - r);
+      const shown = rampShown(target, target + 0.3, r); // video 超前 0.3 秒
+      expect(shown).toBeGreaterThanOrEqual(prev - 1e-9);
+      prev = shown;
+    }
   });
   it('漸進過程中顯示的時間單調不倒退（時間往前走 1 倍時，每秒至少前進 0 秒）', () => {
     let prev = -Infinity;

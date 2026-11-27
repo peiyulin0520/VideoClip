@@ -46,9 +46,9 @@ export const FX_FLOW: KineticDef[] = [
     rest(s) {
       const { g, W, H, cqmin } = s;
       const area = H - 10 * cqmin;
-      const { rows, px } = stackWords(s, 58 * cqmin, W * 0.94, area * 0.92);
+      const { rows, px, step } = stackWords(s, 58 * cqmin, W * 0.94, area * 0.92);
       rows.forEach((w, i) =>
-        centerText(s, w, W / 2, area / 2 + (i - (rows.length - 1) / 2) * px * 1.12, px, s.fg),
+        centerText(s, w, W / 2, area / 2 + (i - (rows.length - 1) / 2) * px * step, px, s.fg),
       );
       const sh = 5.6 * cqmin * 1.2 + 3.2 * cqmin;
       g.fillStyle = s.hi;

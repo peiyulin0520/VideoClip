@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：1209 個單元測試、約 369 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #26（Z29–Z31）已合併部署，使用者覺得彎道「還可以」。新回報 → **照 `docs/plans/2026-11-27-feedback-18.md`：Z32 轉場再精進（起跑延遲記在手機、換手門檻 0.1 秒、處理超前、A 不硬跳）、Z33 顯示範圍可往外拉、Z34 動態字卡吃字距行距、Z35 流動 8 式停在自己的樣子、Z36 字卡長度＝特效播完的時間（hold 時自動算速度、速度滑桿改長度）**，切 Sonnet 實作
+- **下一步**：feedback-18 的 Z32–Z36 已做完、在分支、還沒進 PR；等使用者說要不要開 PR（要先看的話說「只建立 PR，不要合併」）。iPhone 上看 PLAN §7 的 Z32–Z36；轉場如果還跳，把效能框（含「B：」那行）截圖給 Opus
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -89,6 +89,11 @@
 - 2026-11-11 找到新字體來源 max32002/pop-gothic（大波浪圓體，含注音）→ 已加入手寫可愛包。問「能不能直接下載到我的 files 下載資料夾」→ 答：網頁在 iPhone 不能自動寫進「檔案」App 資料夾；官方字體存在瀏覽器裡，自己的字體用「匯入字體檔」從檔案 App 選
 
 ## 日誌（最新在最上面）
+- 2026-11-27 feedback-18 Z32–Z36 實作（claude/zen-tesla-v3brj5）
+  - 做了什麼：Z33 顯示範圍可往外拉（每邊 min(3÷縮放,4)、面積 6）；Z34 動態字卡吃字距行距（代理 context 設 font 時帶 letterSpacing、Stage.lineK）；Z36 〔停在最後畫面〕時速度由字卡長度算（fit）、細調面板速度滑桿改字卡長度；Z35 流動 8 式停在特效自己的樣子（rest：減速淡出＋各式靜止整句）；Z32 轉場：起跑延遲記在手機、換手門檻 0.1、處理超前、A 轉場中不硬跳、B 接縫狀態每次播放都記
+  - 動了哪些檔：src/app/editor/{KineticAreaEdit,TextPanel}.tsx、src/app/editor/tabs/EffectTab.tsx、src/engine/{handover,player}.ts、src/engine/kinetic/{core,render,speed,hold}.ts、kinetic/fx/{flow,swap,in,sp}.ts、src/store/actions.ts、src/model/types.ts、e2e/{k05,z34-spacing,z35-rest,z36-fit,feedback14,z25-handover}.spec.ts、docs
+  - 驗證：✅ 單元測試 1271 個、lint、build、e2e（k05／z34／z35／z36／feedback14／z22／z23／x3／kinetic-hold／k0／z25／z27／z16／z14）；截圖 docs/screenshots/feedback-18/z35-rest-sheet.png（自編的字）  🟡 只在 Chromium  🔴 iPhone 真機還沒看（PLAN §7 Z32–Z36）；轉場在 iPhone 上能不能再順一點沒辦法在沙盒驗證
+  - 使用者的決定/回饋：選 A 全部照順序做；測試和文件改用自編的字、不放使用者的錄影／截圖（已寫進 AGENTS.md）
 - 2026-11-27 規劃 feedback-18（Z32–Z36）（claude/zen-tesla-v3brj5）
   - 做了什麼：看 08:02 兩段錄影＋08:14 錄影＋截圖：轉場後一段不再卡 0 秒，但起跑延遲實際 0.59 秒、重對 3 次用完、轉場後 2 秒一次都沒換回影片（門檻 1 格太嚴、超前沒處理），前一段落後 0.64 秒硬跳；顯示範圍 MAX 1.5×字卡縮放；字距行距沒套到動態字卡；流動 8 式停住時變一般字；速度跟字卡長度無關
   - 動了哪些檔：docs/plans/2026-11-27-feedback-18.md、docs/screenshots/feedback-18/、docs/PROGRESS.md

@@ -280,6 +280,11 @@ e2e 會產生 `docs/screenshots/phase*/` 截圖（給使用者審核用，也會
 - **Z28→Z30 彎道**：`kinetic/fx/ribbon.ts`（`flowRoute` 平常滑的正弦 S、`settleRoute` 到一半後繞一圈進正中間、`flowHead`/`settleHead`、`ribbonShape` 蛇形身體＋風＋拉平、`readForward`）＋ `flow.ts` path 的 draw；整個特效只有一條只寫一遍字的緞帶；`KineticDef.smooth`＝用真正的時間畫（`render.ts` 鍵用毫秒）。
 - **Z29 轉場**：`Player.pauseVideo(el, why)`／`bStat`（效能框「B：」那行）、`videoSyncPlan` 的 `raw`、`hiddenSyncPlan` 的 `resync`；起跑延遲用 rVFC 量。
 - **Z31 裁切**：`CropEditor` 〔自由〕設定區兩行、〔清除形狀〕一直在。
+- **Z32 轉場**：起跑延遲存 `localStorage['vc-play-lat']`；`HANDOVER_TOL` 0.1；`rampShown` 超前；A 轉場中 `protect`。
+- **Z33 顯示範圍**：`KineticAreaEdit.dragArea` 上限（每邊 min(3÷縮放, 4)、面積 6）。
+- **Z34 字距行距**：`render.ts` `withSpacing`（代理 context，設 font 時帶 letterSpacing）、`Stage.letterEm`／`lineK`。
+- **Z35 流動式停止畫面**：`KineticDef.rest`、`core.ts` `fitLine`／`centerText`／`stackWords`；`render.ts` 減速＋淡入。
+- **Z36 字卡長度＝播完時間**：`engine/kinetic/speed.ts`（`fitSpeed`／`fitDuration`／`kineticSpeed`）、`kinetic.fit`、`actions.setKineticFitSpeed`。
 - **Z25 轉場換手**：`handover.ts`（`inHandover`、`pickSource`）決定轉場前後一小段時間畫預解圖還是 `<video>`；`compositor.ts` `updateBitmap` 讓 `ImageBitmap` 直接當貼圖（不經 frameCanvas）。播放時字卡 30 步（`setKineticPlaying`）。
 - **Z20／Z21**：格子軌轉場的虛擬 A／B 也要過 `guardCell`（`scene.ts`）；測試用 `__videoclip.nudgeItem(id, dx)` 把素材位置挪偏（不進復原）。`setGroupStart` 跟 `setGroupDuration` 是一對（改版型開始／長度）；版型的時間 UI＝播放軸兩端把手＋〔時間〕。
 - **模擬 iPhone 晚到**：e2e 把 `HTMLMediaElement.prototype.readyState` 在一段時間內回 1（`z16-transition.spec.ts`）。

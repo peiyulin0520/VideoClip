@@ -144,7 +144,14 @@ export class Player {
   private hid = new WeakMap<HTMLVideoElement, { playAt: number | null; tries: number }>();
   /** play() 起跑延遲量測：呼叫 play() 的時間與當時的 currentTime；最近幾次的毫秒數 */
   private probes = new WeakMap<HTMLVideoElement, { at: number; from: number; viaFrame?: boolean }>();
-  private lats: number[] = [];
+  private lats: number[] = (() => {
+    try {
+      const v = Number(localStorage.getItem('vc-play-lat'));
+      return v >= 100 && v <= 2000 ? [v] : [];
+    } catch {
+      return [];
+    }
+  })();
   private playTimers = new WeakMap<HTMLVideoElement, number>();
   /** 這次播放中，為了對時重新 seek 預約的次數（效能框用） */
   private resyncs = 0;
@@ -257,6 +264,7 @@ export class Player {
     this.statFrames = 0;
     this.statMs = 0;
     this.resyncs = 0;
+    for (const v of this.pool.els) delete v.dataset.seamT; // 這次播放重新記「接縫那一刻」的狀態
     this.bStat = { seam: '', rejects: 0, rejName: '', pauses: {} };
     this.wallStart = performance.now();
     this.tStart = this.t;
@@ -522,7 +530,14 @@ export class Player {
   }
 
   private noteLatency(ms: number) {
-    if (ms < 2000) this.lats = [...this.lats.slice(-4), ms];
+    if (ms >= 2000) return;
+    this.lats = [...this.lats.slice(-4), ms];
+    // 記在這支手機上：下次打開直接用，不用從預設值重新猜
+    try {
+      localStorage.setItem('vc-play-lat', String(Math.round(this.latency() * 1000)));
+    } catch {
+      /* 沒有儲存空間（私密瀏覽）就算了 */
+    }
   }
 
   /** 暫停一支影片，記下原因（效能框「B：」那行：看是誰把後一段的影片停掉的） */
@@ -653,8 +668,13 @@ export class Player {
       } else if (hid.playAt !== null) {
         this.hid.set(el, { playAt: null, tries: hid.tries }); // 不能藏著對了：預約作廢，下面一般流程會 play()
       }
+      // 前一段 A 在轉場中畫的是預解圖（<video> 沒人看）：落後 1.5 秒以內不硬跳，聲音才不會跳
+      const aHidden = this.transRole.get(item.id) === 'a' && cachedNow;
       const protect =
-        !!span && t >= span.cut - span.before - WARM_S && (warm || (t < span.cut + span.after && !cachedNow));
+        aHidden ||
+        (!!span &&
+          t >= span.cut - span.before - WARM_S &&
+          (warm || (t < span.cut + span.after && !cachedNow)));
       const plan = videoSyncPlan({
         target: s,
         current: el.currentTime,

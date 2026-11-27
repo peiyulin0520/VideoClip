@@ -149,13 +149,14 @@ export function fitLine(s: Stage, text: string, maxPx: number, maxW: number, wei
 
 /**
  * 整句字「一個詞一行」往上下疊（詞多就少放幾行、最多 4 行）：每一行的字高一樣，放得進 maxW × maxH（不超過 maxPx）。
- * 回傳字高與每一行（給 centerText 用）。大字的式子停下來用它（巨字橫移、點陣看板），才不會整句擠成一行變成小字。
+ * 回傳字高、行與行的距離倍數（含〔行距〕）與每一行（給 centerText 用）。大字的式子停下來用它（巨字橫移、點陣看板），才不會整句擠成一行變成小字。
  */
 export function stackWords(s: Stage, maxPx: number, maxW: number, maxH: number, weight = 900) {
   const rows = s.words.slice(0, 4);
   const widest = rows.reduce((a, w) => (wlen(w) > wlen(a) ? w : a), rows[0] ?? '');
-  const px = Math.min(fitLine(s, widest, maxPx, maxW, weight), maxH / (rows.length * 1.12));
-  return { rows, px };
+  const step = 1.12 * (s.lineK ?? 1); // 行距：字卡〔版面〕的〔行距〕
+  const px = Math.min(fitLine(s, widest, maxPx, maxW, weight), maxH / (rows.length * step));
+  return { rows, px, step };
 }
 
 /** 在 (cx, cy) 置中畫一行字（字高 px） */

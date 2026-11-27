@@ -474,9 +474,9 @@ export const FX_SWAP: KineticDef[] = [
     rest(s) {
       const { W, H, cqmin } = s;
       ledBoard(s, (sub) => {
-        const { rows, px } = stackWords(sub, 46 * cqmin, W * 0.92, H * 0.8);
+        const { rows, px, step } = stackWords(sub, 46 * cqmin, W * 0.92, H * 0.8);
         rows.forEach((w, i) =>
-          centerText(sub, w, W / 2, H / 2 + (i - (rows.length - 1) / 2) * px * 1.12, px, s.hi),
+          centerText(sub, w, W / 2, H / 2 + (i - (rows.length - 1) / 2) * px * step, px, s.hi),
         );
       });
     },

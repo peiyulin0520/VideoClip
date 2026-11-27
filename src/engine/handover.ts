@@ -12,8 +12,8 @@ export const HANDOVER_AFTER = 2.0;
 export const HANDOVER_A_LAG = 0.6;
 /** 後一段 B 的換手範圍剩這麼多秒時，開始把預解圖慢慢放慢到跟 <video> 同一格 */
 export const HANDOVER_RAMP = 0.6;
-/** <video> 的時間跟要的時間差多少以內才算對上（約 1 格） */
-export const HANDOVER_TOL = 0.04;
+/** <video> 的時間跟要的時間差多少以內才算對上（約 3 格；iPhone 上 1 格幾乎做不到，一直做不到就拖到範圍結束才硬換） */
+export const HANDOVER_TOL = 0.1;
 
 /** 這個時間 t，這個片段（it，在 items 這一軌）是不是在某個轉場前後的換手範圍裡（轉場進行中不算，那時一律用預解圖） */
 export function inHandover(items: Item[], it: Item, t: number): boolean {
@@ -46,11 +46,11 @@ export function handoverRemain(items: Item[], it: Item, t: number): number | nul
 /**
  * 換手範圍快結束、<video> 還落後 d 秒（0＜d≤HANDOVER_RAMP）時，預解圖不要等到最後才往回跳：
  * 剩 HANDOVER_RAMP 秒時還是「目標」那一格，之後慢慢往 <video> 的那一格靠，範圍結束時剛好同一格。
- * 落後太多、或 <video> 超前，就照目標（結束時只好跳一下）。
+ * 落後或超前太多（超過 HANDOVER_RAMP）就照目標（結束時只好跳一下）。
  */
 export function rampShown(target: number, current: number, remain: number): number {
-  const d = target - current;
-  if (!(d > 0.02) || d > HANDOVER_RAMP) return target;
+  const d = target - current; // 正＝<video> 落後；負＝<video> 超前（預解圖就在最後慢慢加速追上去）
+  if (Math.abs(d) <= 0.02 || Math.abs(d) > HANDOVER_RAMP) return target;
   const f = Math.min(Math.max(1 - remain / HANDOVER_RAMP, 0), 1);
   return target - d * f;
 }
