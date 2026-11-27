@@ -8,7 +8,7 @@
 - **最後一個程式 commit**：見 `git log -1`（G6 動態模板三格故事）
 - **測試**：1209 個單元測試、約 369 個 e2e（iPhone 13 尺寸、Chromium）、lint（含 prettier）、build 全過
 - **階段**：feedback-8 的 H1–H7 全部做完（修孤兒格子與跑版、拿掉動態模板、預覽畫質、音訊修剪、軌道多選、轉場 v2、裁切筆刷）；Phase 3A 5（雲朵字）、6（字卡模板）未做；Phase 4–7 未開始。iPhone 真機都還沒測（`docs/PLAN.md §7`）
-- **下一步**：PR #27（Z32–Z36）已合併。使用者回報流動式（巨字橫移）沒流完所有字、最後變一行小字 → **照 `docs/plans/2026-11-27-feedback-18.md` 的 Z37（流動式算「整句流完」的時間當停點、巨字橫移／點陣看板收尾時每個字移動縮放聚成整句、停止畫面選字最大的排法）**，切 Sonnet 實作
+- **下一步**：PR #27（Z32–Z36）已合併。使用者回報流動式（巨字橫移）沒流完所有字、最後變一行小字 → **照 `docs/plans/2026-11-27-feedback-18.md` 的 Z37（使用者建議：〔停在最後畫面〕時流動的 8 式一開始就用整句放得下的大小，一份整句照原方向流進來、減速停在中間；停點＝流進來的時間）**，切 Sonnet 實作
 - **等使用者的事**
   - 選 feedback-7 的實作順序
   - 缺檔字體：LINE Seed 繁中、致一宋體、佮逸體（見 `docs/FONTS.md §4`）
@@ -93,7 +93,7 @@
   - 做了什麼：看 15:10 錄影：巨字橫移在寬扁的框裡只流了兩個字就收尾、淡成一行小字。原因：流動式的停點用縮圖那一格（1.5 秒），Z36 拿它算速度 → 夾到 0.25 倍；收尾是交叉淡化成另一張縮小的圖
   - 動了哪些檔：docs/plans/2026-11-27-feedback-18.md、docs/PROGRESS.md
   - 驗證：🔴 只有規劃
-  - 使用者的決定/回饋：「特效沒有播完所有字詞」「結束後還是會變小，呈現比較小的一般字，不是特效效果下的所有字一起出現的感覺」
+  - 使用者的決定/回饋：建議「一開始先量完整字句的大小，直接用那個大小，只是播的時候要有特效的效果」（Z37 已照這個改寫）；「特效沒有播完所有字詞」「結束後還是會變小，呈現比較小的一般字，不是特效效果下的所有字一起出現的感覺」
 - 2026-11-27 feedback-18 Z32–Z36 實作（claude/zen-tesla-v3brj5）
   - 做了什麼：Z33 顯示範圍可往外拉（每邊 min(3÷縮放,4)、面積 6）；Z34 動態字卡吃字距行距（代理 context 設 font 時帶 letterSpacing、Stage.lineK）；Z36 〔停在最後畫面〕時速度由字卡長度算（fit）、細調面板速度滑桿改字卡長度；Z35 流動 8 式停在特效自己的樣子（rest：減速淡出＋各式靜止整句）；Z32 轉場：起跑延遲記在手機、換手門檻 0.1、處理超前、A 轉場中不硬跳、B 接縫狀態每次播放都記
   - 動了哪些檔：src/app/editor/{KineticAreaEdit,TextPanel}.tsx、src/app/editor/tabs/EffectTab.tsx、src/engine/{handover,player}.ts、src/engine/kinetic/{core,render,speed,hold}.ts、kinetic/fx/{flow,swap,in,sp}.ts、src/store/actions.ts、src/model/types.ts、e2e/{k05,z34-spacing,z35-rest,z36-fit,feedback14,z25-handover}.spec.ts、docs
