@@ -294,6 +294,7 @@ test('回報14 停在最後畫面：選了之後過了停點畫面不再動；�
   expect(await at(1.9)).not.toBe(await at(2.8));
   // 停在最後畫面：停點（巨字橫移＝代表畫面 1.5 秒）之後不再動
   await page.getByTestId('kn-end-hold').tap();
-  expect(await at(1.9)).toBe(await at(2.8));
-  expect(await at(0.5)).not.toBe(await at(1.9)); // 停點之前照樣在動
+  // Z36：字卡多長，特效就在那段時間內播完（最後停住一小段）：字卡結束前 0.45 秒起已經停住
+  expect(await at(dur - 0.42)).toBe(await at(dur - 0.08));
+  expect(await at(0.5)).not.toBe(await at(dur * 0.6)); // 停點之前照樣在動
 });

@@ -5,6 +5,7 @@ import { canvasFamily } from '../textRender';
 import { drawWord, fadeEdges, fit, inkOn, seg, splitWords, wlen, type KineticDef, type Stage } from './core';
 import { kineticContent, kineticFrame } from './hit';
 import { holdTime } from './hold';
+import { kineticSpeed } from './speed';
 import { kineticById, resolveBg, schemeOf } from './index';
 
 export type KineticRender = {
@@ -54,7 +55,7 @@ export function renderKinetic(item: TextItem, t: number, W: number, H: number): 
   requestFont(fontId);
   const sch = schemeOf(def);
   const words = kineticWords(item, def.words);
-  let tt = Math.max(t, 0) * (k.speed ?? 1);
+  let tt = Math.max(t, 0) * kineticSpeed(k, item.duration, holdTime(def, words));
   // 播到字完整呈現就停在那一格（字卡比一輪長、而且選了「停在最後畫面」；一直在跑的那幾式跑到代表畫面就停）
   if (k.end === 'hold') {
     tt = Math.min(tt, holdTime(def, words));
