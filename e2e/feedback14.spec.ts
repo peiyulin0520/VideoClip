@@ -213,7 +213,7 @@ async function addKinetic(page: Page) {
   await createProjectWith(page, ['solid-blue.webm']);
   await openTab(page, '文字');
   await page.getByTestId('tool-text.add').tap();
-  await page.getByLabel('文字內容').fill('蔡氏家族聚餐');
+  await page.getByLabel('文字內容').fill('週末一起出遊');
   await openTab(page, '特效');
   await openTool(page, 'fx.textfx');
 }

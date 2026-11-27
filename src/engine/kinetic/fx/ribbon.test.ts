@@ -34,7 +34,7 @@ const dims = (win: Win) => {
   return { L: sw + size * 1.2, thick: size * (26 / 15) };
 };
 const center = (win: Win) => ({ cx: (win.x0 + win.x1) / 2, cy: (win.y0 + win.y1) / 2 });
-const SEED = '蔡氏家族聚餐';
+const SEED = '週末一起出遊';
 const SETTLE = 2.3;
 
 /** t 秒（字卡自己的時間，已經夾在停點）緞帶的形狀 */
@@ -149,8 +149,8 @@ describe('彎道：一條緞帶，平常滑過 S 形、收尾照原方向飄一�
   it('同一句字永遠同一條路線；不同的字路線不同', () => {
     const win = winOf(360, 640);
     const t = FLOW_HOLD + 1.2;
-    const a = shapeAtT(win, t, '蔡氏家族聚餐').sh.p[10]!;
-    const b = shapeAtT(win, t, '蔡氏家族聚餐').sh.p[10]!;
+    const a = shapeAtT(win, t, '週末一起出遊').sh.p[10]!;
+    const b = shapeAtT(win, t, '週末一起出遊').sh.p[10]!;
     const c = shapeAtT(win, t, '順著河走 就會到海').sh.p[10]!;
     expect(a).toEqual(b);
     expect(a.x === c.x && a.y === c.y).toBe(false);

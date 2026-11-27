@@ -97,7 +97,7 @@ test('Z30 彎道（直式 360×640）：只有一條寫一遍字的緞帶、長�
   await createProjectWith(page, ['solid-blue.webm']);
   await waitHook(page);
   const ts = Array.from({ length: Math.round(HOLD * 60) + 1 }, (_, i) => i / 60);
-  const { out, urls } = await frames(page, 360, 640, ['蔡氏家族聚餐'], ts);
+  const { out, urls } = await frames(page, 360, 640, ['週末一起出遊'], ts);
   if (process.env.Z28_SHEET) {
     const fs = await import('node:fs');
     fs.mkdirSync(process.env.Z28_SHEET, { recursive: true });

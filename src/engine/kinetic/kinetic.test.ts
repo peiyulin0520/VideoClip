@@ -207,9 +207,9 @@ describe('動態字卡：換行與邊緣淡出', () => {
     expect(lineSizes(24, undefined, false)).toEqual([24]);
     expect(lineSizes(10, undefined, true)).toEqual([5, 5]);
     expect(lineSizes(8, undefined, true)).toEqual([8]);
-    expect(lineSizes(6, ['蔡氏家', '族聚餐'], false)).toEqual([3, 3]);
-    expect(lineSizes(6, ['蔡氏', '家', '族聚餐'], true)).toEqual([2, 1, 3]);
-    expect(lineSizes(6, ['蔡氏家族聚餐'], true)).toEqual([6]); // 只有一行：不手動換
+    expect(lineSizes(6, ['週末一', '起出遊'], false)).toEqual([3, 3]);
+    expect(lineSizes(6, ['週末', '一', '起出遊'], true)).toEqual([2, 1, 3]);
+    expect(lineSizes(6, ['週末一起出遊'], true)).toEqual([6]); // 只有一行：不手動換
   });
   it('重擊排字：字再多也縮小排在同一行；按 Enter（lines）真的分成多行', () => {
     const def = kineticById('hitline')!;
@@ -264,7 +264,7 @@ describe('動態字卡：換行與邊緣淡出', () => {
         c,
         def,
         {
-          words: ['蔡氏家族聚餐'],
+          words: ['週末一起出遊'],
           fg: '#fff',
           paper: '#000',
           hi: '#f00',
@@ -278,10 +278,10 @@ describe('動態字卡：換行與邊緣淡出', () => {
       return log.filter((l) => l.startsWith('fillText(')).map((l) => l.split(',')[0]);
     };
     for (const id of ['crawl', 'drift', 'slant', 'ticker', 'tape', 'led', 'depth', 'echo']) {
-      expect(kineticById(id)!.len(['蔡氏家族聚餐']), id).toBeNull();
+      expect(kineticById(id)!.len(['週末一起出遊']), id).toBeNull();
       // 淡入的整句字（alpha 要 settle 才看得到）：settle=1 時畫了整句字，settle=0 沒有這一筆
-      expect(texts(id, 1).filter((x) => x === 'fillText(蔡氏家族聚餐').length, id).toBeGreaterThan(
-        texts(id, 0).filter((x) => x === 'fillText(蔡氏家族聚餐').length - 1,
+      expect(texts(id, 1).filter((x) => x === 'fillText(週末一起出遊').length, id).toBeGreaterThan(
+        texts(id, 0).filter((x) => x === 'fillText(週末一起出遊').length - 1,
       );
     }
     // 環繞、歌詞捲動本來整句都看得到：不處理
@@ -411,7 +411,7 @@ describe('動態字卡：副標、停在最後畫面', () => {
   it('重擊排字：停在最後時 6 個字都在自己的位置（由左到右）、沒放大沒轉；播放中途前面的字已經留在原位', async () => {
     const { holdTime } = await import('./hold');
     const def = kineticById('hitline')!;
-    const words = ['蔡氏家族聚餐'];
+    const words = ['週末一起出遊'];
     const at = (t: number) => {
       const { s, log } = stage(words);
       def.draw(s, t);
@@ -442,7 +442,7 @@ describe('動態字卡：副標、停在最後畫面', () => {
   });
   it('停在最後畫面（settle）：拉長每個字都回到原樣；沒 settle 時有字在被拉', () => {
     const def = kineticById('stretch')!;
-    const words = ['蔡氏家族聚餐'];
+    const words = ['週末一起出遊'];
     const scales = (settle: number) => {
       const { s, log } = stage(words);
       def.draw({ ...s, settle }, 2.35);
@@ -459,7 +459,7 @@ describe('動態字卡：副標、停在最後畫面', () => {
   });
   it('holdTime：時間跟字數有關的式子（逐字重擊、翻牌、翻卡、拉霸…）停在最後一個詞完整的那一刻，字多也一樣', async () => {
     const { holdTime } = await import('./hold');
-    const six = ['蔡氏家族聚餐'];
+    const six = ['週末一起出遊'];
     // 逐字重擊：6 個字一個一個砸，停在第 6 個字砸完（不是第 5 個「聚」）
     const hit = kineticById('hit')!;
     expect(holdTime(hit, six)).toBeCloseTo(5 * 0.42 + 0.3, 6);
